@@ -272,10 +272,13 @@ function getChain(jobs, id) {
 const fetchAll = async () => {
   try {
     // 1) Load manual state
-    const manualState = JSON.parse(
-      localStorage.getItem('manualState') ||
-      JSON.stringify({ machine1: [], machine2: [] })
-    );
+    let manualState = { machine1: [], machine2: [] };
+try {
+  const resp = await axios.get(`${API_ROOT}/manualState`);
+  manualState = resp.data.state;
+} catch (err) {
+  console.error('⚠️ manualState fetch error:', err);
+}
 
     // 2) Preserve previous embroidery_start
     const prevEmb = {};
@@ -492,7 +495,6 @@ const onDragEnd = result => {
 
   // find full chain for this draggableId
   const chainIds = getChain(srcJobs, draggableId);
-  // build array of the actual job objects in chain order
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
 
   // remove all chain members from srcJobs
@@ -500,13 +502,10 @@ const onDragEnd = result => {
 
   // if moving within same column: reorder chain block
   if (srcCol === dstCol) {
-    // compute adjusted destination index in the reduced array
     let insertAt = dstIdx;
-    // if dragging downward, and source index < dest index, after removal dest index shifts up by chain length - 1
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
-    // schedule/resort if machine or queue
     const finalJobs = (srcCol === 'machine1' || srcCol === 'machine2')
       ? scheduleMachineJobs(newSrcJobs)
       : newSrcJobs.sort((a,b) => {
@@ -526,32 +525,34 @@ const onDragEnd = result => {
 
   // ——— Cross-column move ———
 
-  // 1) Update manualState in localStorage as before:
+  // 1) Update manualState locally
   const manualState = JSON.parse(
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
   );
+
   // remove all chain IDs from any machine lists
   ['machine1','machine2'].forEach(col => {
-    manualState[col] = (manualState[col]||[]).filter(id=>!chainIds.includes(id));
+    manualState[col] = (manualState[col]||[]).filter(id => !chainIds.includes(id));
   });
-  // if dropped into a machine, insert chain IDs at dstIdx in that machine’s manual list
+
+  // if dropped into a machine, insert chain IDs at dstIdx
   if (dstCol === 'machine1' || dstCol === 'machine2') {
-    const arr = Array.from(manualState[dstCol]||[]);
+    const arr = Array.from(manualState[dstCol] || []);
     arr.splice(dstIdx, 0, ...chainIds);
     manualState[dstCol] = arr;
   }
+
+  // persist locally and remotely
   localStorage.setItem('manualState', JSON.stringify(manualState));
+  axios.post(`${API_ROOT}/manualState`, manualState)
+    .catch(err => console.error('⚠️ manualState save error:', err));
 
   // 2) Build new src & dst arrays
-  // src has had chainJobs removed → newSrcJobs
-  // dst initial:
   const dstJobs = Array.from(columns[dstCol].jobs);
-
-  // if dropping into queue, clear scheduling and unlink entire chain
   let movedJobs = chainJobs;
+
   if (dstCol === 'queue') {
-    // break all links for this chain
     setLinks(linkMap => {
       const m = { ...linkMap };
       chainIds.forEach(id => delete m[id]);
@@ -569,10 +570,8 @@ const onDragEnd = result => {
       linkedTo: null,
       machineId: 'queue'
     }));
-    // queue will be auto-sorted after
     dstJobs.splice(dstIdx, 0, ...movedJobs);
   } else {
-    // dropping into machine1 or machine2
     movedJobs = chainJobs.map(j => ({ ...j, machineId: dstCol }));
     dstJobs.splice(dstIdx, 0, ...movedJobs);
   }
@@ -580,13 +579,11 @@ const onDragEnd = result => {
   // 3) Build next columns object
   const next = {
     ...columns,
-    [srcCol]:   { ...columns[srcCol],   jobs: newSrcJobs },
-    [dstCol]:   { ...columns[dstCol],   jobs: dstJobs }
+    [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
+    [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
 
-  // 4) Post-move transformations:
-  //   • always re-schedule machines
-  //   • queue auto-sort by due date
+  // 4) Post-move transformations
   ['machine1','machine2'].forEach(col => {
     next[col].jobs = scheduleMachineJobs(next[col].jobs);
   });
@@ -601,6 +598,7 @@ const onDragEnd = result => {
   // 5) Commit
   setColumns(next);
 };
+
 
 // === Section 9: Render via Section9.jsx ===
   return (
