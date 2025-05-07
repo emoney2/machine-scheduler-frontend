@@ -283,67 +283,75 @@ const fetchAll = async () => {
     // 2) Preserve embroidery_start from previous run
     const prevEmb = {};
     Object.values(columns)
-      .flatMap(col => col.jobs)
-      .forEach(j => {
+      .flatMap((col) => col.jobs)
+      .forEach((j) => {
         prevEmb[j.id] = j.embroidery_start || j.start_date || '';
       });
 
     // 3) Fetch live data
     const [{ data: orders }, { data: embList }] = await Promise.all([
       axios.get(`${API_ROOT}/orders`),
-      axios.get(`${API_ROOT}/embroideryList`)
+      axios.get(`${API_ROOT}/embroideryList`),
     ]);
 
     // 4) Build embroidery map
     const embMap = {};
-    embList.forEach(row => {
+    embList.forEach((row) => {
       const id = String(row['Order #'] || '').trim();
       if (id) embMap[id] = row['Embroidery Start Time'] || '';
     });
 
     // 5) Construct jobById from server data
     const jobById = {};
-    orders.forEach(o => {
+    orders.forEach((o) => {
       if (o.id == null) return;
-      const id    = String(o.id).trim();
+      const id = String(o.id).trim();
       const rawTs = embMap[id] ?? prevEmb[id] ?? '';
       jobById[id] = {
         ...o,
         id,
-        stitchCount:      o.stitch_count,
-        quantity:         o.quantity,
-        company:          o.company,
-        design:           o.design,
-        due_date:         o.due_date,
-        due_type:         o.due_type,
+        stitchCount: o.stitch_count,
+        quantity: o.quantity,
+        company: o.company,
+        design: o.design,
+        due_date: o.due_date,
+        due_type: o.due_type,
         embroidery_start: rawTs,
-        start_date:       rawTs,
-        linkedTo:         links[o.id] || null,
-        machineId:        o.machineId ?? o.machine ?? ''
+        start_date: rawTs,
+        linkedTo: links[o.id] || null,
+        machineId: o.machineId ?? o.machine ?? '',
       };
     });
 
-    // 6) Inject placeholders (unchanged) …
-    placeholders.forEach(phJob => {
+    // 5.5) Override machineId from manualState so queue omits those jobs
+    Object.entries(manualState).forEach(([colId, idList]) => {
+      idList.forEach((jid) => {
+        if (jobById[jid]) {
+          jobById[jid].machineId = colId;
+        }
+      });
+    });
+
+    // 6) Inject placeholders into jobById (preserve any saved link)
+    placeholders.forEach((phJob) => {
       jobById[phJob.id] = {
         ...phJob,
-        machineId:       'queue',
-        embroidery_start:'',
-        start_date:      '',
-        linkedTo:        links[phJob.id] || null
+        machineId: 'queue',
+        embroidery_start: '',
+        start_date: '',
+        linkedTo: links[phJob.id] || null,
       };
     });
 
     // 7) Apply manualState overrides AND preserve manual order
-    const buildMachine = colId => {
+    const buildMachine = (colId) => {
       const manualList = manualState[colId] || [];
-      //  7a) in-order jobs from manualList
       const ordered = manualList
-        .map(id => jobById[id])
-        .filter(j => j);
-      //  7b) any new jobs appended afterwards
-      const appended = Object.values(jobById)
-        .filter(j => j.machineId === colId && !manualList.includes(j.id));
+        .map((jid) => jobById[jid])
+        .filter((j) => j);
+      const appended = Object.values(jobById).filter(
+        (j) => j.machineId === colId && !manualList.includes(j.id)
+      );
       return [...ordered, ...appended];
     };
     const machine1Jobs = buildMachine('machine1');
@@ -351,9 +359,10 @@ const fetchAll = async () => {
 
     // 8) Build & sort queue only
     const queueJobs = Object.values(jobById)
-      .filter(j => !['machine1','machine2'].includes(j.machineId))
+      .filter((j) => !['machine1', 'machine2'].includes(j.machineId))
       .sort((a, b) => {
-        const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
+        const da = parseDueDate(a.due_date),
+          db = parseDueDate(b.due_date);
         if (da && db) return da - db;
         if (da) return -1;
         if (db) return 1;
@@ -362,9 +371,15 @@ const fetchAll = async () => {
 
     // 9) Schedule machine runtimes (but do not re-sort)
     setColumns({
-      queue:    { ...columns.queue,    jobs: queueJobs },
-      machine1: { ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
-      machine2: { ...columns.machine2, jobs: scheduleMachineJobs(machine2Jobs) },
+      queue: { ...columns.queue, jobs: queueJobs },
+      machine1: {
+        ...columns.machine1,
+        jobs: scheduleMachineJobs(machine1Jobs),
+      },
+      machine2: {
+        ...columns.machine2,
+        jobs: scheduleMachineJobs(machine2Jobs),
+      },
     });
   } catch (err) {
     console.error('fetchAll error:', err);
