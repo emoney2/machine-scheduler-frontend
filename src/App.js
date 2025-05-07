@@ -484,7 +484,7 @@ const toggleLink = (colId, idx) => {
 };
 
 // === Section 8: Drag & Drop Handler (with Chain-aware Moves) ===
-const onDragEnd = result => {
+const onDragEnd = async (result) => {
   const { source, destination, draggableId } = result;
   if (!destination) return;
 
@@ -493,25 +493,23 @@ const onDragEnd = result => {
   const srcIdx = source.index;
   const dstIdx = destination.index;
 
-  // no-op if dropped back in same place
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
   // get current jobs in source column
   const srcJobs = Array.from(columns[srcCol].jobs);
 
-  // find full chain for this draggableId
+  // find chain and remove it
   const chainIds = getChain(srcJobs, draggableId);
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
-
-  // remove all chain members from srcJobs
   const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // if moving within same column: reorder chain block
+  // moving within same column
   if (srcCol === dstCol) {
     let insertAt = dstIdx;
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
+    // schedule in that exact order
     setColumns(cols => ({
       ...cols,
       [srcCol]: {
@@ -522,9 +520,8 @@ const onDragEnd = result => {
     return;
   }
 
-  // ——— Cross-column move ———
-
-  // 1) Update manualState locally & remotely
+  // ——— cross-column ———
+  // 1) update manualState
   const manualState = JSON.parse(
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
@@ -533,51 +530,41 @@ const onDragEnd = result => {
     manualState[col] = manualState[col].filter(id => !chainIds.includes(id));
   });
   if (dstCol === 'machine1' || dstCol === 'machine2') {
-    const arr = Array.from(manualState[dstCol] || []);
+    const arr = Array.from(manualState[dstCol]||[]);
     arr.splice(dstIdx, 0, ...chainIds);
     manualState[dstCol] = arr;
   }
   localStorage.setItem('manualState', JSON.stringify(manualState));
-  axios.post(`${API_ROOT}/manualState`, manualState)
-    .catch(err => console.error('⚠️ manualState save error:', err));
+  try {
+    await axios.post(`${API_ROOT}/manualState`, manualState);
+  } catch(err) {
+    console.error('⚠️ manualState save error:', err);
+  }
 
-  // 2) Build new src & dst arrays
+  // 2) build new columns
   const dstJobs = Array.from(columns[dstCol].jobs);
   let movedJobs = chainJobs;
   if (dstCol === 'queue') {
-    // unlink chain
-    setLinks(linkMap => {
-      const m = { ...linkMap };
-      chainIds.forEach(id => delete m[id]);
-      saveLinks(m);
-      return m;
-    });
-    movedJobs = chainJobs.map(j => ({
-      ...j,
-      start: '', end: '', delivery: '',
-      _rawStart: null, _rawEnd: null,
-      isLate: false, linkedTo: null,
-      machineId: 'queue'
-    }));
+    // unlink chain if needed…
+    movedJobs = chainJobs.map(j => ({ ...j, machineId: 'queue', start:'', end:'', delivery:'', _rawStart:null, _rawEnd:null, isLate:false, linkedTo:null }));
     dstJobs.splice(dstIdx, 0, ...movedJobs);
   } else {
     movedJobs = chainJobs.map(j => ({ ...j, machineId: dstCol }));
     dstJobs.splice(dstIdx, 0, ...movedJobs);
   }
 
-  // 3) Build next columns object
+  // 3) commit new columns
   const next = {
     ...columns,
     [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
     [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
 
-  // 4) Re-schedule machines but do not re-sort
+  // 4) schedule but do NOT sort machines
   ['machine1','machine2'].forEach(col => {
     next[col].jobs = scheduleMachineJobs(next[col].jobs);
   });
 
-  // 5) Commit
   setColumns(next);
 };
 
