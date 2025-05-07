@@ -1,0 +1,306 @@
+// File: frontend/src/Section9.jsx
+import React from 'react';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { parseDueDate, subWorkDays, fmtMMDD } from './yourHelpers'; // adjust paths as needed
+
+export default function Section9({
+  columns,
+  handleSync,
+  syncStatus,
+  showModal,
+  setShowModal,
+  onDragEnd,
+  getChain,
+  toggleLink,
+  editPlaceholder,
+  removePlaceholder,
+  ph,
+  setPh,
+  submitPlaceholder,
+  LIGHT_YELLOW,
+  DARK_YELLOW,
+  LIGHT_GREY,
+  DARK_GREY,
+  LIGHT_PURPLE,
+  DARK_PURPLE,
+  BUBBLE_START,
+  BUBBLE_END,
+  BUBBLE_DELIV
+}) {
+  return (
+    <div style={{ padding: 16, fontFamily: 'sans-serif', fontSize: 13 }}>
+
+      {/* Add / Sync Buttons */}
+      <button
+        onClick={() => setShowModal(true)}
+        style={{ marginRight: 8, fontSize: 13 }}
+      >
+        + Add Placeholder
+      </button>
+      <button onClick={handleSync} style={{ fontSize: 13 }}>
+        Sync from Sheet{' '}
+        {syncStatus === 'updated' && (
+          <span style={{ color: 'green', fontSize: 13 }}>✓ Updated</span>
+        )}
+      </button>
+
+      {/* Legend */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        margin: '12px 0',
+        flexWrap: 'wrap',
+        fontSize: 12,
+      }}>
+        {[
+          { label: 'Placeholder', bg: LIGHT_YELLOW, border: DARK_YELLOW },
+          { label: 'Soft Date',    bg: LIGHT_GREY,   border: DARK_GREY   },
+          { label: 'Hard Date',    bg: LIGHT_PURPLE, border: DARK_PURPLE },
+          { label: 'Late',         bg: 'red',        border: 'red'       },
+        ].map((item, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{
+              width: 12,
+              height: 12,
+              background: item.bg,
+              border: `2px solid ${item.border}`,
+              borderRadius: 2,
+            }}/>
+            {item.label}
+          </div>
+        ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 14 }}>🔗</span> Link
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 14 }}>❌</span> Unlink
+        </div>
+        {['Start','EED / End','IHD / Delivery'].map((txt,i)=> {
+          const color = i===0?BUBBLE_START:i===1?BUBBLE_END:BUBBLE_DELIV;
+          return (<div key={i} style={{display:'flex',alignItems:'center',gap:4}}>
+            <span style={{width:12,height:12,background:color,borderRadius:2}}/>
+            {txt}
+          </div>);
+        })}
+      </div>
+
+      {/* Drag & Drop Columns */}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div style={{display:'flex', gap:16, marginTop:16}}>
+          {['queue','machine1','machine2'].map(colId=>{
+            const col=columns[colId]||{};
+            const jobs=Array.isArray(col.jobs)?col.jobs:[];
+
+            // build linked-chain segments
+            const segments=[];
+            let idx=0;
+            while(idx<jobs.length){
+              const chain=getChain(jobs,jobs[idx].id);
+              const len=chain.length>1?chain.length:1;
+              segments.push({start:idx,len});
+              idx+=len;
+            }
+            const GAP=6, OUTLINE=6;
+
+            return (
+              <Droppable key={colId} droppableId={colId}>
+                {provided=>(
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    style={{
+                      position:'relative',
+                      border:'1px solid #ccc',
+                      borderRadius:4,
+                      width:colId==='queue'?260:300,
+                      minHeight:400,
+                      padding:12,
+                      background:'#fafafa'
+                    }}
+                  >
+                    <h4 style={{textAlign:'center',margin:'8px 0',fontSize:13}}>
+                      {col.title}
+                    </h4>
+
+                    {segments.map((seg,sIdx)=>(
+                      <div key={sIdx} style={{
+                        position:'relative',
+                        marginBottom:GAP,
+                        zIndex:seg.len>1?3:1,
+                        outline:seg.len>1?`${OUTLINE}px solid #0288d1`:undefined,
+                        outlineOffset:seg.len>1?'0px':undefined,
+                        borderRadius:4
+                      }}>
+                        {jobs.slice(seg.start,seg.start+seg.len).map((job,jIdx)=>{
+                          const globalIdx=seg.start+jIdx;
+                          const isPh=job.id.startsWith('ph-');
+                          const isSoft=job.due_type==='Soft Date';
+                          const base=isPh?LIGHT_YELLOW:isSoft?LIGHT_GREY:LIGHT_PURPLE;
+                          let bg=base;
+                          let bCol=isPh?DARK_YELLOW:isSoft?DARK_GREY:DARK_PURPLE;
+                          if(job.isLate){
+                            bg=`repeating-linear-gradient(45deg,${base},${base} 6px,rgba(255,0,0,0.5) 6px,rgba(255,0,0,0.5) 12px)`;
+                            bCol='red';
+                          }
+                          return (
+                            <Draggable key={job.id} draggableId={job.id} index={globalIdx}>
+                              {prov=>(
+                                <div
+                                  ref={prov.innerRef}
+                                  {...prov.draggableProps}
+                                  {...prov.dragHandleProps}
+                                  style={{
+                                    position:'relative',
+                                    display:'grid',
+                                    gridTemplateColumns:'1fr auto',
+                                    gridTemplateRows:'auto auto auto auto',
+                                    columnGap:6,
+                                    rowGap:4,
+                                    padding:'6px 28px 6px 6px',
+                                    margin:`0 0 ${jIdx<seg.len-1?GAP:0}px 0`,
+                                    background:bg,
+                                    border:`2px solid ${bCol}`,
+                                    borderRadius:4,
+                                    zIndex:2,
+                                    ...prov.draggableProps.style
+                                  }}
+                                >
+                                  {jIdx===0&&seg.len>1&&(
+                                    <div style={{
+                                      position:'absolute',top:0,right:0,width:4,height:'100%',background:'#0288d1',zIndex:4
+                                    }}/>
+                                  )}
+                                  {/* Row1 Col1: ID + Company */}
+                                  <span style={{
+                                    gridRow:1,gridColumn:1,background:base,padding:'0 4px',
+                                    borderRadius:4,whiteSpace:'nowrap',overflow:'hidden',
+                                    textOverflow:'ellipsis',fontSize:13,fontWeight:'bold'
+                                  }}>
+                                    <span style={{
+                                      display:'inline-block',width:20,height:20,borderRadius:'50%',
+                                      background:'#000',color:base,lineHeight:'20px',textAlign:'center',
+                                      fontSize:isPh?13:11,fontWeight:'bold',marginRight:4
+                                    }}>
+                                      {isPh?'*':job.id}
+                                    </span>
+                                    {job.company}
+                                  </span>
+                                  {/* Row1 Col2: Quantity */}
+                                  <span style={{
+                                    gridRow:1,gridColumn:2,justifySelf:'end',background:base,
+                                    padding:'0 4px',borderRadius:4,fontSize:15,fontWeight:'bold',
+                                    whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'
+                                  }}>
+                                    {job.quantity}
+                                  </span>
+                                  {/* Row2 Col1: Design */}
+                                  <span style={{
+                                    gridRow:2,gridColumn:1,background:base,padding:'0 4px',
+                                    borderRadius:4,whiteSpace:'nowrap',overflow:'hidden',
+                                    textOverflow:'ellipsis',fontSize:13
+                                  }}>
+                                    {job.design?.slice(0,22)}
+                                  </span>
+                                  {/* Row2 Col2: Start */}
+                                  {job.start&&(
+                                    <span style={{
+                                      gridRow:2,gridColumn:2,justifySelf:'end',
+                                      background:BUBBLE_START,padding:'0 4px',
+                                      borderRadius:10,whiteSpace:'nowrap',fontSize:13
+                                    }}>
+                                      {job.start}
+                                    </span>
+                                  )}
+                                  {/* Row3 Col1: EED */}
+                                  <span style={{
+                                    gridRow:3,gridColumn:1,background:BUBBLE_END,
+                                    padding:'0 4px',borderRadius:4,whiteSpace:'nowrap',
+                                    overflow:'hidden',textOverflow:'ellipsis',fontSize:13
+                                  }}>
+                                    {`EED: ${fmtMMDD(subWorkDays(parseDueDate(job.due_date),6))}`}
+                                  </span>
+                                  {/* Row3 Col2: End */}
+                                  {job.end&&(
+                                    <span style={{
+                                      gridRow:3,gridColumn:2,justifySelf:'end',
+                                      background:BUBBLE_END,padding:'0 4px',
+                                      borderRadius:10,whiteSpace:'nowrap',fontSize:13
+                                    }}>
+                                      {job.end}
+                                    </span>
+                                  )}
+                                  {/* Row4 Col1: IHD */}
+                                  <span style={{
+                                    gridRow:4,gridColumn:1,background:BUBBLE_DELIV,
+                                    padding:'0 4px',borderRadius:4,fontSize:13
+                                  }}>
+                                    {`IHD: ${fmtMMDD(job.due_date)}`}
+                                  </span>
+                                  {/* Row4 Col2: Delivery */}
+                                  {job.delivery&&(
+                                    <span style={{
+                                      gridRow:4,gridColumn:2,justifySelf:'end',
+                                      background:BUBBLE_DELIV,padding:'0 4px',
+                                      borderRadius:10,fontSize:13
+                                    }}>
+                                      {job.delivery}
+                                    </span>
+                                  )}
+                                  {/* Top-right tab */}  
+                                  <div style={{
+                                    position:'absolute',top:0,right:0,width:28,height:28,
+                                    display:'flex',alignItems:'center',justifyContent:'center',
+                                    background:base,borderTopRightRadius:4,borderBottomLeftRadius:4,
+                                    zIndex:4,fontSize:11,fontWeight:'bold'
+                                  }}>
+                                    {(job.due_type||'')[0]||''}
+                                  </div>
+                                  {/* Link/Unlink */}
+                                  {jIdx<seg.len-1&&(
+                                    <div onClick={()=>toggleLink(colId,globalIdx)} style={{
+                                      position:'absolute',top:28,right:0,width:28,height:`calc(100%-28px)`,
+                                      display:'flex',flexDirection:'column',
+                                      alignItems:'center',justifyContent:'center',
+                                      cursor:'pointer',background:base,
+                                      borderBottomRightRadius:4,zIndex:4
+                                    }}>
+                                      {job.linkedTo===jobs[globalIdx+1]?.id?'❌':'🔗'}
+                                    </div>
+                                  )}
+                                  {/* Edit/Delete */}
+                                  {isPh&&(
+                                    <div style={{
+                                      position:'absolute',top:0,right:0,width:28,height:'100%',
+                                      display:'flex',flexDirection:'column',alignItems:'center',
+                                      justifyContent:'flex-start',background:base,
+                                      borderTopRightRadius:4,borderBottomRightRadius:4,zIndex:4
+                                    }}>
+                                      <span onClick={()=>editPlaceholder(job)} style={{cursor:'pointer',fontSize:12,margin:4}}>✎</span>
+                                      <span onClick={()=>removePlaceholder(job.id)} style={{cursor:'pointer',fontSize:12,margin:4}}>✖</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </Draggable>
+                          );
+                        })}
+                      </div>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            );
+          })}
+        </div>
+      </DragDropContext>
+    </div>
+  );
+}
+"""
+# write to disk
+with open('/mnt/data/Section9.jsx', 'w') as f:
+    f.write(content)
+
+# provide download link
