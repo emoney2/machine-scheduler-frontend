@@ -495,21 +495,18 @@ const onDragEnd = async (result) => {
 
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
-  // get current jobs in source column
+  // 1) Pull out the chain
   const srcJobs = Array.from(columns[srcCol].jobs);
-
-  // find chain and remove it
   const chainIds = getChain(srcJobs, draggableId);
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
   const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // moving within same column
+  // 2) If same column, reorder and schedule
   if (srcCol === dstCol) {
     let insertAt = dstIdx;
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
-    // schedule in that exact order
     setColumns(cols => ({
       ...cols,
       [srcCol]: {
@@ -520,8 +517,7 @@ const onDragEnd = async (result) => {
     return;
   }
 
-  // ——— cross-column ———
-  // 1) update manualState
+  // 3) Cross-column: update manualState
   const manualState = JSON.parse(
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
@@ -541,30 +537,46 @@ const onDragEnd = async (result) => {
     console.error('⚠️ manualState save error:', err);
   }
 
-  // 2) build new columns
+  // 4) Build the new arrays
   const dstJobs = Array.from(columns[dstCol].jobs);
   let movedJobs = chainJobs;
   if (dstCol === 'queue') {
-    // unlink chain if needed…
-    movedJobs = chainJobs.map(j => ({ ...j, machineId: 'queue', start:'', end:'', delivery:'', _rawStart:null, _rawEnd:null, isLate:false, linkedTo:null }));
+    // clear scheduling data for queue
+    movedJobs = chainJobs.map(j => ({
+      ...j,
+      machineId: 'queue',
+      start: '', end: '', delivery: '',
+      _rawStart: null, _rawEnd: null,
+      isLate: false, linkedTo: null
+    }));
     dstJobs.splice(dstIdx, 0, ...movedJobs);
   } else {
     movedJobs = chainJobs.map(j => ({ ...j, machineId: dstCol }));
     dstJobs.splice(dstIdx, 0, ...movedJobs);
   }
 
-  // 3) commit new columns
+  // 5) Assemble the next columns object
   const next = {
     ...columns,
     [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
     [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
 
-  // 4) schedule but do NOT sort machines
+  // 6) Schedule machines (no re-sort)
   ['machine1','machine2'].forEach(col => {
     next[col].jobs = scheduleMachineJobs(next[col].jobs);
   });
 
+  // 7) **Immediately re-sort the queue column by due date**
+  next.queue.jobs = next.queue.jobs.sort((a, b) => {
+    const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
+    if (da && db) return da - db;
+    if (da) return -1;
+    if (db) return 1;
+    return 0;
+  });
+
+  // 8) Commit
   setColumns(next);
 };
 
