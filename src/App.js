@@ -500,12 +500,12 @@ const onDragEnd = async (result) => {
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
   // 1) Extract jobs from source column
-  const srcJobs   = Array.from(columns[srcCol].jobs);
-  const chainIds  = srcCol === dstCol
+  const srcJobs    = Array.from(columns[srcCol].jobs);
+  const chainIds   = srcCol === dstCol
     ? getChain(srcJobs, draggableId)
     : [draggableId];
-  const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
-  const newSrcJobs= srcJobs.filter(j => !chainIds.includes(j.id));
+  const chainJobs  = chainIds.map(id => srcJobs.find(j => j.id === id));
+  const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
   // 2) Reorder within same column
   if (srcCol === dstCol) {
@@ -513,11 +513,15 @@ const onDragEnd = async (result) => {
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
+    const updatedJobs = (srcCol === 'machine1' || srcCol === 'machine2')
+      ? scheduleMachineJobs(newSrcJobs)
+      : newSrcJobs;
+
     setColumns(cols => ({
       ...cols,
       [srcCol]: {
         ...cols[srcCol],
-        jobs: scheduleMachineJobs(newSrcJobs)
+        jobs: updatedJobs
       }
     }));
     return;
@@ -528,9 +532,9 @@ const onDragEnd = async (result) => {
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
   );
-  ['machine1','machine2'].forEach(col =>
-    manualState[col] = manualState[col].filter(id => !chainIds.includes(id))
-  );
+  ['machine1','machine2'].forEach(col => {
+    manualState[col] = manualState[col].filter(id => !chainIds.includes(id));
+  });
   if (dstCol === 'machine1' || dstCol === 'machine2') {
     const dstList = Array.from(manualState[dstCol] || []);
     dstList.splice(dstIdx, 0, ...chainIds);
@@ -541,13 +545,18 @@ const onDragEnd = async (result) => {
   axios.post(`${API_ROOT}/manualState`, manualState)
     .catch(err => console.error('⚠️ manualState save error:', err));
 
-  // 4) Build next state
+  // 4) Build next state object
   const next = { ...columns };
+
+  // 4a) Update source column
   next[srcCol] = {
     ...columns[srcCol],
-    jobs: scheduleMachineJobs(newSrcJobs)
+    jobs: (srcCol === 'machine1' || srcCol === 'machine2')
+      ? scheduleMachineJobs(newSrcJobs)
+      : newSrcJobs
   };
 
+  // 4b) Update destination column
   if (dstCol === 'queue') {
     const resetChain = chainJobs.map(j => ({
       ...j,
