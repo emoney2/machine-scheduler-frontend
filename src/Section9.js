@@ -249,16 +249,18 @@ export default function Section9({
                                     </span>
                                   )}
 
+                                  {/* Due-Type Badge */}
                                   <div style={{
-                                    position:'absolute',top:0,right:0,
-                                    width:28,height:28,
-                                    background:base,
+                                    position:'absolute', top:0, right:0,
+                                    width:28, height:28,
+                                    background: job.due_type === 'Hard Date' ? LIGHT_PURPLE : LIGHT_GREY,
+                                    color: job.due_type === 'Hard Date' ? 'white' : 'black',
                                     borderTopRightRadius:4,
                                     borderBottomLeftRadius:4,
-                                    display:'flex',alignItems:'center',justifyContent:'center',
-                                    fontSize:11,fontWeight:'bold',zIndex:4
+                                    display:'flex', alignItems:'center', justifyContent:'center',
+                                    fontSize:11, fontWeight:'bold', zIndex:4
                                   }}>
-                                    {(job.due_type||'')[0]}
+                                    {job.due_type?.startsWith('Hard') ? 'H' : 'S'}
                                   </div>
 
                                   {globalIdx < jobs.length - 1 && (
