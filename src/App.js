@@ -499,15 +499,13 @@ const onDragEnd = async (result) => {
   // No-op if dropped back in same place
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
-  // 1) Extract jobs from source column
-  const srcJobs    = Array.from(columns[srcCol].jobs);
-  const chainIds   = srcCol === dstCol
-    ? getChain(srcJobs, draggableId)
-    : [draggableId];
-  const chainJobs  = chainIds.map(id => srcJobs.find(j => j.id === id));
-  const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
+  // 1) Extract jobs from source column and always detect full chain
+  const srcJobs   = Array.from(columns[srcCol].jobs);
+  const chainIds  = getChain(srcJobs, draggableId);
+  const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
+  const newSrcJobs= srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // 2) Reorder within same column
+  // 2) Reorder _within_ same column (dragging block)
   if (srcCol === dstCol) {
     let insertAt = dstIdx;
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
@@ -519,15 +517,12 @@ const onDragEnd = async (result) => {
 
     setColumns(cols => ({
       ...cols,
-      [srcCol]: {
-        ...cols[srcCol],
-        jobs: updatedJobs
-      }
+      [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
     }));
     return;
   }
 
-  // 3) Cross-column: update manualState
+  // 3) Cross-column: update manualState for all moved IDs
   const manualState = JSON.parse(
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
@@ -542,13 +537,12 @@ const onDragEnd = async (result) => {
   }
   localStorage.setItem('manualState', JSON.stringify(manualState));
   localStorage.setItem('manualStateMs', Date.now().toString());
-  axios.post(`${API_ROOT}/manualState`, manualState)
-    .catch(err => console.error('⚠️ manualState save error:', err));
+  axios.post(`${API_ROOT}/manualState`, manualState).catch(() => {});
 
-  // 4) Build next state object
+  // 4) Build next state
   const next = { ...columns };
 
-  // 4a) Update source column
+  // 4a) Source loses the moved chain
   next[srcCol] = {
     ...columns[srcCol],
     jobs: (srcCol === 'machine1' || srcCol === 'machine2')
@@ -556,7 +550,7 @@ const onDragEnd = async (result) => {
       : newSrcJobs
   };
 
-  // 4b) Update destination column
+  // 4b) Destination gains the chain
   if (dstCol === 'queue') {
     const resetChain = chainJobs.map(j => ({
       ...j,
@@ -572,7 +566,7 @@ const onDragEnd = async (result) => {
       ...resetChain,
       ...baseQueue.slice(dstIdx)
     ];
-    newQueue.sort((a, b) => {
+    newQueue.sort((a,b) => {
       const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
       if (da && db) return da - db;
       if (da) return -1;
@@ -590,7 +584,7 @@ const onDragEnd = async (result) => {
     };
   }
 
-  // 5) Commit
+  // 5) Commit all at once
   setColumns(next);
 };
 
