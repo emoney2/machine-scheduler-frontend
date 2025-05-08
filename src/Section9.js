@@ -1,4 +1,4 @@
-// File: frontend/src/Section9.js
+// File: frontend/src/Section9.jsx
 import React from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
@@ -39,46 +39,51 @@ export default function Section9({
       </button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, margin: '12px 0', flexWrap: 'wrap', fontSize: 12 }}>
-        {[
-          { label: 'Placeholder', bg: LIGHT_YELLOW, border: DARK_YELLOW },
-          { label: 'Soft Date',    bg: LIGHT_GREY,   border: DARK_GREY   },
-          { label: 'Hard Date',    bg: LIGHT_PURPLE, border: DARK_PURPLE },
-          { label: 'Late',         bg: 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)', border: 'red' }
-        ].map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width:12, height:12, background:item.bg, border:`2px solid ${item.border}`, borderRadius:2 }} />
-            {item.label}
-          </div>
-        ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width:12, height:12, background:LIGHT_YELLOW, border:`2px solid ${DARK_YELLOW}`, borderRadius:2 }} />
+          Placeholder
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width:12, height:12, background:LIGHT_GREY, border:`2px solid ${DARK_GREY}`, borderRadius:2 }} />
+          Soft Date
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width:12, height:12, background:LIGHT_PURPLE, border:`2px solid ${DARK_PURPLE}`, borderRadius:2 }} />
+          Hard Date
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+          <span style={{ width:12, height:12, background:'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)', border:`2px solid red`, borderRadius:2 }} />
+          Late
+        </div>
         <div style={{ display:'flex', alignItems:'center', gap:4 }}>
           <span style={{ fontSize:14 }}>🔗</span> Link
         </div>
         <div style={{ display:'flex', alignItems:'center', gap:4 }}>
           <span style={{ fontSize:14 }}>❌</span> Unlink
         </div>
-        {['Start','EED / End','IHD / Delivery'].map((txt,i) => {
-          const color = i===0 ? BUBBLE_START : i===1 ? BUBBLE_END : BUBBLE_DELIV;
-          return (
-            <div key={i} style={{ display:'flex', alignItems:'center', gap:4 }}>
-              <span style={{ width:12, height:12, background:color, borderRadius:2 }} />
-              {txt}
-            </div>
-          );
-        })}
+        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+          <span style={{ width:12, height:12, background:BUBBLE_START, borderRadius:2 }} /> Start
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+          <span style={{ width:12, height:12, background:BUBBLE_END, borderRadius:2 }} /> EED / End
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:4 }}>
+          <span style={{ width:12, height:12, background:BUBBLE_DELIV, borderRadius:2 }} /> IHD / Delivery
+        </div>
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
         <div style={{ display:'flex', gap:16, marginTop:16 }}>
           {['queue','machine1','machine2'].map(colId => {
             const col = columns[colId] || {};
-            const jobs = Array.isArray(col.jobs) ? col.jobs : [];
+            const rawJobs = Array.isArray(col.jobs) ? col.jobs : [];
+            const jobs    = rawJobs.filter(j => j && j.id !== undefined);
 
-            // break into linked‐chain segments
             const segments = [];
             let idx = 0;
             while (idx < jobs.length) {
-              const chain = getChain(jobs, jobs[idx].id);
-              const len = chain.length > 1 ? chain.length : 1;
+              const chainIds = getChain(jobs, jobs[idx].id);
+              const len = chainIds.length > 1 ? chainIds.length : 1;
               segments.push({ start: idx, len });
               idx += len;
             }
@@ -104,7 +109,7 @@ export default function Section9({
                       {col.title}
                     </h4>
 
-                    {segments.map((seg,sIdx) => (
+                    {segments.map((seg, sIdx) => (
                       <div
                         key={sIdx}
                         style={{
@@ -116,15 +121,23 @@ export default function Section9({
                           borderRadius:4
                         }}
                       >
-                        {jobs.slice(seg.start, seg.start + seg.len).map((job,jIdx) => {
+                        {jobs.slice(seg.start, seg.start + seg.len).map((job, jIdx) => {
                           const globalIdx = seg.start + jIdx;
-                          const isPh = job.id.toString().startsWith('ph-');
-                          const isHardType = job.due_type?.toLowerCase().includes('hard');
-                          const base = isPh ? LIGHT_YELLOW : isHardType ? LIGHT_PURPLE : LIGHT_GREY;
-                          const bCol = isPh ? DARK_YELLOW : isHardType ? DARK_PURPLE : DARK_GREY;
+                          const isPh   = String(job.id).startsWith('ph-');
+                          const isSoft = job.due_type === 'Soft Date';
+                          const base   = isPh ? LIGHT_YELLOW : isSoft ? LIGHT_GREY : LIGHT_PURPLE;
+                          let bg = base, bCol = isPh ? DARK_YELLOW : isSoft ? DARK_GREY : DARK_PURPLE;
+                          if (job.isLate) {
+                            bg   = 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)';
+                            bCol = 'red';
+                          }
 
                           return (
-                            <Draggable key={job.id.toString()} draggableId={job.id.toString()} index={globalIdx}>
+                            <Draggable
+                              key={job.id.toString()}
+                              draggableId={job.id.toString()}
+                              index={globalIdx}
+                            >
                               {prov => (
                                 <div
                                   ref={prov.innerRef}
@@ -139,161 +152,154 @@ export default function Section9({
                                     rowGap:4,
                                     padding:'6px 28px 6px 6px',
                                     margin:`0 0 ${jIdx<seg.len-1?GAP:0}px 0`,
-                                    background: job.isLate
-                                      ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
-                                      : base,
-                                    border:`2px solid ${job.isLate ? 'red' : bCol}`,
+                                    background:bg,
+                                    border:`2px solid ${bCol}`,
                                     borderRadius:4,
                                     zIndex:2,
                                     ...prov.draggableProps.style
                                   }}
                                 >
-                                  {/* Link indicator on multi-job */}
                                   {jIdx===0 && seg.len>1 && (
                                     <div style={{
-                                      position:'absolute', top:0, right:0,
-                                      width:4, height:'100%',
-                                      background:'#0288d1', zIndex:4
+                                      position:'absolute',
+                                      top:0,right:0,
+                                      width:4,height:'100%',
+                                      background:'#0288d1',zIndex:4
                                     }} />
                                   )}
 
-                                  {/* ID & Company */}
                                   <span style={{
-                                    gridRow:1, gridColumn:1,
-                                    fontSize:13, fontWeight:'bold',
-                                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'
+                                    gridRow:1,gridColumn:1,
+                                    background:base,padding:'0 4px',
+                                    borderRadius:4,whiteSpace:'nowrap',
+                                    overflow:'hidden',textOverflow:'ellipsis',
+                                    fontSize:13,fontWeight:'bold'
                                   }}>
                                     <span style={{
-                                      display:'inline-block', width:20, height:20,
-                                      borderRadius:'50%', background:'#000',
-                                      color:base, lineHeight:'20px', textAlign:'center',
-                                      fontSize:isPh?13:11, fontWeight:'bold', marginRight:4
+                                      display:'inline-block',width:20,height:20,
+                                      borderRadius:'50%',background:'#000',
+                                      color:base,lineHeight:'20px',textAlign:'center',
+                                      fontSize:isPh?13:11,fontWeight:'bold',
+                                      marginRight:4
                                     }}>
-                                      {isPh ? '*' : job.id}
+                                      {isPh? '*' : job.id}
                                     </span>
                                     {job.company}
                                   </span>
 
-                                  {/* Quantity */}
                                   <span style={{
-                                    gridRow:1, gridColumn:2, justifySelf:'end',
-                                    fontSize:15, fontWeight:'bold',
-                                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'
+                                    gridRow:1,gridColumn:2,justifySelf:'end',
+                                    background:base,padding:'0 4px',
+                                    borderRadius:4,fontSize:15,fontWeight:'bold',
+                                    whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'
                                   }}>
                                     {job.quantity}
                                   </span>
 
-                                  {/* Design */}
                                   <span style={{
-                                    gridRow:2, gridColumn:1,
-                                    fontSize:13, whiteSpace:'nowrap',
-                                    overflow:'hidden', textOverflow:'ellipsis'
+                                    gridRow:2,gridColumn:1,
+                                    background:base,padding:'0 4px',
+                                    borderRadius:4,whiteSpace:'nowrap',
+                                    overflow:'hidden',textOverflow:'ellipsis',
+                                    fontSize:13
                                   }}>
                                     {job.design?.slice(0,22)}
                                   </span>
 
-                                  {/* Start bubble */}
                                   {job.start && (
                                     <span style={{
-                                      gridRow:2, gridColumn:2, justifySelf:'end',
-                                      background:BUBBLE_START, padding:'0 4px',
-                                      borderRadius:10, whiteSpace:'nowrap',
+                                      gridRow:2,gridColumn:2,justifySelf:'end',
+                                      background:BUBBLE_START,padding:'0 4px',
+                                      borderRadius:10,whiteSpace:'nowrap',
                                       fontSize:13
                                     }}>
                                       {job.start}
                                     </span>
                                   )}
 
-                                  {/* EED */}
                                   <span style={{
-                                    gridRow:3, gridColumn:1,
-                                    background:BUBBLE_END, padding:'0 4px',
-                                    borderRadius:4, whiteSpace:'nowrap',
-                                    overflow:'hidden', textOverflow:'ellipsis',
+                                    gridRow:3,gridColumn:1,
+                                    background:BUBBLE_END,padding:'0 4px',
+                                    borderRadius:4,whiteSpace:'nowrap',
+                                    overflow:'hidden',textOverflow:'ellipsis',
                                     fontSize:13
                                   }}>
                                     EED: {fmtMMDD(subWorkDays(parseDueDate(job.due_date),6))}
                                   </span>
 
-                                  {/* End bubble */}
                                   {job.end && (
                                     <span style={{
-                                      gridRow:3, gridColumn:2, justifySelf:'end',
-                                      background:BUBBLE_END, padding:'0 4px',
-                                      borderRadius:10, whiteSpace:'nowrap',
+                                      gridRow:3,gridColumn:2,justifySelf:'end',
+                                      background:BUBBLE_END,padding:'0 4px',
+                                      borderRadius:10,whiteSpace:'nowrap',
                                       fontSize:13
                                     }}>
                                       {job.end}
                                     </span>
                                   )}
 
-                                  {/* IHD */}
                                   <span style={{
-                                    gridRow:4, gridColumn:1,
-                                    background:BUBBLE_DELIV, padding:'0 4px',
-                                    borderRadius:4, whiteSpace:'nowrap',
+                                    gridRow:4,gridColumn:1,
+                                    background:BUBBLE_DELIV,padding:'0 4px',
+                                    borderRadius:4,whiteSpace:'nowrap',
                                     fontSize:13
                                   }}>
                                     IHD: {fmtMMDD(job.due_date)}
                                   </span>
 
-                                  {/* Delivery bubble */}
                                   {job.delivery && (
                                     <span style={{
-                                      gridRow:4, gridColumn:2, justifySelf:'end',
-                                      background:BUBBLE_DELIV, padding:'0 4px',
-                                      borderRadius:10, whiteSpace:'nowrap',
+                                      gridRow:4,gridColumn:2,justifySelf:'end',
+                                      background:BUBBLE_DELIV,padding:'0 4px',
+                                      borderRadius:10,whiteSpace:'nowrap',
                                       fontSize:13
                                     }}>
                                       {job.delivery}
                                     </span>
                                   )}
 
-                                  {/* Due-Type Badge */}
                                   <div style={{
-                                    position:'absolute', top:0, right:0,
-                                    width:28, height:28,
-                                    background: isHardType ? LIGHT_PURPLE : LIGHT_GREY,
-                                    color: isHardType ? 'white' : 'black',
+                                    position:'absolute',top:0,right:0,
+                                    width:28,height:28,
+                                    background:base,
                                     borderTopRightRadius:4,
                                     borderBottomLeftRadius:4,
-                                    display:'flex', alignItems:'center', justifyContent:'center',
-                                    fontSize:11, fontWeight:'bold', zIndex:4
+                                    display:'flex',alignItems:'center',justifyContent:'center',
+                                    fontSize:11,fontWeight:'bold',zIndex:4
                                   }}>
-                                    {isHardType ? 'H' : 'S'}
+                                    {(job.due_type||'')[0]}
                                   </div>
 
-                                  {/* Link/Unlink toggle */}
-                                  {globalIdx < jobs.length - 1 && (
+                                  {globalIdx < jobs.length-1 && (
                                     <div
                                       onClick={() => toggleLink(colId, globalIdx)}
                                       style={{
-                                        position:'absolute', top:28, right:0,
-                                        width:28, height:`calc(100% - 28px)`,
-                                        display:'flex', alignItems:'center', justifyContent:'center',
-                                        cursor:'pointer', background:base,
-                                        borderBottomRightRadius:4, zIndex:5
+                                        position:'absolute',top:28,right:0,
+                                        width:28,height:`calc(100% - 28px)`,
+                                        display:'flex',alignItems:'center',justifyContent:'center',
+                                        cursor:'pointer',background:base,
+                                        borderBottomRightRadius:4,zIndex:5
                                       }}
                                     >
-                                      {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
+                                      {job.linkedTo === jobs[globalIdx+1]?.id ? '❌' : '🔗'}
                                     </div>
                                   )}
 
-                                  {/* Placeholder edit/delete */}
                                   {isPh && (
                                     <div style={{
-                                      position:'absolute', top:0, right:0,
-                                      width:28, height:'100%',
+                                      position:'absolute',top:0,right:0,
+                                      width:28,height:'100%',
                                       background:base,
-                                      display:'flex', flexDirection:'column',
-                                      alignItems:'center', justifyContent:'flex-start',
-                                      borderTopRightRadius:4, borderBottomRightRadius:4,
+                                      display:'flex',flexDirection:'column',
+                                      alignItems:'center',justifyContent:'flex-start',
+                                      borderTopRightRadius:4,borderBottomRightRadius:4,
                                       zIndex:4
                                     }}>
-                                      <span onClick={() => editPlaceholder(job)} style={{ cursor:'pointer', fontSize:12, margin:4 }}>✎</span>
-                                      <span onClick={() => removePlaceholder(job.id)} style={{ cursor:'pointer', fontSize:12, margin:4 }}>✖</span>
+                                      <span onClick={() => editPlaceholder(job)} style={{ cursor:'pointer',fontSize:12,margin:4 }}>✎</span>
+                                      <span onClick={() => removePlaceholder(job.id)} style={{ cursor:'pointer',fontSize:12,margin:4 }}>✖</span>
                                     </div>
                                   )}
+
                                 </div>
                               )}
                             </Draggable>
@@ -313,12 +319,12 @@ export default function Section9({
 
       {showModal && (
         <div style={{
-          position:'fixed', top:0, left:0, width:'100vw', height:'100vh',
-          background:'rgba(0,0,0,0.5)', display:'flex',
-          alignItems:'center', justifyContent:'center', zIndex:1000
+          position:'fixed',top:0,left:0,width:'100vw',height:'100vh',
+          background:'rgba(0,0,0,0.5)',display:'flex',
+          alignItems:'center',justifyContent:'center',zIndex:1000
         }}>
           <div style={{
-            background:'#fff', padding:24, borderRadius:8, width:320,
+            background:'#fff',padding:24,borderRadius:8,width:320,
             boxShadow:'0 2px 10px rgba(0,0,0,0.2)'
           }}>
             <h3 style={{ marginTop:0 }}>Add / Edit Placeholder</h3>
@@ -342,7 +348,7 @@ export default function Section9({
                 <option>Soft Date</option>
               </select>
             </div>
-            <div style={{ marginTop:16, textAlign:'right' }}>
+            <div style={{ marginTop:16,textAlign:'right' }}>
               <button onClick={() => setShowModal(false)} style={{ marginRight:8,fontSize:13 }}>Cancel</button>
               <button onClick={submitPlaceholder} style={{ fontSize:13 }}>Save</button>
             </div>
