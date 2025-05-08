@@ -499,13 +499,15 @@ const onDragEnd = async (result) => {
   // No-op if dropped back in same place
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
-  // 1) Extract the dragged chain
+  // 1) Extract jobs from source column
   const srcJobs   = Array.from(columns[srcCol].jobs);
-  const chainIds  = getChain(srcJobs, draggableId);
+  const chainIds  = srcCol === dstCol
+    ? getChain(srcJobs, draggableId)
+    : [draggableId];
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
   const newSrcJobs= srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // 2) Same-column reorder
+  // 2) Reorder within same column
   if (srcCol === dstCol) {
     let insertAt = dstIdx;
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
@@ -521,37 +523,32 @@ const onDragEnd = async (result) => {
     return;
   }
 
-  // 3) Update manualState
+  // 3) Cross-column: update manualState
   const manualState = JSON.parse(
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
   );
-  // remove chain from any machine
   ['machine1','machine2'].forEach(col =>
     manualState[col] = manualState[col].filter(id => !chainIds.includes(id))
   );
-  // if dropped into a machine, insert it
   if (dstCol === 'machine1' || dstCol === 'machine2') {
-    const dstList = manualState[dstCol] || [];
+    const dstList = Array.from(manualState[dstCol] || []);
     dstList.splice(dstIdx, 0, ...chainIds);
     manualState[dstCol] = dstList;
   }
   localStorage.setItem('manualState', JSON.stringify(manualState));
   localStorage.setItem('manualStateMs', Date.now().toString());
-  axios.post(`${API_ROOT}/manualState`, manualState).catch(console.error);
+  axios.post(`${API_ROOT}/manualState`, manualState)
+    .catch(err => console.error('⚠️ manualState save error:', err));
 
-  // 4) Build next state object
+  // 4) Build next state
   const next = { ...columns };
-
-  // 4a) Source column loses the chain
   next[srcCol] = {
     ...columns[srcCol],
     jobs: scheduleMachineJobs(newSrcJobs)
   };
 
-  // 4b) Destination update
   if (dstCol === 'queue') {
-    // reset scheduling data on chain items
     const resetChain = chainJobs.map(j => ({
       ...j,
       machineId: 'queue',
@@ -560,12 +557,12 @@ const onDragEnd = async (result) => {
       isLate: false,
       linkedTo: null
     }));
-    // new queue array: existing without chain + inserted chain
     const baseQueue = columns.queue.jobs.filter(j => !chainIds.includes(j.id));
-    const newQueue = [...baseQueue.slice(0, dstIdx),
-                      ...resetChain,
-                      ...baseQueue.slice(dstIdx)];
-    // sort by due date immediately
+    const newQueue = [
+      ...baseQueue.slice(0, dstIdx),
+      ...resetChain,
+      ...baseQueue.slice(dstIdx)
+    ];
     newQueue.sort((a, b) => {
       const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
       if (da && db) return da - db;
@@ -575,7 +572,6 @@ const onDragEnd = async (result) => {
     });
     next.queue = { ...columns.queue, jobs: newQueue };
   } else {
-    // dropped into a machine
     const resetChain = chainJobs.map(j => ({ ...j, machineId: dstCol }));
     const dstJobs = Array.from(columns[dstCol].jobs);
     dstJobs.splice(dstIdx, 0, ...resetChain);
@@ -583,10 +579,9 @@ const onDragEnd = async (result) => {
       ...columns[dstCol],
       jobs: scheduleMachineJobs(dstJobs)
     };
-    // leave queue untouched
   }
 
-  // 5) Commit all at once
+  // 5) Commit
   setColumns(next);
 };
 
