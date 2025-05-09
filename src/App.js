@@ -6,6 +6,7 @@ import axios from 'axios';
 import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 
+console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
 const API_ROOT = process.env.REACT_APP_API_ROOT;
 const WORK_START_HR  = 8,  WORK_START_MIN = 30;
