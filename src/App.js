@@ -444,51 +444,35 @@ const editPlaceholder = job => {
   setShowModal(true);
 };
 // === Section 7: toggleLink (full replacement) ===
+// ─── In App.js (where you define toggleLink) ─────────────────────────────────
+
 const toggleLink = (colId, idx) => {
-  // step 1: read current link-map and our working columns
-  const currentMap = loadLinks();
-  const colJobs   = columns[colId].jobs;
-  const thisId    = colJobs[idx]?.id;
-  const nextId    = colJobs[idx + 1]?.id;
-  if (!thisId || !nextId) return;
+  // Grab the two jobs we’re trying to link/unlink
+  const jobs = columns[colId].jobs;
+  const job = jobs[idx];
+  const next = jobs[idx + 1];
 
-  // step 2: flip it in our persisted map
-  if (currentMap[thisId] === nextId) {
-    delete currentMap[thisId];
-  } else {
-    currentMap[thisId] = nextId;
-  }
-  saveLinks(currentMap);
-  setLinks(currentMap);
+  setLinks(linkMap => {
+    // shallow clone
+    const m = { ...linkMap };
 
-  // step 3: rebuild all job.linkedTo flags from scratch
-  setColumns(cols => {
-    const newCols = {};
-    Object.entries(cols).forEach(([cId, col]) => {
-      newCols[cId] = {
-        ...col,
-        jobs: col.jobs.map(job => ({
-          ...job,
-          // clear every linkedTo first
-          linkedTo: null
-        }))
-      };
-    });
+    if (job.linkedTo === next.id) {
+      // ❌ Unlink: delete this mapping
+      delete m[job.id];
+    } else {
+      // 🔗 Link: set just this one
+      m[job.id] = next.id;
+    }
 
-    // step 4: re-apply only the links still in currentMap
-    Object.entries(newCols).forEach(([cId, col]) => {
-      newCols[cId].jobs = col.jobs.map(job => {
-        const target = currentMap[job.id];
-        return target ? { ...job, linkedTo: target } : job;
-      });
-    });
-
-    return newCols;
+    // persist immediately
+    saveLinks(m);
+    return m;
   });
 };
 
-// === Section 8: Drag & Drop Handler (with Chain-aware Moves) ===
-const onDragEnd = async (result) => {
+
+// === Section 8: Drag & Drop Handler (with Chain-aware Moves & proper unlinking) ===
+const onDragEnd = result => {
   const { source, destination, draggableId } = result;
   if (!destination) return;
 
@@ -497,95 +481,99 @@ const onDragEnd = async (result) => {
   const srcIdx = source.index;
   const dstIdx = destination.index;
 
-  // No-op if dropped back in same place
+  // no-op if dropped back in same spot
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
-  // 1) Extract jobs from source column and always detect full chain
-  const srcJobs   = Array.from(columns[srcCol].jobs);
-  const chainIds  = getChain(srcJobs, draggableId);
+  // grab the jobs in the source column
+  const srcJobs = Array.from(columns[srcCol].jobs);
+  // get the full linked‐chain for this item
+  const chainIds = getChain(srcJobs, draggableId);
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
-  const newSrcJobs= srcJobs.filter(j => !chainIds.includes(j.id));
+  // remove the chain from the source
+  const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // 2) Reorder _within_ same column (dragging block)
+  // —— same-column reorder ——  
   if (srcCol === dstCol) {
     let insertAt = dstIdx;
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
-    const updatedJobs = (srcCol === 'machine1' || srcCol === 'machine2')
-      ? scheduleMachineJobs(newSrcJobs)
-      : newSrcJobs;
-
     setColumns(cols => ({
       ...cols,
-      [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
+      [srcCol]: {
+        ...cols[srcCol],
+        jobs: scheduleMachineJobs(newSrcJobs),
+      }
     }));
     return;
   }
 
-  // 3) Cross-column: update manualState for all moved IDs
+  // —— cross-column move ——  
+  // 1) Update local manualState
   const manualState = JSON.parse(
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
   );
-  ['machine1','machine2'].forEach(col => {
-    manualState[col] = manualState[col].filter(id => !chainIds.includes(id));
+  ['machine1', 'machine2'].forEach(col => {
+    manualState[col] = (manualState[col] || []).filter(id => !chainIds.includes(id));
   });
   if (dstCol === 'machine1' || dstCol === 'machine2') {
-    const dstList = Array.from(manualState[dstCol] || []);
-    dstList.splice(dstIdx, 0, ...chainIds);
-    manualState[dstCol] = dstList;
+    const arr = Array.from(manualState[dstCol] || []);
+    arr.splice(dstIdx, 0, ...chainIds);
+    manualState[dstCol] = arr;
   }
   localStorage.setItem('manualState', JSON.stringify(manualState));
   localStorage.setItem('manualStateMs', Date.now().toString());
-  axios.post(`${API_ROOT}/manualState`, manualState).catch(() => {});
+  axios.post(`${API_ROOT}/manualState`, manualState).catch(console.error);
 
-  // 4) Build next state
-  const next = { ...columns };
+  // 2) Build destination list
+  const dstJobs = Array.from(columns[dstCol].jobs);
+  let movedJobs = chainJobs.map(j => ({
+    ...j,
+    machineId: dstCol === 'queue' ? 'queue' : dstCol,
+    // if queue, clear any scheduled fields:
+    ...(dstCol === 'queue' ? { start: '', end: '', delivery: '', _rawStart: null, _rawEnd: null, isLate: false, linkedTo: null } : {})
+  }));
+  dstJobs.splice(dstIdx, 0, ...movedJobs);
 
-  // 4a) Source loses the moved chain
-  next[srcCol] = {
-    ...columns[srcCol],
-    jobs: (srcCol === 'machine1' || srcCol === 'machine2')
-      ? scheduleMachineJobs(newSrcJobs)
-      : newSrcJobs
-  };
-
-  // 4b) Destination gains the chain
+  // 3) If dropping into the queue, **unlink** the entire chain in your linkMap:
   if (dstCol === 'queue') {
-    const resetChain = chainJobs.map(j => ({
-      ...j,
-      machineId: 'queue',
-      start: '', end: '', delivery: '',
-      _rawStart: null, _rawEnd: null,
-      isLate: false,
-      linkedTo: null
-    }));
-    const baseQueue = columns.queue.jobs.filter(j => !chainIds.includes(j.id));
-    const newQueue = [
-      ...baseQueue.slice(0, dstIdx),
-      ...resetChain,
-      ...baseQueue.slice(dstIdx)
-    ];
-    newQueue.sort((a,b) => {
-      const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
-      if (da && db) return da - db;
-      if (da) return -1;
-      if (db) return 1;
-      return 0;
+    setLinks(linkMap => {
+      const updated = { ...linkMap };
+      // remove all forward links _and_ any reverse pointers
+      chainIds.forEach(id => {
+        delete updated[id];
+      });
+      // also remove any linkMap[k] === one of our chainIds
+      Object.keys(updated).forEach(k => {
+        if (chainIds.includes(updated[k])) {
+          delete updated[k];
+        }
+      });
+      saveLinks(updated);
+      return updated;
     });
-    next.queue = { ...columns.queue, jobs: newQueue };
-  } else {
-    const resetChain = chainJobs.map(j => ({ ...j, machineId: dstCol }));
-    const dstJobs = Array.from(columns[dstCol].jobs);
-    dstJobs.splice(dstIdx, 0, ...resetChain);
-    next[dstCol] = {
-      ...columns[dstCol],
-      jobs: scheduleMachineJobs(dstJobs)
-    };
   }
 
-  // 5) Commit all at once
+  // 4) Assemble new columns object
+  const next = {
+    ...columns,
+    [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
+    [dstCol]: { ...columns[dstCol], jobs: dstJobs }
+  };
+
+  // 5) Re-schedule machines, and always resort the queue
+  ['machine1','machine2'].forEach(col => {
+    next[col].jobs = scheduleMachineJobs(next[col].jobs);
+  });
+  next.queue.jobs = next.queue.jobs.sort((a,b) => {
+    const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
+    if (da && db) return da - db;
+    if (da) return -1;
+    if (db) return 1;
+    return 0;
+  });
+
   setColumns(next);
 };
 
