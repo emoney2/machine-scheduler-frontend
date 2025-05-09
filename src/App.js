@@ -7,7 +7,7 @@ import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 
 // CONFIGURATION
-const API_ROOT = 'https://machine-scheduler-backend.onrender.com/api';
+const API_ROOT = process.env.REACT_APP_API_ROOT;
 const WORK_START_HR  = 8,  WORK_START_MIN = 30;
 const WORK_END_HR    = 16, WORK_END_MIN   = 30;
 const WEEKENDS       = [0,6];
