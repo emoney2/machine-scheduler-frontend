@@ -1,66 +1,49 @@
-// === Section 1: Imports & Configuration ===
+// === Section 1: Imports, Configuration & Initial Hooks ===
 // File: frontend/src/App.js
+
 import React, { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import axios from 'axios';
 import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
-// CONFIGURATION
-const API_ROOT = process.env.REACT_APP_API_ROOT;
-const WORK_START_HR  = 8,  WORK_START_MIN = 30;
-const WORK_END_HR    = 16, WORK_END_MIN   = 30;
-const WEEKENDS       = [0,6];
-const HOLIDAYS       = ['2025-01-01','2025-12-25'];
+const API_ROOT      = process.env.REACT_APP_API_ROOT;
+const WORK_START_HR = 8,  WORK_START_MIN = 30;
+const WORK_END_HR   = 16, WORK_END_MIN   = 30;
+const WEEKENDS      = [0,6];
+const HOLIDAYS      = ['2025-01-01','2025-12-25'];
 
-// COLOR CONSTANTS
-const LIGHT_YELLOW  = '#FFF9C4', DARK_YELLOW  = '#FDD835';
-const LIGHT_GREY    = '#ECEFF1', DARK_GREY    = '#616161';
-const LIGHT_PURPLE  = '#E1BEE7', DARK_PURPLE  = '#6A1B9A';
-const BUBBLE_START  = '#e0f7fa';
-const BUBBLE_END    = '#ffe0b2';
-const BUBBLE_DELIV  = '#c8e6c9';
+// color constants…
+const LIGHT_YELLOW = '#FFF9C4', DARK_YELLOW  = '#FDD835';
+const LIGHT_GREY   = '#ECEFF1', DARK_GREY    = '#616161';
+const LIGHT_PURPLE = '#E1BEE7', DARK_PURPLE  = '#6A1B9A';
+const BUBBLE_START = '#e0f7fa';
+const BUBBLE_END   = '#ffe0b2';
+const BUBBLE_DELIV = '#c8e6c9';
 
 export default function App() {
-  // live sheet data
-  const [orders, setOrders]                 = useState([]);
-  const [embroideryList, setEmbroideryList] = useState([]);
-
-  // Persisted placeholders
-  const [placeholders, setPlaceholders] = useState(() =>
-    JSON.parse(localStorage.getItem('placeholders') || '[]')
-  );
-  useEffect(() => {
-    localStorage.setItem('placeholders', JSON.stringify(placeholders));
-  }, [placeholders]);
-
-  // Core columns state
-  const [columns, setColumns]       = useState({
+  // --- state hooks ---
+  const [columns, setColumns]           = useState({
     queue:    { title: 'Queue',     jobs: [] },
     machine1: { title: 'Machine 1', jobs: [] },
     machine2: { title: 'Machine 2', jobs: [] },
   });
-  const [links, setLinks]           = useState(loadLinks());
-  const [syncStatus, setSyncStatus] = useState('');
-
-  // Modal form state
-  const [showModal, setShowModal] = useState(false);
-  const [ph, setPh] = useState({
-    id:          null,
-    company:     '',
-    quantity:    '',
-    stitchCount: '',
-    inHand:      '',
-    dueType:     'Hard Date'
+  const [links, setLinks]               = useState(() => loadLinks());
+  const [placeholders, setPlaceholders] = useState(() =>
+    JSON.parse(localStorage.getItem('placeholders') || '[]')
+  );
+  const [syncStatus, setSyncStatus]     = useState('');
+  const [showModal, setShowModal]       = useState(false);
+  const [ph, setPh]                     = useState({
+    id: null, company:'', quantity:'', stitchCount:'', inHand:'', dueType:'Hard Date'
   });
 
-  // Initial data load
+  // persist placeholders into localStorage
   useEffect(() => {
-    fetchAll();
-  }, []);
+    localStorage.setItem('placeholders', JSON.stringify(placeholders));
+  }, [placeholders]);
 
-  // Manual sync handler
+  // --- handleSync & polling ---
   const handleSync = async () => {
     setSyncStatus('');
     await fetchAll();
@@ -68,7 +51,19 @@ export default function App() {
     setTimeout(() => setSyncStatus(''), 2000);
   };
 
+// === Section 1b: Initial load + polling ===
+useEffect(() => {
+  // 1) fetch immediately on mount
+  fetchAll();
 
+  // 2) then refetch every 30 seconds to keep all clients in sync
+  const intervalId = setInterval(() => {
+    fetchAll();
+  }, 30_000);
+
+  // 3) cleanup on unmount
+  return () => clearInterval(intervalId);
+}, []);
 
 // === Section 2: Helpers ===
 function isHoliday(dt) {
@@ -269,32 +264,37 @@ function getChain(jobs, id) {
   return chain;
 }
 
-// === Section 5: FETCH & MERGE (with Placeholder Injection) ===
+// === Section 5: FETCH & MERGE (with Debug Logs) ===
 const fetchAll = async () => {
   try {
-    // 1) Load manual state from localStorage
+    // 0) Debug your API root
+    console.log('→ REACT_APP_API_ROOT =', API_ROOT);
+
+    // 1) Load manualState from localStorage
     const manualState = JSON.parse(
       localStorage.getItem('manualState') ||
       JSON.stringify({ machine1: [], machine2: [] })
     );
 
-    // 2) Preserve any previous embroidery_start (so edits stick across sync)
+    // 2) Preserve any previous embroidery_start so edits stick across sync
     const prevEmb = {};
     Object.values(columns)
       .flatMap(col => col.jobs)
       .forEach(job => {
-        if (job.embroidery_start) {
-          prevEmb[job.id] = job.embroidery_start;
-        } else if (job.start_date) {
-          prevEmb[job.id] = job.start_date;
-        }
+        if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
+        else if (job.start_date)     prevEmb[job.id] = job.start_date;
       });
 
-    // 3) Fetch live data from both endpoints in parallel
+    // 3) Fetch live data in parallel
     const [ordersRes, embRes] = await Promise.all([
       axios.get(`${API_ROOT}/orders`),
       axios.get(`${API_ROOT}/embroideryList`)
     ]);
+
+    // 3b) Debug the raw responses
+    console.log('👀 orders from API:', ordersRes.data);
+    console.log('👀 embroideryList from API:', embRes.data);
+
     const orders  = ordersRes.data;
     const embList = embRes.data;
 
@@ -302,9 +302,7 @@ const fetchAll = async () => {
     const embMap = {};
     embList.forEach(row => {
       const id = String(row['Order #'] || '').trim();
-      if (id) {
-        embMap[id] = row['Embroidery Start Time'] || '';
-      }
+      if (id) embMap[id] = row['Embroidery Start Time'] || '';
     });
 
     // 5) Turn orders into a lookup by id, seeding start_date from embMap or prevEmb
@@ -329,7 +327,7 @@ const fetchAll = async () => {
       };
     });
 
-    // 6) Inject any placeholders into jobById (they always go in the queue)
+    // 6) Inject placeholders into jobById
     placeholders.forEach(ph => {
       jobById[ph.id] = {
         ...ph,
@@ -354,24 +352,21 @@ const fetchAll = async () => {
       });
     });
 
-    // 8) Build & sort the queue (everything not on a machine)
+    // 8) Build & sort the queue
     const queueJobs = Object.values(jobById)
       .filter(j => !['machine1','machine2'].includes(j.machineId))
-      .sort((a, b) => {
-        const da = parseDueDate(a.due_date),
-              db = parseDueDate(b.due_date);
+      .sort((a,b) => {
+        const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
         if (da && db) return da - db;
         if (da) return -1;
-        if (db) return  1;
-        return  0;
+        if (db) return 1;
+        return 0;
       });
 
-    // 9) Build each machine’s list, preserving manual order then appending new jobs
+    // 9) Build each machine’s list
     const buildMachine = colId => {
       const manualList = manualState[colId] || [];
-      const fromManual = manualList
-        .map(id => jobById[id])
-        .filter(Boolean);
+      const fromManual = manualList.map(id => jobById[id]).filter(Boolean);
       const autoAppend = Object.values(jobById)
         .filter(j => j.machineId === colId && !manualList.includes(j.id));
       return [...fromManual, ...autoAppend];
@@ -379,12 +374,18 @@ const fetchAll = async () => {
     const machine1Jobs = buildMachine('machine1');
     const machine2Jobs = buildMachine('machine2');
 
-    // 10) Finally, schedule the machine runtimes and update state
+    // 9b) Debug the computed columns
+    console.log('→ queueJobs:', queueJobs);
+    console.log('→ machine1Jobs:', machine1Jobs);
+    console.log('→ machine2Jobs:', machine2Jobs);
+
+    // 10) Finally, update your state
     setColumns({
       queue:    { ...columns.queue,    jobs: queueJobs },
       machine1: { ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
       machine2: { ...columns.machine2, jobs: scheduleMachineJobs(machine2Jobs) },
     });
+
   } catch (err) {
     console.error('fetchAll error:', err);
   }
@@ -443,36 +444,37 @@ const editPlaceholder = job => {
   });
   setShowModal(true);
 };
-// === Section 7: toggleLink (full replacement) ===
-// ─── In App.js (where you define toggleLink) ─────────────────────────────────
-
-const toggleLink = (colId, idx) => {
-  // Grab the two jobs we’re trying to link/unlink
+// === Section 7: Shared Link/Unlink Handler ===
+const toggleLink = async (colId, idx) => {
+  // Grab the two jobs we’re toggling between
   const jobs = columns[colId].jobs;
-  const job = jobs[idx];
+  const job  = jobs[idx];
   const next = jobs[idx + 1];
+  if (!next) return;
 
-  setLinks(linkMap => {
-    // shallow clone
-    const m = { ...linkMap };
+  // Make a copy of the current link map
+  const updated = { ...links };
 
-    if (job.linkedTo === next.id) {
-      // ❌ Unlink: delete this mapping
-      delete m[job.id];
-    } else {
-      // 🔗 Link: set just this one
-      m[job.id] = next.id;
-    }
+  // Unlink if already linked, otherwise link them
+  if (updated[job.id] === next.id) {
+    delete updated[job.id];
+  } else {
+    updated[job.id] = next.id;
+  }
 
-    // persist immediately
-    saveLinks(m);
-    return m;
-  });
+  try {
+    // Persist to the backend
+    await axios.post(`${API_ROOT}/links`, updated);
+    // Re-fetch everything so all open tabs/apps see the same state
+    await fetchAll();
+  } catch (err) {
+    console.error('Link save error:', err);
+  }
 };
 
 
-// === Section 8: Drag & Drop Handler (with Chain-aware Moves & proper unlinking) ===
-const onDragEnd = result => {
+// === Section 8: Drag & Drop Handler (with proper unlink on Queue) ===
+const onDragEnd = async result => {
   const { source, destination, draggableId } = result;
   if (!destination) return;
 
@@ -481,44 +483,41 @@ const onDragEnd = result => {
   const srcIdx = source.index;
   const dstIdx = destination.index;
 
-  // no-op if dropped back in same spot
+  // No-op if dropped back to the same place
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
-  // grab the jobs in the source column
-  const srcJobs = Array.from(columns[srcCol].jobs);
-  // get the full linked‐chain for this item
-  const chainIds = getChain(srcJobs, draggableId);
-  const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
-  // remove the chain from the source
+  // 1) Extract the full linked-chain from src column
+  const srcJobs    = Array.from(columns[srcCol].jobs);
+  const chainIds   = getChain(srcJobs, draggableId);
+  const chainJobs  = chainIds.map(id => srcJobs.find(j => j.id === id));
   const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // —— same-column reorder ——  
+  // —— same-column reorder ——
   if (srcCol === dstCol) {
     let insertAt = dstIdx;
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
-
-    setColumns(cols => ({
-      ...cols,
+    setColumns(c => ({
+      ...c,
       [srcCol]: {
-        ...cols[srcCol],
-        jobs: scheduleMachineJobs(newSrcJobs),
+        ...c[srcCol],
+        jobs: scheduleMachineJobs(newSrcJobs)
       }
     }));
     return;
   }
 
-  // —— cross-column move ——  
-  // 1) Update local manualState
+  // —— cross-column move ——
+  // A) Update manualState
   const manualState = JSON.parse(
     localStorage.getItem('manualState') ||
     JSON.stringify({ machine1: [], machine2: [] })
   );
-  ['machine1', 'machine2'].forEach(col => {
-    manualState[col] = (manualState[col] || []).filter(id => !chainIds.includes(id));
+  ['machine1','machine2'].forEach(col => {
+    manualState[col] = (manualState[col]||[]).filter(id => !chainIds.includes(id));
   });
-  if (dstCol === 'machine1' || dstCol === 'machine2') {
-    const arr = Array.from(manualState[dstCol] || []);
+  if (dstCol==='machine1'||dstCol==='machine2') {
+    const arr = Array.from(manualState[dstCol]||[]);
     arr.splice(dstIdx, 0, ...chainIds);
     manualState[dstCol] = arr;
   }
@@ -526,45 +525,46 @@ const onDragEnd = result => {
   localStorage.setItem('manualStateMs', Date.now().toString());
   axios.post(`${API_ROOT}/manualState`, manualState).catch(console.error);
 
-  // 2) Build destination list
+  // B) Build the destination array
   const dstJobs = Array.from(columns[dstCol].jobs);
-  let movedJobs = chainJobs.map(j => ({
+  const moved   = chainJobs.map(j => ({
     ...j,
-    machineId: dstCol === 'queue' ? 'queue' : dstCol,
-    // if queue, clear any scheduled fields:
-    ...(dstCol === 'queue' ? { start: '', end: '', delivery: '', _rawStart: null, _rawEnd: null, isLate: false, linkedTo: null } : {})
-  }));
-  dstJobs.splice(dstIdx, 0, ...movedJobs);
-
-  // 3) If dropping into the queue, **unlink** the entire chain in your linkMap:
-  if (dstCol === 'queue') {
-    setLinks(linkMap => {
-      const updated = { ...linkMap };
-      // remove all forward links _and_ any reverse pointers
-      chainIds.forEach(id => {
-        delete updated[id];
-      });
-      // also remove any linkMap[k] === one of our chainIds
-      Object.keys(updated).forEach(k => {
-        if (chainIds.includes(updated[k])) {
-          delete updated[k];
+    machineId: dstCol==='queue' ? 'queue' : dstCol,
+    ...(dstCol==='queue'
+      ? { 
+          // Clear all schedule fields when moving back to queue
+          start:'', end:'', delivery:'',
+          _rawStart: null, _rawEnd: null, isLate: false,
+          linkedTo: null
         }
-      });
-      saveLinks(updated);
-      return updated;
+      : {}
+    )
+  }));
+  dstJobs.splice(dstIdx, 0, ...moved);
+
+  // C) If dropped into the queue, unlink that entire chain globally
+  if (dstCol === 'queue') {
+    const updated = { ...links };
+    // remove any forward and reverse pointers
+    chainIds.forEach(id => delete updated[id]);
+    Object.keys(updated).forEach(k => {
+      if (chainIds.includes(updated[k])) delete updated[k];
     });
+    // persist and update local state
+    await axios.post(`${API_ROOT}/links`, updated);
+    setLinks(updated);
   }
 
-  // 4) Assemble new columns object
+  // D) Assemble new columns object
   const next = {
     ...columns,
     [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
     [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
 
-  // 5) Re-schedule machines, and always resort the queue
-  ['machine1','machine2'].forEach(col => {
-    next[col].jobs = scheduleMachineJobs(next[col].jobs);
+  // E) Always re-schedule machines and re-sort queue
+  ['machine1','machine2'].forEach(c => {
+    next[c].jobs = scheduleMachineJobs(next[c].jobs);
   });
   next.queue.jobs = next.queue.jobs.sort((a,b) => {
     const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
