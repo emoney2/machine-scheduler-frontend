@@ -267,67 +267,71 @@ function getChain(jobs, id) {
 // === Section 5: FETCH & MERGE (with Placeholder Injection) ===
 const fetchAll = async () => {
   try {
-    // 1) Load manual state from localStorage
+    // 1) Load manual state
     const manualState = JSON.parse(
       localStorage.getItem('manualState') ||
       JSON.stringify({ machine1: [], machine2: [] })
     );
 
-    // 2) Preserve any previous embroidery_start (so edits stick across sync)
+    // 2) Preserve any previous embroidery_start so it persists across sync
     const prevEmb = {};
     Object.values(columns)
       .flatMap(col => col.jobs)
       .forEach(job => {
-        if (job.embroidery_start) {
-          prevEmb[job.id] = job.embroidery_start;
-        } else if (job.start_date) {
-          prevEmb[job.id] = job.start_date;
-        }
+        if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
+        else if (job.start_date)    prevEmb[job.id] = job.start_date;
       });
 
-    // 3) Fetch live data from both endpoints in parallel
+    // 3) Fetch live data
     const [ordersRes, embRes] = await Promise.all([
       axios.get(`${API_ROOT}/orders`),
       axios.get(`${API_ROOT}/embroideryList`)
     ]);
+    console.log('🚀 fetched orders:', ordersRes.data);
+    console.log('🚀 fetched embroideryList:', embRes.data);
+
     const orders  = ordersRes.data;
     const embList = embRes.data;
 
-    console.log('🚀 fetched orders:', orders);
-    console.log('🚀 fetched embroideryList:', embList);
-
-    // 4) Build a lookup of embroidery start times from the sheet
+    // 4) Build a lookup of embroidery_start times from the sheet
     const embMap = {};
     embList.forEach(row => {
+      // your sheet’s key for order number is “Order #”
       const id = String(row['Order #'] || '').trim();
-      if (id) {
-        embMap[id] = row['Embroidery Start Time'] || '';
-      }
+      if (id) embMap[id] = row['Embroidery Start Time'] || '';
     });
 
-    // 5) Turn orders into a lookup by id, seeding start_date from embMap or prevEmb
+    // 5) Turn orders into a lookup by id
     const jobById = {};
     orders.forEach(o => {
-      const sid = String(o.id ?? '').trim();
+      // sheet header is “Order #”
+      const sid = String(o['Order #'] || '').trim();
       if (!sid) return;
+
+      // pick up any existing embroidery start timestamp
       const rawTs = embMap[sid] ?? prevEmb[sid] ?? '';
+
       jobById[sid] = {
-        ...o,
         id:               sid,
-        company:          o.company,
-        design:           o.design,
-        quantity:         o.quantity,
-        stitch_count:     o.stitch_count,
-        due_date:         o.due_date,
-        due_type:         o.due_type,
+        company:          o['Company Name']   || '',
+        design:           o['Design']         || '',
+        quantity:         +o['Quantity']      || 0,
+        stitch_count:     +o['Stitch Count']  || 0,
+        due_date:         o['Due Date']       || '',
+        due_type:         o['Hard Date/Soft Date'] || '',
         embroidery_start: rawTs,
         start_date:       rawTs,
-        machineId:        o.machineId || 'queue',
+        // map whatever column holds your machine assignment ("Stage" here) to queue/machine1/machine2
+        machineId:        o['Stage'] === 'Machine 1'
+                           ? 'machine1'
+                         : o['Stage'] === 'Machine 2'
+                           ? 'machine2'
+                           : 'queue',
         linkedTo:         links[sid] || null
       };
     });
 
-    // 6) Inject any placeholders into jobById (they always go in the queue)
+    // 6) Inject placeholders (unchanged)
     placeholders.forEach(ph => {
       jobById[ph.id] = {
         ...ph,
@@ -335,7 +339,7 @@ const fetchAll = async () => {
         company:          ph.company,
         design:           ph.design,
         quantity:         ph.quantity,
-        stitch_count:     ph.stitchCount,
+        stitchCount:      ph.stitchCount,
         due_date:         ph.inHand,
         due_type:         ph.dueType,
         embroidery_start: '',
@@ -345,39 +349,34 @@ const fetchAll = async () => {
       };
     });
 
-    // 7) Apply manualState overrides for machine1 & machine2
+    // 7) Apply manualState overrides (unchanged)
     ['machine1','machine2'].forEach(colId => {
       (manualState[colId] || []).forEach(id => {
         if (jobById[id]) jobById[id].machineId = colId;
       });
     });
 
-    // 8) Build & sort the queue (everything not on a machine)
+    // 8) Build & sort the queue, then machines, then schedule (unchanged)…
     const queueJobs = Object.values(jobById)
       .filter(j => !['machine1','machine2'].includes(j.machineId))
-      .sort((a, b) => {
-        const da = parseDueDate(a.due_date),
-              db = parseDueDate(b.due_date);
+      .sort((a,b) => {
+        const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
         if (da && db) return da - db;
         if (da) return -1;
         if (db) return  1;
         return  0;
       });
 
-    // 9) Build each machine’s list, preserving manual order then appending new jobs
     const buildMachine = colId => {
-      const manualList = manualState[colId] || [];
-      const fromManual = manualList
-        .map(id => jobById[id])
-        .filter(Boolean);
-      const autoAppend = Object.values(jobById)
-        .filter(j => j.machineId === colId && !manualList.includes(j.id));
+      const manualList  = manualState[colId] || [];
+      const fromManual  = manualList.map(id => jobById[id]).filter(Boolean);
+      const autoAppend  = Object.values(jobById)
+                                .filter(j => j.machineId === colId && !manualList.includes(j.id));
       return [...fromManual, ...autoAppend];
     };
     const machine1Jobs = buildMachine('machine1');
     const machine2Jobs = buildMachine('machine2');
 
-    // 10) Finally, schedule the machine runtimes and update state
     setColumns({
       queue:    { ...columns.queue,    jobs: queueJobs },
       machine1: { ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
@@ -387,6 +386,7 @@ const fetchAll = async () => {
     console.error('fetchAll error:', err);
   }
 };
+
 
 // === Section 6: Placeholder CRUD ===
 const submitPlaceholder = () => {
