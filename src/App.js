@@ -264,45 +264,45 @@ function getChain(jobs, id) {
   return chain;
 }
 
-// === Section 5: FETCH & MERGE (with Debug Logs) ===
+// === Section 5: FETCH & MERGE (with Placeholder Injection) ===
 const fetchAll = async () => {
   try {
-    // 0) Debug your API root
-    console.log('→ REACT_APP_API_ROOT =', API_ROOT);
-
-    // 1) Load manualState from localStorage
+    // 1) Load manual state from localStorage
     const manualState = JSON.parse(
       localStorage.getItem('manualState') ||
       JSON.stringify({ machine1: [], machine2: [] })
     );
 
-    // 2) Preserve any previous embroidery_start so edits stick across sync
+    // 2) Preserve any previous embroidery_start (so edits stick across sync)
     const prevEmb = {};
     Object.values(columns)
       .flatMap(col => col.jobs)
       .forEach(job => {
-        if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
-        else if (job.start_date)     prevEmb[job.id] = job.start_date;
+        if (job.embroidery_start) {
+          prevEmb[job.id] = job.embroidery_start;
+        } else if (job.start_date) {
+          prevEmb[job.id] = job.start_date;
+        }
       });
 
-    // 3) Fetch live data in parallel
+    // 3) Fetch live data from both endpoints in parallel
     const [ordersRes, embRes] = await Promise.all([
       axios.get(`${API_ROOT}/orders`),
       axios.get(`${API_ROOT}/embroideryList`)
     ]);
-
-    // 3b) Debug the raw responses
-    console.log('👀 orders from API:', ordersRes.data);
-    console.log('👀 embroideryList from API:', embRes.data);
-
     const orders  = ordersRes.data;
     const embList = embRes.data;
+
+    console.log('🚀 fetched orders:', orders);
+    console.log('🚀 fetched embroideryList:', embList);
 
     // 4) Build a lookup of embroidery start times from the sheet
     const embMap = {};
     embList.forEach(row => {
       const id = String(row['Order #'] || '').trim();
-      if (id) embMap[id] = row['Embroidery Start Time'] || '';
+      if (id) {
+        embMap[id] = row['Embroidery Start Time'] || '';
+      }
     });
 
     // 5) Turn orders into a lookup by id, seeding start_date from embMap or prevEmb
@@ -327,7 +327,7 @@ const fetchAll = async () => {
       };
     });
 
-    // 6) Inject placeholders into jobById
+    // 6) Inject any placeholders into jobById (they always go in the queue)
     placeholders.forEach(ph => {
       jobById[ph.id] = {
         ...ph,
@@ -352,21 +352,24 @@ const fetchAll = async () => {
       });
     });
 
-    // 8) Build & sort the queue
+    // 8) Build & sort the queue (everything not on a machine)
     const queueJobs = Object.values(jobById)
       .filter(j => !['machine1','machine2'].includes(j.machineId))
-      .sort((a,b) => {
-        const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
+      .sort((a, b) => {
+        const da = parseDueDate(a.due_date),
+              db = parseDueDate(b.due_date);
         if (da && db) return da - db;
         if (da) return -1;
-        if (db) return 1;
-        return 0;
+        if (db) return  1;
+        return  0;
       });
 
-    // 9) Build each machine’s list
+    // 9) Build each machine’s list, preserving manual order then appending new jobs
     const buildMachine = colId => {
       const manualList = manualState[colId] || [];
-      const fromManual = manualList.map(id => jobById[id]).filter(Boolean);
+      const fromManual = manualList
+        .map(id => jobById[id])
+        .filter(Boolean);
       const autoAppend = Object.values(jobById)
         .filter(j => j.machineId === colId && !manualList.includes(j.id));
       return [...fromManual, ...autoAppend];
@@ -374,18 +377,12 @@ const fetchAll = async () => {
     const machine1Jobs = buildMachine('machine1');
     const machine2Jobs = buildMachine('machine2');
 
-    // 9b) Debug the computed columns
-    console.log('→ queueJobs:', queueJobs);
-    console.log('→ machine1Jobs:', machine1Jobs);
-    console.log('→ machine2Jobs:', machine2Jobs);
-
-    // 10) Finally, update your state
+    // 10) Finally, schedule the machine runtimes and update state
     setColumns({
       queue:    { ...columns.queue,    jobs: queueJobs },
       machine1: { ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
       machine2: { ...columns.machine2, jobs: scheduleMachineJobs(machine2Jobs) },
     });
-
   } catch (err) {
     console.error('fetchAll error:', err);
   }
