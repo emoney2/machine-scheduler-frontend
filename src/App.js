@@ -267,14 +267,25 @@ function getChain(jobs, id) {
   return chain;
 }
 
-// === Section 5: FETCH & MERGE (with Placeholder Injection) ===
+// === Section 5: FETCH & MERGE (with shared manualState) ===
 const fetchAll = async () => {
+  console.log('fetchAll ▶ start');
   try {
-    // 1) Load manual state from localStorage
-    const manualState = JSON.parse(
-      localStorage.getItem('manualState') ||
-        JSON.stringify({ machine1: [], machine2: [] })
-    );
+    // 1) Fetch manualState, orders, embroideryList, and links in parallel
+    const [manualRes, ordersRes, embRes, linksRes] = await Promise.all([
+      axios.get(`${API_ROOT}/manualState`),
+      axios.get(`${API_ROOT}/orders`),
+      axios.get(`${API_ROOT}/embroideryList`),
+      axios.get(`${API_ROOT}/links`)
+    ]);
+
+    const manualState = manualRes.data   || { machine1: [], machine2: [] };
+    const orders      = ordersRes.data   || [];
+    const embList     = embRes.data      || [];
+    const links       = linksRes.data    || {};
+
+    console.log('fetchAll ▶ loaded manualState:', manualState);
+    console.log('fetchAll ▶ orders count:', orders.length, 'embroideryList count:', embList.length, 'links count:', Object.keys(links).length);
 
     // 2) Preserve any previous embroidery_start (so edits stick across sync)
     const prevEmb = {};
@@ -288,24 +299,14 @@ const fetchAll = async () => {
         }
       });
 
-    // 3) Fetch live data from orders, embroideryList, and links
-    const [ordersRes, embRes, linksRes] = await Promise.all([
-      axios.get(`${API_ROOT}/orders`),
-      axios.get(`${API_ROOT}/embroideryList`),
-      axios.get(`${API_ROOT}/links`)
-    ]);
-    const orders = ordersRes.data;
-    const embList = embRes.data;
-    const links = linksRes.data || {};
-
-    // 4) Build a lookup of embroidery start times from the sheet
+    // 3) Build a lookup of embroidery start times
     const embMap = {};
     embList.forEach(row => {
       const id = String(row['Order #'] || '').trim();
       if (id) embMap[id] = row['Embroidery Start Time'] || '';
     });
 
-    // 5) Turn orders into a lookup by id, seeding start_date from embMap or prevEmb
+    // 4) Turn orders into a lookup by ID
     const jobById = {};
     orders.forEach(o => {
       const sid = String(o['Order #'] || '').trim();
@@ -313,23 +314,22 @@ const fetchAll = async () => {
       const rawTs = embMap[sid] ?? prevEmb[sid] ?? '';
       jobById[sid] = {
         id:               sid,
-        company:          o['Company Name'] || '',
-        design:           o['Design']       || '',
-        quantity:         +o['Quantity']    || 0,
-        stitch_count:     +o['Stitch Count']|| 0,
-        due_date:         o['Due Date']     || '',
-        due_type:         o['Hard/Soft Date']|| '',
+        company:          o['Company Name']   || '',
+        design:           o['Design']         || '',
+        quantity:         +o['Quantity']      || 0,
+        stitch_count:     +o['Stitch Count']  || 0,
+        due_date:         o['Due Date']       || '',
+        due_type:         o['Hard/Soft Date'] || '',
         embroidery_start: rawTs,
         start_date:       rawTs,
-        machineId:        o['Machine ID']   || 'queue',
-        linkedTo:         links[sid]        || null
+        machineId:        o['Machine ID']     || 'queue',
+        linkedTo:         links[sid]          || null
       };
     });
 
-    // 6) Inject any placeholders into the queue
+    // 5) Inject any placeholders into the queue
     placeholders.forEach(ph => {
       jobById[ph.id] = {
-        ...ph,
         id:               ph.id,
         company:          ph.company,
         design:           ph.design,
@@ -344,102 +344,87 @@ const fetchAll = async () => {
       };
     });
 
-    // 7) Apply manualState overrides for machine1 & machine2
-    ['machine1', 'machine2'].forEach(machineId => {
-      (manualState[machineId] || []).forEach(jobId => {
-        if (jobById[jobId]) jobById[jobId].machineId = machineId;
+    // 6) Apply shared manualState overrides
+    ['machine1','machine2'].forEach(colId => {
+      (manualState[colId] || []).forEach(id => {
+        if (jobById[id]) jobById[id].machineId = colId;
       });
     });
 
-    // 8) Build & sort the queue (everything not on a machine)
+    // 7) Build & sort the queue
     const queueJobs = Object.values(jobById)
-      .filter(job => !['machine1', 'machine2'].includes(job.machineId))
+      .filter(job => !['machine1','machine2'].includes(job.machineId))
       .sort((a, b) => {
-        const da = parseDueDate(a.due_date),
-              db = parseDueDate(b.due_date);
+        const da = parseDueDate(a.due_date);
+        const db = parseDueDate(b.due_date);
         if (da && db) return da - db;
         if (da) return -1;
-        if (db) return 1;
-        return 0;
+        if (db) return  1;
+        return  0;
       });
 
-    // 9) Build each machine’s list (manual-first, then auto-append)
-    const buildMachine = machineId => {
-      const manualList = manualState[machineId] || [];
+    // 8) Build each machine’s list (manual-first, then auto-append)
+    const buildMachine = colId => {
+      const manualList = manualState[colId] || [];
       const fromManual = manualList.map(id => jobById[id]).filter(Boolean);
-      const autoAppend = Object.values(jobById).filter(
-        job => job.machineId === machineId && !manualList.includes(job.id)
-      );
+      const autoAppend = Object.values(jobById)
+        .filter(job => job.machineId === colId && !manualList.includes(job.id));
       return [...fromManual, ...autoAppend];
     };
     const machine1Jobs = buildMachine('machine1');
     const machine2Jobs = buildMachine('machine2');
 
-    // 10) Schedule runtimes and update state
+    // 9) Schedule runtimes and update state
     setColumns({
       queue:    { ...columns.queue,    jobs: queueJobs },
       machine1: { ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
       machine2: { ...columns.machine2, jobs: scheduleMachineJobs(machine2Jobs) }
     });
+    console.log('fetchAll ▶ completed, columns set');
   } catch (err) {
-    console.error('fetchAll error:', err);
+    console.error('fetchAll ▶ error', err);
   }
 };
 
 
-// === Section 6: Placeholder CRUD ===
-const submitPlaceholder = () => {
-  const job = {
-    id:         ph.id || `ph-${Date.now()}`,
-    company:    ph.company,
-    quantity:   +ph.quantity || 1,
-    stitchCount:+ph.stitchCount || 30000,
-    due_date:   ph.inHand,
-    due_type:   ph.dueType,
-    machineId:  'queue',
-  };
+// === Section 6: Placeholder Management ===
+
+// Populate the modal for editing an existing placeholder
+const editPlaceholder = (id) => {
+  const p = placeholders.find(p => p.id === id);
+  if (p) {
+    setPh(p);
+    setShowModal(true);
+  }
+};
+
+// Remove a placeholder from the list
+const removePlaceholder = (id) => {
+  setPlaceholders(prev => prev.filter(p => p.id !== id));
+};
+
+// Add a new placeholder or update an existing one
+const submitPlaceholder = (e) => {
+  // If this was called from a form submit, prevent reload
+  if (e && e.preventDefault) e.preventDefault();
 
   if (ph.id) {
-    setPlaceholders(ps => ps.map(p => p.id === ph.id ? job : p));
-    setColumns(c => ({
-      ...c,
-      queue:    { ...c.queue,    jobs: c.queue.jobs.map(j => j.id === ph.id ? job : j) },
-      machine1: { ...c.machine1, jobs: c.machine1.jobs.map(j => j.id === ph.id ? job : j) },
-      machine2: { ...c.machine2, jobs: c.machine2.jobs.map(j => j.id === ph.id ? job : j) },
-    }));
+    // update
+    setPlaceholders(prev =>
+      prev.map(p => (p.id === ph.id ? ph : p))
+    );
   } else {
-    setPlaceholders(ps => [job, ...ps]);
-    setColumns(c => ({
-      ...c,
-      queue: { ...c.queue, jobs: [job, ...c.queue.jobs] }
-    }));
+    // create new (use timestamp for unique ID)
+    setPlaceholders(prev => [
+      ...prev,
+      { ...ph, id: Date.now().toString() }
+    ]);
   }
-
+  // reset modal state
   setShowModal(false);
-  setPh({ id:null, company:'', quantity:'', stitchCount:'', inHand:'', dueType:'Hard Date' });
+  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
 };
 
-const removePlaceholder = id => {
-  setPlaceholders(ps => ps.filter(p => p.id !== id));
-  setColumns(c => ({
-    ...c,
-    queue:    { ...c.queue,    jobs: c.queue.jobs.filter(j => j.id !== id) },
-    machine1: { ...c.machine1, jobs: c.machine1.jobs.filter(j => j.id !== id) },
-    machine2: { ...c.machine2, jobs: c.machine2.jobs.filter(j => j.id !== id) },
-  }));
-};
-
-const editPlaceholder = job => {
-  setPh({
-    id:         job.id,
-    company:    job.company,
-    quantity:   job.quantity,
-    stitchCount:job.stitchCount,
-    inHand:     job.due_date,
-    dueType:    job.due_type
-  });
-  setShowModal(true);
-};
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = (colId, idx) => {
   const jobs = Array.from(columns[colId].jobs);
@@ -469,8 +454,8 @@ const toggleLink = (colId, idx) => {
   }));
 };
 
-// === Section 8: Drag & Drop Handler (with Chain-aware Moves & proper unlinking) ===
-const onDragEnd = result => {
+// === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState) ===
+  const onDragEnd = async (result) => {
   const { source, destination, draggableId } = result;
   if (!destination) return;
 
@@ -480,83 +465,71 @@ const onDragEnd = result => {
   const dstIdx = destination.index;
   if (srcCol === dstCol && srcIdx === dstIdx) return;
 
-  // 1) pull out the full chain from source
+  // 1) Extract the full chain from the source column
   const srcJobs   = Array.from(columns[srcCol].jobs);
   const chainIds  = getChain(srcJobs, draggableId);
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
   const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // same‐column reorder
+  // 2) If reordering within the same column:
   if (srcCol === dstCol) {
     let insertAt = dstIdx;
     if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
+    const updatedJobs = srcCol === 'queue'
+      ? sortQueue(newSrcJobs)
+      : scheduleMachineJobs(newSrcJobs);
     setColumns(cols => ({
       ...cols,
-      [srcCol]: {
-        ...cols[srcCol],
-        jobs: srcCol === 'queue'
-          ? sortQueue(newSrcJobs)
-          : scheduleMachineJobs(newSrcJobs)
-      }
+      [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
     }));
     return;
   }
 
-  // cross‐column move
-  // A) update manualState
-  const manualState = JSON.parse(
-    localStorage.getItem('manualState') ||
-    JSON.stringify({ machine1: [], machine2: [] })
-  );
-  ['machine1','machine2'].forEach(c => {
-    manualState[c] = (manualState[c] || []).filter(id => !chainIds.includes(id));
-  });
-  if (dstCol === 'machine1' || dstCol === 'machine2') {
-    const arr = [...(manualState[dstCol] || [])];
-    arr.splice(dstIdx, 0, ...chainIds);
-    manualState[dstCol] = arr;
-  }
-  localStorage.setItem('manualState', JSON.stringify(manualState));
-  axios.post(`${API_ROOT}/manualState`, manualState).catch(console.error);
-
-  // B) build new destination list
+  // 3) Cross-column move: build the destination jobs array
   const dstJobs = Array.from(columns[dstCol].jobs);
-  const moved = chainJobs.map(j => ({
-    ...j,
+  const movedJobs = chainJobs.map(job => ({
+    ...job,
     machineId: dstCol === 'queue' ? 'queue' : dstCol,
-    // reset timing if dropping back to queue
-    ...(dstCol === 'queue'
-      ? { start: '', end: '', delivery: '', _rawStart: null, _rawEnd: null, isLate: false, linkedTo: null }
-      : {})
+    // reset timing if moving back to queue
+    ...(dstCol === 'queue' && {
+      start: '', end: '', delivery: '',
+      _rawStart: null, _rawEnd: null,
+      isLate: false, linkedTo: null
+    })
   }));
-  dstJobs.splice(dstIdx, 0, ...moved);
+  dstJobs.splice(dstIdx, 0, ...movedJobs);
 
-  // C) if dropping into queue, unlink entire chain
+  // 4) If dropping into queue, unlink the chain from links
   if (dstCol === 'queue') {
     const pruned = { ...links };
     chainIds.forEach(id => delete pruned[id]);
-    Object.keys(pruned).forEach(k => {
-      if (chainIds.includes(pruned[k])) delete pruned[k];
+    Object.keys(pruned).forEach(key => {
+      if (chainIds.includes(pruned[key])) delete pruned[key];
     });
     saveLinks(pruned);
     setLinks(pruned);
   }
 
-  // D) assemble and reschedule
+  // 5) Assemble and reschedule all columns
   const nextCols = {
     ...columns,
     [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
     [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
-  // schedule each machine
-  ['machine1','machine2'].forEach(c => {
-    nextCols[c].jobs = scheduleMachineJobs(nextCols[c].jobs);
+  ['machine1', 'machine2'].forEach(machine => {
+    nextCols[machine].jobs = scheduleMachineJobs(nextCols[machine].jobs);
   });
-  // sort the queue
   nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
 
   setColumns(nextCols);
+
+  // 6) Persist the shared manualState to backend
+  const manualState = {
+    machine1: nextCols.machine1.jobs.map(j => j.id),
+    machine2: nextCols.machine2.jobs.map(j => j.id)
+  };
+  await axios.post(`${API_ROOT}/manualState`, manualState).catch(console.error);
 };
 
 
