@@ -177,11 +177,6 @@ export default function Section9(props) {
                               ? DARK_GREY
                               : DARK_PURPLE;
 
-                          if (job.isLate) {
-                            bg = 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)';
-                            bCol = 'red';
-                          }
-
                           return (
                             <Draggable
                               key={job.id.toString()}
@@ -202,8 +197,10 @@ export default function Section9(props) {
                                     rowGap: 4,
                                     padding: '6px 28px 6px 6px',
                                     margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
-                                    background: base,
-                                    border: `2px solid ${bCol}`,
+                                    background: job.isLate
+                                      ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
+                                      : base,
+                                    border:     `2px solid ${job.isLate ? 'red' : bCol}`,
                                     borderRadius: 4,
                                     zIndex: 2,
                                     ...prov.draggableProps.style
