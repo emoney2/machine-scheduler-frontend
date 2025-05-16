@@ -12,3 +12,9 @@ yarn-error.log*
 # caches
 /.cache/
 /node_modules/.cache/
+
+# build output
+/build/
+
+# backups
+*.txt
