@@ -1,28 +1,45 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
+
 import React, { useState, useEffect } from 'react';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import debounce from "lodash.debounce";
+import { io } from 'socket.io-client';
 import axios from 'axios';
 import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
-const API_ROOT = process.env.REACT_APP_API_ROOT;
-const WORK_START_HR  = 8,  WORK_START_MIN = 30;
-const WORK_END_HR    = 16, WORK_END_MIN   = 30;
+const API_ROOT   = process.env.REACT_APP_API_ROOT;
+const SOCKET_URL = API_ROOT.replace(/\/api$/, '');
+const socket     = io(SOCKET_URL, { transports: ['websocket','polling'] });
+
+socket.on("connect",        () => console.log("⚡ socket connected, id =", socket.id));
+socket.on("disconnect",     reason => console.log("🛑 socket disconnected:", reason));
+socket.on("connect_error",  err    => console.error("🚨 socket connection error:", err));
+
+// WORK HOURS / HOLIDAYS
+const WORK_START_HR  = 8;
+const WORK_START_MIN = 30;
+const WORK_END_HR    = 16;
+const WORK_END_MIN   = 30;
 const WEEKENDS       = [0,6];
 const HOLIDAYS       = ['2025-01-01','2025-12-25'];
 
 // COLOR CONSTANTS
-const LIGHT_YELLOW  = '#FFF9C4', DARK_YELLOW  = '#FDD835';
-const LIGHT_GREY    = '#ECEFF1', DARK_GREY    = '#616161';
-const LIGHT_PURPLE  = '#E1BEE7', DARK_PURPLE  = '#6A1B9A';
+const LIGHT_YELLOW  = '#FFF9C4';
+const DARK_YELLOW   = '#FDD835';
+const LIGHT_GREY    = '#ECEFF1';
+const DARK_GREY     = '#616161';
+const LIGHT_PURPLE  = '#E1BEE7';
+const DARK_PURPLE   = '#6A1B9A';
 const BUBBLE_START  = '#e0f7fa';
 const BUBBLE_END    = '#ffe0b2';
 const BUBBLE_DELIV  = '#c8e6c9';
 
 export default function App() {
+  console.log('🔔 App component mounted');
+
   // live sheet data
   const [orders, setOrders]                 = useState([]);
   const [embroideryList, setEmbroideryList] = useState([]);
@@ -41,7 +58,10 @@ export default function App() {
     machine1: { title: 'Machine 1', jobs: [] },
     machine2: { title: 'Machine 2', jobs: [] },
   });
-  const [links, setLinks]           = useState(loadLinks());
+  const [links, setLinks]           = useState(() => {
+    try { return JSON.parse(localStorage.getItem('jobLinks') || '{}'); }
+    catch { return {}; }
+  });
   const [syncStatus, setSyncStatus] = useState('');
 
   // Modal form state
@@ -60,7 +80,29 @@ export default function App() {
     fetchAll();
   }, []);
 
-  // Manual sync handler
+  
+// Real-time updates listener
+useEffect(() => {
+  // debounce so rapid events don’t slam fetchAll
+  const handleUpdate = debounce(() => {
+    console.log("🛰️ remote update – re-fetching");
+    fetchAll();
+  }, 1000);
+
+  socket.on("manualStateUpdated", handleUpdate);
+  socket.on("orderUpdated",         handleUpdate);
+
+  return () => {
+    socket.off("manualStateUpdated", handleUpdate);
+    socket.off("orderUpdated",         handleUpdate);
+    handleUpdate.cancel(); // clear any pending debounce
+  };
+}, []);
+
+
+
+
+  // Manual sync button handler
   const handleSync = async () => {
     setSyncStatus('');
     await fetchAll();
@@ -124,15 +166,16 @@ function addWorkTime(start, ms) {
 }
 
 function fmtDT(dt) {
-  const pad = n => String(n).padStart(2,'0');
+  const pad = n => String(n).padStart(2, '0');
   const month = pad(dt.getMonth() + 1);
   const day   = pad(dt.getDate());
-  let h = dt.getHours(),
-      m = pad(dt.getMinutes()),
-      ap = h >= 12 ? 'PM' : 'AM';
+  let h       = dt.getHours();
+  const m     = pad(dt.getMinutes());
+  let ap      = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
-  return `${month}/${day} ${pad(h)}:${m} ${ap}`;
+  return month + '/' + day + ' ' + pad(h) + ':' + m + ' ' + ap;
 }
+
 
 function parseDueDate(d) {
   if (!d) return null;
@@ -141,7 +184,9 @@ function parseDueDate(d) {
   if (parts.length >= 2) {
     const mo = +parts[0], da = +parts[1],
           yr = parts.length === 3 ? +parts[2] : new Date().getFullYear();
-    if (!isNaN(mo) && !isNaN(da) && !isNaN(yr)) return new Date(yr, mo-1, da);
+    if (!isNaN(mo) && !isNaN(da) && !isNaN(yr)) {
+      return new Date(yr, mo - 1, da);
+    }
   }
   const dt = new Date(d);
   return isNaN(dt) ? null : dt;
@@ -150,7 +195,7 @@ function parseDueDate(d) {
 function addWorkDays(start, days) {
   let d = new Date(start), added = 0;
   while (added < days) {
-    d.setDate(d.getDate()+1);
+    d.setDate(d.getDate() + 1);
     if (isWorkday(d)) added++;
   }
   return d;
@@ -159,7 +204,7 @@ function addWorkDays(start, days) {
 function subWorkDays(start, days) {
   let d = new Date(start), removed = 0;
   while (removed < days) {
-    d.setDate(d.getDate()-1);
+    d.setDate(d.getDate() - 1);
     if (isWorkday(d)) removed++;
   }
   return d;
@@ -167,14 +212,15 @@ function subWorkDays(start, days) {
 
 function fmtMMDD(d) {
   const dt = new Date(d);
-  const mo = String(dt.getMonth()+1).padStart(2,'0');
-  const da = String(dt.getDate()).padStart(2,'0');
-  return `${mo}/${da}`;
+  const mo = String(dt.getMonth() + 1).padStart(2, '0');
+  const da = String(dt.getDate()).padStart(2, '0');
+  return mo + '/' + da;
 }
 
 function sortQueue(arr) {
-  return [...arr].sort((a,b) => {
-    const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
+  return [...arr].sort((a, b) => {
+    const da = parseDueDate(a.due_date);
+    const db = parseDueDate(b.due_date);
     if (da && db) return da - db;
     if (da) return -1;
     if (db) return 1;
@@ -198,22 +244,24 @@ function scheduleMachineJobs(jobs) {
       if (job.embroidery_start) {
         start = clampToWorkHours(new Date(job.embroidery_start));
       } else {
-        const nowIso = new Date().toISOString();
-        job.embroidery_start = nowIso;
-        start = clampToWorkHours(new Date(nowIso));
-        axios
-          .put(`${API_ROOT}/orders/${job.id}`, { embroidery_start: nowIso })
-          .catch(console.error);
+        start = clampToWorkHours(new Date());
       }
     } else {
-      start = clampToWorkHours(new Date(prevEnd.getTime() + 30*60000));
+      start = clampToWorkHours(new Date(prevEnd.getTime() + 30 * 60000));
     }
 
     // 3) Run → end
-    const qty   = job.quantity % 6 === 0
+    //   round quantity up to multiple of 6
+    const qty = job.quantity % 6 === 0
       ? job.quantity
-      : Math.ceil(job.quantity/6)*6;
-    const runMs = (job.stitchCount/30000)*(qty/6)*3600000;
+      : Math.ceil(job.quantity / 6) * 6;
+
+    //   if stitch_count is zero or missing, use 30000 as placeholder
+    const stitches = job.stitch_count > 0
+      ? job.stitch_count
+      : 30000;
+
+    const runMs = (stitches / 30000) * (qty / 6) * 3600000;
     const end   = addWorkTime(start, runMs);
 
     // 4) Decorate
@@ -221,13 +269,14 @@ function scheduleMachineJobs(jobs) {
     job._rawEnd   = end;
     job.start     = fmtDT(start);
     job.end       = fmtDT(end);
-    job.delivery  = fmtMMDD(addWorkDays(end,6));
+    job.delivery  = fmtMMDD(addWorkDays(end, 6));
     job.isLate    = end > cutoff;
 
     prevEnd = end;
     return job;
   });
 }
+
 
 // === Section 4: Link Utilities ===
 function loadLinks() {
@@ -273,10 +322,10 @@ const fetchAll = async () => {
   try {
     // 1) Fetch manualState, orders, embroideryList, and links in parallel
     const [manualRes, ordersRes, embRes, linksRes] = await Promise.all([
-      axios.get(`${API_ROOT}/manualState`),
-      axios.get(`${API_ROOT}/orders`),
-      axios.get(`${API_ROOT}/embroideryList`),
-      axios.get(`${API_ROOT}/links`)
+      axios.get(API_ROOT + '/manualState'),
+      axios.get(API_ROOT + '/orders'),
+      axios.get(API_ROOT + '/embroideryList'),
+      axios.get(API_ROOT + '/links')
     ]);
 
     const manualState = manualRes.data   || { machine1: [], machine2: [] };
@@ -285,7 +334,11 @@ const fetchAll = async () => {
     const links       = linksRes.data    || {};
 
     console.log('fetchAll ▶ loaded manualState:', manualState);
-    console.log('fetchAll ▶ orders count:', orders.length, 'embroideryList count:', embList.length, 'links count:', Object.keys(links).length);
+    console.log(
+      'fetchAll ▶ orders count:', orders.length,
+      'embroideryList count:', embList.length,
+      'links count:', Object.keys(links).length
+    );
 
     // 2) Preserve any previous embroidery_start (so edits stick across sync)
     const prevEmb = {};
@@ -319,7 +372,7 @@ const fetchAll = async () => {
         quantity:         +o['Quantity']      || 0,
         stitch_count:     +o['Stitch Count']  || 0,
         due_date:         o['Due Date']       || '',
-        due_type:         o['Hard/Soft Date'] || '',
+        due_type:         o['Hard Date/Soft Date'] || '',
         embroidery_start: rawTs,
         start_date:       rawTs,
         machineId:        o['Machine ID']     || 'queue',
@@ -345,7 +398,7 @@ const fetchAll = async () => {
     });
 
     // 6) Apply shared manualState overrides
-    ['machine1','machine2'].forEach(colId => {
+    ['machine1', 'machine2'].forEach(colId => {
       (manualState[colId] || []).forEach(id => {
         if (jobById[id]) jobById[id].machineId = colId;
       });
@@ -353,7 +406,7 @@ const fetchAll = async () => {
 
     // 7) Build & sort the queue
     const queueJobs = Object.values(jobById)
-      .filter(job => !['machine1','machine2'].includes(job.machineId))
+      .filter(job => !['machine1', 'machine2'].includes(job.machineId))
       .sort((a, b) => {
         const da = parseDueDate(a.due_date);
         const db = parseDueDate(b.due_date);
@@ -409,17 +462,18 @@ const submitPlaceholder = (e) => {
   if (e && e.preventDefault) e.preventDefault();
 
   if (ph.id) {
-    // update
+    // update existing placeholder
     setPlaceholders(prev =>
       prev.map(p => (p.id === ph.id ? ph : p))
     );
   } else {
-    // create new (use timestamp for unique ID)
+    // create new placeholder (use 'ph-' prefix for identification)
     setPlaceholders(prev => [
       ...prev,
-      { ...ph, id: Date.now().toString() }
+      { ...ph, id: `ph-${Date.now()}` }
     ]);
   }
+
   // reset modal state
   setShowModal(false);
   setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
@@ -455,9 +509,16 @@ const toggleLink = (colId, idx) => {
 };
 
 // === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState) ===
-  const onDragEnd = async (result) => {
+const onDragEnd = async (result) => {
+  // 🔍 DEBUGGING INSTRUMENTATION
+  console.log("🔍 DRAG-END result:", result);
+  console.log("🔍 BEFORE COLUMNS:", JSON.stringify(columns, null, 2));
+
   const { source, destination, draggableId } = result;
-  if (!destination) return;
+  if (!destination) {
+    console.log("→ No destination, aborting");
+    return;
+  }
 
   const srcCol = source.droppableId;
   const dstCol = destination.droppableId;
@@ -483,6 +544,10 @@ const toggleLink = (colId, idx) => {
       ...cols,
       [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
     }));
+    console.log('⏹ onDragEnd end (reorder same col), new columns:', {
+      ...columns,
+      [srcCol]: { ...columns[srcCol], jobs: updatedJobs }
+    });
     return;
   }
 
@@ -491,7 +556,6 @@ const toggleLink = (colId, idx) => {
   const movedJobs = chainJobs.map(job => ({
     ...job,
     machineId: dstCol === 'queue' ? 'queue' : dstCol,
-    // reset timing if moving back to queue
     ...(dstCol === 'queue' && {
       start: '', end: '', delivery: '',
       _rawStart: null, _rawEnd: null,
@@ -522,18 +586,27 @@ const toggleLink = (colId, idx) => {
   });
   nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
 
+  // update state
   setColumns(nextCols);
 
-  // 6) Persist the shared manualState to backend
+  // 🔍 DEBUG: log the resulting new columns
+  console.log('⏹ onDragEnd end (cross-col), new columns:', nextCols);
+
+  // 6) Persist the shared manualState to backend (no fetchAll here)
   const manualState = {
     machine1: nextCols.machine1.jobs.map(j => j.id),
     machine2: nextCols.machine2.jobs.map(j => j.id)
   };
-  await axios.post(`${API_ROOT}/manualState`, manualState).catch(console.error);
+  console.log('⏹ Persisting manualState to server:', manualState);
+  await axios
+    .post(API_ROOT + '/manualState', manualState)
+    .then(() => console.log('✅ manualState saved'))
+    .catch(err => console.error('❌ manualState save failed', err));
 };
 
 
 // === Section 9: Render via Section9.jsx ===
+
   return (
     <div>
       <Section9
@@ -562,4 +635,5 @@ const toggleLink = (colId, idx) => {
       />
     </div>
   );
-} // end of App component
+
+}
