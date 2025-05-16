@@ -156,11 +156,11 @@ export default function Section9(props) {
                         }}
                       >
                         {jobs.slice(seg.start, seg.start + seg.len).map((job, jIdx) => {
-                          console.log('JOB FIELDS:', Object.keys(job), 'dueType=', job.dueType);
+                          console.log('JOB FIELDS:', Object.keys(job), 'dueType=', job.due_type);
 
                           const globalIdx = seg.start + jIdx;
                           const isPh = String(job.id).startsWith('ph-');
-                          const isSoft = job.dueType === 'Soft Date';
+                          const isSoft = job.due_type === 'Soft Date';
                           const base = isPh
                             ? LIGHT_YELLOW
                             : isSoft
@@ -221,7 +221,11 @@ export default function Section9(props) {
                                     fontSize: 10,
                                     fontWeight: 'bold',
                                   }}>
-                                    {isPh ? '' : job.dueType === 'Hard Date' ? 'H' : 'S'}
+                                    {isPh
+  ? ''
+  : job.due_type === 'Hard Date'
+    ? 'H'
+    : 'S'}
                                   </span>
 
                                   {jIdx === 0 && seg.len > 1 && (
@@ -331,7 +335,7 @@ export default function Section9(props) {
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                                     fontSize: 11, fontWeight: 'bold', zIndex: 4
                                   }}>
-                                    {(job.dueType || '')[0]}
+                                    {(job.due_type || '')[0]}
                                   </div>
 
                                   {globalIdx < jobs.length - 1 && (
