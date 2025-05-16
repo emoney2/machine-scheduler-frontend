@@ -195,23 +195,33 @@ export default function Section9(props) {
                                     rowGap: 4,
                                     padding: '6px 28px 6px 6px',
                                     margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
-                                    background: job.due_type === 'Hard Date' ? '#D1C4E9' : '#E0E0E0',
+                                    background: base,
                                     border: `2px solid ${bCol}`,
                                     borderRadius: 4,
                                     zIndex: 2,
                                     ...prov.draggableProps.style
                                   }}
                                 >
+
                                   {/* H/S badge */}
                                   <span style={{
                                     position: 'absolute',
                                     top: 4,
                                     right: 4,
-                                    fontSize: 12,
-                                    fontWeight: 'bold'
+                                    width: 16,
+                                    height: 16,
+                                    background: base,
+                                    border: `1px solid ${bCol}`,
+                                    borderRadius: 2,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 10,
+                                    fontWeight: 'bold',
                                   }}>
-                                    {job.due_type === 'Hard Date' ? 'H' : 'S'}
+                                    {isPh ? '' : job.due_type === 'Hard Date' ? 'H' : 'S'}
                                   </span>
+
                                   {jIdx === 0 && seg.len > 1 && (
                                     <div style={{
                                       position: 'absolute', top: 0, right: 0,
