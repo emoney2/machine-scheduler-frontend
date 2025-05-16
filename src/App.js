@@ -450,10 +450,10 @@ useEffect(() => {
 
 // === Section 5.2: Poll the sheet every 60s ===
 useEffect(() => {
-  // initial load
+   console.log('📡 Starting polling & initial fetch');
   fetchAllRef.current();
-  // then re-fetch once per minute
   const id = setInterval(() => fetchAllRef.current(), 60_000);
+     console.log('📡 Poll: calling fetchAll');
   return () => clearInterval(id);
 }, []);
 
