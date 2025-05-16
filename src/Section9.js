@@ -160,19 +160,23 @@ export default function Section9(props) {
                           console.log('due_type value =', job.due_type);
 
                           const globalIdx = seg.start + jIdx;
-                          const isPh = String(job.id).startsWith('ph-');
-                          const isSoft = job.due_type === 'Soft Date';
+
+                          const isPh   = String(job.id).startsWith('ph-');
+                          const isHard = job.due_type === 'Hard Date';
+                          const isSoft = !isPh && !isHard;  // everything that isn’t placeholder or hard is soft
+
                           const base = isPh
                             ? LIGHT_YELLOW
                             : isSoft
                               ? LIGHT_GREY
                               : LIGHT_PURPLE;
-                          let bg = base;
-                          let bCol = isPh
+
+                          const bCol = isPh
                             ? DARK_YELLOW
                             : isSoft
                               ? DARK_GREY
                               : DARK_PURPLE;
+
                           if (job.isLate) {
                             bg = 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)';
                             bCol = 'red';
@@ -222,11 +226,7 @@ export default function Section9(props) {
                                     fontSize: 10,
                                     fontWeight: 'bold',
                                   }}>
-                                    {isPh
-  ? ''
-  : job.due_type === 'Hard Date'
-    ? 'H'
-    : 'S'}
+                                    {isPh ? '' : isHard ? 'H' : 'S'}
                                   </span>
 
                                   {jIdx === 0 && seg.len > 1 && (
