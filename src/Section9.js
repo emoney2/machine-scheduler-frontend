@@ -164,6 +164,15 @@ export default function Section9(props) {
                           const isPh = String(job.id).startsWith('ph-');
                           const isHard = job.due_type === 'Hard Date';
                           const isSoft = !isPh && !isHard;
+                          console.log(
+                            'CLASSIFY:',
+                            'id=', job.id,
+                            'due_type=', job.due_type,
+                            'isPh=', isPh,
+                            'isHard=', isHard,
+                            'isSoft=', isSoft
+                          );
+
 
                           // pick colors
                           const base = isPh
