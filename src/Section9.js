@@ -156,6 +156,8 @@ export default function Section9(props) {
                         }}
                       >
                         {jobs.slice(seg.start, seg.start + seg.len).map((job, jIdx) => {
+                          console.log('JOB FIELDS:', Object.keys(job), 'dueType=', job.dueType);
+
                           const globalIdx = seg.start + jIdx;
                           const isPh = String(job.id).startsWith('ph-');
                           const isSoft = job.dueType === 'Soft Date';
