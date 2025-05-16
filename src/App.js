@@ -1,7 +1,7 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
 import { io } from 'socket.io-client';
 import axios from 'axios';
@@ -361,14 +361,13 @@ const fetchAll = async () => {
       if (id) embMap[id] = row['Embroidery Start Time'] || '';
     });
 
-    // 4) Turn orders into a lookup by ID, and set due_type correctly
+    // 4) Turn orders into a lookup by ID
     const jobById = {};
     orders.forEach(o => {
       const sid = String(o['Order #'] || '').trim();
       if (!sid) return;
       const rawTs = embMap[sid] ?? prevEmb[sid] ?? '';
 
-      // 👉 pick the correct sheet column for due_type
       jobById[sid] = {
         id:               sid,
         company:          o['Company Name']   || '',
@@ -376,7 +375,6 @@ const fetchAll = async () => {
         quantity:         +o['Quantity']      || 0,
         stitch_count:     +o['Stitch Count']  || 0,
         due_date:         o['Due Date']       || '',
-        // ← single source of truth here:
         due_type:         o['Hard Date/Soft Date'] || '',
         embroidery_start: rawTs,
         start_date:       rawTs,
@@ -443,6 +441,21 @@ const fetchAll = async () => {
     console.error('fetchAll ▶ error', err);
   }
 };
+
+// === Section 5.1: Keep fetchAll in a ref ===
+const fetchAllRef = useRef(fetchAll);
+useEffect(() => {
+  fetchAllRef.current = fetchAll;
+}, [fetchAll]);
+
+// === Section 5.2: Poll the sheet every 60s ===
+useEffect(() => {
+  // initial load
+  fetchAllRef.current();
+  // then re-fetch once per minute
+  const id = setInterval(() => fetchAllRef.current(), 60_000);
+  return () => clearInterval(id);
+}, []);
 
 
 // === Section 6: Placeholder Management ===
