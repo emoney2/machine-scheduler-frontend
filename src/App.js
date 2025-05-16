@@ -82,19 +82,23 @@ export default function App() {
 
   
 // Real-time updates listener
- useEffect(() => {
-   const handleUpdate = debounce(() => {
-     console.log("🛰️ remote update – re-fetching");
-     fetchAll();
-   }, 1000);
+useEffect(() => {
+  const handleUpdate = debounce(() => {
+    console.log("🛰️ remote update – re-fetching");
+    fetchAll();
+  }, 1000);
 
-   socket.on("orderUpdated",         handleUpdate);
+  socket.on("manualStateUpdated", handleUpdate);
+  socket.on("orderUpdated",         handleUpdate);
 
-   return () => {
-     socket.off("orderUpdated",         handleUpdate);
-     handleUpdate.cancel();
-   };
- }, []);
+  return () => {
+    socket.off("manualStateUpdated", handleUpdate);
+    socket.off("orderUpdated",         handleUpdate);
+    handleUpdate.cancel();
+  };
+}, []);
+
+
 
 
 
