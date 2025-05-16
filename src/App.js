@@ -332,8 +332,6 @@ const fetchAll = async () => {
 
     const manualState = manualRes.data   || { machine1: [], machine2: [] };
     const orders      = ordersRes.data   || [];
-    console.log('ORDERS SAMPLE KEYS:', Object.keys(orders[0] || {}));
-    console.log('ORDERS SAMPLE VALUE:', orders[0]);
     const embList     = embRes.data      || [];
     const links       = linksRes.data    || {};
 

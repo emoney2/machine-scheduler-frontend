@@ -156,22 +156,13 @@ export default function Section9(props) {
                         }}
                       >
                         {jobs.slice(seg.start, seg.start + seg.len).map((job, jIdx) => {
-                          console.log('JOB FIELDS:', Object.keys(job), 'dueType=', job.due_type);
-                          console.log('due_type value =', job.due_type);
 
                           const globalIdx = seg.start + jIdx;
 
                           const isPh = String(job.id).startsWith('ph-');
                           const isHard = job.due_type === 'Hard Date';
                           const isSoft = !isPh && !isHard;
-                          console.log(
-                            'CLASSIFY:',
-                            'id=', job.id,
-                            'due_type=', job.due_type,
-                            'isPh=', isPh,
-                            'isHard=', isHard,
-                            'isSoft=', isSoft
-                          );
+
 
 
                           // pick colors
