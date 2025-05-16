@@ -161,14 +161,11 @@ export default function Section9(props) {
 
                           const globalIdx = seg.start + jIdx;
 
-                          const rawHard = job['Hard Date'];
-                          const rawSoft = job['Soft Date'];
+                          const isPh = String(job.id).startsWith('ph-');
+                          const isHard = job.due_type === 'Hard Date';
+                          const isSoft = !isPh && !isHard;
 
-
-                          const isPh   = String(job.id).startsWith('ph-');
-                          const isHard = Boolean(rawHard);
-                          const isSoft = !isPh && Boolean(rawSoft);
-
+                          // pick colors
                           const base = isPh
                             ? LIGHT_YELLOW
                             : isSoft
