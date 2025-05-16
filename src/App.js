@@ -369,9 +369,6 @@ const fetchAll = async () => {
       const rawTs = embMap[sid] ?? prevEmb[sid] ?? '';
 
       // 👉 pick the correct sheet column for due_type
-      const hardVal = o['Hard Date'];
-      const softVal = o['Soft Date'];
-
       jobById[sid] = {
         id:               sid,
         company:          o['Company Name']   || '',
@@ -379,11 +376,8 @@ const fetchAll = async () => {
         quantity:         +o['Quantity']      || 0,
         stitch_count:     +o['Stitch Count']  || 0,
         due_date:         o['Due Date']       || '',
-        due_type:         hardVal
-                           ? 'Hard Date'
-                           : softVal
-                             ? 'Soft Date'
-                             : '',
+        // ← single source of truth here:
+        due_type:         o['Hard Date/Soft Date'] || '',
         embroidery_start: rawTs,
         start_date:       rawTs,
         machineId:        o['Machine ID']     || 'queue',
