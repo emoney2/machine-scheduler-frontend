@@ -327,18 +327,6 @@ export default function Section9(props) {
                                     </span>
                                   )}
 
-                                  <div style={{
-                                    position: 'absolute', top: 0, right: 0,
-                                    width: 28, height: 28,
-                                    background: base,
-                                    borderTopRightRadius: 4,
-                                    borderBottomLeftRadius: 4,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 11, fontWeight: 'bold', zIndex: 4
-                                  }}>
-                                    {(job.due_type || '')[0]}
-                                  </div>
-
                                   {globalIdx < jobs.length - 1 && (
                                     <div
                                       onClick={() => toggleLink(colId, globalIdx)}
