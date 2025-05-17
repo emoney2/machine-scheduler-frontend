@@ -505,7 +505,7 @@ const submitPlaceholder = (e) => {
 
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
-  // 1) Clone the current jobs & find the pair we’re linking/unlinking
+  // 1) Clone the current jobs & find the pair we’re (un)linking
   const jobs = Array.from(columns[colId].jobs);
   const job  = jobs[idx];
   const next = jobs[idx + 1];
@@ -523,7 +523,7 @@ const toggleLink = async (colId, idx) => {
   // 3) Persist to server
   try {
     await axios.post(API_ROOT + '/links', newLinks);
-    // the server will do: socketio.emit("linksUpdated", newLinks)
+    // server will broadcast socketio.emit("linksUpdated", newLinks)
   } catch (err) {
     console.error("❌ failed to save links to server", err);
   }
@@ -538,6 +538,7 @@ const toggleLink = async (colId, idx) => {
     [colId]: { ...cols[colId], jobs }
   }));
 };
+
 
 
 // === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState) ===
