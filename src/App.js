@@ -462,42 +462,33 @@ useEffect(() => {
 
 
 // === Section 6: Placeholder Management ===
+
+// Populate the modal for editing an existing placeholder
+const editPlaceholder = (id) => {
+  const p = placeholders.find(p => p.id === id);
+  if (p) {
+    setPh(p);
+    setShowModal(true);
+  }
+};
+
+// Remove a placeholder
+const removePlaceholder = (id) => {
+  setPlaceholders(prev => prev.filter(p => p.id !== id));
+};
+
+// Add or update a placeholder
 const submitPlaceholder = (e) => {
   if (e && e.preventDefault) e.preventDefault();
-
-  setPlaceholders(prev => {
-    let updated;
-    if (ph.id) {
-      // update existing
-      updated = prev.map(p => p.id === ph.id ? ph : p);
-    } else {
-      // new placeholder
-      updated = [
-        ...prev,
-        { ...ph, id: `ph-${Date.now()}` }
-      ];
-    }
-
-    // broadcast to everyone
-    socket.emit("placeholdersUpdated", updated);
-
-    // re-fetch so queue immediately shows it
-    fetchAll();
-
-    return updated;
-  });
-
-  // reset modal
+  if (ph.id) {
+    setPlaceholders(prev => prev.map(p => p.id === ph.id ? ph : p));
+  } else {
+    setPlaceholders(prev => [...prev, { ...ph, id: `ph-${Date.now()}` }]);
+  }
   setShowModal(false);
-  setPh({
-    id:          null,
-    company:     "",
-    quantity:    "",
-    stitchCount: "",
-    inHand:      "",
-    dueType:     "Hard Date"
-  });
+  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
 };
+
 
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
