@@ -77,9 +77,13 @@ export default function App() {
 
   // Initial data load
   useEffect(() => {
-    fetchAll();
-  }, []);
+    const handle = setInterval(() => {
+      console.log("⏳ Auto-refresh polling");
+      fetchAll();
+    }, 10_000);          // 10,000ms = 10 seconds
 
+  return () => clearInterval(handle);
+}, []);
   
 // Real-time updates listener
 useEffect(() => {
