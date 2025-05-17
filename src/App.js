@@ -92,23 +92,19 @@ useEffect(() => {
     fetchAll();
   }, 1000);
 
-  socket.on("manualStateUpdated", handleUpdate);
+  socket.on("manualStateUpdated",   handleUpdate);
   socket.on("orderUpdated",         handleUpdate);
   socket.on("linksUpdated",         handleUpdate);
+  socket.on("placeholdersUpdated",  handleUpdate);
 
   return () => {
-    socket.off("manualStateUpdated", handleUpdate);
+    socket.off("manualStateUpdated",   handleUpdate);
     socket.off("orderUpdated",         handleUpdate);
     socket.off("linksUpdated",         handleUpdate);
+    socket.off("placeholdersUpdated",  handleUpdate);
     handleUpdate.cancel();
   };
 }, []);
-
-
-
-
-
-
 
   // Manual sync button handler
   const handleSync = async () => {
@@ -466,42 +462,41 @@ useEffect(() => {
 
 
 // === Section 6: Placeholder Management ===
-
-// Populate the modal for editing an existing placeholder
-const editPlaceholder = (id) => {
-  const p = placeholders.find(p => p.id === id);
-  if (p) {
-    setPh(p);
-    setShowModal(true);
-  }
-};
-
-// Remove a placeholder from the list
-const removePlaceholder = (id) => {
-  setPlaceholders(prev => prev.filter(p => p.id !== id));
-};
-
-// Add a new placeholder or update an existing one
 const submitPlaceholder = (e) => {
-  // If this was called from a form submit, prevent reload
   if (e && e.preventDefault) e.preventDefault();
 
-  if (ph.id) {
-    // update existing placeholder
-    setPlaceholders(prev =>
-      prev.map(p => (p.id === ph.id ? ph : p))
-    );
-  } else {
-    // create new placeholder (use 'ph-' prefix for identification)
-    setPlaceholders(prev => [
-      ...prev,
-      { ...ph, id: `ph-${Date.now()}` }
-    ]);
-  }
+  setPlaceholders(prev => {
+    let updated;
+    if (ph.id) {
+      // update existing
+      updated = prev.map(p => p.id === ph.id ? ph : p);
+    } else {
+      // new placeholder
+      updated = [
+        ...prev,
+        { ...ph, id: `ph-${Date.now()}` }
+      ];
+    }
 
-  // reset modal state
+    // broadcast to everyone
+    socket.emit("placeholdersUpdated", updated);
+
+    // re-fetch so queue immediately shows it
+    fetchAll();
+
+    return updated;
+  });
+
+  // reset modal
   setShowModal(false);
-  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
+  setPh({
+    id:          null,
+    company:     "",
+    quantity:    "",
+    stitchCount: "",
+    inHand:      "",
+    dueType:     "Hard Date"
+  });
 };
 
 // === Section 7: toggleLink (full replacement) ===
