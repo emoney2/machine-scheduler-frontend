@@ -94,10 +94,12 @@ useEffect(() => {
 
   socket.on("manualStateUpdated", handleUpdate);
   socket.on("orderUpdated",         handleUpdate);
+  socket.on("linksUpdated",         handleUpdate);
 
   return () => {
     socket.off("manualStateUpdated", handleUpdate);
     socket.off("orderUpdated",         handleUpdate);
+    socket.off("linksUpdated",         handleUpdate);
     handleUpdate.cancel();
   };
 }, []);
@@ -502,33 +504,41 @@ const submitPlaceholder = (e) => {
 };
 
 // === Section 7: toggleLink (full replacement) ===
-const toggleLink = (colId, idx) => {
+const toggleLink = async (colId, idx) => {
+  // 1) Clone the current jobs & find the pair we’re linking/unlinking
   const jobs = Array.from(columns[colId].jobs);
   const job  = jobs[idx];
   const next = jobs[idx + 1];
 
-  // build a new links map
+  // 2) Build a new links map
   const newLinks = { ...links };
   if (job.linkedTo === next?.id) {
     // unlink
     delete newLinks[job.id];
-  } else {
+  } else if (next) {
     // link
-    if (next) newLinks[job.id] = next.id;
+    newLinks[job.id] = next.id;
   }
-  saveLinks(newLinks);
+
+  // 3) Persist to server
+  try {
+    await axios.post(API_ROOT + '/links', newLinks);
+    // the server will do: socketio.emit("linksUpdated", newLinks)
+  } catch (err) {
+    console.error("❌ failed to save links to server", err);
+  }
+
+  // 4) Update local state immediately
   setLinks(newLinks);
 
-  // also update the in-memory jobs so UI updates immediately
-  jobs[idx] = {
-    ...job,
-    linkedTo: job.linkedTo === next?.id ? null : next?.id
-  };
+  // 5) Also update the in-memory jobs so UI updates instantly
+  jobs[idx] = { ...job, linkedTo: newLinks[job.id] || null };
   setColumns(cols => ({
     ...cols,
     [colId]: { ...cols[colId], jobs }
   }));
 };
+
 
 // === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState) ===
 const onDragEnd = async (result) => {
