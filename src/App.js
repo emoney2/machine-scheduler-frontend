@@ -505,38 +505,35 @@ const submitPlaceholder = (e) => {
 
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
-  // 1) Clone the current jobs & find the pair we’re (un)linking
-  const jobs = Array.from(columns[colId].jobs);
+  // 1) grab the two jobs in question
+  const jobs = columns[colId].jobs;
   const job  = jobs[idx];
   const next = jobs[idx + 1];
+  if (!next) return; // nothing to link/unlink
 
-  // 2) Build a new links map
+  // 2) build a new links map
   const newLinks = { ...links };
-  if (job.linkedTo === next?.id) {
-    // unlink
+  if (newLinks[job.id] === next.id) {
+    // already linked → unlink
     delete newLinks[job.id];
-  } else if (next) {
-    // link
+  } else {
+    // not linked → link
     newLinks[job.id] = next.id;
   }
 
-  // 3) Persist to server
+  // 3) persist to server
   try {
     await axios.post(API_ROOT + '/links', newLinks);
-    // server will broadcast socketio.emit("linksUpdated", newLinks)
+    // server will emit "linksUpdated" to *all* clients
   } catch (err) {
-    console.error("❌ failed to save links to server", err);
+    console.error('❌ failed to save links to server', err);
   }
 
-  // 4) Update local state immediately
+  // 4) optimistically update local links state
   setLinks(newLinks);
 
-  // 5) Also update the in-memory jobs so UI updates instantly
-  jobs[idx] = { ...job, linkedTo: newLinks[job.id] || null };
-  setColumns(cols => ({
-    ...cols,
-    [colId]: { ...cols[colId], jobs }
-  }));
+  // 5) re-fetch everything so columns.jobs get updated with the new links
+  fetchAll();
 };
 
 
