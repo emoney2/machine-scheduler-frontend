@@ -480,15 +480,13 @@ const submitPlaceholder = async (e) => {
   // build new placeholders array
   let updated;
   if (ph.id) {
-    // editing an existing placeholder
     updated = placeholders.map(p => p.id === ph.id ? ph : p);
   } else {
-    // creating a brand-new placeholder
     const newPh = { ...ph, id: `ph-${Date.now()}` };
     updated = [...placeholders, newPh];
   }
 
-  // package up current machine assignments + placeholders
+  // prepare the manualState payload (machine order + placeholders)
   const manualState = {
     machine1: columns.machine1.jobs.map(j => j.id),
     machine2: columns.machine2.jobs.map(j => j.id),
@@ -496,24 +494,20 @@ const submitPlaceholder = async (e) => {
   };
 
   try {
-    // persist to your Flask backend → Google Sheets
     await axios.post(API_ROOT + '/manualState', manualState);
-    // server will broadcast "manualStateUpdated" → fetchAll()
-  } catch (err) {
-    console.error('❌ failed to save manual state:', err);
-  }
 
-  // update local UI immediately
-  setPlaceholders(updated);
-  setShowModal(false);
-  setPh({
-    id:          null,
-    company:     '',
-    quantity:    '',
-    stitchCount: '',
-    inHand:      '',
-    dueType:     'Hard Date'
-  });
+    // update local placeholders array
+    setPlaceholders(updated);
+
+    // close modal and reset form
+    setShowModal(false);
+    setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
+
+    // **new**: re-fetch everything so the queue shows your placeholder immediately
+    await fetchAll();
+  } catch (err) {
+    console.error('❌ failed to save placeholders', err);
+  }
 };
 
 // Populate the modal for editing an existing placeholder
@@ -532,11 +526,14 @@ const removePlaceholder = async (id) => {
   };
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
+    setPlaceholders(updated);
+    // **new**: re-fetch so the card disappears without a full page reload
+    await fetchAll();
   } catch (err) {
     console.error('❌ failed to remove placeholder', err);
   }
-  setPlaceholders(updated);
 };
+
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
   // 1) Copy current jobs in that column
