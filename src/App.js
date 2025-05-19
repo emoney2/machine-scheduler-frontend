@@ -320,11 +320,11 @@ function getChain(jobs, id) {
   return chain;
 }
 
-// === Section 5: FETCH & MERGE (with shared manualState) ===
+// === Section 5: FETCH & MERGE (with placeholders from server) ===
 const fetchAll = async () => {
   console.log('fetchAll ▶ start');
   try {
-    // 1) Fetch manualState, orders, embroideryList, and links in parallel
+    // 1) Fetch manualState (includes placeholders), orders, embroideryList, links
     const [manualRes, ordersRes, embRes, linksRes] = await Promise.all([
       axios.get(API_ROOT + '/manualState'),
       axios.get(API_ROOT + '/orders'),
@@ -332,87 +332,78 @@ const fetchAll = async () => {
       axios.get(API_ROOT + '/links')
     ]);
 
-    const manualState = manualRes.data   || { machine1: [], machine2: [] };
+    // unpack
+    const { machine1, machine2, placeholders: serverPh } = manualRes.data || {};
     const orders      = ordersRes.data   || [];
     const embList     = embRes.data      || [];
-    const newLinks    = linksRes.data    || {};
+    const links       = linksRes.data    || {};
 
-    // **NEW** — update the local links state so that incoming socket/refetch
-    // doesn’t stomp out your freshly linked/unlinked pair:
-    setLinks(newLinks);
+    // 2) update local placeholders state from server
+    setPlaceholders(serverPh || []);
 
-    console.log(
-      'fetchAll ▶ loaded manualState:', manualState,
-      'orders count:', orders.length,
-      'embroideryList count:', embList.length,
-      'links count:', Object.keys(newLinks).length
-    );
-
-    // 2) Preserve any previous embroidery_start (so edits stick across sync)
+    // 3) Preserve previous embroidery_start
     const prevEmb = {};
-    Object.values(columns)
-      .flatMap(col => col.jobs)
-      .forEach(job => {
-        if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
-        else if (job.start_date)   prevEmb[job.id] = job.start_date;
-      });
-
-    // 3) Build a lookup of embroidery start times
-    const embMap = {};
-    embList.forEach(row => {
-      const id = String(row['Order #'] || '').trim();
-      if (id) embMap[id] = row['Embroidery Start Time'] || '';
+    Object.values(columns).flatMap(col => col.jobs).forEach(job => {
+      if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
+      else if (job.start_date)  prevEmb[job.id] = job.start_date;
     });
 
-    // 4) Turn orders into a lookup by ID, pulling in due_type from the sheet
+    // 4) Build embroidery‐start lookup
+    const embMap = {};
+    embList.forEach(r => {
+      const id = String(r['Order #']||'').trim();
+      if (id) embMap[id] = r['Embroidery Start Time'] || '';
+    });
+
+    // 5) Build jobById from orders
     const jobById = {};
     orders.forEach(o => {
-      const sid = String(o['Order #'] || '').trim();
+      const sid = String(o['Order #']||'').trim();
       if (!sid) return;
       const rawTs = embMap[sid] ?? prevEmb[sid] ?? '';
       jobById[sid] = {
-        id:               sid,
-        company:          o['Company Name']   || '',
-        design:           o['Design']         || '',
-        quantity:         +o['Quantity']      || 0,
-        stitch_count:     +o['Stitch Count']  || 0,
-        due_date:         o['Due Date']       || '',
-        due_type:         o['Hard Date/Soft Date'] || '',
+        id: sid,
+        company:      o['Company Name'] || '',
+        design:       o['Design']       || '',
+        quantity:    +o['Quantity']     || 0,
+        stitch_count:+o['Stitch Count'] || 0,
+        due_date:     o['Due Date']      || '',
+        due_type:     o['Hard Date/Soft Date'] || '',
         embroidery_start: rawTs,
-        start_date:       rawTs,
-        machineId:        o['Machine ID']     || 'queue',
-        linkedTo:         newLinks[sid]      || null
+        start_date:   rawTs,
+        machineId:    o['Machine ID']    || 'queue',
+        linkedTo:     links[sid]        || null
       };
     });
 
-    // 5) Inject placeholders (unchanged)
-    placeholders.forEach(ph => {
+    // 6) Inject placeholders from server
+    serverPh.forEach(ph => {
       jobById[ph.id] = {
         id:               ph.id,
         company:          ph.company,
-        design:           ph.design,
-        quantity:         ph.quantity,
-        stitch_count:     ph.stitchCount,
+        design:           ph.design || '',
+        quantity:         +ph.quantity || 0,
+        stitch_count:     +ph.stitchCount || 0,
         due_date:         ph.inHand,
         due_type:         ph.dueType,
         embroidery_start: '',
         start_date:       '',
         machineId:        'queue',
-        linkedTo:         newLinks[ph.id] || null
+        linkedTo:         links[ph.id] || null
       };
     });
 
-    // 6) Apply manualState overrides (unchanged)
-    ['machine1', 'machine2'].forEach(colId => {
-      (manualState[colId] || []).forEach(id => {
+    // 7) Apply manual machine‐assignments
+    ;['machine1','machine2'].forEach(colId => {
+      (manualRes.data[colId]||[]).forEach(id => {
         if (jobById[id]) jobById[id].machineId = colId;
       });
     });
 
-    // 7) Build & sort the queue (unchanged)
+    // 8) Build & sort queue
     const queueJobs = Object.values(jobById)
-      .filter(job => !['machine1','machine2'].includes(job.machineId))
-      .sort((a,b) => {
+      .filter(j => !['machine1','machine2'].includes(j.machineId))
+      .sort((a,b)=> {
         const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
         if (da && db) return da - db;
         if (da) return -1;
@@ -420,29 +411,30 @@ const fetchAll = async () => {
         return  0;
       });
 
-    // 8) Build machines lists (unchanged)
+    // 9) Build machine lists
     const buildMachine = colId => {
-      const manualList = manualState[colId] || [];
-      const fromManual = manualList.map(id => jobById[id]).filter(Boolean);
-      const autoAppend = Object.values(jobById)
-        .filter(job => job.machineId === colId && !manualList.includes(job.id));
-      return [...fromManual, ...autoAppend];
+      const manualList = manualRes.data[colId] || [];
+      const fromManual = manualList.map(id=>jobById[id]).filter(Boolean);
+      const autoApp    = Object.values(jobById)
+        .filter(j=>j.machineId===colId && !manualList.includes(j.id));
+      return [...fromManual, ...autoApp];
     };
     const machine1Jobs = buildMachine('machine1');
     const machine2Jobs = buildMachine('machine2');
 
-    // 9) Schedule & setColumns (unchanged)
+    // 10) Schedule & update
     setColumns({
       queue:    { ...columns.queue,    jobs: queueJobs },
-      machine1: { ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
-      machine2: { ...columns.machine2, jobs: scheduleMachineJobs(machine2Jobs) }
+      machine1:{ ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
+      machine2:{ ...columns.machine2, jobs: scheduleMachineJobs(machine2Jobs) }
     });
-
-    console.log('fetchAll ▶ completed, columns set');
-  } catch (err) {
+    console.log('fetchAll ▶ done');
+  }
+  catch(err) {
     console.error('fetchAll ▶ error', err);
   }
 };
+
 
 
 // === Section 5.1: Keep fetchAll in a ref ===
@@ -462,34 +454,38 @@ useEffect(() => {
 
 
 // === Section 6: Placeholder Management ===
-
-// Populate the modal for editing an existing placeholder
-const editPlaceholder = (id) => {
-  const p = placeholders.find(p => p.id === id);
-  if (p) {
-    setPh(p);
-    setShowModal(true);
-  }
-};
-
-// Remove a placeholder
-const removePlaceholder = (id) => {
-  setPlaceholders(prev => prev.filter(p => p.id !== id));
-};
-
-// Add or update a placeholder
-const submitPlaceholder = (e) => {
+// === Section 6: Add / Edit Placeholder ===
+const submitPlaceholder = async (e) => {
   if (e && e.preventDefault) e.preventDefault();
+
+  // 1) build new placeholder array:
+  const newPh = { ...ph };
+  let updated = [];
   if (ph.id) {
-    setPlaceholders(prev => prev.map(p => p.id === ph.id ? ph : p));
+    // editing existing
+    updated = placeholders.map(p => p.id === ph.id ? newPh : p);
   } else {
-    setPlaceholders(prev => [...prev, { ...ph, id: `ph-${Date.now()}` }]);
+    // adding new
+    updated = [ ...placeholders, { ...newPh, id: `ph-${Date.now()}` } ];
   }
+
+  // 2) persist machine‐lists + new placeholders back to server
+  try {
+    await axios.post(API_ROOT + '/manualState', {
+      machine1: columns.machine1.jobs.map(j=>j.id),
+      machine2: columns.machine2.jobs.map(j=>j.id),
+      placeholders: updated
+    });
+    // server will broadcast "manualStateUpdated"
+  } catch(err) {
+    console.error("❌ failed to save placeholders", err);
+  }
+
+  // 3) locally clear modal (actual queue update will happen
+  //    when the socket fires manualStateUpdated, which re-calls fetchAll)
   setShowModal(false);
-  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
+  setPh({ id: null, company:'', quantity:'', stitchCount:'', inHand:'', dueType:'Hard Date' });
 };
-
-
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
   // 1) grab the two jobs in question
