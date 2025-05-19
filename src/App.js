@@ -454,38 +454,51 @@ useEffect(() => {
 
 
 // === Section 6: Placeholder Management ===
-// === Section 6: Add / Edit Placeholder ===
-const submitPlaceholder = async (e) => {
+// Populate the modal for editing an existing placeholder
+const editPlaceholder = (id) => {
+  const p = placeholders.find(p => p.id === id);
+  if (p) {
+    setPh(p);
+    setShowModal(true);
+  }
+};
+
+// Remove a placeholder from the list
+const removePlaceholder = (id) => {
+  setPlaceholders(prev =>
+    prev.filter(p => p.id !== id)
+  );
+};
+
+// Add a new placeholder or update an existing one
+const submitPlaceholder = (e) => {
   if (e && e.preventDefault) e.preventDefault();
 
-  // 1) build new placeholder array:
-  const newPh = { ...ph };
-  let updated = [];
   if (ph.id) {
-    // editing existing
-    updated = placeholders.map(p => p.id === ph.id ? newPh : p);
+    // edit existing
+    setPlaceholders(prev =>
+      prev.map(p => p.id === ph.id ? ph : p)
+    );
   } else {
-    // adding new
-    updated = [ ...placeholders, { ...newPh, id: `ph-${Date.now()}` } ];
+    // new one
+    setPlaceholders(prev => [
+      ...prev,
+      { ...ph, id: `ph-${Date.now()}` }
+    ]);
   }
 
-  // 2) persist machine‐lists + new placeholders back to server
-  try {
-    await axios.post(API_ROOT + '/manualState', {
-      machine1: columns.machine1.jobs.map(j=>j.id),
-      machine2: columns.machine2.jobs.map(j=>j.id),
-      placeholders: updated
-    });
-    // server will broadcast "manualStateUpdated"
-  } catch(err) {
-    console.error("❌ failed to save placeholders", err);
-  }
-
-  // 3) locally clear modal (actual queue update will happen
-  //    when the socket fires manualStateUpdated, which re-calls fetchAll)
+  // reset
   setShowModal(false);
-  setPh({ id: null, company:'', quantity:'', stitchCount:'', inHand:'', dueType:'Hard Date' });
+  setPh({
+    id:          null,
+    company:     '',
+    quantity:    '',
+    stitchCount: '',
+    inHand:      '',
+    dueType:     'Hard Date'
+  });
 };
+
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
   // 1) grab the two jobs in question
