@@ -542,7 +542,7 @@ const toggleLink = async (colId, idx) => {
   }));
 };
 
-// === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState) ===
+// === Section 8: Drag & Drop Handler (with Chain‐aware Moves & shared manualState + placeholders) ===
 const onDragEnd = async (result) => {
   // 🔍 DEBUGGING INSTRUMENTATION
   console.log("🔍 DRAG-END result:", result);
@@ -622,23 +622,22 @@ const onDragEnd = async (result) => {
 
   // update state
   setColumns(nextCols);
-
-  // 🔍 DEBUG: log the resulting new columns
   console.log('⏹ onDragEnd end (cross-col), new columns:', nextCols);
 
-  // 6) Persist the shared manualState to backend (no fetchAll here)
+  // 6) Persist the shared manualState to backend **including placeholders**
   const manualState = {
-    machine1: nextCols.machine1.jobs.map(j => j.id),
-    machine2: nextCols.machine2.jobs.map(j => j.id)
+    machine1:    nextCols.machine1.jobs.map(j => j.id),
+    machine2:    nextCols.machine2.jobs.map(j => j.id),
+    placeholders // ← make sure to include this
   };
   console.log('⏹ Persisting manualState to server:', manualState);
-  await axios
-    .post(API_ROOT + '/manualState', manualState)
-    .then(() => console.log('✅ manualState saved'))
-    .catch(err => console.error('❌ manualState save failed', err));
+  try {
+    await axios.post(API_ROOT + '/manualState', manualState);
+    console.log('✅ manualState saved');
+  } catch (err) {
+    console.error('❌ manualState save failed', err);
+  }
 };
-
-
 // === Section 9: Render via Section9.jsx ===
 
   return (
