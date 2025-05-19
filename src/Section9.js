@@ -186,9 +186,7 @@ export default function Section9(props) {
                             >
                               {prov => {
                                 const isPh = String(job.id).startsWith('ph-');
-                                // if placeholder, we need to make room for *two* 28px-wide tabs
-                                const rightPad = isPh ? 28 + 28 : 28;
-
+                                const rightPad = isPh ? 56 : 28;
                                 return (
                                   <div
                                     ref={prov.innerRef}
@@ -201,7 +199,6 @@ export default function Section9(props) {
                                       gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
-                                      // increase right padding when placeholder so nothing slips under the two tabs
                                       padding: `6px ${rightPad}px 6px 6px`,
                                       margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
                                       background: job.isLate
@@ -213,156 +210,156 @@ export default function Section9(props) {
                                       ...prov.draggableProps.style
                                     }}
                                   >
-
-                                  {/* H/S badge */}
-                                  <span style={{
-                                    position: 'absolute',
-                                    top: 4,
-                                    right: 4,
-                                    width: 16,
-                                    height: 16,
-                                    background: base,
-                                    border: `1px solid ${bCol}`,
-                                    borderRadius: 2,
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 10,
-                                    fontWeight: 'bold',
-                                  }}>
-                                    {isPh ? '' : isHard ? 'H' : 'S'}
-                                  </span>
-
-                                  {jIdx === 0 && seg.len > 1 && (
-                                    <div style={{
-                                      position: 'absolute', top: 0, right: 0,
-                                      width: 4, height: '100%',
-                                      background: '#0288d1', zIndex: 4
-                                    }} />
-                                  )}
-
-                                  <span style={{
-                                    gridRow: 1, gridColumn: 1,
-                                    background: base, padding: '0 4px',
-                                    borderRadius: 4, whiteSpace: 'nowrap',
-                                    overflow: 'hidden', textOverflow: 'ellipsis',
-                                    fontSize: 13, fontWeight: 'bold'
-                                  }}>
                                     <span style={{
-                                      display: 'inline-block', width: 20, height: 20,
-                                      borderRadius: '50%', background: '#000',
-                                      color: base, lineHeight: '20px', textAlign: 'center',
-                                      fontSize: isPh ? 13 : 11, fontWeight: 'bold',
-                                      marginRight: 4
-                                    }}>
-                                      {isPh ? '*' : job.id}
-                                    </span>
-                                    {job.company}
-                                  </span>
-
-                                  <span style={{
-                                    gridRow: 1, gridColumn: 2, justifySelf: 'end',
-                                    background: base, padding: '0 4px',
-                                    borderRadius: 4, fontSize: 15, fontWeight: 'bold',
-                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                                  }}>
-                                    {job.quantity}
-                                  </span>
-
-                                  <span style={{
-                                    gridRow: 2, gridColumn: 1,
-                                    background: base, padding: '0 4px',
-                                    borderRadius: 4, whiteSpace: 'nowrap',
-                                    overflow: 'hidden', textOverflow: 'ellipsis',
-                                    fontSize: 13
-                                  }}>
-                                    {job.design?.slice(0,22)}
-                                  </span>
-
-                                  {job.start && (
-                                    <span style={{
-                                      gridRow: 2, gridColumn: 2, justifySelf: 'end',
-                                      background: BUBBLE_START, padding: '0 4px',
-                                      borderRadius: 10, whiteSpace: 'nowrap',
-                                      fontSize: 13
-                                    }}>
-                                      {job.start}
-                                    </span>
-                                  )}
-
-                                  <span style={{
-                                    gridRow: 3, gridColumn: 1,
-                                    background: BUBBLE_END, padding: '0 4px',
-                                    borderRadius: 4, whiteSpace: 'nowrap',
-                                    overflow: 'hidden', textOverflow: 'ellipsis',
-                                    fontSize: 13
-                                  }}>
-                                    EED: {fmtMMDD(subWorkDays(parseDueDate(job.due_date), 6))}
-                                  </span>
-
-                                  {job.end && (
-                                    <span style={{
-                                      gridRow: 3, gridColumn: 2, justifySelf: 'end',
-                                      background: BUBBLE_END, padding: '0 4px',
-                                      borderRadius: 10, whiteSpace: 'nowrap',
-                                      fontSize: 13
-                                    }}>
-                                      {job.end}
-                                    </span>
-                                  )}
-
-                                  <span style={{
-                                    gridRow: 4, gridColumn: 1,
-                                    background: BUBBLE_DELIV, padding: '0 4px',
-                                    borderRadius: 4, whiteSpace: 'nowrap',
-                                    fontSize: 13
-                                  }}>
-                                    IHD: {fmtMMDD(job.due_date)}
-                                  </span>
-
-                                  {job.delivery && (
-                                    <span style={{
-                                      gridRow: 4, gridColumn: 2, justifySelf: 'end',
-                                      background: BUBBLE_DELIV, padding: '0 4px',
-                                      borderRadius: 10, whiteSpace: 'nowrap',
-                                      fontSize: 13
-                                    }}>
-                                      {job.delivery}
-                                    </span>
-                                  )}
-
-                                  {globalIdx < jobs.length - 1 && (
-                                    <div
-                                      onClick={() => toggleLink(colId, globalIdx)}
-                                      style={{
-                                        position: 'absolute', top: 28, right: 0,
-                                        width: 28, height: `calc(100% - 28px)`,
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        cursor: 'pointer', background: base,
-                                        borderBottomRightRadius: 4, zIndex: 5
-                                      }}
-                                    >
-                                      {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
-                                    </div>
-                                  )}
-
-                                  {isPh && (
-                                    <div style={{
-                                      position: 'absolute', top: 0, right: 28,    // ← shift right so link button sits to its left
-                                      width: 28, height: '100%',
+                                      position: 'absolute',
+                                      top: 4,
+                                      right: 4,
+                                      width: 16,
+                                      height: 16,
                                       background: base,
-                                      display: 'flex', flexDirection: 'column',
-                                      alignItems: 'center', justifyContent: 'flex-start',
-                                      borderTopRightRadius: 4, borderBottomRightRadius: 4,
-                                      zIndex: 6                                  // ← sit above the link button
+                                      border: `1px solid ${bCol}`,
+                                      borderRadius: 2,
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: 10,
+                                      fontWeight: 'bold',
                                     }}>
-                                      <span onClick={() => editPlaceholder(job)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✎</span>
-                                      <span onClick={() => removePlaceholder(job.id)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✖</span>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                                      {isPh ? '' : isHard ? 'H' : 'S'}
+                                    </span>
+
+                                    {jIdx === 0 && seg.len > 1 && (
+                                      <div style={{
+                                        position: 'absolute', top: 0, right: 0,
+                                        width: 4, height: '100%',
+                                        background: '#0288d1', zIndex: 4
+                                      }} />
+                                    )}
+
+                                    <span style={{
+                                      gridRow: 1, gridColumn: 1,
+                                      background: base, padding: '0 4px',
+                                      borderRadius: 4, whiteSpace: 'nowrap',
+                                      overflow: 'hidden', textOverflow: 'ellipsis',
+                                      fontSize: 13, fontWeight: 'bold'
+                                    }}>
+                                      <span style={{
+                                        display: 'inline-block', width: 20, height: 20,
+                                        borderRadius: '50%', background: '#000',
+                                        color: base, lineHeight: '20px', textAlign: 'center',
+                                        fontSize: isPh ? 13 : 11, fontWeight: 'bold',
+                                        marginRight: 4
+                                      }}>
+                                        {isPh ? '*' : job.id}
+                                      </span>
+                                      {job.company}
+                                    </span>
+
+                                    <span style={{
+                                      gridRow: 1, gridColumn: 2, justifySelf: 'end',
+                                      background: base, padding: '0 4px',
+                                      borderRadius: 4, fontSize: 15, fontWeight: 'bold',
+                                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                    }}>
+                                      {job.quantity}
+                                    </span>
+
+                                    <span style={{
+                                      gridRow: 2, gridColumn: 1,
+                                      background: base, padding: '0 4px',
+                                      borderRadius: 4, whiteSpace: 'nowrap',
+                                      overflow: 'hidden', textOverflow: 'ellipsis',
+                                      fontSize: 13
+                                    }}>
+                                      {job.design?.slice(0,22)}
+                                    </span>
+
+                                    {job.start && (
+                                      <span style={{
+                                        gridRow: 2, gridColumn: 2, justifySelf: 'end',
+                                        background: BUBBLE_START, padding: '0 4px',
+                                        borderRadius: 10, whiteSpace: 'nowrap',
+                                        fontSize: 13
+                                      }}>
+                                        {job.start}
+                                      </span>
+                                    )}
+
+                                    <span style={{
+                                      gridRow: 3, gridColumn: 1,
+                                      background: BUBBLE_END, padding: '0 4px',
+                                      borderRadius: 4, whiteSpace: 'nowrap',
+                                      overflow: 'hidden', textOverflow: 'ellipsis',
+                                      fontSize: 13
+                                    }}>
+                                      EED: {fmtMMDD(subWorkDays(parseDueDate(job.due_date), 6))}
+                                    </span>
+
+                                    {job.end && (
+                                      <span style={{
+                                        gridRow: 3, gridColumn: 2, justifySelf: 'end',
+                                        background: BUBBLE_END, padding: '0 4px',
+                                        borderRadius: 10, whiteSpace: 'nowrap',
+                                        fontSize: 13
+                                      }}>
+                                        {job.end}
+                                      </span>
+                                    )}
+
+                                    <span style={{
+                                      gridRow: 4, gridColumn: 1,
+                                      background: BUBBLE_DELIV, padding: '0 4px',
+                                      borderRadius: 4, whiteSpace: 'nowrap',
+                                      fontSize: 13
+                                    }}>
+                                      IHD: {fmtMMDD(job.due_date)}
+                                    </span>
+
+                                    {job.delivery && (
+                                      <span style={{
+                                        gridRow: 4, gridColumn: 2, justifySelf: 'end',
+                                        background: BUBBLE_DELIV, padding: '0 4px',
+                                        borderRadius: 10, whiteSpace: 'nowrap',
+                                        fontSize: 13
+                                      }}>
+                                        {job.delivery}
+                                      </span>
+                                    )}
+
+                                    {globalIdx < jobs.length - 1 && (
+                                      <div
+                                        onClick={() => toggleLink(colId, globalIdx)}
+                                        style={{
+                                          position: 'absolute', top: 28, right: 0,
+                                          width: 28, height: `calc(100% - 28px)`,
+                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                          cursor: 'pointer', background: base,
+                                          borderBottomRightRadius: 4, zIndex: 5
+                                        }}
+                                      >
+                                        {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
+                                      </div>
+                                    )}
+
+                                    {isPh && (
+                                      <div style={{
+                                        position: 'absolute', top: 0, right: 28,
+                                        width: 28, height: '100%',
+                                        background: base,
+                                        display: 'flex', flexDirection: 'column',
+                                        alignItems: 'center', justifyContent: 'flex-start',
+                                        borderTopRightRadius: 4, borderBottomRightRadius: 4,
+                                        zIndex: 6
+                                      }}>
+                                        <span onClick={() => editPlaceholder(job)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✎</span>
+                                        <span onClick={() => removePlaceholder(job.id)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✖</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }}
                             </Draggable>
+
                           );
                         })}
                       </div>
