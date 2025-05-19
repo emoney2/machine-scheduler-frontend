@@ -333,20 +333,22 @@ const fetchAll = async () => {
     ]);
 
     // unpack
-    const { machine1, machine2, placeholders: serverPh } = manualRes.data || {};
-    const orders      = ordersRes.data   || [];
-    const embList     = embRes.data      || [];
-    const links       = linksRes.data    || {};
+    const { machine1, machine2, placeholders: serverPh = [] } = manualRes.data || {};
+    const orders  = ordersRes.data   || [];
+    const embList = embRes.data      || [];
+    const links   = linksRes.data    || {};
 
-    // 2) update local placeholders state from server
-    setPlaceholders(serverPh || []);
+    // 2) Mirror server placeholders into local state
+    setPlaceholders(serverPh);
 
     // 3) Preserve previous embroidery_start
     const prevEmb = {};
-    Object.values(columns).flatMap(col => col.jobs).forEach(job => {
-      if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
-      else if (job.start_date)  prevEmb[job.id] = job.start_date;
-    });
+    Object.values(columns)
+      .flatMap(col => col.jobs)
+      .forEach(job => {
+        if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
+        else if (job.start_date)  prevEmb[job.id] = job.start_date;
+      });
 
     // 4) Build embroidery‐start lookup
     const embMap = {};
@@ -382,19 +384,19 @@ const fetchAll = async () => {
         id:               ph.id,
         company:          ph.company,
         design:           ph.design || '',
-        quantity:         +ph.quantity || 0,
-        stitch_count:     +ph.stitchCount || 0,
-        due_date:         ph.inHand,
-        due_type:         ph.dueType,
+        quantity:         +ph.quantity  || 0,
+        stitch_count:     +ph.stitchCount|| 0,
+        due_date:         ph.inHand      || '',
+        due_type:         ph.dueType     || '',
         embroidery_start: '',
         start_date:       '',
         machineId:        'queue',
-        linkedTo:         links[ph.id] || null
+        linkedTo:         links[ph.id]   || null
       };
     });
 
     // 7) Apply manual machine‐assignments
-    ;['machine1','machine2'].forEach(colId => {
+    [ 'machine1', 'machine2' ].forEach(colId => {
       (manualRes.data[colId]||[]).forEach(id => {
         if (jobById[id]) jobById[id].machineId = colId;
       });
@@ -411,18 +413,18 @@ const fetchAll = async () => {
         return  0;
       });
 
-    // 9) Build machine lists
+    // 9) Build each machine’s list (manual first, then auto)
     const buildMachine = colId => {
       const manualList = manualRes.data[colId] || [];
-      const fromManual = manualList.map(id=>jobById[id]).filter(Boolean);
+      const fromManual = manualList.map(id => jobById[id]).filter(Boolean);
       const autoApp    = Object.values(jobById)
-        .filter(j=>j.machineId===colId && !manualList.includes(j.id));
+        .filter(j => j.machineId === colId && !manualList.includes(j.id));
       return [...fromManual, ...autoApp];
     };
     const machine1Jobs = buildMachine('machine1');
     const machine2Jobs = buildMachine('machine2');
 
-    // 10) Schedule & update
+    // 10) Schedule & update columns
     setColumns({
       queue:    { ...columns.queue,    jobs: queueJobs },
       machine1:{ ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
@@ -435,74 +437,60 @@ const fetchAll = async () => {
   }
 };
 
-
-
 // === Section 5.1: Keep fetchAll in a ref ===
 const fetchAllRef = useRef(fetchAll);
 useEffect(() => {
   fetchAllRef.current = fetchAll;
 }, [fetchAll]);
 
-// === Section 5.2: Poll the sheet every 60s ===
+// === Section 5.2: Poll & initial fetch every 60s ===
 useEffect(() => {
-   console.log('📡 Starting polling & initial fetch');
+  console.log('📡 Starting polling & initial fetch');
   fetchAllRef.current();
   const id = setInterval(() => fetchAllRef.current(), 60_000);
-     console.log('📡 Poll: calling fetchAll');
   return () => clearInterval(id);
 }, []);
 
 
-// === Section 6: Placeholder Management ===
+// === Section 6: Placeholder Management (FULL REPLACEMENT) ===
+const editPlaceholder = (phToEdit) => {
+  setPh(phToEdit);
+  setShowModal(true);
+};
 
-// Populate the modal for editing an existing placeholder
-const editPlaceholder = (id) => {
-  const p = placeholders.find(p => p.id === id);
-  if (p) {
-    setPh(p);
-    setShowModal(true);
+const removePlaceholder = async (id) => {
+  const newPh = placeholders.filter(p => p.id !== id);
+  setPlaceholders(newPh);
+  // persist
+  await axios.post(API_ROOT + '/manualState', {
+    machine1: columns.machine1.jobs.map(j => j.id),
+    machine2: columns.machine2.jobs.map(j => j.id),
+    placeholders: newPh.map(p => p.id)
+  });
+};
+
+const submitPlaceholder = async (e) => {
+  if (e?.preventDefault) e.preventDefault();
+
+  // merge into state
+  let newPh;
+  if (ph.id) {
+    newPh = placeholders.map(p => p.id === ph.id ? ph : p);
+  } else {
+    newPh = [...placeholders, { ...ph, id: `ph-${Date.now()}` }];
   }
-};
+  setPlaceholders(newPh);
 
-// Remove a placeholder and re-run your scheduling so it shows/vanishes instantly
-const removePlaceholder = (id) => {
-  setPlaceholders(prev => {
-    const next = prev.filter(p => p.id !== id);
-    // re-trigger a refresh of the board
-    fetchAll();
-    return next;
-  });
-};
-
-// Add or update a placeholder and push it into the queue immediately
-const submitPlaceholder = (e) => {
-  if (e && e.preventDefault) e.preventDefault();
-
-  setPlaceholders(prev => {
-    let next;
-    if (ph.id) {
-      // editing
-      next = prev.map(p => (p.id === ph.id ? ph : p));
-    } else {
-      // new
-      next = [...prev, { ...ph, id: `ph-${Date.now()}` }];
-    }
-    return next;
+  // persist ALL three arrays
+  await axios.post(API_ROOT + '/manualState', {
+    machine1: columns.machine1.jobs.map(j => j.id),
+    machine2: columns.machine2.jobs.map(j => j.id),
+    placeholders: newPh.map(p => p.id)
   });
 
-  // close form & reset
+  // reset modal
   setShowModal(false);
-  setPh({
-    id:          null,
-    company:     '',
-    quantity:    '',
-    stitchCount: '',
-    inHand:      '',
-    dueType:     'Hard Date'
-  });
-
-  // re-run fetchAll so your new placeholder appears in the queue immediately
-  fetchAll();
+  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
 };
 
 
