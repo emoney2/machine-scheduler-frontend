@@ -454,67 +454,86 @@ useEffect(() => {
 
 
 // === Section 6: Placeholder Management ===
-const submitPlaceholder = async (e) => {
-  // 1) Prevent form reload
+
+// Populate the modal for editing an existing placeholder
+const editPlaceholder = id => {
+  const p = placeholders.find(p => p.id === id);
+  if (p) {
+    setPh(p);
+    setShowModal(true);
+  }
+};
+
+// Remove a placeholder from the list
+const removePlaceholder = id => {
+  setPlaceholders(prev => prev.filter(p => p.id !== id));
+};
+
+// Add a new placeholder or update an existing one
+const submitPlaceholder = e => {
   if (e && e.preventDefault) e.preventDefault();
 
-  // 2) Build the new or updated placeholder object
-  let newPh = {
-    ...ph,
-    id: ph.id || `ph-${Date.now()}`           // create an id if it didn't exist
-  };
+  if (ph.id) {
+    // update existing placeholder
+    setPlaceholders(prev =>
+      prev.map(p => (p.id === ph.id ? ph : p))
+    );
+  } else {
+    // create new placeholder (use 'ph-' prefix for identification)
+    setPlaceholders(prev => [
+      ...prev,
+      { ...ph, id: `ph-${Date.now()}` }
+    ]);
+  }
 
-  // 3) Update your local placeholders array
-  setPlaceholders(prev => {
-    // if we already had this id, replace it; otherwise append
-    const exists = prev.find(p => p.id === newPh.id);
-    return exists
-      ? prev.map(p => p.id === newPh.id ? newPh : p)
-      : [...prev, newPh];
-  });
-
-  // 4) Close the modal and reset your form state
+  // reset modal state
   setShowModal(false);
-  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
-
-  // 5) ***IMPORTANT***: re-fetch and re-render **right away**
-  await fetchAll();
+  setPh({
+    id:          null,
+    company:     '',
+    quantity:    '',
+    stitchCount: '',
+    inHand:      '',
+    dueType:     'Hard Date'
+  });
 };
+
 
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
-  // 1) grab the two jobs in question
-  const jobs = columns[colId].jobs;
+  // 1) Copy current jobs in that column
+  const jobs = Array.from(columns[colId].jobs);
   const job  = jobs[idx];
   const next = jobs[idx + 1];
-  if (!next) return; // nothing to link/unlink
 
-  // 2) build a new links map
+  // 2) Build a new links map
   const newLinks = { ...links };
-  if (newLinks[job.id] === next.id) {
-    // already linked → unlink
+  if (job.linkedTo === next?.id) {
+    // unlink
     delete newLinks[job.id];
-  } else {
-    // not linked → link
+  } else if (next) {
+    // link
     newLinks[job.id] = next.id;
   }
 
-  // 3) persist to server
+  // 3) Persist to server so everyone sees it
   try {
     await axios.post(API_ROOT + '/links', newLinks);
-    // server will emit "linksUpdated" to *all* clients
+    // server will broadcast a "linksUpdated" event
   } catch (err) {
     console.error('❌ failed to save links to server', err);
   }
 
-  // 4) optimistically update local links state
+  // 4) Update local state immediately
   setLinks(newLinks);
 
-  // 5) re-fetch everything so columns.jobs get updated with the new links
-  fetchAll();
+  // 5) Reflect it in the UI right away
+  jobs[idx] = { ...job, linkedTo: newLinks[job.id] || null };
+  setColumns(cols => ({
+    ...cols,
+    [colId]: { ...cols[colId], jobs }
+  }));
 };
-
-
 
 // === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState) ===
 const onDragEnd = async (result) => {
