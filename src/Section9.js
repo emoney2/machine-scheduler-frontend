@@ -239,8 +239,9 @@ export default function Section9(props) {
                                       fontSize: 10,
                                       fontWeight: 'bold'
                                     }}>
-                                      {isPh ? '' : isHard ? 'H' : 'S'}
+                                      {job.due_type === 'Hard Date' ? 'H' : job.due_type === 'Soft Date' ? 'S' : ''}
                                     </span>
+
 
                                     {/* Placeholder edit/delete buttons */}
                                     {isPh && (
