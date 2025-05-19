@@ -186,7 +186,20 @@ export default function Section9(props) {
                             >
                               {prov => {
                                 const isPh = String(job.id).startsWith('ph-');
-                                const rightPad = isPh ? 56 : 28;
+                                const isHard = job.due_type === 'Hard Date';
+                                const isSoft = !isPh && !isHard;
+
+                                const base = isPh
+                                  ? LIGHT_YELLOW
+                                  : isSoft
+                                    ? LIGHT_GREY
+                                    : LIGHT_PURPLE;
+                                const bCol = isPh
+                                  ? DARK_YELLOW
+                                  : isSoft
+                                    ? DARK_GREY
+                                    : DARK_PURPLE;
+
                                 return (
                                   <div
                                     ref={prov.innerRef}
@@ -199,7 +212,7 @@ export default function Section9(props) {
                                       gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
-                                      padding: `6px ${rightPad}px 6px 6px`,
+                                      padding: '6px 28px 6px 6px',
                                       margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
                                       background: job.isLate
                                         ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
@@ -210,6 +223,7 @@ export default function Section9(props) {
                                       ...prov.draggableProps.style
                                     }}
                                   >
+                                    {/* H/S badge */}
                                     <span style={{
                                       position: 'absolute',
                                       top: 4,
@@ -223,19 +237,64 @@ export default function Section9(props) {
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       fontSize: 10,
-                                      fontWeight: 'bold',
+                                      fontWeight: 'bold'
                                     }}>
                                       {isPh ? '' : isHard ? 'H' : 'S'}
                                     </span>
 
-                                    {jIdx === 0 && seg.len > 1 && (
+                                    {/* Placeholder edit/delete buttons */}
+                                    {isPh && (
                                       <div style={{
-                                        position: 'absolute', top: 0, right: 0,
-                                        width: 4, height: '100%',
-                                        background: '#0288d1', zIndex: 4
-                                      }} />
+                                        position: 'absolute',
+                                        top: 24,
+                                        right: 4,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: 4,
+                                        zIndex: 5,
+                                        background: base,
+                                        padding: '2px',
+                                        borderRadius: 2
+                                      }}>
+                                        <span
+                                          onClick={() => editPlaceholder(job.id)}
+                                          style={{ cursor: 'pointer', fontSize: 12 }}
+                                        >
+                                          ✎
+                                        </span>
+                                        <span
+                                          onClick={() => removePlaceholder(job.id)}
+                                          style={{ cursor: 'pointer', fontSize: 12 }}
+                                        >
+                                          ✖
+                                        </span>
+                                      </div>
                                     )}
 
+                                    {/* Link/unlink tab */}
+                                    {globalIdx < jobs.length - 1 && (
+                                      <div
+                                        onClick={() => toggleLink(colId, globalIdx)}
+                                        style={{
+                                          position: 'absolute',
+                                          top: isPh ? 60 : 28,
+                                          right: 0,
+                                          width: 28,
+                                          height: `calc(100% - ${isPh ? 60 : 28}px)`,
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          cursor: 'pointer',
+                                          background: base,
+                                          borderBottomRightRadius: 4,
+                                          zIndex: 4
+                                        }}
+                                      >
+                                        {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
+                                      </div>
+                                    )}
+
+                                    {/* Job ID + Company */}
                                     <span style={{
                                       gridRow: 1, gridColumn: 1,
                                       background: base, padding: '0 4px',
@@ -255,6 +314,7 @@ export default function Section9(props) {
                                       {job.company}
                                     </span>
 
+                                    {/* Quantity */}
                                     <span style={{
                                       gridRow: 1, gridColumn: 2, justifySelf: 'end',
                                       background: base, padding: '0 4px',
@@ -264,6 +324,7 @@ export default function Section9(props) {
                                       {job.quantity}
                                     </span>
 
+                                    {/* Design */}
                                     <span style={{
                                       gridRow: 2, gridColumn: 1,
                                       background: base, padding: '0 4px',
@@ -274,6 +335,7 @@ export default function Section9(props) {
                                       {job.design?.slice(0,22)}
                                     </span>
 
+                                    {/* Embroidery Start */}
                                     {job.start && (
                                       <span style={{
                                         gridRow: 2, gridColumn: 2, justifySelf: 'end',
@@ -285,6 +347,7 @@ export default function Section9(props) {
                                       </span>
                                     )}
 
+                                    {/* EED */}
                                     <span style={{
                                       gridRow: 3, gridColumn: 1,
                                       background: BUBBLE_END, padding: '0 4px',
@@ -295,6 +358,7 @@ export default function Section9(props) {
                                       EED: {fmtMMDD(subWorkDays(parseDueDate(job.due_date), 6))}
                                     </span>
 
+                                    {/* Embroidery End */}
                                     {job.end && (
                                       <span style={{
                                         gridRow: 3, gridColumn: 2, justifySelf: 'end',
@@ -306,6 +370,7 @@ export default function Section9(props) {
                                       </span>
                                     )}
 
+                                    {/* Delivery */}
                                     <span style={{
                                       gridRow: 4, gridColumn: 1,
                                       background: BUBBLE_DELIV, padding: '0 4px',
@@ -314,7 +379,6 @@ export default function Section9(props) {
                                     }}>
                                       IHD: {fmtMMDD(job.due_date)}
                                     </span>
-
                                     {job.delivery && (
                                       <span style={{
                                         gridRow: 4, gridColumn: 2, justifySelf: 'end',
@@ -325,40 +389,11 @@ export default function Section9(props) {
                                         {job.delivery}
                                       </span>
                                     )}
-
-                                    {globalIdx < jobs.length - 1 && (
-                                      <div
-                                        onClick={() => toggleLink(colId, globalIdx)}
-                                        style={{
-                                          position: 'absolute', top: 28, right: 0,
-                                          width: 28, height: `calc(100% - 28px)`,
-                                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                          cursor: 'pointer', background: base,
-                                          borderBottomRightRadius: 4, zIndex: 5
-                                        }}
-                                      >
-                                        {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
-                                      </div>
-                                    )}
-
-                                    {isPh && (
-                                      <div style={{
-                                        position: 'absolute', top: 0, right: 28,
-                                        width: 28, height: '100%',
-                                        background: base,
-                                        display: 'flex', flexDirection: 'column',
-                                        alignItems: 'center', justifyContent: 'flex-start',
-                                        borderTopRightRadius: 4, borderBottomRightRadius: 4,
-                                        zIndex: 6
-                                      }}>
-                                        <span onClick={() => editPlaceholder(job)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✎</span>
-                                        <span onClick={() => removePlaceholder(job.id)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✖</span>
-                                      </div>
-                                    )}
                                   </div>
                                 );
                               }}
                             </Draggable>
+
 
                           );
                         })}
