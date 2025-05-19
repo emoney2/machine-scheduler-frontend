@@ -201,9 +201,10 @@ export default function Section9(props) {
                                     background: job.isLate
                                       ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
                                       : base,
-                                    border:     `2px solid ${job.isLate ? 'red' : bCol}`,
+                                    border: `2px solid ${job.isLate ? 'red' : bCol}`,
                                     borderRadius: 4,
                                     zIndex: 2,
+                                    transition: 'none',          // ← disable the default drag “bounce”
                                     ...prov.draggableProps.style
                                   }}
                                 >
@@ -342,19 +343,18 @@ export default function Section9(props) {
 
                                   {isPh && (
                                     <div style={{
-                                      position: 'absolute', top: 0, right: 0,
+                                      position: 'absolute', top: 0, right: 28,    // ← shift right so link button sits to its left
                                       width: 28, height: '100%',
                                       background: base,
                                       display: 'flex', flexDirection: 'column',
                                       alignItems: 'center', justifyContent: 'flex-start',
                                       borderTopRightRadius: 4, borderBottomRightRadius: 4,
-                                      zIndex: 4
+                                      zIndex: 6                                  // ← sit above the link button
                                     }}>
                                       <span onClick={() => editPlaceholder(job)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✎</span>
                                       <span onClick={() => removePlaceholder(job.id)} style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}>✖</span>
                                     </div>
                                   )}
-
                                 </div>
                               )}
                             </Draggable>
