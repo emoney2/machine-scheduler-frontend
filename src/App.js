@@ -454,49 +454,31 @@ useEffect(() => {
 
 
 // === Section 6: Placeholder Management ===
-// Populate the modal for editing an existing placeholder
-const editPlaceholder = (id) => {
-  const p = placeholders.find(p => p.id === id);
-  if (p) {
-    setPh(p);
-    setShowModal(true);
-  }
-};
-
-// Remove a placeholder from the list
-const removePlaceholder = (id) => {
-  setPlaceholders(prev =>
-    prev.filter(p => p.id !== id)
-  );
-};
-
-// Add a new placeholder or update an existing one
-const submitPlaceholder = (e) => {
+const submitPlaceholder = async (e) => {
+  // 1) Prevent form reload
   if (e && e.preventDefault) e.preventDefault();
 
-  if (ph.id) {
-    // edit existing
-    setPlaceholders(prev =>
-      prev.map(p => p.id === ph.id ? ph : p)
-    );
-  } else {
-    // new one
-    setPlaceholders(prev => [
-      ...prev,
-      { ...ph, id: `ph-${Date.now()}` }
-    ]);
-  }
+  // 2) Build the new or updated placeholder object
+  let newPh = {
+    ...ph,
+    id: ph.id || `ph-${Date.now()}`           // create an id if it didn't exist
+  };
 
-  // reset
-  setShowModal(false);
-  setPh({
-    id:          null,
-    company:     '',
-    quantity:    '',
-    stitchCount: '',
-    inHand:      '',
-    dueType:     'Hard Date'
+  // 3) Update your local placeholders array
+  setPlaceholders(prev => {
+    // if we already had this id, replace it; otherwise append
+    const exists = prev.find(p => p.id === newPh.id);
+    return exists
+      ? prev.map(p => p.id === newPh.id ? newPh : p)
+      : [...prev, newPh];
   });
+
+  // 4) Close the modal and reset your form state
+  setShowModal(false);
+  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
+
+  // 5) ***IMPORTANT***: re-fetch and re-render **right away**
+  await fetchAll();
 };
 
 // === Section 7: toggleLink (full replacement) ===
