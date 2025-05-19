@@ -451,52 +451,60 @@ useEffect(() => {
   return () => clearInterval(id);
 }, []);
 
-// === Section 6: Placeholder Management (full replacement) ===
+// === Section 6: Placeholder Management ===
+
+// Add or update a placeholder and persist to server
 const submitPlaceholder = async (e) => {
-  // 1) prevent form reload
   if (e && e.preventDefault) e.preventDefault();
 
-  // 2) build the new placeholders array
-  let nextPh;
+  // build new placeholders array
+  let updated;
   if (ph.id) {
-    // editing an existing one
-    nextPh = placeholders.map(p => p.id === ph.id ? ph : p);
+    updated = placeholders.map(p => p.id === ph.id ? ph : p);
   } else {
-    // creating brand-new
-    nextPh = [
-      ...placeholders,
-      { ...ph, id: `ph-${Date.now()}` }
-    ];
+    const newPh = { ...ph, id: `ph-${Date.now()}` };
+    updated = [...placeholders, newPh];
   }
 
-  // 3) update local React state immediately
-  setPlaceholders(nextPh);
-  setShowModal(false);
-  setPh({
-    id:          null,
-    company:     '',
-    quantity:    '',
-    stitchCount: '',
-    inHand:      '',
-    dueType:     'Hard Date'
-  });
-
-  // 4) gather your manualState payload
+  // update server with new manualState + placeholders
   const manualState = {
-    machine1:    columns.machine1.jobs.map(j => j.id),
-    machine2:    columns.machine2.jobs.map(j => j.id),
-    placeholders: nextPh
+    machine1: columns.machine1.jobs.map(j => j.id),
+    machine2: columns.machine2.jobs.map(j => j.id),
+    placeholders: updated
   };
-
-  // 5) POST it up to the server
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
-    // your socket listener (on "manualStateUpdated") will fire fetchAll for everyone
+    // after server echo, update local list and close modal
+    setPlaceholders(updated);
+    setShowModal(false);
+    setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
   } catch (err) {
-    console.error('❌ Saving placeholders to server failed', err);
-    // (you can surface an error to the user here)
+    console.error('❌ failed to save placeholders', err);
   }
 };
+
+// Populate the modal for editing an existing placeholder
+const editPlaceholder = (job) => {
+  setPh(job);
+  setShowModal(true);
+};
+
+// Remove a placeholder from the list (and persist)
+const removePlaceholder = async (id) => {
+  const updated = placeholders.filter(p => p.id !== id);
+  const manualState = {
+    machine1: columns.machine1.jobs.map(j => j.id),
+    machine2: columns.machine2.jobs.map(j => j.id),
+    placeholders: updated
+  };
+  try {
+    await axios.post(API_ROOT + '/manualState', manualState);
+    setPlaceholders(updated);
+  } catch (err) {
+    console.error('❌ failed to remove placeholder', err);
+  }
+};
+
 
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
