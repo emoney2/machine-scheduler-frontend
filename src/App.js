@@ -5,6 +5,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
 import { io } from 'socket.io-client';
 import axios from 'axios';
+
+// enable sending cookies so your Flask session is preserved
+axios.defaults.withCredentials = true;
+
 import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 
