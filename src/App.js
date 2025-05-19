@@ -456,7 +456,7 @@ useEffect(() => {
 // === Section 6: Placeholder Management ===
 
 // Populate the modal for editing an existing placeholder
-const editPlaceholder = id => {
+const editPlaceholder = (id) => {
   const p = placeholders.find(p => p.id === id);
   if (p) {
     setPh(p);
@@ -464,29 +464,33 @@ const editPlaceholder = id => {
   }
 };
 
-// Remove a placeholder from the list
-const removePlaceholder = id => {
-  setPlaceholders(prev => prev.filter(p => p.id !== id));
+// Remove a placeholder and re-run your scheduling so it shows/vanishes instantly
+const removePlaceholder = (id) => {
+  setPlaceholders(prev => {
+    const next = prev.filter(p => p.id !== id);
+    // re-trigger a refresh of the board
+    fetchAll();
+    return next;
+  });
 };
 
-// Add a new placeholder or update an existing one
-const submitPlaceholder = e => {
+// Add or update a placeholder and push it into the queue immediately
+const submitPlaceholder = (e) => {
   if (e && e.preventDefault) e.preventDefault();
 
-  if (ph.id) {
-    // update existing placeholder
-    setPlaceholders(prev =>
-      prev.map(p => (p.id === ph.id ? ph : p))
-    );
-  } else {
-    // create new placeholder (use 'ph-' prefix for identification)
-    setPlaceholders(prev => [
-      ...prev,
-      { ...ph, id: `ph-${Date.now()}` }
-    ]);
-  }
+  setPlaceholders(prev => {
+    let next;
+    if (ph.id) {
+      // editing
+      next = prev.map(p => (p.id === ph.id ? ph : p));
+    } else {
+      // new
+      next = [...prev, { ...ph, id: `ph-${Date.now()}` }];
+    }
+    return next;
+  });
 
-  // reset modal state
+  // close form & reset
   setShowModal(false);
   setPh({
     id:          null,
@@ -496,6 +500,9 @@ const submitPlaceholder = e => {
     inHand:      '',
     dueType:     'Hard Date'
   });
+
+  // re-run fetchAll so your new placeholder appears in the queue immediately
+  fetchAll();
 };
 
 
