@@ -9,16 +9,19 @@ import axios from 'axios';
 // enable sending cookies so your Flask session is preserved
 axios.defaults.withCredentials = true;
 
-// redirect to /login on any 401 response
+// redirect to login on 401
 axios.interceptors.response.use(
   response => response,
   error => {
     if (error.response?.status === 401) {
-      window.location.href = '/login';
+      const base = API_ROOT.replace(/\/api$/, '');
+      // send them to login, and once they succeed, return here
+      window.location.href = `${base}/login?next=${encodeURIComponent(window.location.pathname)}`;
     }
     return Promise.reject(error);
   }
 );
+
 
 import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
