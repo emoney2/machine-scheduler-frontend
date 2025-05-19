@@ -451,48 +451,52 @@ useEffect(() => {
   return () => clearInterval(id);
 }, []);
 
-
-// === Section 6: Placeholder Management (FULL REPLACEMENT) ===
-const editPlaceholder = (phToEdit) => {
-  setPh(phToEdit);
-  setShowModal(true);
-};
-
-const removePlaceholder = async (id) => {
-  const newPh = placeholders.filter(p => p.id !== id);
-  setPlaceholders(newPh);
-  // persist
-  await axios.post(API_ROOT + '/manualState', {
-    machine1: columns.machine1.jobs.map(j => j.id),
-    machine2: columns.machine2.jobs.map(j => j.id),
-    placeholders: newPh.map(p => p.id)
-  });
-};
-
+// === Section 6: Placeholder Management (full replacement) ===
 const submitPlaceholder = async (e) => {
-  if (e?.preventDefault) e.preventDefault();
+  // 1) prevent form reload
+  if (e && e.preventDefault) e.preventDefault();
 
-  // merge into state
-  let newPh;
+  // 2) build the new placeholders array
+  let nextPh;
   if (ph.id) {
-    newPh = placeholders.map(p => p.id === ph.id ? ph : p);
+    // editing an existing one
+    nextPh = placeholders.map(p => p.id === ph.id ? ph : p);
   } else {
-    newPh = [...placeholders, { ...ph, id: `ph-${Date.now()}` }];
+    // creating brand-new
+    nextPh = [
+      ...placeholders,
+      { ...ph, id: `ph-${Date.now()}` }
+    ];
   }
-  setPlaceholders(newPh);
 
-  // persist ALL three arrays
-  await axios.post(API_ROOT + '/manualState', {
-    machine1: columns.machine1.jobs.map(j => j.id),
-    machine2: columns.machine2.jobs.map(j => j.id),
-    placeholders: newPh.map(p => p.id)
+  // 3) update local React state immediately
+  setPlaceholders(nextPh);
+  setShowModal(false);
+  setPh({
+    id:          null,
+    company:     '',
+    quantity:    '',
+    stitchCount: '',
+    inHand:      '',
+    dueType:     'Hard Date'
   });
 
-  // reset modal
-  setShowModal(false);
-  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
-};
+  // 4) gather your manualState payload
+  const manualState = {
+    machine1:    columns.machine1.jobs.map(j => j.id),
+    machine2:    columns.machine2.jobs.map(j => j.id),
+    placeholders: nextPh
+  };
 
+  // 5) POST it up to the server
+  try {
+    await axios.post(API_ROOT + '/manualState', manualState);
+    // your socket listener (on "manualStateUpdated") will fire fetchAll for everyone
+  } catch (err) {
+    console.error('❌ Saving placeholders to server failed', err);
+    // (you can surface an error to the user here)
+  }
+};
 
 // === Section 7: toggleLink (full replacement) ===
 const toggleLink = async (colId, idx) => {
