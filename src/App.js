@@ -9,6 +9,17 @@ import axios from 'axios';
 // enable sending cookies so your Flask session is preserved
 axios.defaults.withCredentials = true;
 
+// redirect to /login on any 401 response
+axios.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response?.status === 401) {
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 
@@ -16,7 +27,10 @@ console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
 const API_ROOT   = process.env.REACT_APP_API_ROOT;
 const SOCKET_URL = API_ROOT.replace(/\/api$/, '');
-const socket     = io(SOCKET_URL, { transports: ['websocket','polling'] });
+const socket     = io(SOCKET_URL, {
+  transports: ['websocket','polling'],
+  withCredentials: true
+});
 
 socket.on("connect",        () => console.log("⚡ socket connected, id =", socket.id));
 socket.on("disconnect",     reason => console.log("🛑 socket disconnected:", reason));
@@ -86,29 +100,29 @@ export default function App() {
       fetchAll();
     }, 10_000);          // 10,000ms = 10 seconds
 
-  return () => clearInterval(handle);
-}, []);
+    return () => clearInterval(handle);
+  }, []);
   
-// Real-time updates listener
-useEffect(() => {
-  const handleUpdate = debounce(() => {
-    console.log("🛰️ remote update – re-fetching");
-    fetchAll();
-  }, 1000);
+  // Real-time updates listener
+  useEffect(() => {
+    const handleUpdate = debounce(() => {
+      console.log("🛰️ remote update – re-fetching");
+      fetchAll();
+    }, 1000);
 
-  socket.on("manualStateUpdated",   handleUpdate);
-  socket.on("orderUpdated",         handleUpdate);
-  socket.on("linksUpdated",         handleUpdate);
-  socket.on("placeholdersUpdated",  handleUpdate);
+    socket.on("manualStateUpdated",   handleUpdate);
+    socket.on("orderUpdated",         handleUpdate);
+    socket.on("linksUpdated",         handleUpdate);
+    socket.on("placeholdersUpdated",  handleUpdate);
 
-  return () => {
-    socket.off("manualStateUpdated",   handleUpdate);
-    socket.off("orderUpdated",         handleUpdate);
-    socket.off("linksUpdated",         handleUpdate);
-    socket.off("placeholdersUpdated",  handleUpdate);
-    handleUpdate.cancel();
-  };
-}, []);
+    return () => {
+      socket.off("manualStateUpdated",   handleUpdate);
+      socket.off("orderUpdated",         handleUpdate);
+      socket.off("linksUpdated",         handleUpdate);
+      socket.off("placeholdersUpdated",  handleUpdate);
+      handleUpdate.cancel();
+    };
+  }, []);
 
   // Manual sync button handler
   const handleSync = async () => {
@@ -117,7 +131,6 @@ useEffect(() => {
     setSyncStatus('updated');
     setTimeout(() => setSyncStatus(''), 2000);
   };
-
 // === Section 2: Helpers ===
 function isHoliday(dt) {
   return dt instanceof Date &&
