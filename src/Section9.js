@@ -184,30 +184,35 @@ export default function Section9(props) {
                               draggableId={job.id.toString()}
                               index={globalIdx}
                             >
-                              {prov => (
-                                <div
-                                  ref={prov.innerRef}
-                                  {...prov.draggableProps}
-                                  {...prov.dragHandleProps}
-                                  style={{
-                                    position: 'relative',
-                                    display: 'grid',
-                                    gridTemplateColumns: '1fr auto',
-                                    gridTemplateRows: 'repeat(4, auto)',
-                                    columnGap: 6,
-                                    rowGap: 4,
-                                    padding: '6px 28px 6px 6px',
-                                    margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
-                                    background: job.isLate
-                                      ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
-                                      : base,
-                                    border: `2px solid ${job.isLate ? 'red' : bCol}`,
-                                    borderRadius: 4,
-                                    zIndex: 2,
-                                    transition: 'none',          // ← disable the default drag “bounce”
-                                    ...prov.draggableProps.style
-                                  }}
-                                >
+                              {prov => {
+                                const isPh = String(job.id).startsWith('ph-');
+                                // if placeholder, we need to make room for *two* 28px-wide tabs
+                                const rightPad = isPh ? 28 + 28 : 28;
+
+                                return (
+                                  <div
+                                    ref={prov.innerRef}
+                                    {...prov.draggableProps}
+                                    {...prov.dragHandleProps}
+                                    style={{
+                                      position: 'relative',
+                                      display: 'grid',
+                                      gridTemplateColumns: '1fr auto',
+                                      gridTemplateRows: 'repeat(4, auto)',
+                                      columnGap: 6,
+                                      rowGap: 4,
+                                      // increase right padding when placeholder so nothing slips under the two tabs
+                                      padding: `6px ${rightPad}px 6px 6px`,
+                                      margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
+                                      background: job.isLate
+                                        ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
+                                        : base,
+                                      border: `2px solid ${job.isLate ? 'red' : bCol}`,
+                                      borderRadius: 4,
+                                      zIndex: 2,
+                                      ...prov.draggableProps.style
+                                    }}
+                                  >
 
                                   {/* H/S badge */}
                                   <span style={{
