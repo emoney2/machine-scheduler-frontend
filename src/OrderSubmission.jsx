@@ -1,5 +1,6 @@
 // File: frontend/src/OrderSubmission.jsx
 import React from 'react';
+console.log("🔍 OrderSubmission component rendered, iframe src →", window.location.href);
 
 export default function OrderSubmission() {
   return (
