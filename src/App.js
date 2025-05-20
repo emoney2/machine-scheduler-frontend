@@ -5,6 +5,7 @@
  import debounce from "lodash.debounce";
  import { io } from 'socket.io-client';
  import axios from 'axios';
+ import OrderSubmission from './OrderSubmission';
  
  // send cookies on every API call so Flask session is preserved
  axios.defaults.withCredentials = true;
@@ -24,6 +25,8 @@
 
 import Section9 from './Section9';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
+import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import OrderSubmission from './OrderSubmission';   // ← create this file next
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
@@ -668,32 +671,66 @@ const onDragEnd = async (result) => {
 // === Section 9: Render via Section9.jsx ===
 
   return (
-    <div>
-      <Section9
-        columns={columns}
-        handleSync={handleSync}
-        syncStatus={syncStatus}
-        showModal={showModal}
-        setShowModal={setShowModal}
-        onDragEnd={onDragEnd}
-        getChain={getChain}
-        toggleLink={toggleLink}
-        editPlaceholder={editPlaceholder}
-        removePlaceholder={removePlaceholder}
-        ph={ph}
-        setPh={setPh}
-        submitPlaceholder={submitPlaceholder}
-        LIGHT_YELLOW={LIGHT_YELLOW}
-        DARK_YELLOW={DARK_YELLOW}
-        LIGHT_GREY={LIGHT_GREY}
-        DARK_GREY={DARK_GREY}
-        LIGHT_PURPLE={LIGHT_PURPLE}
-        DARK_PURPLE={DARK_PURPLE}
-        BUBBLE_START={BUBBLE_START}
-        BUBBLE_END={BUBBLE_END}
-        BUBBLE_DELIV={BUBBLE_DELIV}
-      />
-    </div>
+    <BrowserRouter>
+      {/* ─── Nav Bar ────────────────────────────────────────────────────────── */}
+      <nav style={{ padding: 12, borderBottom: '1px solid #ddd', marginBottom: 16 }}>
+        <NavLink
+          to="/"
+          style={({ isActive }) => ({
+            marginRight: 16,
+            textDecoration: isActive ? 'underline' : 'none'
+          })}
+        >
+          Scheduler
+        </NavLink>
+        <NavLink
+          to="/submit"
+          style={({ isActive }) => ({
+            textDecoration: isActive ? 'underline' : 'none'
+          })}
+        >
+          Order Submission
+        </NavLink>
+      </nav>
+
+      {/* ─── Route Outlet ─────────────────────────────────────────────────────── */}
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Section9
+              columns={columns}
+              handleSync={handleSync}
+              syncStatus={syncStatus}
+              showModal={showModal}
+              setShowModal={setShowModal}
+              onDragEnd={onDragEnd}
+              getChain={getChain}
+              toggleLink={toggleLink}
+              editPlaceholder={editPlaceholder}
+              removePlaceholder={removePlaceholder}
+              ph={ph}
+              setPh={setPh}
+              submitPlaceholder={submitPlaceholder}
+              LIGHT_YELLOW={LIGHT_YELLOW}
+              DARK_YELLOW={DARK_YELLOW}
+              LIGHT_GREY={LIGHT_GREY}
+              DARK_GREY={DARK_GREY}
+              LIGHT_PURPLE={LIGHT_PURPLE}
+              DARK_PURPLE={DARK_PURPLE}
+              BUBBLE_START={BUBBLE_START}
+              BUBBLE_END={BUBBLE_END}
+              BUBBLE_DELIV={BUBBLE_DELIV}
+            />
+          }
+        />
+        <Route
+          path="/submit"
+          element={<OrderSubmission />}
+        />
+      </Routes>
+    </BrowserRouter>
   );
+
 
 }
