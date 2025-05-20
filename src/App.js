@@ -2,30 +2,30 @@
 // File: frontend/src/App.js
 
  import React, { useState, useEffect, useRef } from 'react';
- import debounce from "lodash.debounce";
- import { io } from 'socket.io-client';
- import axios from 'axios';
- 
- // send cookies on every API call so Flask session is preserved
- axios.defaults.withCredentials = true;
- 
- // if any API response is 401, kick the browser to /login
- axios.interceptors.response.use(
-   resp => resp,
-   err => {
-     if (err.response && err.response.status === 401) {
-       const base = process.env.REACT_APP_API_ROOT.replace(/\/api$/, '');
-       window.location.href = `${base}/login?next=/`;
-     }
-     return Promise.reject(err);
-   }
- );
+import debounce from "lodash.debounce";
+import { io } from 'socket.io-client';
+import axios from 'axios';
 
+// send cookies on every API call so Flask session is preserved
+axios.defaults.withCredentials = true;
+
+// if any API response is 401, kick the browser to /login
+axios.interceptors.response.use(
+  resp => resp,
+  err => {
+    if (err.response && err.response.status === 401) {
+      const base = process.env.REACT_APP_API_ROOT.replace(/\/api$/, '');
+      window.location.href = `${base}/login?next=/`;
+    }
+    return Promise.reject(err);
+  }
+);
 
 import Section9 from './Section9';
+import OrderSubmission from './OrderSubmission';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import OrderSubmission from './OrderSubmission';   // ← create this file next
+
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
@@ -730,6 +730,4 @@ const onDragEnd = async (result) => {
       </Routes>
     </BrowserRouter>
   );
-
-
 }
