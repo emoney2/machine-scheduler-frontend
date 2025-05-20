@@ -29,10 +29,10 @@ console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
 const API_ROOT   = process.env.REACT_APP_API_ROOT;
 const SOCKET_URL = API_ROOT.replace(/\/api$/, '');
-const socket = io(SOCKET_URL, {
-  transports: ['websocket','polling'],
-  withCredentials: true
-});
+  const socket     = io(SOCKET_URL, {
+    transports: ['websocket','polling'],
+    withCredentials: true   // ← send the session cookie on the WS handshake
+  });
 
 socket.on("connect",        () => console.log("⚡ socket connected, id =", socket.id));
 socket.on("disconnect",     reason => console.log("🛑 socket disconnected:", reason));
