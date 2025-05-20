@@ -249,7 +249,7 @@ export default function Section9(props) {
                                         style={{
                                           position: 'absolute',
                                           top: 0,
-                                          right: 28,
+                                          right: 0,
                                           width: 28,
                                           height: '100%',
                                           background: base,
@@ -291,7 +291,7 @@ export default function Section9(props) {
                                         style={{
                                           position: 'absolute',
                                           top: isPh ? 60 : 28,
-                                          right: 0,
+                                          right: isPh ? 28 : 0,
                                           width: 28,
                                           height: `calc(100% - ${isPh ? 60 : 28}px)`,
                                           display: 'flex',
