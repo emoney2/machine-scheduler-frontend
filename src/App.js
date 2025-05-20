@@ -5,7 +5,6 @@
  import debounce from "lodash.debounce";
  import { io } from 'socket.io-client';
  import axios from 'axios';
- import OrderSubmission from './OrderSubmission';
  
  // send cookies on every API call so Flask session is preserved
  axios.defaults.withCredentials = true;
