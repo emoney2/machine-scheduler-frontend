@@ -245,32 +245,44 @@ export default function Section9(props) {
 
                                     {/* Placeholder edit/delete buttons */}
                                     {isPh && (
-                                      <div style={{
-                                        position: 'absolute',
-                                        top: 24,
-                                        right: 4,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 4,
-                                        zIndex: 5,
-                                        background: base,
-                                        padding: '2px',
-                                        borderRadius: 2
-                                      }}>
+                                      <div
+                                        style={{
+                                          position: 'absolute',
+                                          top: 0,
+                                          right: 28,
+                                          width: 28,
+                                          height: '100%',
+                                          background: base,
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          alignItems: 'center',
+                                          justifyContent: 'flex-start',
+                                          borderTopRightRadius: 4,
+                                          borderBottomRightRadius: 4,
+                                          zIndex: 6
+                                        }}
+                                      >
                                         <span
-                                          onClick={() => editPlaceholder(job.id)}
-                                          style={{ cursor: 'pointer', fontSize: 12 }}
+                                          onClick={e => {
+                                            e.stopPropagation();
+                                            editPlaceholder(job);
+                                          }}
+                                          style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}
                                         >
                                           ✎
                                         </span>
                                         <span
-                                          onClick={() => removePlaceholder(job.id)}
-                                          style={{ cursor: 'pointer', fontSize: 12 }}
+                                          onClick={e => {
+                                            e.stopPropagation();
+                                            removePlaceholder(job.id);
+                                          }}
+                                          style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}
                                         >
                                           ✖
                                         </span>
                                       </div>
                                     )}
+
 
                                     {/* Link/unlink tab */}
                                     {globalIdx < jobs.length - 1 && (
