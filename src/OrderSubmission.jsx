@@ -5,7 +5,7 @@ console.log("🔍 OrderSubmission component rendered, iframe src →", window.lo
 export default function OrderSubmission() {
   return (
     <iframe
-      src="https://order-submission.onrender.com"
+      src="https://order-submission.onrender.com/"
       title="Order Submission"
       style={{
         width: '100%',
