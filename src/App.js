@@ -1,7 +1,7 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
 
- import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
 import { io } from 'socket.io-client';
 import axios from 'axios';
@@ -24,7 +24,7 @@ axios.interceptors.response.use(
 import Section9 from './Section9';
 import OrderSubmission from './OrderSubmission';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink }        from 'react-router-dom';
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
@@ -669,6 +669,7 @@ const onDragEnd = async (result) => {
 // === Section 9: Render via Section9.jsx ===
 
   return (
+    <>
       {/* ─── Nav Bar ────────────────────────────────────────────────────────── */}
       <nav style={{ padding: 12, borderBottom: '1px solid #ddd', marginBottom: 16 }}>
         <NavLink
@@ -721,10 +722,8 @@ const onDragEnd = async (result) => {
             />
           }
         />
-        <Route
-          path="/submit"
-          element={<OrderSubmission />}
-        />
+        <Route path="/submit" element={<OrderSubmission />} />
       </Routes>
+    </>
   );
 }
