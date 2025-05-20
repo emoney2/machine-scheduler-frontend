@@ -22,7 +22,6 @@ axios.interceptors.response.use(
 );
 
 import Section9 from './Section9';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import OrderSubmission from './OrderSubmission';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 import { Routes, Route, NavLink }        from 'react-router-dom';
