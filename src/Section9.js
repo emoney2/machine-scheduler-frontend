@@ -243,7 +243,7 @@ export default function Section9(props) {
                                       gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
-                                      padding: '6px 28px 6px 6px',
+                                      padding: '6px 24px 6px 6px',
                                       margin: `0 0 ${
                                         jIdx < seg.len - 1 ? 6 : 0
                                       }px 0`,
@@ -258,12 +258,13 @@ export default function Section9(props) {
                                       ...prov.draggableProps.style
                                     }}
                                   >
-                                    {/* H/S badge */}
+                                    {/* H/S badge (now above the action strip) */}
                                     <span
                                       style={{
                                         position: 'absolute',
                                         top: 4,
                                         right: 4,
+                                        zIndex: 7,            // ensure it sits above the strip
                                         width: 16,
                                         height: 16,
                                         background: base,
@@ -273,7 +274,7 @@ export default function Section9(props) {
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         fontSize: 10,
-                                        fontWeight: 'bold'
+                                        fontWeight: 'bold',
                                       }}
                                     >
                                       {job.due_type === 'Hard Date'
@@ -289,7 +290,7 @@ export default function Section9(props) {
                                         position: 'absolute',
                                         top: 0,
                                         right: 0,
-                                        width: 28,
+                                        width: 24,
                                         height: '100%',
                                         background: base,
                                         display: 'flex',
