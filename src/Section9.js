@@ -4,7 +4,6 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
 
 export default function Section9(props) {
-  // confirm that the handler is actually arriving
   console.log('🔥 Section9 props.onDragEnd is', typeof props.onDragEnd);
 
   const {
@@ -34,7 +33,11 @@ export default function Section9(props) {
 
   return (
     <div style={{ padding: 16, fontFamily: 'sans-serif', fontSize: 13 }}>
-      <button onClick={() => setShowModal(true)} style={{ marginRight: 8, fontSize: 13 }}>
+      {/* Top controls */}
+      <button
+        onClick={() => setShowModal(true)}
+        style={{ marginRight: 8, fontSize: 13 }}
+      >
         + Add Placeholder
       </button>
       <button onClick={handleSync} style={{ fontSize: 13 }}>
@@ -42,37 +45,64 @@ export default function Section9(props) {
         {syncStatus === 'updated' && <span style={{ color: 'green' }}>✓ Updated</span>}
       </button>
 
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 16,
-        margin: '12px 0', flexWrap: 'wrap', fontSize: 12
-      }}>
+      {/* Legend */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          margin: '12px 0',
+          flexWrap: 'wrap',
+          fontSize: 12
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 12, height: 12, background: LIGHT_YELLOW,
-            border: `2px solid ${DARK_YELLOW}`, borderRadius: 2
-          }} />
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: LIGHT_YELLOW,
+              border: `2px solid ${DARK_YELLOW}`,
+              borderRadius: 2
+            }}
+          />
           Placeholder
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 12, height: 12, background: LIGHT_GREY,
-            border: `2px solid ${DARK_GREY}`, borderRadius: 2
-          }} />
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: LIGHT_GREY,
+              border: `2px solid ${DARK_GREY}`,
+              borderRadius: 2
+            }}
+          />
           Soft Date
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 12, height: 12, background: LIGHT_PURPLE,
-            border: `2px solid ${DARK_PURPLE}`, borderRadius: 2
-          }} />
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: LIGHT_PURPLE,
+              border: `2px solid ${DARK_PURPLE}`,
+              borderRadius: 2
+            }}
+          />
           Hard Date
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 12, height: 12,
-            background: 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)',
-            border: '2px solid red', borderRadius: 2
-          }} />
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background:
+                'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)',
+              border: '2px solid red',
+              borderRadius: 2
+            }}
+          />
           Late
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -82,30 +112,45 @@ export default function Section9(props) {
           <span style={{ fontSize: 14 }}>❌</span> Unlink
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 12, height: 12, background: BUBBLE_START, borderRadius: 2
-          }} /> Start
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: BUBBLE_START,
+              borderRadius: 2
+            }}
+          />{' '}
+          Start
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 12, height: 12, background: BUBBLE_END, borderRadius: 2
-          }} /> EED / End
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: BUBBLE_END,
+              borderRadius: 2
+            }}
+          />{' '}
+          EED / End
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{
-            width: 12, height: 12, background: BUBBLE_DELIV, borderRadius: 2
-          }} /> IHD / Delivery
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: BUBBLE_DELIV,
+              borderRadius: 2
+            }}
+          />{' '}
+          IHD / Delivery
         </div>
       </div>
 
       <DragDropContext
         onDragEnd={result => {
           console.log('🔍 Section9 DRAG-END result:', result);
-          console.log('🔍 Section9 calling props.onDragEnd...');
-          if (typeof props.onDragEnd === 'function') {
-            props.onDragEnd(result);
-          } else {
-            console.error('❌ props.onDragEnd is not a function!');
+          if (typeof onDragEnd === 'function') {
+            onDragEnd(result);
           }
         }}
       >
@@ -140,7 +185,13 @@ export default function Section9(props) {
                       background: '#fafafa'
                     }}
                   >
-                    <h4 style={{ textAlign: 'center', margin: '8px 0', fontSize: 13 }}>
+                    <h4
+                      style={{
+                        textAlign: 'center',
+                        margin: '8px 0',
+                        fontSize: 13
+                      }}
+                    >
                       {col.title}
                     </h4>
 
@@ -155,52 +206,32 @@ export default function Section9(props) {
                           borderRadius: 4
                         }}
                       >
-                        {jobs.slice(seg.start, seg.start + seg.len).map((job, jIdx) => {
+                        {jobs
+                          .slice(seg.start, seg.start + seg.len)
+                          .map((job, jIdx) => {
+                            const globalIdx = seg.start + jIdx;
+                            const isPh = String(job.id).startsWith('ph-');
+                            const isHard = job.due_type === 'Hard Date';
+                            const isSoft = !isPh && !isHard;
 
-                          const globalIdx = seg.start + jIdx;
-
-                          const isPh = String(job.id).startsWith('ph-');
-                          const isHard = job.due_type === 'Hard Date';
-                          const isSoft = !isPh && !isHard;
-
-
-
-                          // pick colors
-                          const base = isPh
-                            ? LIGHT_YELLOW
-                            : isSoft
+                            const base = isPh
+                              ? LIGHT_YELLOW
+                              : isSoft
                               ? LIGHT_GREY
                               : LIGHT_PURPLE;
-
-                          const bCol = isPh
-                            ? DARK_YELLOW
-                            : isSoft
+                            const bCol = isPh
+                              ? DARK_YELLOW
+                              : isSoft
                               ? DARK_GREY
                               : DARK_PURPLE;
 
-                          return (
-                            <Draggable
-                              key={job.id.toString()}
-                              draggableId={job.id.toString()}
-                              index={globalIdx}
-                            >
-                              {prov => {
-                                const isPh = String(job.id).startsWith('ph-');
-                                const isHard = job.due_type === 'Hard Date';
-                                const isSoft = !isPh && !isHard;
-
-                                const base = isPh
-                                  ? LIGHT_YELLOW
-                                  : isSoft
-                                    ? LIGHT_GREY
-                                    : LIGHT_PURPLE;
-                                const bCol = isPh
-                                  ? DARK_YELLOW
-                                  : isSoft
-                                    ? DARK_GREY
-                                    : DARK_PURPLE;
-
-                                return (
+                            return (
+                              <Draggable
+                                key={job.id.toString()}
+                                draggableId={job.id.toString()}
+                                index={globalIdx}
+                              >
+                                {prov => (
                                   <div
                                     ref={prov.innerRef}
                                     {...prov.draggableProps}
@@ -213,203 +244,274 @@ export default function Section9(props) {
                                       columnGap: 6,
                                       rowGap: 4,
                                       padding: '6px 28px 6px 6px',
-                                      margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
+                                      margin: `0 0 ${
+                                        jIdx < seg.len - 1 ? 6 : 0
+                                      }px 0`,
                                       background: job.isLate
                                         ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
                                         : base,
-                                      border: `2px solid ${job.isLate ? 'red' : bCol}`,
+                                      border: `2px solid ${
+                                        job.isLate ? 'red' : bCol
+                                      }`,
                                       borderRadius: 4,
                                       zIndex: 2,
                                       ...prov.draggableProps.style
                                     }}
                                   >
                                     {/* H/S badge */}
-                                    <span style={{
-                                      position: 'absolute',
-                                      top: 4,
-                                      right: 4,
-                                      width: 16,
-                                      height: 16,
-                                      background: base,
-                                      border: `1px solid ${bCol}`,
-                                      borderRadius: 2,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: 10,
-                                      fontWeight: 'bold'
-                                    }}>
-                                      {job.due_type === 'Hard Date' ? 'H' : job.due_type === 'Soft Date' ? 'S' : ''}
+                                    <span
+                                      style={{
+                                        position: 'absolute',
+                                        top: 4,
+                                        right: 4,
+                                        width: 16,
+                                        height: 16,
+                                        background: base,
+                                        border: `1px solid ${bCol}`,
+                                        borderRadius: 2,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        fontSize: 10,
+                                        fontWeight: 'bold'
+                                      }}
+                                    >
+                                      {job.due_type === 'Hard Date'
+                                        ? 'H'
+                                        : job.due_type === 'Soft Date'
+                                        ? 'S'
+                                        : ''}
                                     </span>
 
-
-                                    {/* Placeholder edit/delete buttons */}
-                                    {isPh && (
-                                      <div
-                                        style={{
-                                          position: 'absolute',
-                                          top: 0,
-                                          right: 0,
-                                          width: 28,
-                                          height: '100%',
-                                          background: base,
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          alignItems: 'center',
-                                          justifyContent: 'flex-start',
-                                          borderTopRightRadius: 4,
-                                          borderBottomRightRadius: 4,
-                                          zIndex: 6
-                                        }}
-                                      >
+                                    {/* Unified action strip */}
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        right: 0,
+                                        width: 28,
+                                        height: '100%',
+                                        background: base,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: isPh
+                                          ? 'flex-start'
+                                          : 'center',
+                                        paddingTop: isPh ? 4 : 0,
+                                        borderTopRightRadius: 4,
+                                        borderBottomRightRadius: 4,
+                                        zIndex: 6
+                                      }}
+                                    >
+                                      {isPh && (
+                                        <>
+                                          <span
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              editPlaceholder(job);
+                                            }}
+                                            style={{
+                                              cursor: 'pointer',
+                                              fontSize: 12,
+                                              margin: 4
+                                            }}
+                                          >
+                                            ✎
+                                          </span>
+                                          <span
+                                            onClick={e => {
+                                              e.stopPropagation();
+                                              removePlaceholder(job.id);
+                                            }}
+                                            style={{
+                                              cursor: 'pointer',
+                                              fontSize: 12,
+                                              margin: 4
+                                            }}
+                                          >
+                                            ✖
+                                          </span>
+                                        </>
+                                      )}
+                                      {globalIdx < jobs.length - 1 && (
                                         <span
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            editPlaceholder(job);
+                                          onClick={() =>
+                                            toggleLink(colId, globalIdx)
+                                          }
+                                          style={{
+                                            cursor: 'pointer',
+                                            fontSize: 14,
+                                            margin: 4
                                           }}
-                                          style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}
                                         >
-                                          ✎
+                                          {job.linkedTo ===
+                                          jobs[globalIdx + 1]?.id
+                                            ? '❌'
+                                            : '🔗'}
                                         </span>
-                                        <span
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            removePlaceholder(job.id);
-                                          }}
-                                          style={{ cursor: 'pointer', fontSize: 12, margin: 4 }}
-                                        >
-                                          ✖
-                                        </span>
-                                      </div>
-                                    )}
-
-
-                                    {/* Link/unlink tab */}
-                                    {globalIdx < jobs.length - 1 && (
-                                      <div
-                                        onClick={() => toggleLink(colId, globalIdx)}
-                                        style={{
-                                          position: 'absolute',
-                                          top: isPh ? 60 : 28,
-                                          right: isPh ? 28 : 0,
-                                          width: 28,
-                                          height: `calc(100% - ${isPh ? 60 : 28}px)`,
-                                          display: 'flex',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          cursor: 'pointer',
-                                          background: base,
-                                          borderBottomRightRadius: 4,
-                                          zIndex: 4
-                                        }}
-                                      >
-                                        {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
-                                      </div>
-                                    )}
+                                      )}
+                                    </div>
 
                                     {/* Job ID + Company */}
-                                    <span style={{
-                                      gridRow: 1, gridColumn: 1,
-                                      background: base, padding: '0 4px',
-                                      borderRadius: 4, whiteSpace: 'nowrap',
-                                      overflow: 'hidden', textOverflow: 'ellipsis',
-                                      fontSize: 13, fontWeight: 'bold'
-                                    }}>
-                                      <span style={{
-                                        display: 'inline-block', width: 20, height: 20,
-                                        borderRadius: '50%', background: '#000',
-                                        color: base, lineHeight: '20px', textAlign: 'center',
-                                        fontSize: isPh ? 13 : 11, fontWeight: 'bold',
-                                        marginRight: 4
-                                      }}>
+                                    <span
+                                      style={{
+                                        gridRow: 1,
+                                        gridColumn: 1,
+                                        background: base,
+                                        padding: '0 4px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        fontSize: 13,
+                                        fontWeight: 'bold'
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          display: 'inline-block',
+                                          width: 20,
+                                          height: 20,
+                                          borderRadius: '50%',
+                                          background: '#000',
+                                          color: base,
+                                          lineHeight: '20px',
+                                          textAlign: 'center',
+                                          fontSize: isPh ? 13 : 11,
+                                          fontWeight: 'bold',
+                                          marginRight: 4
+                                        }}
+                                      >
                                         {isPh ? '*' : job.id}
                                       </span>
                                       {job.company}
                                     </span>
 
                                     {/* Quantity */}
-                                    <span style={{
-                                      gridRow: 1, gridColumn: 2, justifySelf: 'end',
-                                      background: base, padding: '0 4px',
-                                      borderRadius: 4, fontSize: 15, fontWeight: 'bold',
-                                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                                    }}>
+                                    <span
+                                      style={{
+                                        gridRow: 1,
+                                        gridColumn: 2,
+                                        justifySelf: 'end',
+                                        background: base,
+                                        padding: '0 4px',
+                                        borderRadius: 4,
+                                        fontSize: 15,
+                                        fontWeight: 'bold',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
+                                      }}
+                                    >
                                       {job.quantity}
                                     </span>
 
                                     {/* Design */}
-                                    <span style={{
-                                      gridRow: 2, gridColumn: 1,
-                                      background: base, padding: '0 4px',
-                                      borderRadius: 4, whiteSpace: 'nowrap',
-                                      overflow: 'hidden', textOverflow: 'ellipsis',
-                                      fontSize: 13
-                                    }}>
-                                      {job.design?.slice(0,22)}
+                                    <span
+                                      style={{
+                                        gridRow: 2,
+                                        gridColumn: 1,
+                                        background: base,
+                                        padding: '0 4px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        fontSize: 13
+                                      }}
+                                    >
+                                      {job.design?.slice(0, 22)}
                                     </span>
 
                                     {/* Embroidery Start */}
                                     {job.start && (
-                                      <span style={{
-                                        gridRow: 2, gridColumn: 2, justifySelf: 'end',
-                                        background: BUBBLE_START, padding: '0 4px',
-                                        borderRadius: 10, whiteSpace: 'nowrap',
-                                        fontSize: 13
-                                      }}>
+                                      <span
+                                        style={{
+                                          gridRow: 2,
+                                          gridColumn: 2,
+                                          justifySelf: 'end',
+                                          background: BUBBLE_START,
+                                          padding: '0 4px',
+                                          borderRadius: 10,
+                                          whiteSpace: 'nowrap',
+                                          fontSize: 13
+                                        }}
+                                      >
                                         {job.start}
                                       </span>
                                     )}
 
                                     {/* EED */}
-                                    <span style={{
-                                      gridRow: 3, gridColumn: 1,
-                                      background: BUBBLE_END, padding: '0 4px',
-                                      borderRadius: 4, whiteSpace: 'nowrap',
-                                      overflow: 'hidden', textOverflow: 'ellipsis',
-                                      fontSize: 13
-                                    }}>
+                                    <span
+                                      style={{
+                                        gridRow: 3,
+                                        gridColumn: 1,
+                                        background: BUBBLE_END,
+                                        padding: '0 4px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        fontSize: 13
+                                      }}
+                                    >
                                       EED: {fmtMMDD(subWorkDays(parseDueDate(job.due_date), 6))}
                                     </span>
 
                                     {/* Embroidery End */}
                                     {job.end && (
-                                      <span style={{
-                                        gridRow: 3, gridColumn: 2, justifySelf: 'end',
-                                        background: BUBBLE_END, padding: '0 4px',
-                                        borderRadius: 10, whiteSpace: 'nowrap',
-                                        fontSize: 13
-                                      }}>
+                                      <span
+                                        style={{
+                                          gridRow: 3,
+                                          gridColumn: 2,
+                                          justifySelf: 'end',
+                                          background: BUBBLE_END,
+                                          padding: '0 4px',
+                                          borderRadius: 10,
+                                          whiteSpace: 'nowrap',
+                                          fontSize: 13
+                                        }}
+                                      >
                                         {job.end}
                                       </span>
                                     )}
 
                                     {/* Delivery */}
-                                    <span style={{
-                                      gridRow: 4, gridColumn: 1,
-                                      background: BUBBLE_DELIV, padding: '0 4px',
-                                      borderRadius: 4, whiteSpace: 'nowrap',
-                                      fontSize: 13
-                                    }}>
+                                    <span
+                                      style={{
+                                        gridRow: 4,
+                                        gridColumn: 1,
+                                        background: BUBBLE_DELIV,
+                                        padding: '0 4px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap',
+                                        fontSize: 13
+                                      }}
+                                    >
                                       IHD: {fmtMMDD(job.due_date)}
                                     </span>
                                     {job.delivery && (
-                                      <span style={{
-                                        gridRow: 4, gridColumn: 2, justifySelf: 'end',
-                                        background: BUBBLE_DELIV, padding: '0 4px',
-                                        borderRadius: 10, whiteSpace: 'nowrap',
-                                        fontSize: 13
-                                      }}>
+                                      <span
+                                        style={{
+                                          gridRow: 4,
+                                          gridColumn: 2,
+                                          justifySelf: 'end',
+                                          background: BUBBLE_DELIV,
+                                          padding: '0 4px',
+                                          borderRadius: 10,
+                                          whiteSpace: 'nowrap',
+                                          fontSize: 13
+                                        }}
+                                      >
                                         {job.delivery}
                                       </span>
                                     )}
                                   </div>
-                                );
-                              }}
-                            </Draggable>
-
-
-                          );
-                        })}
+                                )}
+                              </Draggable>
+                            );
+                          })}
                       </div>
                     ))}
 
@@ -422,16 +524,31 @@ export default function Section9(props) {
         </div>
       </DragDropContext>
 
+      {/* Modal for Add / Edit Placeholder */}
       {showModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          background: 'rgba(0,0,0,0.5)', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div style={{
-            background: '#fff', padding: 24, borderRadius: 8, width: 320,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
-          }}>
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+        >
+          <div
+            style={{
+              background: '#fff',
+              padding: 24,
+              borderRadius: 8,
+              width: 320,
+              boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+            }}
+          >
             <h3 style={{ marginTop: 0 }}>Add / Edit Placeholder</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <input
@@ -472,8 +589,15 @@ export default function Section9(props) {
               </select>
             </div>
             <div style={{ marginTop: 16, textAlign: 'right' }}>
-              <button onClick={() => setShowModal(false)} style={{ marginRight: 8, fontSize: 13 }}>Cancel</button>
-              <button onClick={submitPlaceholder} style={{ fontSize: 13 }}>Save</button>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{ marginRight: 8, fontSize: 13 }}  
+              >
+                Cancel
+              </button>
+              <button onClick={submitPlaceholder} style={{ fontSize: 13 }}>
+                Save
+              </button>
             </div>
           </div>
         </div>
