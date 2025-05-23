@@ -211,9 +211,9 @@ export default function Section9(props) {
                           .map((job, jIdx) => {
                             const globalIdx = seg.start + jIdx;
                             const isPh = String(job.id).startsWith('ph-');
-                            // widen the strip for placeholders so both ✎ and ❌ fit
+                            // for placeholders we need a bit more room
                             const stripWidth = isPh ? 32 : 24;
-                            const rightPadding = stripWidth;
+                            const rightPadding = stripWidth + 4; // extra gutter so icon margins don’t push off;
                             const isHard = job.due_type === 'Hard Date';
                             const isSoft = !isPh && !isHard;
 
@@ -246,7 +246,7 @@ export default function Section9(props) {
                                       gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
-                                      padding: `6px ${rightPadding}px 6px 6px`,
+                                      padding: `6px ${rightPadding}px 6px 6px`,  // keep content clear of strip 
                                       margin: `0 0 ${
                                         jIdx < seg.len - 1 ? 6 : 0
                                       }px 0`,
@@ -289,73 +289,52 @@ export default function Section9(props) {
 
                                     {/* Unified action strip */}
                                     <div
-                                      style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        right: 0,
-                                        width: stripWidth,
-                                        height: '100%',
-                                        background: base,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: isPh
-                                          ? 'flex-start'
-                                          : 'center',
-                                        paddingTop: isPh ? 4 : 0,
-                                        borderTopRightRadius: 4,
-                                        borderBottomRightRadius: 4,
-                                        zIndex: 6
-                                      }}
-                                    >
-                                      {isPh && (
-                                        <>
+                                        style={{
+                                          position: 'absolute',
+                                          top: 0,
+                                          bottom: 0,               // span exactly from top→bottom
+                                          right: 0,
+                                          width: stripWidth,
+                                          background: base,
+                                          display: 'flex',
+                                          flexDirection: 'column',
+                                          alignItems: 'center',
+                                          justifyContent: isPh ? 'flex-start' : 'center',
+                                          paddingTop: isPh ? 4 : 0,
+                                          borderTopRightRadius: 4,
+                                          borderBottomRightRadius: 4,
+                                          zIndex: 6,
+                                          overflow: 'hidden',     // never grow beyond card
+                                        }}
+                                      >
+                                        {/* always show ✎ & ✖ for placeholders */}
+                                        {isPh && (
+                                          <>
+                                            <span
+                                              onClick={e => { e.stopPropagation(); editPlaceholder(job); }}
+                                              style={{ cursor: 'pointer', fontSize: 12, margin: 2 }}
+                                            >
+                                              ✎
+                                            </span>
+                                            <span
+                                              onClick={e => { e.stopPropagation(); removePlaceholder(job.id); }}
+                                              style={{ cursor: 'pointer', fontSize: 12, margin: 2 }}
+                                            >
+                                              ✖
+                                            </span>
+                                          </>
+                                        )}
+                                    
+                                        {/* link/unlink under the edit/delete */}
+                                        {globalIdx < jobs.length - 1 && (
                                           <span
-                                            onClick={e => {
-                                              e.stopPropagation();
-                                              editPlaceholder(job);
-                                            }}
-                                            style={{
-                                              cursor: 'pointer',
-                                              fontSize: 12,
-                                              margin: 4
-                                            }}
+                                            onClick={() => toggleLink(colId, globalIdx)}
+                                            style={{ cursor: 'pointer', fontSize: 14, margin: 2 }}
                                           >
-                                            ✎
+                                            {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
                                           </span>
-                                          <span
-                                            onClick={e => {
-                                              e.stopPropagation();
-                                              removePlaceholder(job.id);
-                                            }}
-                                            style={{
-                                              cursor: 'pointer',
-                                              fontSize: 12,
-                                              margin: 4
-                                            }}
-                                          >
-                                            ✖
-                                          </span>
-                                        </>
-                                      )}
-                                      {globalIdx < jobs.length - 1 && (
-                                        <span
-                                          onClick={() =>
-                                            toggleLink(colId, globalIdx)
-                                          }
-                                          style={{
-                                            cursor: 'pointer',
-                                            fontSize: 14,
-                                            margin: 4
-                                          }}
-                                        >
-                                          {job.linkedTo ===
-                                          jobs[globalIdx + 1]?.id
-                                            ? '❌'
-                                            : '🔗'}
-                                        </span>
-                                      )}
-                                    </div>
+                                        )}
+                                      </div>
 
                                     {/* Job ID + Company */}
                                     <span
