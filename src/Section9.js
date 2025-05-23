@@ -34,21 +34,30 @@ export default function Section9(props) {
 
   return (
     <div style={{ padding: 16, fontFamily: 'sans-serif', fontSize: 13 }}>
-       {/* Status banner */}
-       <div style={{ marginBottom: 8, fontWeight: 'bold' }}>
-         {status}
-       </div>
-      {/* Top controls */}
-      <button
-        onClick={() => setShowModal(true)}
-        style={{ marginRight: 8, fontSize: 13 }}
-      >
-        + Add Placeholder
-      </button>
-      <button onClick={handleSync} style={{ fontSize: 13 }}>
-        Sync from Sheet{' '}
-        {syncStatus === 'updated' && <span style={{ color: 'green' }}>✓ Updated</span>}
-      </button>
+      {/* Top‐line controls + status */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 16,
+        marginBottom: 12
+      }}>
+        <button
+          onClick={() => setShowModal(true)}
+          style={{ fontSize: 13 }}
+        >
+          + Add Placeholder
+        </button>
+
+        <button onClick={handleSync} style={{ fontSize: 13 }}>
+          Sync from Sheet{' '}
+          {syncStatus === 'updated' && <span style={{ color: 'green' }}>✓ Updated</span>}
+        </button>
+
+        {/* push status to the far right */}
+        <span style={{ marginLeft: 'auto', fontWeight: 'bold' }}>
+          {status}
+        </span>
+      </div>
 
       {/* Legend */}
       <div
