@@ -1,11 +1,12 @@
 // File: frontend/src/Section9.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
 
 export default function Section9(props) {
   console.log('🔥 Section9 props.onDragEnd is', typeof props.onDragEnd);
 
+  const [status, setStatus] = useState('');
   const {
     columns,
     handleSync,
@@ -33,6 +34,10 @@ export default function Section9(props) {
 
   return (
     <div style={{ padding: 16, fontFamily: 'sans-serif', fontSize: 13 }}>
+       {/* Status banner */}
+       <div style={{ marginBottom: 8, fontWeight: 'bold' }}>
+         {status}
+       </div>
       {/* Top controls */}
       <button
         onClick={() => setShowModal(true)}
@@ -146,14 +151,25 @@ export default function Section9(props) {
         </div>
       </div>
 
-      <DragDropContext
-        onDragEnd={result => {
-          console.log('🔍 Section9 DRAG-END result:', result);
-          if (typeof onDragEnd === 'function') {
-            onDragEnd(result);
-          }
-        }}
-      >
+       <DragDropContext
+         onDragEnd={result => {
+           // show working...
+           setStatus('Working…');
+ 
+           // call the passed-in handler (which does your fetch)
+           const ret = props.onDragEnd(result);
+ 
+           // if it returns a Promise, wait for it
+           if (ret && typeof ret.then === 'function') {
+             ret
+               .then(() => setStatus('Success!'))
+               .catch(() => setStatus('Error'));
+           } else {
+             // otherwise mark success immediately
+             setStatus('Success!');
+           }
+         }}
+       >
         <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
           {['queue', 'machine1', 'machine2'].map(colId => {
             const col = columns[colId] || {};
