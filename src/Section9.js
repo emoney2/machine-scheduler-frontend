@@ -261,31 +261,6 @@ export default function Section9(props) {
                                       ...prov.draggableProps.style
                                     }}
                                   >
-                                    {/* H/S badge (now above the action strip) */}
-                                    <span
-                                      style={{
-                                        position: 'absolute',
-                                        top: 4,
-                                        right: 4,
-                                        zIndex: 7,            // ensure it sits above the strip
-                                        width: 16,
-                                        height: 16,
-                                        background: base,
-                                        border: `1px solid ${bCol}`,
-                                        borderRadius: 2,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: 10,
-                                        fontWeight: 'bold',
-                                      }}
-                                    >
-                                      {job.due_type === 'Hard Date'
-                                        ? 'H'
-                                        : job.due_type === 'Soft Date'
-                                        ? 'S'
-                                        : ''}
-                                    </span>
 
                                     {/* Unified action strip */}
                                     <div
