@@ -299,8 +299,7 @@ export default function Section9(props) {
                                         display: 'flex',
                                         flexDirection: 'column',
                                         alignItems: 'center',
-                                        justifyContent: isPh ? 'flex-start' : 'center',
-                                        paddingTop: isPh ? 8 : 0,
+                                        justifyContent: isPh ? 'space-evenly' : 'center',
                                         borderTopRightRadius: 4,
                                         borderBottomRightRadius: 4,
                                         zIndex: 6,
@@ -308,31 +307,52 @@ export default function Section9(props) {
                                       }}
                                     >
                                       {isPh && (
-                                        <>
-                                          <span
-                                            onClick={e => { e.stopPropagation(); editPlaceholder(job); }}
-                                            style={{ cursor: 'pointer', fontSize: 14, margin: 4 }}
-                                          >
-                                            ✎
-                                          </span>
-                                          <span
-                                            onClick={e => { e.stopPropagation(); removePlaceholder(job.id); }}
-                                            style={{ cursor: 'pointer', fontSize: 14, margin: 4 }}
-                                          >
-                                            ✖
-                                          </span>
-                                        </>
+                                        <span
+                                          style={{
+                                            width: 16,
+                                            height: 16,
+                                            background: base,
+                                            border: `1px solid ${bCol}`,
+                                            borderRadius: 2,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: 10,
+                                            fontWeight: 'bold',
+                                          }}
+                                        >
+                                          {job.due_type === 'Hard Date' ? 'H' : 'S'}
+                                        </span>
+                                      )}
+
+                                      {isPh && (
+                                        <span
+                                          onClick={e => { e.stopPropagation(); editPlaceholder(job); }}
+                                          style={{ cursor: 'pointer', fontSize: 14 }}
+                                        >
+                                          ✎
+                                        </span>
+                                      )}
+
+                                      {isPh && (
+                                        <span
+                                          onClick={e => { e.stopPropagation(); removePlaceholder(job.id); }}
+                                          style={{ cursor: 'pointer', fontSize: 14 }}
+                                        >
+                                          ✖
+                                        </span>
                                       )}
 
                                       {globalIdx < jobs.length - 1 && (
                                         <span
                                           onClick={() => toggleLink(colId, globalIdx)}
-                                          style={{ cursor: 'pointer', fontSize: 16, margin: 4 }}
+                                          style={{ cursor: 'pointer', fontSize: 16 }}
                                         >
                                           {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
                                         </span>
                                       )}
                                     </div>
+
 
                                     {/* Job ID + Company */}
                                     <span
