@@ -261,73 +261,99 @@ export default function Section9(props) {
                                       ...prov.draggableProps.style
                                     }}
                                   >
+{/* only show badge outside strip on real jobs */}
+{!isPh && (
+  <span
+    style={{
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 16,
+      height: 16,
+      background: base,
+      border: `1px solid ${bCol}`,
+      borderRadius: 2,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: 10,
+      fontWeight: 'bold',
+      zIndex: 7
+    }}
+  >
+    {job.due_type === 'Hard Date' ? 'H' : 'S'}
+  </span>
+)}
 
-                                    {/* Unified action strip */}
-                                    <div
-                                      style={{
-                                        position: 'absolute',
-                                        top: 0,
-                                        bottom: 0,
-                                        right: 0,
-                                        width: stripWidth,
-                                        background: base,
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        justifyContent: isPh ? 'space-evenly' : 'center',
-                                        borderTopRightRadius: 4,
-                                        borderBottomRightRadius: 4,
-                                        zIndex: 6,
-                                        overflow: 'hidden',
-                                      }}
-                                    >
-                                      {isPh && (
-                                        <span
-                                          style={{
-                                            width: 16,
-                                            height: 16,
-                                            background: base,
-                                            border: `1px solid ${bCol}`,
-                                            borderRadius: 2,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            fontSize: 10,
-                                            fontWeight: 'bold',
-                                          }}
-                                        >
-                                          {job.due_type === 'Hard Date' ? 'H' : 'S'}
-                                        </span>
-                                      )}
+{/* unified action strip: badge+edit+delete+link, evenly spaced for placeholders */}
+<div
+  style={{
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    width: stripWidth,
+    background: base,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: isPh ? 'space-evenly' : 'center',
+    borderTopRightRadius: 4,
+    borderBottomRightRadius: 4,
+    zIndex: 6,
+    overflow: 'hidden',
+  }}
+>
+  {/* placeholder’s own badge */}
+  {isPh && (
+    <span
+      style={{
+        width: 16,
+        height: 16,
+        background: base,
+        border: `1px solid ${bCol}`,
+        borderRadius: 2,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 10,
+        fontWeight: 'bold'
+      }}
+    >
+      {job.due_type === 'Hard Date' ? 'H' : 'S'}
+    </span>
+  )}
 
-                                      {isPh && (
-                                        <span
-                                          onClick={e => { e.stopPropagation(); editPlaceholder(job); }}
-                                          style={{ cursor: 'pointer', fontSize: 14 }}
-                                        >
-                                          ✎
-                                        </span>
-                                      )}
+  {/* edit ✎ */}
+  {isPh && (
+    <span
+      onClick={e => { e.stopPropagation(); editPlaceholder(job); }}
+      style={{ cursor: 'pointer', fontSize: 14 }}
+    >
+      ✎
+    </span>
+  )}
 
-                                      {isPh && (
-                                        <span
-                                          onClick={e => { e.stopPropagation(); removePlaceholder(job.id); }}
-                                          style={{ cursor: 'pointer', fontSize: 14 }}
-                                        >
-                                          ✖
-                                        </span>
-                                      )}
+  {/* delete ✖ */}
+  {isPh && (
+    <span
+      onClick={e => { e.stopPropagation(); removePlaceholder(job.id); }}
+      style={{ cursor: 'pointer', fontSize: 14 }}
+    >
+      ✖
+    </span>
+  )}
 
-                                      {globalIdx < jobs.length - 1 && (
-                                        <span
-                                          onClick={() => toggleLink(colId, globalIdx)}
-                                          style={{ cursor: 'pointer', fontSize: 16 }}
-                                        >
-                                          {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
-                                        </span>
-                                      )}
-                                    </div>
-
+  {/* link/unlink 🔗/❌ */}
+  {globalIdx < jobs.length - 1 && (
+    <span
+      onClick={() => toggleLink(colId, globalIdx)}
+      style={{ cursor: 'pointer', fontSize: 16 }}
+    >
+      {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
+    </span>
+  )}
+</div>
 
                                     {/* Job ID + Company */}
                                     <span
