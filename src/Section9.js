@@ -212,8 +212,8 @@ export default function Section9(props) {
                             const globalIdx = seg.start + jIdx;
                             const isPh = String(job.id).startsWith('ph-');
                             // for placeholders we need a bit more room
-                            const stripWidth = isPh ? 32 : 24;
-                            const rightPadding = stripWidth + 4; // extra gutter so icon margins don’t push off;
+                            const stripWidth = isPh ? 36 : 24;
+                            const rightPadding = stripWidth + 8;
                             const isHard = job.due_type === 'Hard Date';
                             const isSoft = !isPh && !isHard;
 
@@ -246,7 +246,7 @@ export default function Section9(props) {
                                       gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
-                                      padding: `6px ${rightPadding}px 6px 6px`,  // keep content clear of strip 
+                                      padding: `6px ${rightPadding}px 6px 6px`,
                                       margin: `0 0 ${
                                         jIdx < seg.len - 1 ? 6 : 0
                                       }px 0`,
@@ -289,52 +289,50 @@ export default function Section9(props) {
 
                                     {/* Unified action strip */}
                                     <div
-                                        style={{
-                                          position: 'absolute',
-                                          top: 0,
-                                          bottom: 0,               // span exactly from top→bottom
-                                          right: 0,
-                                          width: stripWidth,
-                                          background: base,
-                                          display: 'flex',
-                                          flexDirection: 'column',
-                                          alignItems: 'center',
-                                          justifyContent: isPh ? 'flex-start' : 'center',
-                                          paddingTop: isPh ? 4 : 0,
-                                          borderTopRightRadius: 4,
-                                          borderBottomRightRadius: 4,
-                                          zIndex: 6,
-                                          overflow: 'hidden',     // never grow beyond card
-                                        }}
-                                      >
-                                        {/* always show ✎ & ✖ for placeholders */}
-                                        {isPh && (
-                                          <>
-                                            <span
-                                              onClick={e => { e.stopPropagation(); editPlaceholder(job); }}
-                                              style={{ cursor: 'pointer', fontSize: 12, margin: 2 }}
-                                            >
-                                              ✎
-                                            </span>
-                                            <span
-                                              onClick={e => { e.stopPropagation(); removePlaceholder(job.id); }}
-                                              style={{ cursor: 'pointer', fontSize: 12, margin: 2 }}
-                                            >
-                                              ✖
-                                            </span>
-                                          </>
-                                        )}
-                                    
-                                        {/* link/unlink under the edit/delete */}
-                                        {globalIdx < jobs.length - 1 && (
+                                      style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        bottom: 0,
+                                        right: 0,
+                                        width: stripWidth,
+                                        background: base,
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        alignItems: 'center',
+                                        justifyContent: isPh ? 'flex-start' : 'center',
+                                        paddingTop: isPh ? 8 : 0,
+                                        borderTopRightRadius: 4,
+                                        borderBottomRightRadius: 4,
+                                        zIndex: 6,
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      {isPh && (
+                                        <>
                                           <span
-                                            onClick={() => toggleLink(colId, globalIdx)}
-                                            style={{ cursor: 'pointer', fontSize: 14, margin: 2 }}
+                                            onClick={e => { e.stopPropagation(); editPlaceholder(job); }}
+                                            style={{ cursor: 'pointer', fontSize: 14, margin: 4 }}
                                           >
-                                            {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
+                                            ✎
                                           </span>
-                                        )}
-                                      </div>
+                                          <span
+                                            onClick={e => { e.stopPropagation(); removePlaceholder(job.id); }}
+                                            style={{ cursor: 'pointer', fontSize: 14, margin: 4 }}
+                                          >
+                                            ✖
+                                          </span>
+                                        </>
+                                      )}
+
+                                      {globalIdx < jobs.length - 1 && (
+                                        <span
+                                          onClick={() => toggleLink(colId, globalIdx)}
+                                          style={{ cursor: 'pointer', fontSize: 16, margin: 4 }}
+                                        >
+                                          {job.linkedTo === jobs[globalIdx + 1]?.id ? '❌' : '🔗'}
+                                        </span>
+                                      )}
+                                    </div>
 
                                     {/* Job ID + Company */}
                                     <span
