@@ -211,6 +211,9 @@ export default function Section9(props) {
                           .map((job, jIdx) => {
                             const globalIdx = seg.start + jIdx;
                             const isPh = String(job.id).startsWith('ph-');
+                            // widen the strip for placeholders so both ✎ and ❌ fit
+                            const stripWidth = isPh ? 32 : 24;
+                            const rightPadding = stripWidth;
                             const isHard = job.due_type === 'Hard Date';
                             const isSoft = !isPh && !isHard;
 
@@ -243,7 +246,7 @@ export default function Section9(props) {
                                       gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
-                                      padding: '6px 24px 6px 6px',
+                                      padding: `6px ${rightPadding}px 6px 6px`,
                                       margin: `0 0 ${
                                         jIdx < seg.len - 1 ? 6 : 0
                                       }px 0`,
@@ -290,7 +293,7 @@ export default function Section9(props) {
                                         position: 'absolute',
                                         top: 0,
                                         right: 0,
-                                        width: 24,
+                                        width: stripWidth,
                                         height: '100%',
                                         background: base,
                                         display: 'flex',
