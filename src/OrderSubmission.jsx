@@ -6,10 +6,10 @@ export default function OrderSubmission() {
   const [form, setForm] = useState({
     company: "",
     designName: "",
-    dueDate: "",
     quantity: "",
     product: "",
     price: "",
+    dueDate: "",
     dateType: "Hard Date",
     referral: "",
     materials: ["", "", "", "", ""],
@@ -20,6 +20,7 @@ export default function OrderSubmission() {
   const [prodFiles, setProdFiles] = useState([]);
   const [printFiles, setPrintFiles] = useState([]);
 
+  // builds e.g. "https://order-submission.onrender.com/submit"
   const submitUrl =
     process.env.REACT_APP_ORDER_SUBMIT_URL ||
     `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
@@ -43,25 +44,34 @@ export default function OrderSubmission() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      // build a JSON payload
-      const payload = {
-        ...form,
-        materials: form.materials,
-        prodFileNames: prodFiles.map((f) => f.name),
-        printFileNames: printFiles.map((f) => f.name),
-      };
 
-      await axios.post(submitUrl, payload);
+    // build multipart form data
+    const fd = new FormData();
+
+    // append scalar fields
+    ["company","designName","quantity","product","price","dueDate","dateType","referral","backMaterial","furColor","notes"]
+      .forEach(key => fd.append(key, form[key] || ""));
+
+    // append materials (M1–M5)
+    form.materials.forEach((mat) => fd.append("materials", mat));
+
+    // append files
+    prodFiles.forEach((file) => fd.append("prodFiles", file));
+    printFiles.forEach((file) => fd.append("printFiles", file));
+
+    try {
+      await axios.post(submitUrl, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
       alert("Order submitted!");
-      // reset
+      // reset everything
       setForm({
         company: "",
         designName: "",
-        dueDate: "",
         quantity: "",
         product: "",
         price: "",
+        dueDate: "",
         dateType: "Hard Date",
         referral: "",
         materials: ["", "", "", "", ""],
@@ -73,9 +83,7 @@ export default function OrderSubmission() {
       setPrintFiles([]);
     } catch (err) {
       console.error(err);
-      alert(
-        err.response?.data?.error || "Submission failed – check your console"
-      );
+      alert(err.response?.data?.error || "Submission failed – check your console");
     }
   };
 
@@ -94,6 +102,7 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <div>
           <label>
             Design Name*<br />
@@ -105,6 +114,7 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <div>
           <label>
             Quantity*<br />
@@ -117,6 +127,7 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <div>
           <label>
             Product*<br />
@@ -128,30 +139,33 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <div>
           <label>
             Price*<br />
             <input
-              name="price"
               type="number"
+              name="price"
               value={form.price}
               onChange={handleChange}
               required
             />
           </label>
         </div>
+
         <div>
           <label>
             Due Date*<br />
             <input
-              name="dueDate"
               type="date"
+              name="dueDate"
               value={form.dueDate}
               onChange={handleChange}
               required
             />
           </label>
         </div>
+
         <div>
           <label>
             Hard/Soft Date*<br />
@@ -165,6 +179,7 @@ export default function OrderSubmission() {
             </select>
           </label>
         </div>
+
         <div>
           <label>
             Referral<br />
@@ -175,13 +190,13 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <fieldset style={{ margin: "1em 0", padding: "0.5em" }}>
           <legend>Materials</legend>
           {form.materials.map((m, i) => (
             <div key={i}>
               <label>
-                Material {i + 1}
-                <br />
+                Material {i + 1}<br />
                 <input
                   value={m}
                   onChange={(e) =>
@@ -202,6 +217,7 @@ export default function OrderSubmission() {
             </label>
           </div>
         </fieldset>
+
         <div>
           <label>
             Fur Color*<br />
@@ -213,6 +229,7 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <div>
           <label>
             Notes<br />
@@ -223,6 +240,7 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <div>
           <label>
             Production File(s)<br />
@@ -233,6 +251,7 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <div>
           <label>
             Print File(s)<br />
@@ -243,6 +262,7 @@ export default function OrderSubmission() {
             />
           </label>
         </div>
+
         <button type="submit" style={{ marginTop: 16 }}>
           Submit Order
         </button>
