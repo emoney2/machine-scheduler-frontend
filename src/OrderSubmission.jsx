@@ -60,6 +60,7 @@ export default function OrderSubmission() {
     printFiles.forEach((file) => fd.append("printFiles", file));
 
     try {
+      console.log("Submitting to:", submitUrl);
       await axios.post(submitUrl, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
