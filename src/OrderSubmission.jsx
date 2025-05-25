@@ -14,6 +14,7 @@ export default function OrderSubmission() {
     referral: "",
     materials: ["", "", "", "", ""],
     backMaterial: "",
+    embBacking: "",
     furColor: "",
     notes: "",
   });
@@ -218,6 +219,19 @@ export default function OrderSubmission() {
             </label>
           </div>
         </fieldset>
+
+          <div>
+            <label>
+              EMB Backing*<br />
+              <input
+                name="embBacking"
+                value={form.embBacking}
+                onChange={handleChange}
+                required
+              />
+            </label>
+          </div>
+
 
         <div>
           <label>
