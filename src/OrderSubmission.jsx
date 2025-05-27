@@ -120,6 +120,7 @@ export default function OrderSubmission() {
               name="designName"
               value={form.designName}
               onChange={handleChange}
+              readOnly
               required
             />
           </label>
@@ -206,12 +207,12 @@ export default function OrderSubmission() {
           {form.materials.map((m, i) => (
             <div key={i}>
               <label>
-                Material {i + 1}<br />
+                Material {i + 1}
+                <br />
                 <input
                   value={m}
-                  onChange={(e) =>
-                    handleMaterialChange(i, e.target.value)
-                  }
+                  onChange={(e) => handleMaterialChange(i, e.target.value)}
+                  required={i === 0}
                 />
               </label>
             </div>
@@ -270,6 +271,7 @@ export default function OrderSubmission() {
             <input
               type="file"
               multiple
+              required
               onChange={(e) => handleFileChange(e, setProdFiles)}
             />
           </label>
