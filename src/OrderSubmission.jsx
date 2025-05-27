@@ -24,8 +24,25 @@ export default function OrderSubmission() {
 
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
-    setProdFiles((f) => f.filter((_, idx) => idx !== i));
-    setProdPreviews((p) => p.filter((_, idx) => idx !== i));
+    setProdFiles((prevFiles) => {
+      const newFiles = prevFiles.filter((_, idx) => idx !== i);
+
+      // Adjust designName:  
+      // • if we still have files, use the first one  
+      // • otherwise clear it
+      if (newFiles.length > 0) {
+        let name = newFiles[0].name.replace(/\.[^/.]+$/, "");
+        if (name.length > 12) name = name.slice(0, 12) + "..";
+        setForm((prev) => ({ ...prev, designName: name }));
+      } else {
+        setForm((prev) => ({ ...prev, designName: "" }));
+      }
+
+      return newFiles;
+    });
+
+    // remove its preview
+    setProdPreviews((prev) => prev.filter((_, idx) => idx !== i));
   };
 
   // remove the print file + its preview at index i
