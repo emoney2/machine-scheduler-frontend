@@ -22,6 +22,19 @@ export default function OrderSubmission() {
   const [prodPreviews, setProdPreviews] = useState([]);
   const [printPreviews, setPrintPreviews] = useState([]);
 
+  // remove the production file + its preview at index i
+  const removeProdFile = (i) => {
+    setProdFiles((f) => f.filter((_, idx) => idx !== i));
+    setProdPreviews((p) => p.filter((_, idx) => idx !== i));
+  };
+
+  // remove the print file + its preview at index i
+  const removePrintFile = (i) => {
+    setPrintFiles((f) => f.filter((_, idx) => idx !== i));
+    setPrintPreviews((p) => p.filter((_, idx) => idx !== i));
+  };
+
+
   const submitUrl =
     process.env.REACT_APP_ORDER_SUBMIT_URL ||
     `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
@@ -345,56 +358,84 @@ export default function OrderSubmission() {
         <fieldset style={{ padding: "0.5rem", height: "50%" }}>
           <legend>Production Preview</legend>
           <div style={{ overflow: "auto", height: "100%" }}>
-            {prodPreviews.map((p, i) =>
-              p.type.startsWith("image/") ? (
-                <img
-                  key={i}
-                  src={p.url}
-                  alt={p.name}
-                  style={{ maxWidth: "100%", marginBottom: "0.25rem" }}
-                />
-              ) : p.type === "application/pdf" ? (
-                <iframe
-                  key={i}
-                  src={p.url}
-                  title={p.name}
-                  style={{ width: "100%", height: "100%" }}
-                />
-              ) : (
-                <div key={i} style={{ fontSize: "0.75rem" }}>
-                  📄 {p.name}
-                </div>
-              )
-            )}
+            {prodPreviews.map((p, i) => (
+              <div key={i} style={{ position: "relative", marginBottom: "0.25rem" }}>
+                <button
+                  type="button"
+                  onClick={() => removeProdFile(i)}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: "1rem",
+                    lineHeight: 1,
+                  }}
+                  aria-label="Remove file"
+                >
+                  ×
+                </button>
+                {p.type.startsWith("image/") ? (
+                  <img
+                    src={p.url}
+                    alt={p.name}
+                    style={{ maxWidth: "100%", maxHeight: 80 }}
+                  />
+                ) : p.type === "application/pdf" ? (
+                  <iframe
+                    src={p.url}
+                    title={p.name}
+                    style={{ width: "100%", height: 80 }}
+                  />
+                ) : (
+                  <div style={{ fontSize: "0.8rem" }}>📄 {p.name}</div>
+                )}
+              </div>
+            ))}
           </div>
         </fieldset>
+
         <fieldset style={{ padding: "0.5rem", height: "50%" }}>
           <legend>Print Preview</legend>
           <div style={{ overflow: "auto", height: "100%" }}>
-            {printPreviews.map((p, i) =>
-              p.type.startsWith("image/") ? (
-                <img
-                  key={i}
-                  src={p.url}
-                  alt={p.name}
-                  style={{ maxWidth: "100%", marginBottom: "0.25rem" }}
-                />
-              ) : p.type === "application/pdf" ? (
-                <iframe
-                  key={i}
-                  src={p.url}
-                  title={p.name}
-                  style={{ width: "100%", height: "100%" }}
-                />
-              ) : (
-                <div key={i} style={{ fontSize: "0.75rem" }}>
-                  📄 {p.name}
-                </div>
-              )
-            )}
+            {printPreviews.map((p, i) => (
+              <div key={i} style={{ position: "relative", marginBottom: "0.25rem" }}>
+                <button
+                  type="button"
+                  onClick={() => removePrintFile(i)}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    border: "none",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: "1rem",
+                    lineHeight: 1,
+                  }}
+                  aria-label="Remove file"
+                >
+                  ×
+                </button>
+                {p.type.startsWith("image/") ? (
+                  <img
+                    src={p.url}
+                    alt={p.name}
+                    style={{ maxWidth: "100%", maxHeight: 80 }}
+                  />
+                ) : p.type === "application/pdf" ? (
+                  <iframe
+                    src={p.url}
+                    title={p.name}
+                    style={{ width: "100%", height: 80 }}
+                  />
+                ) : (
+                  <div style={{ fontSize: "0.8rem" }}>📄 {p.name}</div>
+                )}
+              </div>
+            ))}
           </div>
         </fieldset>
       </div>
-    </form>
-  );
-}
