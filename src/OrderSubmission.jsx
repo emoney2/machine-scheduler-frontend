@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./FileInput.css";
+import { useCombobox } from "downshift";
 
 export default function OrderSubmission() {
   const [form, setForm] = useState({
@@ -30,7 +31,7 @@ export default function OrderSubmission() {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
-        // transform into react-select option objects and sort
+        console.log("Directory response:", res.data);
         const opts = res.data
           .map((c) => ({ value: c, label: c }))
           .sort((a, b) => a.label.localeCompare(b.label));
@@ -40,6 +41,31 @@ export default function OrderSubmission() {
         console.error("Failed to load companies:", err);
       });
   }, []);
+
+// keep an array of just the strings
+const companyNames = companies.map((o) => o.value);
+
+const {
+  isOpen,
+  getMenuProps,
+  getComboboxProps,
+  getInputProps,
+  getItemProps,
+  highlightedIndex,
+} = useCombobox({
+  items: companyNames,
+  inputValue: form.company,
+  onInputValueChange: ({ inputValue }) => {
+    // sync what you type into form.company
+    setForm((prev) => ({ ...prev, company: inputValue || "" }));
+  },
+  onSelectedItemChange: ({ selectedItem }) => {
+    // when you pick from the list
+    setForm((prev) => ({ ...prev, company: selectedItem || "" }));
+  },
+  itemToString: (item) => item || "",
+});
+
 
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
@@ -204,18 +230,54 @@ const handleSubmit = async (e) => {
               gap: "0.5rem",
             }}
           >
-            <div>
-              <label>
+            <div {...getComboboxProps()} style={{ marginBottom: "0.5rem" }}>
+              <label style={{ display: "block" }}>
                 Company Name*<br />
                 <input
-                  name="company"
-                  value={form.company}
-                  onChange={handleChange}
-                  required
-                  style={{ width: "80%" }}
+                  {...getInputProps({
+                    placeholder: "Company Name*",
+                    required: true,
+                    style: {
+                      width: "80%",
+                      fontSize: "0.85rem",
+                      padding: "0.25rem",
+                    },
+                  })}
                 />
               </label>
+              <ul
+                {...getMenuProps()}
+                style={{
+                  margin: 0,
+                  padding: 0,
+                  listStyle: "none",
+                  maxHeight: 120,
+                  overflowY: "auto",
+                  border: isOpen ? "1px solid #ccc" : "none",
+                }}
+              >
+                {isOpen &&
+                  companyNames
+                    .filter((name) =>
+                      name.toLowerCase().startsWith((form.company || "").toLowerCase())
+                    )
+                    .map((item, index) => (
+                      <li
+                        key={`${item}-${index}`}
+                        {...getItemProps({ item, index })}
+                        style={{
+                          backgroundColor:
+                            highlightedIndex === index ? "#bde4ff" : "white",
+                          padding: "0.25rem 0.5rem",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {item}
+                      </li>
+                    ))}
+              </ul>
             </div>
+
             <div>
               <label>
                 Design Name*<br />
