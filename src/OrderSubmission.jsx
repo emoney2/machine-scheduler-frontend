@@ -31,22 +31,31 @@ export default function OrderSubmission() {
   const companyInputRef = useRef(null);
 
   // when user types, update form.company and show inline suggestion
-  const handleCompanyInput = (e) => {
-    const raw = e.target.value;
-    // find first match that begins with what they've typed
-    const match = companyNames.find((c) =>
-      c.toLowerCase().startsWith(raw.toLowerCase())
-    );
-    // always update form state to the *raw* user input
-    setForm((prev) => ({ ...prev, company: raw }));
+// when user types, update form.company and show inline suggestion
+const handleCompanyInput = (e) => {
+  const raw = e.target.value;
 
-    if (match && raw !== match) {
-      // set the input’s value to the full match
-      e.target.value = match;
-      // select just the appended part
-      companyInputRef.current.setSelectionRange(raw.length, match.length);
-    }
-  };
+  // find first match that begins with what they've typed
+  const match = companyNames.find((c) =>
+    c.toLowerCase().startsWith(raw.toLowerCase())
+  );
+
+  if (match && raw !== match) {
+    // 1) put the full match into state (so input.value === match)
+    setForm((prev) => ({ ...prev, company: match }));
+
+    // 2) after React flushes, select only the appended part
+    setTimeout(() => {
+      const input = companyInputRef.current;
+      // select from end of raw up to end of match
+      input.setSelectionRange(raw.length, match.length);
+    }, 0);
+  } else {
+    // no suggestion or exact match: just store the raw input
+    setForm((prev) => ({ ...prev, company: raw }));
+  }
+};
+
 
   useEffect(() => {
     axios
