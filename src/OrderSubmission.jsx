@@ -31,30 +31,35 @@ export default function OrderSubmission() {
   const companyInputRef = useRef(null);
 
   // when user types, update form.company and show inline suggestion
-// when user types, update form.company and show inline suggestion
-const handleCompanyInput = (e) => {
-  const raw = e.target.value;
+  const handleCompanyInput = (e) => {
+    const raw = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
 
-  // find first match that begins with what they've typed
-  const match = companyNames.find((c) =>
-    c.toLowerCase().startsWith(raw.toLowerCase())
-  );
+    // If the user is deleting, just store the raw value and bail out
+    if (inputType && inputType.startsWith("delete")) {
+      setForm((prev) => ({ ...prev, company: raw }));
+      return;
+    }
 
-  if (match && raw !== match) {
-    // 1) put the full match into state (so input.value === match)
-    setForm((prev) => ({ ...prev, company: match }));
+    // Otherwise attempt inline completion
+    const match = companyNames.find((c) =>
+      c.toLowerCase().startsWith(raw.toLowerCase())
+    );
 
-    // 2) after React flushes, select only the appended part
-    setTimeout(() => {
-      const input = companyInputRef.current;
-      // select from end of raw up to end of match
-      input.setSelectionRange(raw.length, match.length);
-    }, 0);
-  } else {
-    // no suggestion or exact match: just store the raw input
-    setForm((prev) => ({ ...prev, company: raw }));
-  }
-};
+    if (match && raw !== match) {
+      // put the full match into state so the input shows it
+      setForm((prev) => ({ ...prev, company: match }));
+
+      // then schedule selecting only the appended portion
+      setTimeout(() => {
+        const input = companyInputRef.current;
+        input.setSelectionRange(raw.length, match.length);
+      }, 0);
+    } else {
+      // no suggestion or exact match: just store the raw input
+      setForm((prev) => ({ ...prev, company: raw }));
+    }
+  };
 
 
   useEffect(() => {
