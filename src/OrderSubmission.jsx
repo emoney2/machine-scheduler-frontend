@@ -40,7 +40,15 @@ export default function OrderSubmission() {
   };
 
   const handleFileChange = (e, setter) => {
-    setter(Array.from(e.target.files));
+    const files = Array.from(e.target.files);
+    setter(files);
+
+    // if these are Production Files, auto-set designName
+    if (setter === setProdFiles && files.length > 0) {
+      let name = files[0].name.replace(/\.[^/.]+$/, ""); // strip extension
+      if (name.length > 12) name = name.slice(0, 12) + "..";
+      setForm(f => ({ ...f, designName: name }));
+    }
   };
 
   const handleSubmit = async (e) => {
