@@ -207,7 +207,7 @@ export default function OrderSubmission() {
           {form.materials.map((m, i) => (
             <div key={i}>
               <label>
-                Material {i + 1}
+                Material {i + 1}{i === 0 && "*"}
                 <br />
                 <input
                   value={m}
