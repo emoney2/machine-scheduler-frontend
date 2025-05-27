@@ -109,21 +109,22 @@ export default function OrderSubmission() {
       style={{
         display: "grid",
         gridTemplateColumns: "2fr 1fr",
-        gap: "1.5rem",
-        padding: "1rem",
+        gap: "0.5rem",        // tighter gaps
+        padding: "0.5rem",    // reduced padding
         fontFamily: "sans-serif",
+        fontSize: "0.85rem",  // slightly smaller text
       }}
     >
-      {/* LEFT COLUMN: Form sections */}
-      <div style={{ display: "grid", gap: "1.5rem" }}>
+      {/* LEFT COLUMN */}
+      <div style={{ display: "grid", gap: "0.5rem" }}>
         {/* Order Details */}
-        <fieldset style={{ padding: "1rem" }}>
+        <fieldset style={{ padding: "0.5rem" }}>
           <legend>Order Details</legend>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "1rem",
+              gap: "0.5rem",
             }}
           >
             <div>
@@ -230,21 +231,19 @@ export default function OrderSubmission() {
         </fieldset>
 
         {/* Materials */}
-        <fieldset style={{ padding: "1rem" }}>
+        <fieldset style={{ padding: "0.5rem" }}>
           <legend>Materials</legend>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "1rem",
+              gap: "0.5rem",
             }}
           >
             {form.materials.map((m, i) => (
               <div key={i}>
                 <label>
-                  Material {i + 1}
-                  {i === 0 && "*"}
-                  <br />
+                  Material {i + 1}{i === 0 && "*"}<br />
                   <input
                     value={m}
                     onChange={(e) => handleMaterialChange(i, e.target.value)}
@@ -267,8 +266,7 @@ export default function OrderSubmission() {
             </div>
             <div>
               <label>
-                EMB Backing*
-                <br />
+                EMB Backing*<br />
                 <input
                   name="embBacking"
                   value={form.embBacking}
@@ -280,8 +278,7 @@ export default function OrderSubmission() {
             </div>
             <div>
               <label>
-                Fur Color*
-                <br />
+                Fur Color*<br />
                 <input
                   name="furColor"
                   value={form.furColor}
@@ -295,9 +292,9 @@ export default function OrderSubmission() {
         </fieldset>
 
         {/* Additional Info + Files */}
-        <fieldset style={{ padding: "1rem" }}>
+        <fieldset style={{ padding: "0.5rem" }}>
           <legend>Additional Info</legend>
-          <div style={{ display: "grid", gap: "0.75rem" }}>
+          <div style={{ display: "grid", gap: "0.5rem" }}>
             <div>
               <label>
                 Notes<br />
@@ -305,7 +302,7 @@ export default function OrderSubmission() {
                   name="notes"
                   value={form.notes}
                   onChange={handleChange}
-                  rows={3}
+                  rows={2}
                   style={{ width: "100%" }}
                 />
               </label>
@@ -317,9 +314,7 @@ export default function OrderSubmission() {
                   type="file"
                   multiple
                   required
-                  onChange={(e) =>
-                    handleFileChange(e, setProdFiles, setProdPreviews)
-                  }
+                  onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
                 />
               </label>
             </div>
@@ -329,18 +324,16 @@ export default function OrderSubmission() {
                 <input
                   type="file"
                   multiple
-                  onChange={(e) =>
-                    handleFileChange(e, setPrintFiles, setPrintPreviews)
-                  }
+                  onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews)}
                 />
               </label>
             </div>
             <div style={{ textAlign: "center" }}>
               <button
                 type="submit"
-                style={{ marginTop: "1rem", padding: "0.75rem 1.5rem" }}
+                style={{ marginTop: "0.5rem", padding: "0.5rem 1rem" }}
               >
-                Submit Order
+                Submit
               </button>
             </div>
           </div>
@@ -348,9 +341,9 @@ export default function OrderSubmission() {
       </div>
 
       {/* RIGHT COLUMN: Previews */}
-      <div style={{ display: "grid", gap: "1.5rem" }}>
-        <fieldset style={{ padding: "1rem", height: "50%" }}>
-          <legend>Production File Preview</legend>
+      <div style={{ display: "grid", gap: "0.5rem" }}>
+        <fieldset style={{ padding: "0.5rem", height: "50%" }}>
+          <legend>Production Preview</legend>
           <div style={{ overflow: "auto", height: "100%" }}>
             {prodPreviews.map((p, i) =>
               p.type.startsWith("image/") ? (
@@ -358,7 +351,7 @@ export default function OrderSubmission() {
                   key={i}
                   src={p.url}
                   alt={p.name}
-                  style={{ maxWidth: "100%", marginBottom: "0.5rem" }}
+                  style={{ maxWidth: "100%", marginBottom: "0.25rem" }}
                 />
               ) : p.type === "application/pdf" ? (
                 <iframe
@@ -368,15 +361,15 @@ export default function OrderSubmission() {
                   style={{ width: "100%", height: "100%" }}
                 />
               ) : (
-                <div key={i} style={{ fontSize: "0.8rem" }}>
+                <div key={i} style={{ fontSize: "0.75rem" }}>
                   📄 {p.name}
                 </div>
               )
             )}
           </div>
         </fieldset>
-        <fieldset style={{ padding: "1rem", height: "50%" }}>
-          <legend>Print File Preview</legend>
+        <fieldset style={{ padding: "0.5rem", height: "50%" }}>
+          <legend>Print Preview</legend>
           <div style={{ overflow: "auto", height: "100%" }}>
             {printPreviews.map((p, i) =>
               p.type.startsWith("image/") ? (
@@ -384,7 +377,7 @@ export default function OrderSubmission() {
                   key={i}
                   src={p.url}
                   alt={p.name}
-                  style={{ maxWidth: "100%", marginBottom: "0.5rem" }}
+                  style={{ maxWidth: "100%", marginBottom: "0.25rem" }}
                 />
               ) : p.type === "application/pdf" ? (
                 <iframe
@@ -394,7 +387,7 @@ export default function OrderSubmission() {
                   style={{ width: "100%", height: "100%" }}
                 />
               ) : (
-                <div key={i} style={{ fontSize: "0.8rem" }}>
+                <div key={i} style={{ fontSize: "0.75rem" }}>
                   📄 {p.name}
                 </div>
               )
