@@ -66,13 +66,6 @@ export default function OrderSubmission() {
   // prepare simple array of names
   const companyNames = companies.map((opt) => opt.value);
 
-console.log(" • getMenuProps:     ", getMenuProps,     typeof getMenuProps);
-console.log(" • getInputProps:    ", getInputProps,    typeof getInputProps);
-console.log(" • getItemProps:     ", getItemProps,     typeof getItemProps);
-console.log(" • isOpen, highlightedIndex:", isOpen, highlightedIndex);
-
-
-
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
     setProdFiles((prevFiles) => {
