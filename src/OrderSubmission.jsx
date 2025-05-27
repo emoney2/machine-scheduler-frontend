@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { useCombobox } from "downshift";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./FileInput.css";
 
@@ -28,6 +27,27 @@ export default function OrderSubmission() {
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
 
+  // ref to our company <input> so we can manipulate selection
+  const companyInputRef = useRef(null);
+
+  // when user types, update form.company and show inline suggestion
+  const handleCompanyInput = (e) => {
+    const raw = e.target.value;
+    // find first match that begins with what they've typed
+    const match = companyNames.find((c) =>
+      c.toLowerCase().startsWith(raw.toLowerCase())
+    );
+    // always update form state to the *raw* user input
+    setForm((prev) => ({ ...prev, company: raw }));
+
+    if (match && raw !== match) {
+      // set the input’s value to the full match
+      e.target.value = match;
+      // select just the appended part
+      companyInputRef.current.setSelectionRange(raw.length, match.length);
+    }
+  };
+
   useEffect(() => {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
@@ -45,24 +65,6 @@ export default function OrderSubmission() {
 
   // prepare simple array of names
   const companyNames = companies.map((opt) => opt.value);
-
-  // initialize Downshift combobox for companyName
-  const {
-    isOpen,
-    getMenuProps,
-    getInputProps,
-    getItemProps,
-    highlightedIndex,
-  } = useCombobox({
-    items: companyNames,
-    inputValue: form.company,
-    defaultHighlightedIndex: 0,
-    onInputValueChange: ({ inputValue }) =>
-      setForm((prev) => ({ ...prev, company: inputValue || "" })),
-    onSelectedItemChange: ({ selectedItem }) =>
-      setForm((prev) => ({ ...prev, company: selectedItem || "" })),
-    itemToString: (item) => item || "",
-  });
 
 console.log(" • getMenuProps:     ", getMenuProps,     typeof getMenuProps);
 console.log(" • getInputProps:    ", getInputProps,    typeof getInputProps);
@@ -234,62 +236,32 @@ const handleSubmit = async (e) => {
               gap: "0.5rem",
             }}
           >
-            {/* COMPANY COMBOBOX */}
-            <div style={{ position: "relative", marginBottom: "0.5rem" }}>
+            {/* COMPANY INLINE TYPE-AHEAD */}
+            <div style={{ marginBottom: "0.5rem", position: "relative" }}>
               <label style={{ display: "block" }}>
                 Company Name*<br />
                 <input
-                  {...getInputProps({
-                    placeholder: "Company Name*",
-                    required: true,
-                    style: {
-                      width: "80%",
-                      fontSize: "0.85rem",
-                      padding: "0.25rem",
-                    },
-                  })}
+                  ref={companyInputRef}
+                  name="company"
+                  placeholder="Company Name*"
+                  required
+                  autoComplete="off"
+                  style={{
+                    width: "80%",
+                    fontSize: "0.85rem",
+                    padding: "0.25rem",
+                  }}
+                  onChange={handleCompanyInput}
+                  value={form.company}
+                  list="company-list"
                 />
               </label>
-
-              <ul
-                {...getMenuProps()}
-                style={{
-                  position: "absolute",
-                  top: "100%",
-                  left: 0,
-                  width: "80%",
-                  margin: 0,
-                  padding: 0,
-                  listStyle: "none",
-                  maxHeight: 120,
-                  overflowY: "auto",
-                  background: "white",
-                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-                  zIndex: 1000,
-                }}
-              >
-                {isOpen &&
-                  companyNames
-                    .filter((name) =>
-                      name
-                        .toLowerCase()
-                        .startsWith((form.company || "").toLowerCase())
-                    )
-                    .map((item, index) => (
-                      <li
-                        key={`${item}-${index}`}
-                        {...getItemProps({ item, index })}
-                        style={{
-                          backgroundColor:
-                            highlightedIndex === index ? "#bde4ff" : "white",
-                          padding: "0.25rem 0.5rem",
-                          cursor: "pointer",
-                        }}
-                      >
-                        {item}
-                      </li>
-                    ))}
-              </ul>
+              {/* fallback dropdown list for clicking */}
+              <datalist id="company-list">
+                {companyNames.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </div>
 
             <div>
