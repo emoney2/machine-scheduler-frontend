@@ -1,0 +1,13 @@
+/* src/FileInput.css */
+/* Collapse the native filename text */
+input[type="file"] {
+  font-size: 0 !important;
+  color: transparent !important;
+}
+
+/* Restore the button’s “Choose file” text */
+input[type="file"]::-webkit-file-upload-button,
+input[type="file"]::file-selector-button {
+  font-size: initial !important;
+  color: initial !important;
+}
