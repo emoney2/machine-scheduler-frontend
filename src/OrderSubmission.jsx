@@ -353,6 +353,10 @@ export default function OrderSubmission() {
                   multiple
                   required
                   onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
+                  style={{
+                    width: "auto",       // shrink input to its intrinsic width (just the button)
+                    overflow: "hidden"   // hide any filename text that would overflow
+                  }}
                 />
                 <span style={{ fontSize: "0.85rem" }}>
                   {prodFiles.map((f) => f.name).join(", ")}
@@ -366,6 +370,10 @@ export default function OrderSubmission() {
                   type="file"
                   multiple
                   onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews)}
+                  style={{
+                    width: "auto",
+                    overflow: "hidden"
+                  }}
                 />
                 <span style={{ fontSize: "0.85rem" }}>
                   {printFiles.map((f) => f.name).join(", ")}
