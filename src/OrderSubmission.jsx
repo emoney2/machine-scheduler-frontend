@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./FileInput.css";
 
@@ -22,6 +22,24 @@ export default function OrderSubmission() {
   const [printFiles, setPrintFiles] = useState([]);
   const [prodPreviews, setProdPreviews] = useState([]);
   const [printPreviews, setPrintPreviews] = useState([]);
+
+  // list of company‐name options from Directory sheet
+  const [companies, setCompanies] = useState([]);
+
+  useEffect(() => {
+    axios
+      .get(`${process.env.REACT_APP_API_ROOT}/directory`)
+      .then((res) => {
+        // transform into react-select option objects and sort
+        const opts = res.data
+          .map((c) => ({ value: c, label: c }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+        setCompanies(opts);
+      })
+      .catch((err) => {
+        console.error("Failed to load companies:", err);
+      });
+  }, []);
 
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
