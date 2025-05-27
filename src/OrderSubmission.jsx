@@ -50,7 +50,6 @@ export default function OrderSubmission() {
   const {
     isOpen,
     getMenuProps,
-    getComboboxProps,
     getInputProps,
     getItemProps,
     highlightedIndex,
@@ -237,7 +236,7 @@ const handleSubmit = async (e) => {
             }}
           >
             {/* COMPANY COMBOBOX */}
-            <div {...getComboboxProps()} style={{ marginBottom: "0.5rem" }}>
+            <div style={{ marginBottom: "0.5rem" }}>
               <label style={{ display: "block" }}>
                 Company Name*<br />
                 <input
