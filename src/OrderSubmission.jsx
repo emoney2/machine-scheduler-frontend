@@ -135,7 +135,7 @@ export default function OrderSubmission() {
                   value={form.company}
                   onChange={handleChange}
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -147,7 +147,7 @@ export default function OrderSubmission() {
                   value={form.designName}
                   readOnly
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -160,7 +160,7 @@ export default function OrderSubmission() {
                   value={form.quantity}
                   onChange={handleChange}
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -172,7 +172,7 @@ export default function OrderSubmission() {
                   value={form.product}
                   onChange={handleChange}
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -185,7 +185,7 @@ export default function OrderSubmission() {
                   value={form.price}
                   onChange={handleChange}
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -198,7 +198,7 @@ export default function OrderSubmission() {
                   value={form.dueDate}
                   onChange={handleChange}
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -209,7 +209,7 @@ export default function OrderSubmission() {
                   name="dateType"
                   value={form.dateType}
                   onChange={handleChange}
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 >
                   <option>Hard Date</option>
                   <option>Soft Date</option>
@@ -223,7 +223,7 @@ export default function OrderSubmission() {
                   name="referral"
                   value={form.referral}
                   onChange={handleChange}
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -248,7 +248,7 @@ export default function OrderSubmission() {
                     value={m}
                     onChange={(e) => handleMaterialChange(i, e.target.value)}
                     required={i === 0}
-                    style={{ width: "100%" }}
+                    style={{ width: "80%" }}
                   />
                 </label>
               </div>
@@ -260,7 +260,7 @@ export default function OrderSubmission() {
                   name="backMaterial"
                   value={form.backMaterial}
                   onChange={handleChange}
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -272,7 +272,7 @@ export default function OrderSubmission() {
                   value={form.embBacking}
                   onChange={handleChange}
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -284,7 +284,7 @@ export default function OrderSubmission() {
                   value={form.furColor}
                   onChange={handleChange}
                   required
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
@@ -303,7 +303,7 @@ export default function OrderSubmission() {
                   value={form.notes}
                   onChange={handleChange}
                   rows={2}
-                  style={{ width: "100%" }}
+                  style={{ width: "80%" }}
                 />
               </label>
             </div>
