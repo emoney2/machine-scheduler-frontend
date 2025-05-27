@@ -56,6 +56,7 @@ export default function OrderSubmission() {
   } = useCombobox({
     items: companyNames,
     inputValue: form.company,
+    defaultHighlightedIndex: 0,
     onInputValueChange: ({ inputValue }) =>
       setForm((prev) => ({ ...prev, company: inputValue || "" })),
     onSelectedItemChange: ({ selectedItem }) =>
@@ -234,32 +235,45 @@ const handleSubmit = async (e) => {
             }}
           >
             {/* COMPANY COMBOBOX */}
-            <div style={{ marginBottom: "0.5rem" }}>
+            <div style={{ position: "relative", marginBottom: "0.5rem" }}>
               <label style={{ display: "block" }}>
                 Company Name*<br />
                 <input
                   {...getInputProps({
                     placeholder: "Company Name*",
                     required: true,
-                    style: { width: "80%", fontSize: "0.85rem", padding: "0.25rem" },
+                    style: {
+                      width: "80%",
+                      fontSize: "0.85rem",
+                      padding: "0.25rem",
+                    },
                   })}
                 />
               </label>
+
               <ul
                 {...getMenuProps()}
                 style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  width: "80%",
                   margin: 0,
                   padding: 0,
                   listStyle: "none",
                   maxHeight: 120,
                   overflowY: "auto",
-                  border: isOpen ? "1px solid #ccc" : "none",
+                  background: "white",
+                  boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+                  zIndex: 1000,
                 }}
               >
                 {isOpen &&
                   companyNames
                     .filter((name) =>
-                      name.toLowerCase().startsWith((form.company || "").toLowerCase())
+                      name
+                        .toLowerCase()
+                        .startsWith((form.company || "").toLowerCase())
                     )
                     .map((item, index) => (
                       <li
@@ -277,7 +291,6 @@ const handleSubmit = async (e) => {
                     ))}
               </ul>
             </div>
-
 
             <div>
               <label>
