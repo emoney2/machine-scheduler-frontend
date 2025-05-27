@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useCombobox } from "downshift";
 import axios from "axios";
 import "./FileInput.css";
-import { useCombobox } from "downshift";
+
 
 export default function OrderSubmission() {
   const [form, setForm] = useState({
@@ -42,29 +43,26 @@ export default function OrderSubmission() {
       });
   }, []);
 
-// keep an array of just the strings
-const companyNames = companies.map((o) => o.value);
+  // prepare simple array of names
+  const companyNames = companies.map((opt) => opt.value);
 
-const {
-  isOpen,
-  getMenuProps,
-  getComboboxProps,
-  getInputProps,
-  getItemProps,
-  highlightedIndex,
-} = useCombobox({
-  items: companyNames,
-  inputValue: form.company,
-  onInputValueChange: ({ inputValue }) => {
-    // sync what you type into form.company
-    setForm((prev) => ({ ...prev, company: inputValue || "" }));
-  },
-  onSelectedItemChange: ({ selectedItem }) => {
-    // when you pick from the list
-    setForm((prev) => ({ ...prev, company: selectedItem || "" }));
-  },
-  itemToString: (item) => item || "",
-});
+  // initialize Downshift combobox for companyName
+  const {
+    isOpen,
+    getMenuProps,
+    getComboboxProps,
+    getInputProps,
+    getItemProps,
+    highlightedIndex,
+  } = useCombobox({
+    items: companyNames,
+    inputValue: form.company,
+    onInputValueChange: ({ inputValue }) =>
+      setForm((prev) => ({ ...prev, company: inputValue || "" })),
+    onSelectedItemChange: ({ selectedItem }) =>
+      setForm((prev) => ({ ...prev, company: selectedItem || "" })),
+    itemToString: (item) => item || "",
+  });
 
 
   // remove the production file + its preview at index i
@@ -230,6 +228,7 @@ const handleSubmit = async (e) => {
               gap: "0.5rem",
             }}
           >
+            {/* COMPANY COMBOBOX */}
             <div {...getComboboxProps()} style={{ marginBottom: "0.5rem" }}>
               <label style={{ display: "block" }}>
                 Company Name*<br />
@@ -237,11 +236,7 @@ const handleSubmit = async (e) => {
                   {...getInputProps({
                     placeholder: "Company Name*",
                     required: true,
-                    style: {
-                      width: "80%",
-                      fontSize: "0.85rem",
-                      padding: "0.25rem",
-                    },
+                    style: { width: "80%", fontSize: "0.85rem", padding: "0.25rem" },
                   })}
                 />
               </label>
@@ -277,6 +272,7 @@ const handleSubmit = async (e) => {
                     ))}
               </ul>
             </div>
+
 
             <div>
               <label>
