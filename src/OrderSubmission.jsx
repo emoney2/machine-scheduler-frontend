@@ -355,6 +355,11 @@ export default function OrderSubmission() {
                   onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
                 />
               </label>
+              <div style={{ marginTop: "0.25rem", fontSize: "0.8rem" }}>
+                {prodFiles.map((f, i) => (
+                  <div key={i}>• {f.name}</div>
+                ))}
+              </div>
             </div>
             <div>
               <label>
@@ -365,6 +370,11 @@ export default function OrderSubmission() {
                   onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews)}
                 />
               </label>
+              <div style={{ marginTop: "0.25rem", fontSize: "0.8rem" }}>
+                {printFiles.map((f, i) => (
+                  <div key={i}>• {f.name}</div>
+                ))}
+              </div>
             </div>
             <div style={{ textAlign: "center" }}>
               <button
