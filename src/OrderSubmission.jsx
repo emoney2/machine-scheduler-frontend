@@ -63,8 +63,6 @@ export default function OrderSubmission() {
     itemToString: (item) => item || "",
   });
 
-console.log("useCombobox returns:");
-console.log(" • getComboboxProps:", getComboboxProps, typeof getComboboxProps);
 console.log(" • getMenuProps:     ", getMenuProps,     typeof getMenuProps);
 console.log(" • getInputProps:    ", getInputProps,    typeof getInputProps);
 console.log(" • getItemProps:     ", getItemProps,     typeof getItemProps);
