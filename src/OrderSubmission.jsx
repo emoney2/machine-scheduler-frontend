@@ -346,35 +346,31 @@ export default function OrderSubmission() {
               </label>
             </div>
             <div>
-              <label>
-                Production File(s)*<br />
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                Production File(s)*
                 <input
                   type="file"
                   multiple
                   required
                   onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
                 />
+                <span style={{ fontSize: "0.85rem" }}>
+                  {prodFiles.map((f) => f.name).join(", ")}
+                </span>
               </label>
-              <div style={{ marginTop: "0.25rem", fontSize: "0.8rem" }}>
-                {prodFiles.map((f, i) => (
-                  <div key={i}>• {f.name}</div>
-                ))}
-              </div>
             </div>
             <div>
-              <label>
-                Print File(s)<br />
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                Print File(s)
                 <input
                   type="file"
                   multiple
                   onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews)}
                 />
+                <span style={{ fontSize: "0.85rem" }}>
+                  {printFiles.map((f) => f.name).join(", ")}
+                </span>
               </label>
-              <div style={{ marginTop: "0.25rem", fontSize: "0.8rem" }}>
-                {printFiles.map((f, i) => (
-                  <div key={i}>• {f.name}</div>
-                ))}
-              </div>
             </div>
             <div style={{ textAlign: "center" }}>
               <button
