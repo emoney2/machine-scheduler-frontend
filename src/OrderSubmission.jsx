@@ -56,19 +56,22 @@ export default function OrderSubmission() {
     files.map((f) => ({ url: URL.createObjectURL(f), type: f.type, name: f.name }));
 
   const handleFileChange = (e, setter, previewSetter) => {
-   const files = Array.from(e.target.files);
-    // accumulate new files with any already selected
-    setter(prevFiles => [...prevFiles, ...files]);
-    // accumulate their previews too
+    const files = Array.from(e.target.files);
+    setter(prev => [...prev, ...files]);
     previewSetter(prev => [...prev, ...createPreviews(files)]);
 
-    // auto-fill designName only when prodFiles
-    if (setter === setProdFiles && files.length > 0) {
+    // only set designName on very first production-file upload
+    if (
+      setter === setProdFiles &&
+      prodFiles.length === 0 &&      // no files were there before
+      files.length > 0
+    ) {
       let name = files[0].name.replace(/\.[^/.]+$/, "");
       if (name.length > 12) name = name.slice(0, 12) + "..";
       setForm(prev => ({ ...prev, designName: name }));
     }
   };
+
 
 
   const handleSubmit = async (e) => {
