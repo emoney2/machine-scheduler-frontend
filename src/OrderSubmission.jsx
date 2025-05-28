@@ -42,6 +42,24 @@ export default function OrderSubmission() {
   const [furColors, setFurColors] = useState([]);
   const furColorRef = useRef(null);
 
+  // ─── New-Material modal state & data ─────────────────────────
+  const [isNewMaterialModalOpen, setIsNewMaterialModalOpen] = useState(false);
+  const [modalMaterialField, setModalMaterialField] = useState(null);
+  const [newMaterialData, setNewMaterialData] = useState({
+    materialName: "",
+    unit: "",
+    minInv: "",
+    reorder: "",
+    cost: "",
+  });
+  const [newMaterialErrors, setNewMaterialErrors] = useState({});
+
+  const handleNewMaterialChange = (e) => {
+    const { name, value } = e.target;
+    setNewMaterialData((prev) => ({ ...prev, [name]: value }));
+  };
+
+
   // ─── New‐Company modal state & data ───────────────────────────
   const [isNewCompanyModalOpen, setIsNewCompanyModalOpen] = useState(false);
   const [newCompanyData, setNewCompanyData] = useState({
@@ -375,6 +393,31 @@ const handleSubmit = async (e) => {
     return;
   }
 
+    // ─── If any material field is unknown, open material modal ────
+    const firstUnknown = form.materials.find(
+      (m) => m.trim() && !materialNames.includes(m.trim())
+    );
+    const backUnknown = form.backMaterial.trim() && !materialNames.includes(form.backMaterial.trim());
+    const furUnknown = form.furColor.trim() && !materialNames.includes(form.furColor.trim());
+
+    if (firstUnknown || backUnknown || furUnknown) {
+      // decide which field
+      if (firstUnknown) {
+        const idx = form.materials.findIndex((m) => m.trim() === firstUnknown.trim());
+        setModalMaterialField({ type: "materials", index: idx });
+        setNewMaterialData((prev) => ({ ...prev, materialName: firstUnknown.trim() }));
+      } else if (backUnknown) {
+        setModalMaterialField({ type: "backMaterial" });
+        setNewMaterialData((prev) => ({ ...prev, materialName: form.backMaterial.trim() }));
+      } else {
+        setModalMaterialField({ type: "furColor" });
+        setNewMaterialData((prev) => ({ ...prev, materialName: form.furColor.trim() }));
+      }
+      setNewMaterialErrors({});
+      setIsNewMaterialModalOpen(true);
+      return;
+    }
+
   // ─── start loading ───────────────────────────────────────────
   setIsSubmitting(true);
   try {
@@ -496,16 +539,57 @@ const handleSaveNewCompany = async () => {
   }
 };
 
+  // ─── Save the new material to Google Sheets ───────────────────
+  const handleSaveNewMaterial = async () => {
+    // validate name, unit, minInv, reorder, cost
+    const required = ["materialName", "unit", "minInv", "reorder", "cost"];
+    const errors = {};
+    required.forEach((k) => {
+      if (!newMaterialData[k]?.toString().trim()) errors[k] = "Required";
+    });
+    if (Object.keys(errors).length) {
+      setNewMaterialErrors(errors);
+      return;
+    }
+
+    try {
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/materials`,
+        newMaterialData
+      );
+
+      // 1) Add to local list
+      setMaterialsInv((prev) => [...prev, newMaterialData.materialName]);
+
+      // 2) Update the form field that triggered it
+      if (modalMaterialField.type === "materials") {
+        const mArr = [...form.materials];
+        mArr[modalMaterialField.index] = newMaterialData.materialName;
+        setForm((f) => ({ ...f, materials: mArr }));
+      } else if (modalMaterialField.type === "backMaterial") {
+        setForm((f) => ({ ...f, backMaterial: newMaterialData.materialName }));
+      } else {
+        setForm((f) => ({ ...f, furColor: newMaterialData.materialName }));
+      }
+
+      // 3) Close modal & clear errors
+      setIsNewMaterialModalOpen(false);
+      setNewMaterialErrors({});
+    } catch {
+      setNewMaterialErrors({ general: "Failed to save material. Try again." });
+    }
+  };
+
+
   return (
     <>
+      {/* Company Modal */}
       {isNewCompanyModalOpen && (
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
+            top: 0, left: 0,
+            width: "100%", height: "100%",
             background: "rgba(0,0,0,0.5)",
             display: "flex",
             alignItems: "center",
@@ -524,25 +608,12 @@ const handleSaveNewCompany = async () => {
             }}
           >
             <h2 style={{ marginTop: 0 }}>Add New Company</h2>
-
             {newCompanyErrors.general && (
               <div style={{ color: "red", marginBottom: "0.5rem" }}>
                 {newCompanyErrors.general}
               </div>
             )}
-
-            {[
-              { key: "companyName", label: "Company Name*" },
-              { key: "contactFirstName", label: "Contact First Name*" },
-              { key: "contactLastName", label: "Contact Last Name*" },
-              { key: "contactEmailAddress", label: "Contact Email Address*" },
-              { key: "streetAddress1", label: "Street Address 1*" },
-              { key: "streetAddress2", label: "Street Address 2" },
-              { key: "city", label: "City*" },
-              { key: "state", label: "State*" },
-              { key: "zipCode", label: "Zip Code*" },
-              { key: "phoneNumber", label: "Phone Number*" },
-            ].map(({ key, label }) => (
+            {[ /* company fields array */ ].map(({ key, label }) => (
               <div key={key} style={{ marginBottom: "0.75rem" }}>
                 <label style={{ display: "block", fontSize: "0.9rem" }}>
                   {label}
@@ -568,14 +639,7 @@ const handleSaveNewCompany = async () => {
                 )}
               </div>
             ))}
-
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "0.5rem",
-              }}
-            >
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
               <button
                 type="button"
                 onClick={() => setIsNewCompanyModalOpen(false)}
@@ -595,14 +659,187 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
 
+      {/* Material Modal */}
+      {isNewMaterialModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0, left: 0,
+            width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "1.5rem",
+              borderRadius: "0.5rem",
+              width: "400px",
+              maxHeight: "90%",
+              overflowY: "auto",
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>Add New Material</h2>
+            {newMaterialErrors.general && (
+              <div style={{ color: "red", marginBottom: "0.5rem" }}>
+                {newMaterialErrors.general}
+              </div>
+            )}
+            {/* Material Name */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label>Material Name*<br/>
+                <input
+                  name="materialName"
+                  value={newMaterialData.materialName}
+                  onChange={handleNewMaterialChange}
+                  style={{
+                    width: "100%",
+                    padding: "0.4rem",
+                    border: newMaterialErrors.materialName
+                      ? "1px solid red"
+                      : "1px solid #ccc",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+              </label>
+              {newMaterialErrors.materialName && (
+                <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  {newMaterialErrors.materialName}
+                </div>
+              )}
+            </div>
+            {/* Unit */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label>Unit*<br/>
+                <select
+                  name="unit"
+                  value={newMaterialData.unit}
+                  onChange={handleNewMaterialChange}
+                  style={{
+                    width: "100%",
+                    padding: "0.4rem",
+                    border: newMaterialErrors.unit
+                      ? "1px solid red"
+                      : "1px solid #ccc",
+                    borderRadius: "0.25rem",
+                  }}
+                >
+                  <option value="">Select unit…</option>
+                  <option value="Yards">Yards</option>
+                  <option value="Sqft">Sqft</option>
+                </select>
+              </label>
+              {newMaterialErrors.unit && (
+                <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  {newMaterialErrors.unit}
+                </div>
+              )}
+            </div>
+            {/* Min. Inv. */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label>Min. Inv.*<br/>
+                <input
+                  type="number"
+                  name="minInv"
+                  value={newMaterialData.minInv}
+                  onChange={handleNewMaterialChange}
+                  style={{
+                    width: "100%",
+                    padding: "0.4rem",
+                    border: newMaterialErrors.minInv
+                      ? "1px solid red"
+                      : "1px solid #ccc",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+              </label>
+              {newMaterialErrors.minInv && (
+                <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  {newMaterialErrors.minInv}
+                </div>
+              )}
+            </div>
+            {/* Reorder */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label>Reorder Point*<br/>
+                <input
+                  type="number"
+                  name="reorder"
+                  value={newMaterialData.reorder}
+                  onChange={handleNewMaterialChange}
+                  style={{
+                    width: "100%",
+                    padding: "0.4rem",
+                    border: newMaterialErrors.reorder
+                      ? "1px solid red"
+                      : "1px solid #ccc",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+              </label>
+              {newMaterialErrors.reorder && (
+                <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  {newMaterialErrors.reorder}
+                </div>
+              )}
+            </div>
+            {/* Cost */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label>Cost*<br/>
+                <input
+                  type="number"
+                  step="0.01"
+                  name="cost"
+                  value={newMaterialData.cost}
+                  onChange={handleNewMaterialChange}
+                  style={{
+                    width: "100%",
+                    padding: "0.4rem",
+                    border: newMaterialErrors.cost
+                      ? "1px solid red"
+                      : "1px solid #ccc",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+              </label>
+              {newMaterialErrors.cost && (
+                <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  {newMaterialErrors.cost}
+                </div>
+              )}
+            </div>
+            {/* Modal buttons */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button
+                type="button"
+                onClick={() => setIsNewMaterialModalOpen(false)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveNewMaterial}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Save Material
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Loading bar */}
       {isSubmitting && (
         <progress
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "4px",
+            top: 0, left: 0,
+            width: "100%", height: "4px",
             zIndex: 1001,
           }}
         />
