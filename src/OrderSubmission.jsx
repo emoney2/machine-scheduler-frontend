@@ -1066,6 +1066,7 @@ const handleSaveNewCompany = async () => {
                   onChange={handleBackMaterialInput}
                   list="material-list"
                   autoComplete="off"
+                  required={form.product.toLowerCase().includes("back")}
                   style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                 />
               </label>
@@ -1081,8 +1082,8 @@ const handleSaveNewCompany = async () => {
                   style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                 >
                   <option value="">Select backing…</option>
-                  <option value="cutaway">Cut Away</option>
-                  <option value="tearaway">Tear Away</option>
+                  <option value="Cut Away">Cut Away</option>
+                  <option value="Tear Away">Tear Away</option>
                 </select>
               </label>
             </div>
