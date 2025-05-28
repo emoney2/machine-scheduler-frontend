@@ -32,6 +32,13 @@ export default function OrderSubmission() {
   const [products, setProducts] = useState([]);
   const productInputRef = useRef(null);
 
+  // ─── MATERIALS inventory + refs ───────────────────────────────
+  const [materialsInv, setMaterialsInv] = useState([]);
+  // an array of refs for Material1–5
+  const materialInputRefs = useRef([null, null, null, null, null]);
+  // single ref for Back Material
+  const backMaterialRef = useRef(null);
+
   // when user types, update form.company and show inline suggestion
   const handleCompanyInput = (e) => {
     const raw = e.target.value;
@@ -120,6 +127,60 @@ export default function OrderSubmission() {
     }
   };
 
+  // ─── MATERIAL inline‐typeahead ─────────────────────────────────
+  const handleMaterialInput = (idx) => (e) => {
+    const raw = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
+
+    if (inputType?.startsWith("delete")) {
+      const newM = [...form.materials];
+      newM[idx] = raw;
+      setForm(prev => ({ ...prev, materials: newM }));
+      return;
+    }
+
+    const match = materialNames.find(m =>
+      m.toLowerCase().startsWith(raw.toLowerCase())
+    );
+    if (match && raw !== match) {
+      const newM = [...form.materials];
+      newM[idx] = match;
+      setForm(prev => ({ ...prev, materials: newM }));
+      setTimeout(() => {
+        const input = materialInputRefs.current[idx];
+        input.setSelectionRange(raw.length, match.length);
+      }, 0);
+    } else {
+      const newM = [...form.materials];
+      newM[idx] = raw;
+      setForm(prev => ({ ...prev, materials: newM }));
+    }
+  };
+
+  // ─── BACK MATERIAL inline‐typeahead ─────────────────────────────
+  const handleBackMaterialInput = (e) => {
+    const raw = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
+
+    if (inputType?.startsWith("delete")) {
+      setForm(prev => ({ ...prev, backMaterial: raw }));
+      return;
+    }
+
+    const match = materialNames.find(m =>
+      m.toLowerCase().startsWith(raw.toLowerCase())
+    );
+    if (match && raw !== match) {
+      setForm(prev => ({ ...prev, backMaterial: match }));
+      setTimeout(() => {
+        const input = backMaterialRef.current;
+        input.setSelectionRange(raw.length, match.length);
+      }, 0);
+    } else {
+      setForm(prev => ({ ...prev, backMaterial: raw }));
+    }
+  };
+
   useEffect(() => {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
@@ -142,6 +203,17 @@ export default function OrderSubmission() {
        .then((res) => setProducts(res.data))
        .catch((err) => console.error("Failed to load products:", err));
    }, []);
+
+  // ─── Fetch materials inventory from Sheet ──────────────────────
+  useEffect(() => {
+    axios
+      .get(`${process.env.REACT_APP_API_ROOT}/materials`)
+      .then(res => setMaterialsInv(res.data))
+      .catch(err => console.error("Failed to load materials:", err));
+  }, []);
+
+  // for matching
+  const materialNames = materialsInv;
 
   // prepare simple array of names
   const companyNames = companies.map((opt) => opt.value);
