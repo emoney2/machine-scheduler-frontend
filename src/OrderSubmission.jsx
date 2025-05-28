@@ -548,9 +548,11 @@ const handleSubmit = async (e) => {
                     autoComplete="off"
                     required={i === 0}
                     style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
+                  />
                 </label>
               </div>
             ))}
+
             {/* shared dropdown options for all Material inputs */}
             <datalist id="material-list">
               {materialNames.map((mat) => (
