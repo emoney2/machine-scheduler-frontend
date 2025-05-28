@@ -575,14 +575,18 @@ const handleSubmit = async (e) => {
             </div>
             <div>
               <label>
-                EMB Backing*<br />
-                <input
+                EMB Backing*<br/>
+                <select
                   name="embBacking"
                   value={form.embBacking}
                   onChange={handleChange}
                   required
-                  style={{ width: "80%" }}
-                />
+                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
+                >
+                  <option value="">Select backing…</option>
+                  <option value="cutaway">Cut Away</option>
+                  <option value="tearaway">Tear Away</option>
+                </select>
               </label>
             </div>
             <div>
