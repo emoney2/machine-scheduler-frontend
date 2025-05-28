@@ -104,7 +104,7 @@ export default function Inventory() {
                     value={r.value}
                     placeholder="Thread color…"
                     onChange={handleThreadInput(i)}
-                    style={{ width: "100%" }}
+                    style={{ width: "90%", boxSizing: "border-box" }}
                   />
                 </td>
                 <td>
