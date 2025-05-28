@@ -26,9 +26,11 @@ export default function OrderSubmission() {
 
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
-
-  // ref to our company <input> so we can manipulate selection
   const companyInputRef = useRef(null);
+
+  // product list + input ref
+  const [products, setProducts] = useState([]);
+  const productInputRef = useRef(null);
 
   // when user types, update form.company and show inline suggestion
   const handleCompanyInput = (e) => {
@@ -77,8 +79,22 @@ export default function OrderSubmission() {
       });
   }, []);
 
+  // list of product‐name options from Table sheet
+  const [products, setProducts] = useState([]);
+
+   // ─── Fetch products ────────────────────────────────────────────────
+   useEffect(() => {
+     axios
+       .get(`${process.env.REACT_APP_API_ROOT}/products`)
+       .then((res) => setProducts(res.data))
+       .catch((err) => console.error("Failed to load products:", err));
+   }, []);
+
   // prepare simple array of names
   const companyNames = companies.map((opt) => opt.value);
+
+  const productNames = products;
+
 
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
