@@ -5,6 +5,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
 import { io } from 'socket.io-client';
 import axios from 'axios';
+import Inventory from "./Inventory";
+import InventoryOrdered from "./InventoryOrdered";
 
 // send cookies on every API call so Flask session is preserved
 axios.defaults.withCredentials = true;
