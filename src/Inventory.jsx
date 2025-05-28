@@ -1,12 +1,43 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-
-const BLANK = { value: "", action: "Ordered", quantity: "" };
 const ROWS = 15;
+const BLANK = { value: "", action: "Ordered", quantity: "" };
 
 export default function Inventory() {
   const [threads, setThreads] = useState([]);
   const [materials, setMaterials] = useState([]);
+
+  // ➊ Create refs for each Thread-Color input (for later selection)
+  const threadInputRefs = useRef(Array(ROWS).fill(null));
+
+  // ➋ Handler to autocomplete Thread-Color inputs
+  const handleThreadInput = (idx) => (e) => {
+    const raw       = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
+
+    setThreadRows((rows) => {
+      const newRows = [...rows];
+      // If deleting, just store raw
+      if (inputType?.startsWith("delete")) {
+        newRows[idx].value = raw;
+      } else {
+        // Otherwise, attempt to complete from the threads list
+        const match = threads.find((t) =>
+          t.toLowerCase().startsWith(raw.toLowerCase())
+        );
+        newRows[idx].value = match && raw !== match ? match : raw;
+        if (match && raw !== match) {
+          // Highlight the appended text after render
+          setTimeout(() => {
+            const inp = threadInputRefs.current[idx];
+            inp.setSelectionRange(raw.length, match.length);
+          }, 0);
+        }
+      }
+      return newRows;
+    });
+  };
+
 
   // Fetch dropdown options
   useEffect(() => {
@@ -58,17 +89,23 @@ export default function Inventory() {
               <th>Quantity (ft)</th>
             </tr>
           </thead>
+          <datalist id="thread-list">
+            {threads.map(c => (
+              <option key={c} value={c} />
+            ))}
+          </datalist>
           <tbody>
             {threadRows.map((r, i) => (
               <tr key={i}>
                 <td>
-                  <select
+                  <input
+                    ref={el => (threadInputRefs.current[i] = el)}
+                    list="thread-list"
                     value={r.value}
-                    onChange={handleChange(setThreadRows, i, "value")}
-                  >
-                    <option value="">—</option>
-                    {threads.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                    placeholder="Thread color…"
+                    onChange={handleThreadInput(i)}
+                    style={{ width: "100%" }}
+                  />
                 </td>
                 <td>
                   <select
