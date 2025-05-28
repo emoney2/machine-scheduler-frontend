@@ -37,6 +37,36 @@ export default function OrderSubmission() {
     const raw = e.target.value;
     const inputType = e.nativeEvent?.inputType;
 
+  // when user types, update form.product and show inline suggestion
+  const handleProductInput = (e) => {
+    const raw = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
+
+    // allow deletes/backspace
+    if (inputType?.startsWith("delete")) {
+      setForm((prev) => ({ ...prev, product: raw }));
+      return;
+    }
+
+    // attempt inline completion
+    const match = productNames.find((p) =>
+      p.toLowerCase().startsWith(raw.toLowerCase())
+    );
+
+    if (match && raw !== match) {
+      // show the full match
+      setForm((prev) => ({ ...prev, product: match }));
+      // select just the appended part after React updates
+      setTimeout(() => {
+        const input = productInputRef.current;
+        input.setSelectionRange(raw.length, match.length);
+      }, 0);
+    } else {
+      // no match or exact match: just store raw
+      setForm((prev) => ({ ...prev, product: raw }));
+    }
+  };
+
     // If the user is deleting, just store the raw value and bail out
     if (inputType && inputType.startsWith("delete")) {
       setForm((prev) => ({ ...prev, company: raw }));
@@ -284,6 +314,7 @@ const handleSubmit = async (e) => {
               </datalist>
             </div>
 
+
             <div>
               <label>
                 Design Name*<br />
@@ -309,17 +340,31 @@ const handleSubmit = async (e) => {
                 />
               </label>
             </div>
-            <div>
-              <label>
+            {/* PRODUCT INLINE TYPE-AHEAD */}
+            <div style={{ marginBottom: "0.5rem", position: "relative" }}>
+              <label style={{ display: "block" }}>
                 Product*<br />
                 <input
+                  ref={productInputRef}
                   name="product"
-                  value={form.product}
-                  onChange={handleChange}
+                  placeholder="Product*"
                   required
-                  style={{ width: "80%" }}
+                  autoComplete="off"
+                  style={{
+                    width: "80%",
+                    fontSize: "0.85rem",
+                    padding: "0.25rem",
+                  }}
+                  onChange={handleProductInput}
+                  value={form.product}
+                  list="product-list"
                 />
               </label>
+              <datalist id="product-list">
+                {productNames.map((p) => (
+                  <option key={p} value={p} />
+                ))}
+              </datalist>
             </div>
             <div>
               <label>
