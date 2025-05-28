@@ -15,16 +15,39 @@ export default function Inventory() {
     const raw       = e.target.value;
     const inputType = e.nativeEvent?.inputType;
 
-  // ➌ If user leaves an input that isn’t in the list, open a modal to add it
+    setThreadRows((rows) => {
+      const newRows = [...rows];
+      // If deleting, just store raw
+      if (inputType?.startsWith("delete")) {
+        newRows[idx].value = raw;
+      } else {
+        // Otherwise, attempt to complete from the threads list
+        const match = threads.find((t) =>
+          t.toLowerCase().startsWith(raw.toLowerCase())
+        );
+        newRows[idx].value = match && raw !== match ? match : raw;
+        if (match && raw !== match) {
+          // Highlight the appended text after render
+          setTimeout(() => {
+            const inp = threadInputRefs.current[idx];
+            inp.setSelectionRange(raw.length, match.length);
+          }, 0);
+        }
+      }
+      return newRows;
+    });
+  };
+
+  // ➌ When a Thread-Color input loses focus, if its value isn’t in the list, open the “new thread” modal
   const handleThreadBlur = (idx) => (e) => {
     const val = e.target.value.trim();
     if (val && !threads.includes(val)) {
-      // seed the modal
       setNewItemData({ name: val, type: "Thread" });
       setNewItemErrors({});
       setIsNewItemModalOpen(true);
     }
   };
+
 
     setThreadRows((rows) => {
       const newRows = [...rows];
