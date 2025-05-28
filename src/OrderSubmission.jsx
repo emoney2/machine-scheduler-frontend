@@ -977,6 +977,7 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
       </div>
-    </form>        
-  );               
+    </form>  
+  </>      
+);               
 }  
