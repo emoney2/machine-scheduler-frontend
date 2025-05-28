@@ -57,6 +57,7 @@ export default function OrderSubmission() {
     phoneNumber: "",
   });
   const [newCompanyErrors, setNewCompanyErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleNewCompanyChange = (e) => {
     const { name, value } = e.target;
@@ -372,6 +373,18 @@ const handleSubmit = async (e) => {
     setIsNewCompanyModalOpen(true);
     return;  // bail out of the normal submit
   }
+
+  // ─── start loading ───────────────────────────────────────────
+  setIsSubmitting(true);
+  try {
+    // … your existing axios.post(…) and success logic …
+  } catch (err) {
+    // … your existing error handling …
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
   const fd = new FormData();
 
   // append scalar fields
@@ -493,6 +506,18 @@ const handleSaveNewCompany = async () => {
   return (
     <>
       {isNewCompanyModalOpen && (
+      {isSubmitting && (
+        <progress
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "4px",
+            zIndex: 1001,
+          }}
+        />
+      )}
         <div
           style={{
             position: "fixed",
@@ -884,7 +909,7 @@ const handleSaveNewCompany = async () => {
                 type="submit"
                 style={{ marginTop: "0.5rem", padding: "0.5rem 1rem" }}
               >
-                Submit
+                {isSubmitting ? "Submitting…" : "Submit"}
               </button>
             </div>
           </div>
