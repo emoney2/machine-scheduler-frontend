@@ -684,10 +684,28 @@ const onDragEnd = async (result) => {
         <NavLink
           to="/submit"
           style={({ isActive }) => ({
+            marginRight: 16,
             textDecoration: isActive ? 'underline' : 'none'
           })}
         >
           Order Submission
+        </NavLink>
+        <NavLink
+          to="/inventory"
+          style={({ isActive }) => ({
+            marginRight: 16,
+            textDecoration: isActive ? 'underline' : 'none'
+          })}
+        >
+          Inventory
+        </NavLink>
+        <NavLink
+          to="/inventory-ordered"
+          style={({ isActive }) => ({
+            textDecoration: isActive ? 'underline' : 'none'
+          })}
+        >
+          Inventory Ordered
         </NavLink>
       </nav>
 
@@ -723,6 +741,8 @@ const onDragEnd = async (result) => {
           }
         />
         <Route path="/submit" element={<OrderSubmission />} />
+        <Route path="/inventory" element={<Inventory />} />
+        <Route path="/inventory-ordered" element={<InventoryOrdered />} />
       </Routes>
     </>
   );
