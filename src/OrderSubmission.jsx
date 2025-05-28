@@ -359,75 +359,64 @@ const furColorNames = furColors;
     }
   };
 
+// ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   e.preventDefault();
 
-  // ─── If company not in our directory, open modal ─────────────────
+  // ─── If company not in our directory, open modal ───────────────
   if (!companyNames.includes(form.company.trim())) {
-    // seed the modal’s companyName and clear any past errors
     setNewCompanyData((prev) => ({
       ...prev,
       companyName: form.company.trim(),
     }));
     setNewCompanyErrors({});
     setIsNewCompanyModalOpen(true);
-    return;  // bail out of the normal submit
+    return;
   }
 
   // ─── start loading ───────────────────────────────────────────
   setIsSubmitting(true);
   try {
-    // … your existing axios.post(…) and success logic …
-  } catch (err) {
-    // … your existing error handling …
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    // build the form payload
+    const fd = new FormData();
+    [
+      "company",
+      "designName",
+      "quantity",
+      "product",
+      "price",
+      "dueDate",
+      "dateType",
+      "referral",
+      "backMaterial",
+      "embBacking",
+      "furColor",
+      "notes",
+    ].forEach((k) => fd.append(k, form[k] || ""));
 
-  const fd = new FormData();
+    form.materials.forEach((m) => fd.append("materials", m));
 
-  // append scalar fields
-  [
-    "company",
-    "designName",
-    "quantity",
-    "product",
-    "price",
-    "dueDate",
-    "dateType",
-    "referral",
-    "backMaterial",
-    "embBacking",
-    "furColor",
-    "notes",
-  ].forEach((k) => fd.append(k, form[k] || ""));
+    // ensure the designName file is first
+    let filesToUpload = [...prodFiles];
+    const baseName = form.designName.replace(/\.\.$/, "");
+    const idx = filesToUpload.findIndex(
+      (f) => f.name.replace(/\.[^/.]+$/, "") === baseName
+    );
+    if (idx > 0) {
+      const [match] = filesToUpload.splice(idx, 1);
+      filesToUpload.unshift(match);
+    }
 
-  // append materials
-  form.materials.forEach((m) => fd.append("materials", m));
+    filesToUpload.forEach((f) => fd.append("prodFiles", f));
+    printFiles.forEach((f) => fd.append("printFiles", f));
 
-  // ensure the designName file is first
-  let filesToUpload = [...prodFiles];
-  const baseName = form.designName.replace(/\.\.$/, "");
-  const idx = filesToUpload.findIndex(
-    (f) => f.name.replace(/\.[^/.]+$/, "") === baseName
-  );
-  if (idx > 0) {
-    const [match] = filesToUpload.splice(idx, 1);
-    filesToUpload.unshift(match);
-  }
-
-  // append production files in the new order
-  filesToUpload.forEach((f) => fd.append("prodFiles", f));
-
-  // append print files
-  printFiles.forEach((f) => fd.append("printFiles", f));
-
-  try {
+    // send to server
     await axios.post(submitUrl, fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+
     alert("Order submitted!");
+
     // reset form + state
     setForm({
       company: "",
@@ -451,8 +440,11 @@ const handleSubmit = async (e) => {
   } catch (err) {
     console.error(err);
     alert(err.response?.data?.error || "Submission failed");
+  } finally {
+    setIsSubmitting(false);
   }
 };
+
 
 // ─── Save the new company to Google Sheets ─────────────────────
 const handleSaveNewCompany = async () => {
