@@ -1066,7 +1066,7 @@ const handleSaveNewCompany = async () => {
                   onChange={handleBackMaterialInput}
                   list="material-list"
                   autoComplete="off"
-                  required={form.product.toLowerCase().includes("back")}
+                  required={form.product.toLowerCase().includes("full")}
                   style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                 />
               </label>
