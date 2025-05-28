@@ -93,6 +93,32 @@ export default function OrderSubmission() {
     }
   };
 
+  // ─── PRODUCT inline‐typeahead ─────────────────────────────────
+  const handleProductInput = (e) => {
+    const raw = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
+
+    // handle backspace/delete just by storing raw
+    if (inputType?.startsWith("delete")) {
+      setForm((prev) => ({ ...prev, product: raw }));
+      return;
+    }
+
+    // otherwise try to autocomplete
+    const match = productNames.find((p) =>
+      p.toLowerCase().startsWith(raw.toLowerCase())
+    );
+    if (match && raw !== match) {
+      setForm((prev) => ({ ...prev, product: match }));
+      // highlight only the appended text
+      setTimeout(() => {
+        const input = productInputRef.current;
+        input.setSelectionRange(raw.length, match.length);
+      }, 0);
+    } else {
+      setForm((prev) => ({ ...prev, product: raw }));
+    }
+  };
 
   useEffect(() => {
     axios
