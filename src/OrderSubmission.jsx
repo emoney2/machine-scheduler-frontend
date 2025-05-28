@@ -127,59 +127,66 @@ export default function OrderSubmission() {
     }
   };
 
-  // ─── MATERIAL inline‐typeahead ─────────────────────────────────
-  const handleMaterialInput = (idx) => (e) => {
-    const raw = e.target.value;
-    const inputType = e.nativeEvent?.inputType;
+// ─── MATERIAL inline‐typeahead ─────────────────────────────────
+const handleMaterialInput = (idx) => (e) => {
+  const raw = e.target.value;
+  const inputType = e.nativeEvent?.inputType;
 
-    if (inputType?.startsWith("delete")) {
-      const newM = [...form.materials];
-      newM[idx] = raw;
-      setForm(prev => ({ ...prev, materials: newM }));
-      return;
-    }
+  // on delete/backspace, just store raw
+  if (inputType?.startsWith("delete")) {
+    const newM = [...form.materials];
+    newM[idx] = raw;
+    setForm(prev => ({ ...prev, materials: newM }));
+    return;
+  }
 
-    const match = materialNames.find(m =>
-      m.toLowerCase().startsWith(raw.toLowerCase())
-    );
-    if (match && raw !== match) {
-      const newM = [...form.materials];
-      newM[idx] = match;
-      setForm(prev => ({ ...prev, materials: newM }));
-      setTimeout(() => {
-        const input = materialInputRefs.current[idx];
-        input.setSelectionRange(raw.length, match.length);
-      }, 0);
-    } else {
-      const newM = [...form.materials];
-      newM[idx] = raw;
-      setForm(prev => ({ ...prev, materials: newM }));
-    }
-  };
+  // otherwise try to complete
+  const match = materialNames.find(m =>
+    m.toLowerCase().startsWith(raw.toLowerCase())
+  );
+  if (match && raw !== match) {
+    const newM = [...form.materials];
+    newM[idx] = match;
+    setForm(prev => ({ ...prev, materials: newM }));
+    // highlight the appended text
+    setTimeout(() => {
+      const input = materialInputRefs.current[idx];
+      input.setSelectionRange(raw.length, match.length);
+    }, 0);
+  } else {
+    const newM = [...form.materials];
+    newM[idx] = raw;
+    setForm(prev => ({ ...prev, materials: newM }));
+  }
+};
 
-  // ─── BACK MATERIAL inline‐typeahead ─────────────────────────────
-  const handleBackMaterialInput = (e) => {
-    const raw = e.target.value;
-    const inputType = e.nativeEvent?.inputType;
+// ─── BACK MATERIAL inline‐typeahead ─────────────────────────────
+const handleBackMaterialInput = (e) => {
+  const raw = e.target.value;
+  const inputType = e.nativeEvent?.inputType;
 
-    if (inputType?.startsWith("delete")) {
-      setForm(prev => ({ ...prev, backMaterial: raw }));
-      return;
-    }
+  // allow backspace/delete
+  if (inputType?.startsWith("delete")) {
+    setForm(prev => ({ ...prev, backMaterial: raw }));
+    return;
+  }
 
-    const match = materialNames.find(m =>
-      m.toLowerCase().startsWith(raw.toLowerCase())
-    );
-    if (match && raw !== match) {
-      setForm(prev => ({ ...prev, backMaterial: match }));
-      setTimeout(() => {
-        const input = backMaterialRef.current;
-        input.setSelectionRange(raw.length, match.length);
-      }, 0);
-    } else {
-      setForm(prev => ({ ...prev, backMaterial: raw }));
-    }
-  };
+  // otherwise try to complete
+  const match = materialNames.find(m =>
+    m.toLowerCase().startsWith(raw.toLowerCase())
+  );
+  if (match && raw !== match) {
+    setForm(prev => ({ ...prev, backMaterial: match }));
+    // highlight the appended text
+    setTimeout(() => {
+      const input = backMaterialRef.current;
+      input.setSelectionRange(raw.length, match.length);
+    }, 0);
+  } else {
+    setForm(prev => ({ ...prev, backMaterial: raw }));
+  }
+};
+
 
   useEffect(() => {
     axios
@@ -533,22 +540,34 @@ const handleSubmit = async (e) => {
                 <label>
                   Material {i + 1}{i === 0 && "*"}<br />
                   <input
-                    value={m}
-                    onChange={(e) => handleMaterialChange(i, e.target.value)}
+                    ref={el => (materialInputRefs.current[i] = el)}
+                    name={`materials[${i}]`}
+                    value={form.materials[i]}
+                    onChange={handleMaterialInput(i)}
+                    list="material-list"
+                    autoComplete="off"
                     required={i === 0}
-                    style={{ width: "80%" }}
-                  />
+                    style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                 </label>
               </div>
             ))}
+            {/* shared dropdown options for all Material inputs */}
+            <datalist id="material-list">
+              {materialNames.map((mat) => (
+                <option key={mat} value={mat} />
+              ))}
+            </datalist>
             <div>
               <label>
                 Back Material<br />
                 <input
+                  ref={backMaterialRef}
                   name="backMaterial"
                   value={form.backMaterial}
-                  onChange={handleChange}
-                  style={{ width: "80%" }}
+                  onChange={handleBackMaterialInput}
+                  list="material-list"
+                  autoComplete="off"
+                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                 />
               </label>
             </div>
