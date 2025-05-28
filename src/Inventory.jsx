@@ -15,6 +15,17 @@ export default function Inventory() {
     const raw       = e.target.value;
     const inputType = e.nativeEvent?.inputType;
 
+  // ➌ If user leaves an input that isn’t in the list, open a modal to add it
+  const handleThreadBlur = (idx) => (e) => {
+    const val = e.target.value.trim();
+    if (val && !threads.includes(val)) {
+      // seed the modal
+      setNewItemData({ name: val, type: "Thread" });
+      setNewItemErrors({});
+      setIsNewItemModalOpen(true);
+    }
+  };
+
     setThreadRows((rows) => {
       const newRows = [...rows];
       // If deleting, just store raw
@@ -104,6 +115,7 @@ export default function Inventory() {
                     value={r.value}
                     placeholder="Thread color…"
                     onChange={handleThreadInput(i)}
+                    onBlur={handleThreadBlur(i)}
                     style={{ width: "90%", boxSizing: "border-box" }}
                   />
                 </td>
