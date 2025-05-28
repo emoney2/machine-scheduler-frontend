@@ -349,6 +349,15 @@ const furColorNames = furColors;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
+  // ─── Quick-pick Due Date (6/7/8 weeks) ────────────────────────
+  const setDueDateWeeks = (weeks) => {
+    const d = new Date();
+    d.setDate(d.getDate() + weeks * 7);
+    const iso = d.toISOString().split("T")[0];  // YYYY-MM-DD
+    setForm((prev) => ({ ...prev, dueDate: iso }));
+  };
+
+
   const handleMaterialChange = (i, val) => {
     setForm((prev) => {
       const m = [...prev.materials];
@@ -962,7 +971,7 @@ const handleSaveNewCompany = async () => {
             </div>
             <div>
               <label>
-                Due Date*<br />
+                Due Date*<br/>
                 <input
                   name="dueDate"
                   type="date"
@@ -971,8 +980,20 @@ const handleSaveNewCompany = async () => {
                   required
                   style={{ width: "80%" }}
                 />
+                <div style={{ marginTop: "0.25rem", display: "flex", gap: "0.5rem" }}>
+                  <button type="button" onClick={() => setDueDateWeeks(6)}>
+                    6 Weeks
+                  </button>
+                  <button type="button" onClick={() => setDueDateWeeks(7)}>
+                    7 Weeks
+                  </button>
+                  <button type="button" onClick={() => setDueDateWeeks(8)}>
+                    8 Weeks
+                  </button>
+                </div>
               </label>
             </div>
+
             <div>
               <label>
                 Hard/Soft Date*<br />
