@@ -362,6 +362,7 @@ const furColorNames = furColors;
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   e.preventDefault();
+  console.log("handleSubmit – isSubmitting before:", isSubmitting);
 
   // ─── If company not in our directory, open modal ───────────────
   if (!companyNames.includes(form.company.trim())) {
