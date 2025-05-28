@@ -79,9 +79,6 @@ export default function OrderSubmission() {
       });
   }, []);
 
-  // list of product‐name options from Table sheet
-  const [products, setProducts] = useState([]);
-
    // ─── Fetch products ────────────────────────────────────────────────
    useEffect(() => {
      axios
