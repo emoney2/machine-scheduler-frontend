@@ -86,7 +86,7 @@ export default function Inventory() {
             <tr>
               <th>Thread Color</th>
               <th>O/R</th>
-              <th>Quantity (ft)</th>
+              <th>Quantity (# of Cones)</th>
             </tr>
           </thead>
           <datalist id="thread-list">
