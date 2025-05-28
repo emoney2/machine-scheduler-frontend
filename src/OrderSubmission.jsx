@@ -498,18 +498,6 @@ const handleSaveNewCompany = async () => {
   return (
     <>
       {isNewCompanyModalOpen && (
-      {isSubmitting && (
-        <progress
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "4px",
-            zIndex: 1001,
-          }}
-        />
-      )}
         <div
           style={{
             position: "fixed",
@@ -606,15 +594,28 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
 
+      {isSubmitting && (
+        <progress
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "4px",
+            zIndex: 1001,
+          }}
+        />
+      )}
+
       <form
         onSubmit={handleSubmit}
         style={{
           display: "grid",
           gridTemplateColumns: "2fr 1fr",
-          gap: "0.5rem",        // tighter gaps
-          padding: "0.5rem",    // reduced padding
+          gap: "0.5rem",
+          padding: "0.5rem",
           fontFamily: "sans-serif",
-          fontSize: "0.85rem",  // slightly smaller text
+          fontSize: "0.85rem",
         }}
       >
         {/* LEFT COLUMN */}
