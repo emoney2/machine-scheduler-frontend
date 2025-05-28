@@ -25,6 +25,15 @@ export default function Inventory() {
       setIsNewItemModalOpen(true);
     }
   };
+  // ➍ When a Thread-Color input loses focus, if its value isn’t in the list, open the “new thread” modal
+  const handleThreadBlur = (idx) => (e) => {
+    const val = e.target.value.trim();
+    if (val && !threads.includes(val)) {
+      setNewItemData({ name: val, type: "Thread" });
+      setNewItemErrors({});
+      setIsNewItemModalOpen(true);
+    }
+  };
 
     setThreadRows((rows) => {
       const newRows = [...rows];
