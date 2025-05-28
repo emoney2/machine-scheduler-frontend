@@ -42,6 +42,27 @@ export default function OrderSubmission() {
   const [furColors, setFurColors] = useState([]);
   const furColorRef = useRef(null);
 
+  // ─── New‐Company modal state & data ───────────────────────────
+  const [isNewCompanyModalOpen, setIsNewCompanyModalOpen] = useState(false);
+  const [newCompanyData, setNewCompanyData] = useState({
+    companyName: form.company,
+    contactFirstName: "",
+    contactLastName: "",
+    contactEmailAddress: "",
+    streetAddress1: "",
+    streetAddress2: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    phoneNumber: "",
+  });
+  const [newCompanyErrors, setNewCompanyErrors] = useState({});
+
+  const handleNewCompanyChange = (e) => {
+    const { name, value } = e.target;
+    setNewCompanyData((prev) => ({ ...prev, [name]: value }));
+  };
+
   // when user types, update form.company and show inline suggestion
   const handleCompanyInput = (e) => {
     const raw = e.target.value;
@@ -339,6 +360,18 @@ const furColorNames = furColors;
 
 const handleSubmit = async (e) => {
   e.preventDefault();
+
+  // ─── If company not in our directory, open modal ─────────────────
+  if (!companyNames.includes(form.company.trim())) {
+    // seed the modal’s companyName and clear any past errors
+    setNewCompanyData((prev) => ({
+      ...prev,
+      companyName: form.company.trim(),
+    }));
+    setNewCompanyErrors({});
+    setIsNewCompanyModalOpen(true);
+    return;  // bail out of the normal submit
+  }
   const fd = new FormData();
 
   // append scalar fields
@@ -408,32 +441,177 @@ const handleSubmit = async (e) => {
   }
 };
 
+// ─── Save the new company to Google Sheets ─────────────────────
+const handleSaveNewCompany = async () => {
+  // 1) Validate required fields (everything except streetAddress2)
+  const required = [
+    "companyName",
+    "contactFirstName",
+    "contactLastName",
+    "contactEmailAddress",
+    "streetAddress1",
+    "city",
+    "state",
+    "zipCode",
+    "phoneNumber",
+  ];
+  const errors = {};
+  required.forEach((key) => {
+    if (!newCompanyData[key]?.trim()) {
+      errors[key] = "Required";
+    }
+  });
+  if (Object.keys(errors).length) {
+    setNewCompanyErrors(errors);
+    return;
+  }
+
+  // 2) Call the backend
+  try {
+    await axios.post(
+      `${process.env.REACT_APP_API_ROOT}/directory`,
+      newCompanyData
+    );
+    // 3) On success, add to local company list so it’s available immediately
+    setCompanies((prev) => [
+      ...prev,
+      { value: newCompanyData.companyName, label: newCompanyData.companyName },
+    ]);
+    // 4) Fill the form.company with the newly added name
+    setForm((prev) => ({ ...prev, company: newCompanyData.companyName }));
+    // 5) Close the modal
+    setIsNewCompanyModalOpen(false);
+    // 6) Clear any past errors
+    setNewCompanyErrors({});
+    // (You can now click Submit again to finish the order.)
+  } catch (err) {
+    // Show a general error at the top of the modal
+    setNewCompanyErrors({ general: "Failed to save company. Please try again." });
+  }
+};
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "2fr 1fr",
-        gap: "0.5rem",        // tighter gaps
-        padding: "0.5rem",    // reduced padding
-        fontFamily: "sans-serif",
-        fontSize: "0.85rem",  // slightly smaller text
-      }}
-    >
-      {/* LEFT COLUMN */}
-      <div style={{ display: "grid", gap: "0.5rem" }}>
-        {/* Order Details */}
-        <fieldset style={{ padding: "0.5rem" }}>
-          <legend>Order Details</legend>
+    <>
+      {isNewCompanyModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
-              gap: "0.5rem",
+              background: "#fff",
+              padding: "1.5rem",
+              borderRadius: "0.5rem",
+              width: "400px",
+              maxHeight: "90%",
+              overflowY: "auto",
             }}
           >
-            {/* COMPANY INLINE TYPE-AHEAD */}
+            <h2 style={{ marginTop: 0 }}>Add New Company</h2>
+
+            {newCompanyErrors.general && (
+              <div style={{ color: "red", marginBottom: "0.5rem" }}>
+                {newCompanyErrors.general}
+              </div>
+            )}
+
+            {[
+              { key: "companyName", label: "Company Name*" },
+              { key: "contactFirstName", label: "Contact First Name*" },
+              { key: "contactLastName", label: "Contact Last Name*" },
+              { key: "contactEmailAddress", label: "Contact Email Address*" },
+              { key: "streetAddress1", label: "Street Address 1*" },
+              { key: "streetAddress2", label: "Street Address 2" },
+              { key: "city", label: "City*" },
+              { key: "state", label: "State*" },
+              { key: "zipCode", label: "Zip Code*" },
+              { key: "phoneNumber", label: "Phone Number*" },
+            ].map(({ key, label }) => (
+              <div key={key} style={{ marginBottom: "0.75rem" }}>
+                <label style={{ display: "block", fontSize: "0.9rem" }}>
+                  {label}
+                </label>
+                <input
+                  name={key}
+                  value={newCompanyData[key]}
+                  onChange={handleNewCompanyChange}
+                  style={{
+                    width: "100%",
+                    padding: "0.4rem",
+                    fontSize: "0.9rem",
+                    border: newCompanyErrors[key]
+                      ? "1px solid red"
+                      : "1px solid #ccc",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+                {newCompanyErrors[key] && (
+                  <div style={{ color: "red", fontSize: "0.8rem" }}>
+                    {newCompanyErrors[key]}
+                  </div>
+                )}
+              </div>
+            ))}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "0.5rem",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsNewCompanyModalOpen(false)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveNewCompany}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Save Company
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <form
+        onSubmit={handleSubmit}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "2fr 1fr",
+          gap: "0.5rem",        // tighter gaps
+          padding: "0.5rem",    // reduced padding
+          fontFamily: "sans-serif",
+          fontSize: "0.85rem",  // slightly smaller text
+        }}
+      >
+        {/* LEFT COLUMN */}
+        <div style={{ display: "grid", gap: "0.5rem" }}>
+          {/* Order Details */}
+          <fieldset style={{ padding: "0.5rem" }}>
+            <legend>Order Details</legend>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "0.5rem",
+              }}
+            >            {/* COMPANY INLINE TYPE-AHEAD */}
             <div style={{ marginBottom: "0.5rem", position: "relative" }}>
               <label style={{ display: "block" }}>
                 Company Name*<br />
