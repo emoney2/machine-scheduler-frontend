@@ -38,6 +38,9 @@ export default function OrderSubmission() {
   const materialInputRefs = useRef([null, null, null, null, null]);
   // single ref for Back Material
   const backMaterialRef = useRef(null);
+  // ─── FUR COLORS list + input ref ───────────────────────────────
+  const [furColors, setFurColors] = useState([]);
+  const furColorRef = useRef(null);
 
   // when user types, update form.company and show inline suggestion
   const handleCompanyInput = (e) => {
@@ -187,6 +190,34 @@ const handleBackMaterialInput = (e) => {
   }
 };
 
+  // ─── FUR COLOR inline‐typeahead ────────────────────────────────
+  const handleFurColorInput = (e) => {
+    const raw = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
+
+    // on delete/backspace, store raw
+    if (inputType?.startsWith("delete")) {
+      setForm((prev) => ({ ...prev, furColor: raw }));
+      return;
+    }
+
+    // try to autocomplete from materialNames
+    const match = materialNames.find((m) =>
+      m.toLowerCase().startsWith(raw.toLowerCase())
+    );
+    if (match && raw !== match) {
+      setForm((prev) => ({ ...prev, furColor: match }));
+      // highlight appended text
+      setTimeout(() => {
+        const input = furColorRef.current;
+        input.setSelectionRange(raw.length, match.length);
+      }, 0);
+    } else {
+      setForm((prev) => ({ ...prev, furColor: raw }));
+    }
+  };
+
+
 
   useEffect(() => {
     axios
@@ -218,6 +249,17 @@ const handleBackMaterialInput = (e) => {
       .then(res => setMaterialsInv(res.data))
       .catch(err => console.error("Failed to load materials:", err));
   }, []);
+
+  // ─── Fetch fur colors from API ───────────────────────────────────
+  useEffect(() => {
+    axios
+      .get(`${process.env.REACT_APP_API_ROOT}/fur-colors`)
+      .then(res => setFurColors(res.data))
+      .catch(err => console.error("Failed to load fur colors:", err));
+  }, []);
+
+// make array of just the names for matching
+const furColorNames = furColors;
 
   // for matching
   const materialNames = materialsInv;
@@ -593,11 +635,15 @@ const handleSubmit = async (e) => {
               <label>
                 Fur Color*<br />
                 <input
+                  ref={furColorRef}
                   name="furColor"
+                  placeholder="Fur Color*"
                   value={form.furColor}
-                  onChange={handleChange}
+                  onChange={handleFurColorInput}
+                  list="material-list"
+                  autoComplete="off"
                   required
-                  style={{ width: "80%" }}
+                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                 />
               </label>
             </div>
