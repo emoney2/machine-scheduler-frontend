@@ -122,7 +122,7 @@ export default function Inventory() {
         `${process.env.REACT_APP_API_ROOT}${url}`,
         payload
       );
-      alert(`Added ${res.data.added} rows`);
+      alert("Submitted!");
       resetRows(initRows());
     } catch (err) {
       console.error(err);
