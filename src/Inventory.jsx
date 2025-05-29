@@ -2,6 +2,22 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
+const modalOverlay = {
+  position: "fixed", top: 0, left: 0,
+  width: "100%", height: "100%",
+  background: "rgba(0,0,0,0.5)",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  zIndex: 1000
+};
+const modalBox = {
+  background: "#fff", padding: 16,
+  borderRadius: 8, minWidth: 500
+};
+const inputStyle = {
+  width: "100%", padding: 4,
+  border: "1px solid #ccc"
+};
+
 const ROWS = 15;
 const BLANK = { value: "", action: "Ordered", quantity: "" };
 
@@ -23,6 +39,7 @@ export default function Inventory() {
     cost: ""
   });
   const [newItemErrors, setNewItemErrors]           = useState({});
+  const [bulkNewItems, setBulkNewItems] = useState([]);
 
   // --- Section 2.3: Refs for Inline Typeahead ---------------------------
   const threadInputRefs   = useRef(Array(ROWS).fill(null));
@@ -133,21 +150,36 @@ export default function Inventory() {
 // ⏺ Add this immediately below handleSubmit
    // ——— Custom submit for Threads — detect new colors first ———
    const submitThreads = () => {
-     const newRow = threadRows.find(r =>
-       r.value.trim() && !threads.includes(r.value.trim())
-     );
-     if (newRow) {
-       setNewItemData({ name: newRow.value.trim(), type: "Thread" });
+     // ① Gather every distinct color in the grid that’s not yet in threads[]
+     const unknowns = [
+       ...new Set(
+         threadRows
+           .map(r => r.value.trim())
+           .filter(v => v && !threads.includes(v))
+       )
+     ];
+
+     // ② If there are any, prepare the bulk modal and bail out
+     if (unknowns.length) {
+       setBulkNewItems(
+         unknowns.map(color => ({
+           name:    color,
+           minInv:  "",
+           reorder: "",
+           cost:    ""
+         }))
+       );
        setNewItemErrors({});
        setIsNewItemModalOpen(true);
        return;
      }
-     // all colors known—proceed
+
+     // ③ Otherwise, no unknowns → submit the grid as usual
      handleSubmit(threadRows, "/threadInventory", setThreadRows);
    };
 
-  // --- Section 5: New-Item Modal Save Handler ---------------------------
-  // — Section 5: New-Item Modal Save Handler ——————————————
+  // — Section 5: New-Item Modal Save Handlers ——————————————
+  // Single-item save (for materials, if you’re still using it)
   const handleSaveNewItem = async () => {
     // 1) Validate all four fields
     const errs = {};
@@ -183,7 +215,10 @@ export default function Inventory() {
 
     // 3) POST to backend
     try {
-      await axios.post(`${process.env.REACT_APP_API_ROOT}${url}`, payload);
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}${url}`,
+        payload
+      );
 
       // 4) Update local dropdown so new item shows up immediately
       if (newItemData.type === "Thread") {
@@ -199,112 +234,146 @@ export default function Inventory() {
     }
   };
 
+  // Bulk save (for multiple new thread colors at once)
+  const handleSaveBulkNewItems = async () => {
+    // 1) Ensure every bulk row has all fields
+    if (bulkNewItems.some(it => !it.minInv || !it.reorder || !it.cost)) {
+      setNewItemErrors({ general: "Fill in MinInv, ReOrder & Cost for all." });
+      return;
+    }
+
+    // 2) Build payload array for /threads
+    const payload = bulkNewItems.map(it => ({
+      threadColor: it.name,
+      minInv:      it.minInv,
+      reorder:     it.reorder,
+      cost:        it.cost
+    }));
+
+    try {
+      // 3) POST all at once
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/threads`,
+        payload
+      );
+
+      // 4) Add all new colors to the dropdown
+      setThreads(prev => [...prev, ...bulkNewItems.map(it => it.name)]);
+
+      // 5) Clear bulk state & close modal
+      setBulkNewItems([]);
+      setIsNewItemModalOpen(false);
+
+      // 6) Finally, submit the main threadRows grid in one go
+      handleSubmit(threadRows, "/threadInventory", setThreadRows);
+    } catch {
+      setNewItemErrors({ general: "Failed to save threads. Try again." });
+    }
+  };
   // --- Section 6: Render -----------------------------------------------
   return (
     <>
-      {isNewItemModalOpen && (
-        <div style={{ position:"fixed", top:0, left:0, width:"100%", height:"100%", background:"rgba(0,0,0,0.5)",
-                      display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
-          <div style={{ background:"#fff", padding:16, borderRadius:8, minWidth:300 }}>
-            <h2>Add New {newItemData.type}</h2>
-
+      {isNewItemModalOpen && bulkNewItems.length > 0 && (
+        <div style={modalOverlay}>
+          <div style={modalBox}>
+            <h2>
+              Add {bulkNewItems.length} New Thread
+              {bulkNewItems.length > 1 ? "s" : ""}
+            </h2>
             {newItemErrors.general && (
-              <div style={{ color:"red", marginBottom:8 }}>
+              <div style={{ color: "red", marginBottom: 8 }}>
                 {newItemErrors.general}
               </div>
             )}
 
-            {/* Thread Color (editable, prefilled) */}
-            <div style={{ marginBottom:12 }}>
-              <label style={{ fontWeight:"bold" }}>
-                Thread Color*<br/>
+            {/* Header row */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 1fr 1fr 1fr",
+              gap: 8,
+              fontWeight: "bold",
+              marginBottom: 4
+            }}>
+              <div>Thread Color</div>
+              <div>Min. Inv.</div>
+              <div>ReOrder</div>
+              <div>Cost</div>
+            </div>
+
+            {/* One line per new color */}
+            {bulkNewItems.map((item, idx) => (
+              <div key={idx} style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr 1fr 1fr",
+                gap: 8,
+                marginBottom: 4
+              }}>
                 <input
-                  value={newItemData.name}
-                  onChange={e => setNewItemData(prev => ({ ...prev, name: e.target.value }))}
-                  style={{
-                    width:"100%",
-                    padding:4,
-                    borderColor: newItemErrors.name ? "red" : "#ccc"
+                  value={item.name}
+                  readOnly
+                  style={{ ...inputStyle, background: "#eee" }}
+                />
+                <input
+                  type="number"
+                  value={item.minInv}
+                  onChange={e => {
+                    const v = e.target.value;
+                    setBulkNewItems(bs => {
+                      const copy = [...bs];
+                      copy[idx].minInv = v;
+                      return copy;
+                    });
                   }}
+                  style={inputStyle}
                 />
-              </label>
-              {newItemErrors.name && (
-                <div style={{ color:"red" }}>{newItemErrors.name}</div>
-              )}
-            </div>
-
-            {/* Min. Inv. */}
-            <div style={{ marginBottom:12 }}>
-              <label style={{ display:"block" }}>
-                Min. Inv.*<br/>
                 <input
                   type="number"
-                  value={newItemData.minInv || ""}
-                  onChange={e => setNewItemData(prev => ({
-                    ...prev,
-                    minInv: e.target.value
-                  }))}
-                  style={{ width:"100%", padding:4 }}
+                  value={item.reorder}
+                  onChange={e => {
+                    const v = e.target.value;
+                    setBulkNewItems(bs => {
+                      const copy = [...bs];
+                      copy[idx].reorder = v;
+                      return copy;
+                    });
+                  }}
+                  style={inputStyle}
                 />
-              </label>
-              {!newItemData.minInv && (
-                <div style={{ color:"red" }}>Required</div>
-              )}
-            </div>
-
-            {/* ReOrder */}
-            <div style={{ marginBottom:12 }}>
-              <label style={{ display:"block" }}>
-                ReOrder*<br/>
-                <input
-                  type="number"
-                  value={newItemData.reorder || ""}
-                  onChange={e => setNewItemData(prev => ({
-                    ...prev,
-                    reorder: e.target.value
-                  }))}
-                  style={{ width:"100%", padding:4 }}
-                />
-              </label>
-              {!newItemData.reorder && (
-                <div style={{ color:"red" }}>Required</div>
-              )}
-            </div>
-
-            {/* Cost */}
-            <div style={{ marginBottom:12 }}>
-              <label style={{ display:"block" }}>
-                Cost*<br/>
                 <input
                   type="number"
                   step="0.01"
-                  value={newItemData.cost || ""}
-                  onChange={e => setNewItemData(prev => ({
-                    ...prev,
-                    cost: e.target.value
-                  }))}
-                  style={{ width:"100%", padding:4 }}
+                  value={item.cost}
+                  onChange={e => {
+                    const v = e.target.value;
+                    setBulkNewItems(bs => {
+                      const copy = [...bs];
+                      copy[idx].cost = v;
+                      return copy;
+                    });
+                  }}
+                  style={inputStyle}
                 />
-              </label>
-              {!newItemData.cost && (
-                <div style={{ color:"red" }}>Required</div>
-              )}
-            </div>
+              </div>
+            ))}
 
-            {/* Actions */}
-            <div style={{ textAlign:"right" }}>
+            {/* Modal actions */}
+            <div style={{ textAlign: "right", marginTop: 8 }}>
               <button
-                onClick={() => setIsNewItemModalOpen(false)}
-                style={{ marginRight:8 }}
+                onClick={() => {
+                  setBulkNewItems([]);
+                  setIsNewItemModalOpen(false);
+                }}
+                style={{ marginRight: 8 }}
               >
                 Cancel
               </button>
-              <button onClick={handleSaveNewItem}>Save</button>
+              <button onClick={handleSaveBulkNewItems}>
+                Save All
+              </button>
             </div>
           </div>
         </div>
       )}
-
 
       <div style={{ display:"flex", gap:32, padding:16 }}>
         {/* Thread Inventory */}
