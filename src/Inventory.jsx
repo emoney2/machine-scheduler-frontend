@@ -15,7 +15,13 @@ export default function Inventory() {
 
   // --- Section 2.2: New-Item Modal State --------------------------------
   const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
-  const [newItemData, setNewItemData]               = useState({ name: "", type: "" });
+  const [newItemData, setNewItemData] = useState({
+    name: "",
+    type: "",
+    minInv: "",
+    reorder: "",
+    cost: ""
+  });
   const [newItemErrors, setNewItemErrors]           = useState({});
 
   // --- Section 2.3: Refs for Inline Typeahead ---------------------------
@@ -124,20 +130,69 @@ export default function Inventory() {
     }
   };
 
+// ⏺ Add this immediately below handleSubmit
+   // ——— Custom submit for Threads — detect new colors first ———
+   const submitThreads = () => {
+     const newRow = threadRows.find(r =>
+       r.value.trim() && !threads.includes(r.value.trim())
+     );
+     if (newRow) {
+       setNewItemData({ name: newRow.value.trim(), type: "Thread" });
+       setNewItemErrors({});
+       setIsNewItemModalOpen(true);
+       return;
+     }
+     // all colors known—proceed
+     handleSubmit(threadRows, "/threadInventory", setThreadRows);
+   };
+
   // --- Section 5: New-Item Modal Save Handler ---------------------------
+  // — Section 5: New-Item Modal Save Handler ——————————————
   const handleSaveNewItem = async () => {
-    const key = newItemData.type === "Thread" ? "/fur-colors" : "/materials";
-    if (!newItemData.name.trim()) {
-      setNewItemErrors({ name: "Required" });
+    // 1) Validate all four fields
+    const errs = {};
+    if (!newItemData.name.trim())    errs.name    = "Required";
+    if (!newItemData.minInv)         errs.minInv  = "Required";
+    if (!newItemData.reorder)        errs.reorder = "Required";
+    if (!newItemData.cost)           errs.cost    = "Required";
+    if (Object.keys(errs).length) {
+      setNewItemErrors(errs);
       return;
     }
+
+    // 2) Decide endpoint & payload based on type
+    let url, payload;
+    if (newItemData.type === "Thread") {
+      url = "/threads";
+      payload = {
+        threadColor: newItemData.name.trim(),
+        minInv:      newItemData.minInv,
+        reorder:     newItemData.reorder,
+        cost:        newItemData.cost
+      };
+    } else {
+      url = "/materials";
+      payload = {
+        materialName: newItemData.name.trim(),
+        unit:         "",  // adjust if you need a unit selector
+        minInv:       newItemData.minInv,
+        reorder:      newItemData.reorder,
+        cost:         newItemData.cost
+      };
+    }
+
+    // 3) POST to backend
     try {
-      await axios.post(
-        `${process.env.REACT_APP_API_ROOT}${key}`,
-        { [(newItemData.type === "Thread" ? "furColor" : "materialName")]: newItemData.name }
-      );
-      if (newItemData.type === "Thread") setThreads(prev => [...prev, newItemData.name]);
-      else setMaterials(prev => [...prev, newItemData.name]);
+      await axios.post(`${process.env.REACT_APP_API_ROOT}${url}`, payload);
+
+      // 4) Update local dropdown so new item shows up immediately
+      if (newItemData.type === "Thread") {
+        setThreads(prev => [...prev, newItemData.name.trim()]);
+      } else {
+        setMaterials(prev => [...prev, newItemData.name.trim()]);
+      }
+
+      // 5) Close modal
       setIsNewItemModalOpen(false);
     } catch {
       setNewItemErrors({ general: "Failed to save. Try again." });
@@ -148,27 +203,108 @@ export default function Inventory() {
   return (
     <>
       {isNewItemModalOpen && (
-        <div style={{ position: "fixed", top:0, left:0, width:"100%", height:"100%", background:"rgba(0,0,0,0.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
+        <div style={{ position:"fixed", top:0, left:0, width:"100%", height:"100%", background:"rgba(0,0,0,0.5)",
+                      display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000 }}>
           <div style={{ background:"#fff", padding:16, borderRadius:8, minWidth:300 }}>
             <h2>Add New {newItemData.type}</h2>
-            {newItemErrors.general && <div style={{color:"red"}}>{newItemErrors.general}</div>}
+
+            {newItemErrors.general && (
+              <div style={{ color:"red", marginBottom:8 }}>
+                {newItemErrors.general}
+              </div>
+            )}
+
+            {/* Thread Color (editable, prefilled) */}
             <div style={{ marginBottom:12 }}>
-              <label>Name*<br/>
+              <label style={{ fontWeight:"bold" }}>
+                Thread Color*<br/>
                 <input
                   value={newItemData.name}
                   onChange={e => setNewItemData(prev => ({ ...prev, name: e.target.value }))}
-                  style={{ width:"100%", padding:4, borderColor: newItemErrors.name ? 'red':'#ccc' }}
+                  style={{
+                    width:"100%",
+                    padding:4,
+                    borderColor: newItemErrors.name ? "red" : "#ccc"
+                  }}
                 />
               </label>
-              {newItemErrors.name && <div style={{color:"red"}}>{newItemErrors.name}</div>}
+              {newItemErrors.name && (
+                <div style={{ color:"red" }}>{newItemErrors.name}</div>
+              )}
             </div>
+
+            {/* Min. Inv. */}
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:"block" }}>
+                Min. Inv.*<br/>
+                <input
+                  type="number"
+                  value={newItemData.minInv || ""}
+                  onChange={e => setNewItemData(prev => ({
+                    ...prev,
+                    minInv: e.target.value
+                  }))}
+                  style={{ width:"100%", padding:4 }}
+                />
+              </label>
+              {!newItemData.minInv && (
+                <div style={{ color:"red" }}>Required</div>
+              )}
+            </div>
+
+            {/* ReOrder */}
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:"block" }}>
+                ReOrder*<br/>
+                <input
+                  type="number"
+                  value={newItemData.reorder || ""}
+                  onChange={e => setNewItemData(prev => ({
+                    ...prev,
+                    reorder: e.target.value
+                  }))}
+                  style={{ width:"100%", padding:4 }}
+                />
+              </label>
+              {!newItemData.reorder && (
+                <div style={{ color:"red" }}>Required</div>
+              )}
+            </div>
+
+            {/* Cost */}
+            <div style={{ marginBottom:12 }}>
+              <label style={{ display:"block" }}>
+                Cost*<br/>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={newItemData.cost || ""}
+                  onChange={e => setNewItemData(prev => ({
+                    ...prev,
+                    cost: e.target.value
+                  }))}
+                  style={{ width:"100%", padding:4 }}
+                />
+              </label>
+              {!newItemData.cost && (
+                <div style={{ color:"red" }}>Required</div>
+              )}
+            </div>
+
+            {/* Actions */}
             <div style={{ textAlign:"right" }}>
-              <button onClick={() => setIsNewItemModalOpen(false)} style={{ marginRight:8 }}>Cancel</button>
+              <button
+                onClick={() => setIsNewItemModalOpen(false)}
+                style={{ marginRight:8 }}
+              >
+                Cancel
+              </button>
               <button onClick={handleSaveNewItem}>Save</button>
             </div>
           </div>
         </div>
       )}
+
 
       <div style={{ display:"flex", gap:32, padding:16 }}>
         {/* Thread Inventory */}
@@ -194,7 +330,6 @@ export default function Inventory() {
                       list="thread-list"
                       value={r.value}
                       onChange={handleThreadInput(i)}
-                      onBlur={handleThreadBlur(i)}
                       placeholder="Thread color…"
                       style={{ width:"90%", boxSizing:"border-box" }}
                     />
@@ -212,7 +347,9 @@ export default function Inventory() {
               ))}
             </tbody>
           </table>
-          <button onClick={() => handleSubmit(threadRows, "/threadInventory", setThreadRows)} style={{ marginTop:8 }}>Submit Threads</button>
+          <button onClick={submitThreads} style={{ marginTop:8 }}>
+            Submit Threads
+          </button>
         </fieldset>
 
         {/* Material Inventory */}
