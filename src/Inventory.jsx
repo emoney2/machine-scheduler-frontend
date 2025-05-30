@@ -309,9 +309,9 @@ const handleSaveBulkNewItems = async () => {
           minInv:       item.minInv.trim(),
           reorder:      item.reorder.trim(),
           cost:         item.cost.trim(),
-          action:       item.action,
-          quantity:     item.quantity,
-          notes:        item.notes || ""
+          action:       item.action,     // either "Ordered" or "Received"
+          quantity:     item.quantity,   // the quantity entered
+          notes:        item.notes || "" // optional notes
         }));
 
         // 2) POST to /materials → (adds to Inventory AND logs)
@@ -347,8 +347,15 @@ const handleSaveBulkNewItems = async () => {
     setIsNewItemModalOpen(false);
     setNewItemErrors({});
     setNewItemData({
-      name: "", type: "", unit:"", minInv:"", reorder:"", cost:"",
-      action:"", quantity:"", notes:""
+      name:     "",
+      type:     "",
+      unit:     "",
+      minInv:   "",
+      reorder:  "",
+      cost:     "",
+      action:   "",
+      quantity: "",
+      notes:    ""
     });
     setBulkNewItems([]);
 
