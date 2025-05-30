@@ -1,4 +1,57 @@
-/* Apply a single uniform font throughout the app */
-html, body {
-  font-family: Arial, sans-serif;
+/* src/index.css */
+
+/* ─── CSS Variables for Font Sizes ─────────────────────────────────────── */
+:root {
+  --font-size-base:   16px;      /* Base reference (1rem) */
+  --font-size-small:  0.875rem;  /* ~14px */
+  --font-size-normal: 1rem;      /* 16px */
+  --font-size-large:  1.125rem;  /* ~18px */
+}
+
+/* ─── Global Reset & Base Styles ───────────────────────────────────────── */
+html {
+  font-size: var(--font-size-base);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;      /* uniform font */
+  font-size: var(--font-size-normal);
+  line-height: 1.4;
+  background-color: #fff;
+  color: #333;
+}
+
+/* ─── Form Controls & Buttons ─────────────────────────────────────────── */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: var(--font-size-normal);
+}
+
+/* ─── Tables ───────────────────────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-small);
+}
+
+th,
+td {
+  padding: 0.5rem;
+  text-align: center;
+}
+
+/* ─── Headings (if used) ───────────────────────────────────────────────── */
+h1 {
+  font-size: var(--font-size-large);
+  margin: 0.5rem 0;
+}
+
+h2 {
+  font-size: var(--font-size-normal);
+  margin: 0.5rem 0;
 }
