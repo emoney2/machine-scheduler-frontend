@@ -298,6 +298,7 @@ const handleSaveNewItem = async () => {
 
 // ─── Section 5b: Save Bulk New Items (Threads OR Materials) ───────────────
 const handleSaveBulkNewItems = async () => {
+  console.log("handleSaveBulkNewItems running", newItemData, bulkNewItems);
   try {
     if (bulkNewItems.length) {
       // --- MATERIAL BATCH ---
