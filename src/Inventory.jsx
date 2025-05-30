@@ -179,34 +179,46 @@ export default function Inventory() {
      handleSubmit(threadRows, "/threadInventory", setThreadRows);
    };
 
-  // ―― Section 4.3: Batch‐submit Materials to Material Log ――
-  const handleMaterialSubmit = async () => {
-    // only fire once on “submit”
-    const payload = materialRows
-      .filter(r => r.value && r.quantity)
-      .map(r => ({
-        materialName: r.value,
-        action:       r.action,
-        quantity:     r.quantity
-      }));
-    if (!payload.length) {
-      alert("No materials to submit");
-      return;
-    }
-    try {
-      setIsNewItemModalOpen(false);     // just in case a modal is open
-      const res = await axios.post(
-        `${process.env.REACT_APP_API_ROOT}/materialInventory`,
-        payload
-      );
-      alert(`Added ${res.data.added} rows to Material Log`);
-      setMaterialRows(initRows());       // reset the grid
-    } catch (err) {
-      console.error(err);
-      alert("Material submission failed");
-    }
-  };
+// — Section 4b: Intercept Material‐Submit, batch unknowns, then POST ——
+const handleMaterialSubmit = async () => {
+  // 1) collect any rows whose value isn't in our known materials list
+  const unknowns = materialRows.filter(
+    r => r.value.trim() && !materials.includes(r.value.trim())
+  );
+  if (unknowns.length) {
+    setNewMaterialsBatch(unknowns);
+    setNewItemErrors({});
+    setIsNewItemModalOpen(true);
+    return;  // bail out to show the “add new material” modal
+  }
 
+  // 2) build the payload for only the filled‐in rows
+  const payload = materialRows
+    .filter(r => r.value.trim() && r.quantity)
+    .map(r => ({
+      materialName: r.value.trim(),
+      action:       r.action,
+      quantity:     r.quantity
+    }));
+
+  if (!payload.length) {
+    alert("No materials to submit");
+    return;
+  }
+
+  // 3) send to the server
+  try {
+    const res = await axios.post(
+      `${process.env.REACT_APP_API_ROOT}/materialInventory`,
+      payload
+    );
+    alert(`Added ${res.data.added} rows to Material Log`);
+    setMaterialRows(initRows());
+  } catch (err) {
+    console.error(err);
+    alert("Material submission failed");
+  }
+};
 
   // — Section 5: New-Item Modal Save Handler ——————————————
   const handleSaveNewItem = async () => {
