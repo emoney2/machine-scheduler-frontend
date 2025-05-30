@@ -315,6 +315,10 @@ const handleSaveBulkNewItems = async () => {
           notes:        newItemData.notes || "" // any notes
         }));
 
+
+        console.log("🛠️ addAndLogPayload:", addAndLogPayload);
+
+
         // POST to /materials → (adds to Inventory AND logs)
         await axios.post(
           `${process.env.REACT_APP_API_ROOT}/materials`,
