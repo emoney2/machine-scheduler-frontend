@@ -312,8 +312,8 @@ const handleSaveBulkNewItems = async () => {
               minInv:       newItemData.minInv.trim(),
               reorder:      newItemData.reorder.trim(),
               cost:         newItemData.cost.trim(),
-              action:       newItemData.action,         // "Ordered" or "Received"
-              quantity:     newItemData.quantity,       // from modal
+              action:       item.action,            // from the batch item
+              quantity:     item.quantity,          // from the batch item
               notes:        newItemData.notes || ""
             }))
           : [];
