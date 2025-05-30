@@ -3,26 +3,64 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 export default function InventoryOrdered() {
-  const [entries, setEntries]   = useState([]);
-  const [selected, setSelected] = useState(null);
+  const [entries, setEntries]     = useState([]);
+  const [sortConfig, setSortConfig] = useState({ key: "date", direction: "asc" });
   const API = process.env.REACT_APP_API_ROOT;
 
-  // load only Ordered entries
+  // Fetch only Ordered entries
   const load = async () => {
     const res = await axios.get(`${API}/inventoryOrdered`);
     setEntries(res.data);
-    setSelected(null);
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const handleReceive = async () => {
-    if (!selected) return;
-    const { type, row } = selected;
-    await axios.put(`${API}/inventoryOrdered`, { type, row });
+  // Mark a single row as Received
+  const handleReceiveRow = async (e) => {
+    await axios.put(`${API}/inventoryOrdered`, { type: e.type, row: e.row });
     load();
+  };
+
+  // Sort handler
+  const requestSort = (key) => {
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  // Produce sorted entries
+  const sortedEntries = React.useMemo(() => {
+    const sorted = [...entries];
+    sorted.sort((a, b) => {
+      let aVal = a[sortConfig.key] || "";
+      let bVal = b[sortConfig.key] || "";
+      // for numeric sort on quantity (strip non‐digits)
+      if (sortConfig.key === "quantity") {
+        const numA = parseFloat(aVal) || 0;
+        const numB = parseFloat(bVal) || 0;
+        aVal = numA; bVal = numB;
+      }
+      if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === "asc" ? 1  : -1;
+      return 0;
+    });
+    return sorted;
+  }, [entries, sortConfig]);
+
+  // Helper to display qty+unit
+  const displayQty = (e) =>
+    e.type === "Material"
+      ? `${e.quantity} ${e.unit || ""}`.trim()
+      : e.quantity;
+
+  // Render sort arrow
+  const SortArrow = ({ column }) => {
+    if (sortConfig.key !== column) return null;
+    return sortConfig.direction === "asc" ? " ▲" : " ▼";
   };
 
   return (
@@ -31,71 +69,72 @@ export default function InventoryOrdered() {
       margin: "2rem auto",
       fontFamily: "sans-serif"
     }}>
-      <button
-        onClick={handleReceive}
-        disabled={!selected}
-        style={{
-          marginBottom: "1rem",
-          padding: "0.5rem 1rem",
-          cursor: selected ? "pointer" : "not-allowed",
-          backgroundColor: selected ? "#4caf50" : "#ccc",
-          color: "#fff",
-          border: "none",
-          borderRadius: 4,
-          fontFamily: "sans-serif"
-        }}
-      >
-        Receive
-      </button>
-
       <table style={{
         width: "100%",
         borderCollapse: "collapse",
-        fontFamily: "sans-serif"
+        fontFamily: "sans-serif",
+        marginBottom: "1rem"
       }}>
         <thead>
           <tr>
-            {["Date", "Type", "Name", "Quantity"].map(header => (
-              <th key={header} style={{
-                borderBottom: "1px solid #ddd",
-                padding: "0.5rem",
-                textAlign: "center"
-              }}>
-                {header}
+            {[
+              { key: "date", label: "Date" },
+              { key: "type", label: "Type" },
+              { key: "name", label: "Name" },
+              { key: "quantity", label: "Quantity" }
+            ].map(col => (
+              <th
+                key={col.key}
+                onClick={() => requestSort(col.key)}
+                style={{
+                  borderBottom: "1px solid #ddd",
+                  padding: "0.5rem",
+                  textAlign: "center",
+                  cursor: "pointer",
+                  userSelect: "none"
+                }}
+              >
+                {col.label}<SortArrow column={col.key}/>
               </th>
             ))}
+            <th style={{
+              borderBottom: "1px solid #ddd",
+              padding: "0.5rem",
+              textAlign: "center"
+            }}>
+              Action
+            </th>
           </tr>
         </thead>
         <tbody>
-          {entries.map((e, i) => {
-            const isSel = selected && selected.row === e.row;
-            const displayQty = e.type === "Material"
-              ? `${e.quantity} ${e.unit || ""}`.trim()
-              : e.quantity;
-            return (
-              <tr
-                key={i}
-                onClick={() => setSelected(e)}
-                style={{
-                  backgroundColor: isSel ? "#e0f7fa" : "transparent",
-                  cursor: "pointer"
-                }}
-              >
-                <td style={{ padding: "0.5rem", textAlign: "center" }}>
-                  {e.date}
-                </td>
-                <td style={{ padding: "0.5rem", textAlign: "center" }}>
-                  {e.type}
-                </td>
-                <td style={{ padding: "0.5rem", textAlign: "center" }}>
-                  {e.name}
-                </td>
-                <td style={{ padding: "0.5rem", textAlign: "center" }}>
-                  {displayQty}
-                </td>
-              </tr>
-            );
-          })}
+          {sortedEntries.map((e, i) => (
+            <tr key={i} style={{
+              backgroundColor: i % 2 === 0 ? "#fafafa" : "transparent"
+            }}>
+              <td style={{ padding: "0.5rem", textAlign: "center" }}>{e.date}</td>
+              <td style={{ padding: "0.5rem", textAlign: "center" }}>{e.type}</td>
+              <td style={{ padding: "0.5rem", textAlign: "center" }}>{e.name}</td>
+              <td style={{ padding: "0.5rem", textAlign: "center" }}>
+                {displayQty(e)}
+              </td>
+              <td style={{ padding: "0.5rem", textAlign: "center" }}>
+                <button
+                  onClick={() => handleReceiveRow(e)}
+                  style={{
+                    padding: "0.3rem 0.6rem",
+                    backgroundColor: "#4caf50",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 4,
+                    cursor: "pointer",
+                    fontFamily: "sans-serif"
+                  }}
+                >
+                  Receive
+                </button>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
