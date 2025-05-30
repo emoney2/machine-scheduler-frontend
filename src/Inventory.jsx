@@ -195,33 +195,6 @@ export default function Inventory() {
     // 2) otherwise, just submit as usual
     handleSubmit(materialRows, "/materialInventory", setMaterialRows);
   };
-// ―― Section 4.3: Batch‐submit Materials to Material Log ――
-const handleMaterialSubmit = async () => {
-  // only fire once on “submit”
-  const payload = materialRows
-    .filter(r => r.value && r.quantity)
-    .map(r => ({
-      materialName: r.value,
-      action:       r.action,
-      quantity:     r.quantity
-    }));
-  if (!payload.length) {
-    alert("No materials to submit");
-    return;
-  }
-  try {
-    setIsNewItemModalOpen(false);     // just in case a modal is open
-    const res = await axios.post(
-      `${process.env.REACT_APP_API_ROOT}/materialInventory`,
-      payload
-    );
-    alert(`Added ${res.data.added} rows to Material Log`);
-    setMaterialRows(initRows());       // reset the grid
-  } catch (err) {
-    console.error(err);
-    alert("Material submission failed");
-  }
-};
 
   // — Section 5: New-Item Modal Save Handler ——————————————
   const handleSaveNewItem = async () => {
