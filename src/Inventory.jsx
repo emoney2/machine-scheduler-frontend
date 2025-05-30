@@ -223,30 +223,90 @@ const handleMaterialSubmit = async () => {
 };
 
 // — Section 5: New-Item Modal Save Handler ——————————————
+// 5a: Single-item save (threads or a manual material)
 const handleSaveNewItem = async () => {
   const errs = {};
-  // Name is always required
   if (!newItemData.name.trim()) errs.name = "Required";
-
-  // If we're saving materials, also validate unit/minInv/reorder/cost
-  const isMaterialBatch = newMaterialsBatch.length > 0 || newItemData.type === "Material";
-  if (isMaterialBatch) {
+  if (newItemData.type === "Material") {
     if (!newItemData.unit)    errs.unit    = "Required";
     if (!newItemData.minInv)  errs.minInv  = "Required";
     if (!newItemData.reorder) errs.reorder = "Required";
     if (!newItemData.cost)    errs.cost    = "Required";
   }
-
   if (Object.keys(errs).length) {
     setNewItemErrors(errs);
     return;
   }
 
   try {
+    if (newItemData.type === "Thread") {
+      // single thread
+      const payload = [{
+        threadColor: newItemData.name.trim(),
+        minInv:      newItemData.minInv,
+        reorder:     newItemData.reorder,
+        cost:        newItemData.cost
+      }];
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/threads`,
+        payload
+      );
+      setThreads(t => [...t, newItemData.name.trim()]);
+    } else {
+      // single material
+      const payload = [{
+        materialName: newItemData.name.trim(),
+        unit:         newItemData.unit,
+        minInv:       newItemData.minInv,
+        reorder:      newItemData.reorder,
+        cost:         newItemData.cost
+      }];
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/materials`,
+        payload
+      );
+      setMaterials(m => [...m, newItemData.name.trim()]);
+    }
+
+    // close modal & clear out
+    setIsNewItemModalOpen(false);
+    setNewItemErrors({});
+    setNewItemData({ name:"", type:"", unit:"", minInv:"", reorder:"", cost:"" });
+
+    // re-submit the grid now that dropdowns are up to date
+    if (newItemData.type === "Thread") {
+      handleSubmit(threadRows,    "/threadInventory",   setThreadRows);
+    } else {
+      handleSubmit(materialRows,  "/materialInventory", setMaterialRows);
+    }
+  } catch {
+    setNewItemErrors({ general: "Failed to save. Try again." });
+  }
+};
+
+// 5b: Bulk-items save (when you’ve queued up multiple new threads or materials)
+const handleSaveBulkNewItems = async () => {
+  try {
+    // threads batch?
+    if (bulkNewItems.length) {
+      const payload = bulkNewItems.map(item => ({
+        threadColor: item.name,
+        minInv:      item.minInv,
+        reorder:     item.reorder,
+        cost:        item.cost
+      }));
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/threads`,
+        payload
+      );
+      setThreads(t => [...t, ...bulkNewItems.map(i => i.name)]);
+      setBulkNewItems([]);
+      handleSubmit(threadRows, "/threadInventory", setThreadRows);
+    }
+    // materials batch?
     if (newMaterialsBatch.length) {
-      // 1) Batch‐create new materials
-      const payload = newMaterialsBatch.map(r => ({
-        materialName: r.value.trim(),
+      const payload = newMaterialsBatch.map(item => ({
+        materialName: item.value.trim(),
         unit:         newItemData.unit,
         minInv:       newItemData.minInv,
         reorder:      newItemData.reorder,
@@ -256,38 +316,19 @@ const handleSaveNewItem = async () => {
         `${process.env.REACT_APP_API_ROOT}/materials`,
         payload
       );
-      // update dropdown
-      setMaterials(prev => [...prev, ...payload.map(p => p.materialName)]);
-      // now submit the original materialRows to Material Log
-      handleSubmit(materialRows, "/materialInventory", setMaterialRows);
+      setMaterials(m => [...m, ...newMaterialsBatch.map(i => i.value.trim())]);
       setNewMaterialsBatch([]);
+      handleSubmit(materialRows, "/materialInventory", setMaterialRows);
     }
-    else if (bulkNewItems.length) {
-      // 2) Batch‐create new threads
-      const payload = bulkNewItems.map(n => ({
-        threadColor: n.name,
-        minInv:      n.minInv,
-        reorder:     n.reorder,
-        cost:        n.cost
-      }));
-      await axios.post(
-        `${process.env.REACT_APP_API_ROOT}/threads`,
-        payload
-      );
-      setThreads(prev => [...prev, ...payload.map(p => p.threadColor)]);
-      handleSubmit(threadRows, "/threadInventory", setThreadRows);
-      setBulkNewItems([]);
-    }
-    // close modal
+
     setIsNewItemModalOpen(false);
     setNewItemErrors({});
     setNewItemData({ name:"", type:"", unit:"", minInv:"", reorder:"", cost:"" });
-  }
-  catch (err) {
-    console.error(err);
-    setNewItemErrors({ general: "Failed to save. Try again." });
+  } catch {
+    setNewItemErrors({ general: "Bulk save failed. Try again." });
   }
 };
+
 
   // --- Section 6: Render -----------------------------------------------
   return (
@@ -497,7 +538,9 @@ const handleSaveNewItem = async () => {
             >
               Cancel
             </button>
-            <button onClick={handleSaveNewItem}>Save All</button>
+            <button onClick={handleSaveBulkNewItems}>
+              Save All
+            </button>
           </div>
         </>
       )}
