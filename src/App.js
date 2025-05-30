@@ -466,14 +466,6 @@ useEffect(() => {
   fetchAllRef.current = fetchAll;
 }, [fetchAll]);
 
-// === Section 5.2: Poll & initial fetch every 60s ===
-useEffect(() => {
-  console.log('📡 Starting polling & initial fetch');
-  fetchAllRef.current();
-  const id = setInterval(() => fetchAllRef.current(), 60_000);
-  return () => clearInterval(id);
-}, []);
-
 // === Section 6: Placeholder Management ===
 
 // Add or update a placeholder and persist to server
