@@ -185,7 +185,9 @@ const handleMaterialSubmit = async () => {
   const unknowns = materialRows.filter(
     r => r.value.trim() && !materials.includes(r.value.trim())
   );
-  if (unknowns.length) {
+   if (unknowns.length) {
+     // make sure our save-handler knows it’s a material batch
+     setNewItemData({ name: "", type: "Material", unit: "", minInv: "", reorder: "", cost: "" });
     setNewMaterialsBatch(unknowns);
     setNewItemErrors({});
     setIsNewItemModalOpen(true);
