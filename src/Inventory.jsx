@@ -222,173 +222,288 @@ const handleMaterialSubmit = async () => {
   }
 };
 
-  // — Section 5: New-Item Modal Save Handler ——————————————
-  const handleSaveNewItem = async () => {
-    const errs = {};
-    // common validation
-    if (!newItemData.name.trim()) errs.name = "Required";
-    if (newItemData.type === "Material") {
-      if (!newItemData.unit)    errs.unit    = "Required";
-      if (!newItemData.minInv)  errs.minInv  = "Required";
-      if (!newItemData.reorder) errs.reorder = "Required";
-      if (!newItemData.cost)    errs.cost    = "Required";
-    }
-    if (Object.keys(errs).length) {
-      setNewItemErrors(errs);
-      return;
-    }
+// — Section 5: New-Item Modal Save Handler ——————————————
+const handleSaveNewItem = async () => {
+  const errs = {};
+  // Name is always required
+  if (!newItemData.name.trim()) errs.name = "Required";
 
-    try {
-      if (newItemData.type === "Thread") {
-        // single or batch threads (you already did this)
-        const payload = isNewThreadsBatch
-          ? newThreadsBatch.map(n => ({ threadColor: n.name, minInv: n.minInv, reorder: n.reorder, cost: n.cost }))
-          : { threadColor:newItemData.name, minInv:newItemData.minInv, reorder:newItemData.reorder, cost:newItemData.cost };
-        await axios.post(
-          `${process.env.REACT_APP_API_ROOT}${isNewThreadsBatch ? "/threads" : "/threads"}`,
-          isNewThreadsBatch ? payload : [payload]
-        );
-        setThreads(prev => [...prev, ...payload.map(p=>p.threadColor)]);
-        setNewThreadsBatch([]);
-      } else {
-        // **new**: handle **batch** of unknown materials
-        const batch = newMaterialsBatch.length
-          ? newMaterialsBatch.map(r => ({
-              materialName: r.value.trim(),
-              unit:         newItemData.unit,
-              minInv:       newItemData.minInv,
-              reorder:      newItemData.reorder,
-              cost:         newItemData.cost
-            }))
-          : [{
-              materialName: newItemData.name.trim(),
-              unit:         newItemData.unit,
-              minInv:       newItemData.minInv,
-              reorder:      newItemData.reorder,
-              cost:         newItemData.cost
-            }];
-        await axios.post(
-          `${process.env.REACT_APP_API_ROOT}/materials`,
-          batch
-        );
-        setMaterials(prev => [...prev, ...batch.map(b=>b.materialName)]);
-        setNewMaterialsBatch([]);
-        // now that our dropdown is up-to-date, actually post the table rows:
-        handleSubmit(materialRows, "/materialInventory", setMaterialRows);
-      }
+  // If we're saving materials, also validate unit/minInv/reorder/cost
+  const isMaterialBatch = newMaterialsBatch.length > 0 || newItemData.type === "Material";
+  if (isMaterialBatch) {
+    if (!newItemData.unit)    errs.unit    = "Required";
+    if (!newItemData.minInv)  errs.minInv  = "Required";
+    if (!newItemData.reorder) errs.reorder = "Required";
+    if (!newItemData.cost)    errs.cost    = "Required";
+  }
 
-      setIsNewItemModalOpen(false);
-      setNewItemErrors({});
-      setNewItemData({ name:"", type:"", unit:"", minInv:"", reorder:"", cost:"" });
-    } catch (err) {
-      setNewItemErrors({ general: "Failed to save. Try again." });
+  if (Object.keys(errs).length) {
+    setNewItemErrors(errs);
+    return;
+  }
+
+  try {
+    if (newMaterialsBatch.length) {
+      // 1) Batch‐create new materials
+      const payload = newMaterialsBatch.map(r => ({
+        materialName: r.value.trim(),
+        unit:         newItemData.unit,
+        minInv:       newItemData.minInv,
+        reorder:      newItemData.reorder,
+        cost:         newItemData.cost
+      }));
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/materials`,
+        payload
+      );
+      // update dropdown
+      setMaterials(prev => [...prev, ...payload.map(p => p.materialName)]);
+      // now submit the original materialRows to Material Log
+      handleSubmit(materialRows, "/materialInventory", setMaterialRows);
+      setNewMaterialsBatch([]);
     }
-  };
+    else if (bulkNewItems.length) {
+      // 2) Batch‐create new threads
+      const payload = bulkNewItems.map(n => ({
+        threadColor: n.name,
+        minInv:      n.minInv,
+        reorder:     n.reorder,
+        cost:        n.cost
+      }));
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/threads`,
+        payload
+      );
+      setThreads(prev => [...prev, ...payload.map(p => p.threadColor)]);
+      handleSubmit(threadRows, "/threadInventory", setThreadRows);
+      setBulkNewItems([]);
+    }
+    // close modal
+    setIsNewItemModalOpen(false);
+    setNewItemErrors({});
+    setNewItemData({ name:"", type:"", unit:"", minInv:"", reorder:"", cost:"" });
+  }
+  catch (err) {
+    console.error(err);
+    setNewItemErrors({ general: "Failed to save. Try again." });
+  }
+};
 
   // --- Section 6: Render -----------------------------------------------
   return (
     <>
-      {isNewItemModalOpen && bulkNewItems.length > 0 && (
-        <div style={modalOverlay}>
-          <div style={modalBox}>
-            <h2>
-              Add {bulkNewItems.length} New Thread
-              {bulkNewItems.length > 1 ? "s" : ""}
-            </h2>
-            {newItemErrors.general && (
-              <div style={{ color: "red", marginBottom: 8 }}>
-                {newItemErrors.general}
-              </div>
-            )}
-
-            {/* Header row */}
-            <div style={{
+{isNewItemModalOpen && (bulkNewItems.length > 0 || newMaterialsBatch.length > 0) && (
+  <div style={modalOverlay}>
+    <div style={modalBox}>
+      {bulkNewItems.length > 0 ? (
+        <>
+          <h2>
+            Add {bulkNewItems.length} New Thread
+            {bulkNewItems.length > 1 ? "s" : ""}
+          </h2>
+          {newItemErrors.general && (
+            <div style={{ color: "red", marginBottom: 8 }}>
+              {newItemErrors.general}
+            </div>
+          )}
+          {/* Header for threads */}
+          <div
+            style={{
               display: "grid",
               gridTemplateColumns: "2fr 1fr 1fr 1fr",
               gap: 8,
               fontWeight: "bold",
               marginBottom: 4
-            }}>
-              <div>Thread Color</div>
-              <div>Min. Inv.</div>
-              <div>ReOrder</div>
-              <div>Cost</div>
-            </div>
-
-            {/* One line per new color */}
-            {bulkNewItems.map((item, idx) => (
-              <div key={idx} style={{
+            }}
+          >
+            <div>Thread Color</div>
+            <div>Min. Inv.</div>
+            <div>ReOrder</div>
+            <div>Cost</div>
+          </div>
+          {/* One row per new thread */}
+          {bulkNewItems.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
                 display: "grid",
                 gridTemplateColumns: "2fr 1fr 1fr 1fr",
                 gap: 8,
                 marginBottom: 4
-              }}>
-                <input
-                  value={item.name}
-                  readOnly
-                  style={{ ...inputStyle, background: "#eee" }}
-                />
-                <input
-                  type="number"
-                  value={item.minInv}
-                  onChange={e => {
-                    const v = e.target.value;
-                    setBulkNewItems(bs => {
-                      const copy = [...bs];
-                      copy[idx].minInv = v;
-                      return copy;
-                    });
-                  }}
-                  style={inputStyle}
-                />
-                <input
-                  type="number"
-                  value={item.reorder}
-                  onChange={e => {
-                    const v = e.target.value;
-                    setBulkNewItems(bs => {
-                      const copy = [...bs];
-                      copy[idx].reorder = v;
-                      return copy;
-                    });
-                  }}
-                  style={inputStyle}
-                />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={item.cost}
-                  onChange={e => {
-                    const v = e.target.value;
-                    setBulkNewItems(bs => {
-                      const copy = [...bs];
-                      copy[idx].cost = v;
-                      return copy;
-                    });
-                  }}
-                  style={inputStyle}
-                />
-              </div>
-            ))}
-
-            {/* Modal actions */}
-            <div style={{ textAlign: "right", marginTop: 8 }}>
-              <button
-                onClick={() => {
-                  setBulkNewItems([]);
-                  setIsNewItemModalOpen(false);
+              }}
+            >
+              <input
+                value={item.name}
+                readOnly
+                style={{ ...inputStyle, background: "#eee" }}
+              />
+              <input
+                type="number"
+                value={item.minInv}
+                onChange={e => {
+                  const v = e.target.value;
+                  setBulkNewItems(bs => {
+                    const copy = [...bs];
+                    copy[idx].minInv = v;
+                    return copy;
+                  });
                 }}
-                style={{ marginRight: 8 }}
-              >
-                Cancel
-              </button>
-              <button onClick={handleSaveBulkNewItems}>
-                Save All
-              </button>
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                value={item.reorder}
+                onChange={e => {
+                  const v = e.target.value;
+                  setBulkNewItems(bs => {
+                    const copy = [...bs];
+                    copy[idx].reorder = v;
+                    return copy;
+                  });
+                }}
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                step="0.01"
+                value={item.cost}
+                onChange={e => {
+                  const v = e.target.value;
+                  setBulkNewItems(bs => {
+                    const copy = [...bs];
+                    copy[idx].cost = v;
+                    return copy;
+                  });
+                }}
+                style={inputStyle}
+              />
             </div>
+          ))}
+          {/* Actions */}
+          <div style={{ textAlign: "right", marginTop: 8 }}>
+            <button
+              onClick={() => {
+                setBulkNewItems([]);
+                setIsNewItemModalOpen(false);
+              }}
+              style={{ marginRight: 8 }}
+            >
+              Cancel
+            </button>
+            <button onClick={handleSaveNewItem}>Save All</button>
           </div>
-        </div>
+        </>
+      ) : (
+        <>
+          <h2>
+            Add {newMaterialsBatch.length} New Material
+            {newMaterialsBatch.length > 1 ? "s" : ""}
+          </h2>
+          {newItemErrors.general && (
+            <div style={{ color: "red", marginBottom: 8 }}>
+              {newItemErrors.general}
+            </div>
+          )}
+          {/* Header for materials */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
+              gap: 8,
+              fontWeight: "bold",
+              marginBottom: 4
+            }}
+          >
+            <div>Material Name</div>
+            <div>Unit</div>
+            <div>Min. Inv.</div>
+            <div>ReOrder</div>
+            <div>Cost</div>
+          </div>
+          {/* One row per new material */}
+          {newMaterialsBatch.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr",
+                gap: 8,
+                marginBottom: 4
+              }}
+            >
+              <input
+                value={item.value}
+                readOnly
+                style={{ ...inputStyle, background: "#eee" }}
+              />
+              <select
+                value={newItemData.unit}
+                onChange={e =>
+                  setNewItemData(d => ({
+                    ...d,
+                    unit: e.target.value
+                  }))
+                }
+                style={inputStyle}
+              >
+                <option value="">—select—</option>
+                <option>Yards</option>
+                <option>Sqft</option>
+              </select>
+              <input
+                type="number"
+                value={newItemData.minInv}
+                onChange={e =>
+                  setNewItemData(d => ({
+                    ...d,
+                    minInv: e.target.value
+                  }))
+                }
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                value={newItemData.reorder}
+                onChange={e =>
+                  setNewItemData(d => ({
+                    ...d,
+                    reorder: e.target.value
+                  }))
+                }
+                style={inputStyle}
+              />
+              <input
+                type="number"
+                step="0.01"
+                value={newItemData.cost}
+                onChange={e =>
+                  setNewItemData(d => ({
+                    ...d,
+                    cost: e.target.value
+                  }))
+                }
+                style={inputStyle}
+              />
+            </div>
+          ))}
+          {/* Actions */}
+          <div style={{ textAlign: "right", marginTop: 8 }}>
+            <button
+              onClick={() => {
+                setNewMaterialsBatch([]);
+                setIsNewItemModalOpen(false);
+              }}
+              style={{ marginRight: 8 }}
+            >
+              Cancel
+            </button>
+            <button onClick={handleSaveNewItem}>Save All</button>
+          </div>
+        </>
       )}
+    </div>
+  </div>
+)}
 
       <div style={{ display:"flex", gap:32, padding:16 }}>
         {/* Thread Inventory */}
