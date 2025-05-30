@@ -1272,7 +1272,7 @@ const handleSaveNewCompany = async () => {
                   ) : p.type === "application/pdf" ? (
                     <iframe
                       src={p.url}
-                      title={p.name}`
+                      title={p.name}
                       style={{ width: "100%", height: 80 }}
                     />
                   ) : (
