@@ -180,7 +180,6 @@ export default function Inventory() {
    };
 
   // — Section 4b: Intercept Material Submit & batch unknowns ——————
-  const [newMaterialsBatch, setNewMaterialsBatch] = useState([]);
 
   const handleMaterialSubmit = () => {
     // 1) collect any rows whose value isn't in our known materials list
