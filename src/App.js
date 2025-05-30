@@ -7,6 +7,7 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import Inventory from "./Inventory";
 import InventoryOrdered from "./InventoryOrdered";
+import "./axios-setup";
 
 // send cookies on every API call so Flask session is preserved
 axios.defaults.withCredentials = true;
