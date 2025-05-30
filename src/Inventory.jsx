@@ -214,7 +214,7 @@ const handleMaterialSubmit = async () => {
       `${process.env.REACT_APP_API_ROOT}/materialInventory`,
       payload
     );
-    alert(`Added ${res.data.added} rows to Material Log`);
+    alert("Submitted!");
     setMaterialRows(initRows());
   } catch (err) {
     console.error(err);
