@@ -673,42 +673,35 @@ const onDragEnd = async (result) => {
   return (
     <>
       {/* ─── Nav Bar ────────────────────────────────────────────────────────── */}
-      <nav style={{ padding: 12, borderBottom: '1px solid #ddd', marginBottom: 16 }}>
-        <NavLink
-          to="/"
-          style={({ isActive }) => ({
-            marginRight: 16,
-            textDecoration: isActive ? 'underline' : 'none'
-          })}
-        >
-          Scheduler
-        </NavLink>
-        <NavLink
-          to="/submit"
-          style={({ isActive }) => ({
-            marginRight: 16,
-            textDecoration: isActive ? 'underline' : 'none'
-          })}
-        >
-          Order Submission
-        </NavLink>
-        <NavLink
-          to="/inventory"
-          style={({ isActive }) => ({
-            marginRight: 16,
-            textDecoration: isActive ? 'underline' : 'none'
-          })}
-        >
-          Inventory
-        </NavLink>
-        <NavLink
-          to="/inventory-ordered"
-          style={({ isActive }) => ({
-            textDecoration: isActive ? 'underline' : 'none'
-          })}
-        >
-          Inventory Ordered
-        </NavLink>
+      <nav style={{
+        display: 'flex',
+        padding: 8,
+        backgroundColor: '#fafafa',
+        borderBottom: '1px solid #ccc'
+      }}>
+        {[
+          { to: "/",                label: "Scheduler" },
+          { to: "/submit",          label: "Order Submission" },
+          { to: "/inventory",       label: "Inventory" },
+          { to: "/inventory-ordered", label: "Inventory Ordered" },
+        ].map(({ to, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            style={({ isActive }) => ({
+              marginRight: 16,
+              padding: '0.5rem 1rem',
+              textDecoration: 'none',
+              color: '#333',                             // uniform dark text
+              backgroundColor: isActive ? '#e0e0e0' : 'transparent',
+              border: isActive ? '1px solid #ccc' : '1px solid transparent',
+              borderBottom: isActive ? 'none' : '1px solid #ccc',
+              borderRadius: '4px 4px 0 0'
+            })}
+          >
+            {label}
+          </NavLink>
+        ))}
       </nav>
 
       {/* ─── Route Outlet ─────────────────────────────────────────────────────── */}
