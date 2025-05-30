@@ -2,37 +2,73 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 export default function InventoryOrdered() {
-  const [orders, setOrders] = useState([]);
+  const [entries, setEntries]       = useState([]);
+  const [selected, setSelected]     = useState(null);
+  const API = process.env.REACT_APP_API_ROOT;
+
+  // fetch only “Ordered” rows (your existing logic)
+  const load = async () => {
+    const mat = await axios.get(`${API}/inventoryOrdered`);
+    setEntries(mat.data);
+    setSelected(null);
+  };
 
   useEffect(() => {
-    axios.get(`${process.env.REACT_APP_API_ROOT}/inventoryOrdered`)
-         .then(r => setOrders(r.data))
-         .catch(console.error);
+    load();
   }, []);
 
+  const handleReceive = async () => {
+    if (!selected) return;
+    const { type, row } = selected;
+    await axios.put(`${API}/inventoryOrdered`, { type, row });
+    // reload list: row will no longer appear
+    load();
+  };
+
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Inventory Ordered</h1>
-      <button onClick={() => window.location.reload()}>Refresh</button>
-      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 8 }}>
+    <div>
+      <button
+        onClick={handleReceive}
+        disabled={!selected}
+        style={{
+          marginBottom: "1rem",
+          padding: "0.5rem 1rem",
+          cursor: selected ? "pointer" : "not-allowed",
+          backgroundColor: selected ? "#4caf50" : "#ccc",
+          color: "#fff",
+          border: "none",
+          borderRadius: 4
+        }}
+      >
+        Receive
+      </button>
+
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
-            {["Date","Type","Name","Quantity"].map(col => (
-              <th key={col} style={{ border: "1px solid #ccc", padding: 4 }}>
-                {col}
-              </th>
-            ))}
+            <th>Date</th><th>Type</th><th>Name</th><th>Quantity</th><th>O/R</th>
           </tr>
         </thead>
         <tbody>
-          {orders.map((o, i) => (
-            <tr key={i}>
-              <td style={{ border: "1px solid #eee", padding: 4 }}>{o.date}</td>
-              <td style={{ border: "1px solid #eee", padding: 4 }}>{o.type}</td>
-              <td style={{ border: "1px solid #eee", padding: 4 }}>{o.name}</td>
-              <td style={{ border: "1px solid #eee", padding: 4 }}>{o.quantity}</td>
-            </tr>
-          ))}
+          {entries.map((e, i) => {
+            const isSel = selected && selected.row === e.row;
+            return (
+              <tr
+                key={i}
+                onClick={() => setSelected(e)}
+                style={{
+                  backgroundColor: isSel ? "#e0f7fa" : "transparent",
+                  cursor: "pointer"
+                }}
+              >
+                <td>{e.date}</td>
+                <td>{e.type}</td>
+                <td>{e.name}</td>
+                <td>{e.quantity}</td>
+                <td>{e.type==="Material" ? e.or : e.or}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
