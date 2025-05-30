@@ -305,29 +305,30 @@ const handleSaveBulkNewItems = async () => {
       // --- MATERIAL BATCH ---
       if (newItemData.type === "Material") {
         // Build payload to add & log new materials
-        const addAndLogPayload = newMaterialsBatch.map(item => ({
-          materialName: item.value.trim(),       // <-- use .value, not .name
-          unit:         newItemData.unit.trim(),
-          minInv:       newItemData.minInv.trim(),
-          reorder:      newItemData.reorder.trim(),
-          cost:         newItemData.cost.trim(),
-          action:       newItemData.action,      // "Ordered" or "Received"
-          quantity:     newItemData.quantity,    // the quantity entered
-          notes:        newItemData.notes || ""
-        }));
+        const addAndLogPayload = newItemData
+          ? newMaterialsBatch.map(item => ({
+              materialName: item.value.trim(),          // use .value for the typed name
+              unit:         newItemData.unit.trim(),
+              minInv:       newItemData.minInv.trim(),
+              reorder:      newItemData.reorder.trim(),
+              cost:         newItemData.cost.trim(),
+              action:       newItemData.action,         // "Ordered" or "Received"
+              quantity:     newItemData.quantity,       // from modal
+              notes:        newItemData.notes || ""
+            }))
+          : [];
 
-        console.log("🛠 POST /materials payload:", addAndLogPayload);
+        // 👉 Debug: log the target URL and payload
+        const url = `${process.env.REACT_APP_API_ROOT}/materials`;
+        console.log("Posting to:", url, addAndLogPayload);
 
-        // POST to /materials → (adds to Inventory AND logs)
-        await axios.post(
-          `${process.env.REACT_APP_API_ROOT}/materials`,
-          addAndLogPayload
-        );
+        // POST to /materials → adds to Inventory AND logs to Material Log
+        await axios.post(url, addAndLogPayload);
 
-        // Refresh local dropdown list
+        // Refresh local dropdown
         setMaterials(m => [
           ...m,
-          ...newMaterialsBatch.map(i => i.value.trim())  // <-- use .value here too
+          ...newMaterialsBatch.map(i => i.value.trim())
         ]);
 
         // Clear out the material batch
