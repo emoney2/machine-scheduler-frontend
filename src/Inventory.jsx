@@ -300,12 +300,12 @@ const handleSaveNewItem = async () => {
 const handleSaveBulkNewItems = async () => {
   console.log("handleSaveBulkNewItems running", newItemData, bulkNewItems);
   try {
-    if (bulkNewItems.length) {
+    if (newMaterialsBatch.length) {
       // --- MATERIAL BATCH ---
       if (newItemData.type === "Material") {
         // Build payload to add & log new materials,
         // using the shared newItemData fields for unit/minInv/reorder/cost
-        const addAndLogPayload = bulkNewItems.map(item => ({
+        const addAndLogPayload = newMaterialsBatch.map(item => ({
           materialName: item.name.trim(),
           unit:         newItemData.unit.trim(),
           minInv:       newItemData.minInv.trim(),
@@ -329,7 +329,7 @@ const handleSaveBulkNewItems = async () => {
         // Refresh local dropdown list
         setMaterials(m => [
           ...m,
-          ...bulkNewItems.map(i => i.name.trim())
+          ...newMaterialsBatch.map(i => i.value.trim())
         ]);
       }
 
