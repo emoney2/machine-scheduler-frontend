@@ -179,34 +179,34 @@ export default function Inventory() {
      handleSubmit(threadRows, "/threadInventory", setThreadRows);
    };
 
-// ─── Section 4b: Intercept Material‐Submit & Branch Endpoints ────────────
+// ─── Section 4b: Intercept Material-Submit & Branch Endpoints ────────────
 const handleMaterialSubmit = async () => {
-  // 1) Find any unknown materials
+  // 1) Do we have any new (unknown) materials?
   const unknowns = materialRows.filter(
     r => r.value.trim() && !materials.includes(r.value.trim())
   );
   if (unknowns.length) {
-    // Open modal to collect new‐material data
+    // Open the “add new material” modal
     setNewItemData({
-      name:   "",
-      type:   "Material",
-      unit:   "",
-      minInv: "",
-      reorder:"",
-      cost:   "",
-      action: "",
+      name:     "",
+      type:     "Material",
+      unit:     "",
+      minInv:   "",
+      reorder:  "",
+      cost:     "",
+      action:   "Ordered",
       quantity: "",
-      notes:  ""
+      notes:    ""
     });
     setNewMaterialsBatch(unknowns);
     setNewItemErrors({});
     setIsNewItemModalOpen(true);
-    return;  // bail out to show the “add new material” modal
+    return;
   }
 
   // 2) All rows are known → build payload for logging only
   const payload = materialRows
-    .filter(r => r.value.trim() && r.quantity)
+    .filter(r => r.value.trim() && r.quantity.trim())
     .map(r => ({
       materialName: r.value.trim(),
       action:       r.action,
@@ -214,8 +214,24 @@ const handleMaterialSubmit = async () => {
       notes:        r.notes || ""
     }));
 
-  // 3) POST only to /materialInventory (log‐only endpoint)
-  await handleSubmit(payload, "/materialInventory", setMaterialRows);
+  if (!payload.length) {
+    alert("No materials to submit");
+    return;
+  }
+
+  // 3) POST to /materialInventory (only writes to your Material Log)
+  try {
+    await axios.post(
+      `${process.env.REACT_APP_API_ROOT}/materialInventory`,
+      payload
+    );
+    // reset the grid
+    setMaterialRows(initRows());
+    alert("Submitted!");
+  } catch (err) {
+    console.error(err);
+    alert("Material submission failed");
+  }
 };
 
 // — Section 5: New-Item Modal Save Handler ——————————————
