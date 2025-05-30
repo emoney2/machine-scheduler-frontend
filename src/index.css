@@ -1,0 +1,4 @@
+/* Apply a single uniform font throughout the app */
+html, body {
+  font-family: Arial, sans-serif;
+}
