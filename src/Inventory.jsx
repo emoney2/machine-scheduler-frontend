@@ -302,25 +302,26 @@ const handleSaveBulkNewItems = async () => {
     if (bulkNewItems.length) {
       // --- MATERIAL BATCH ---
       if (newItemData.type === "Material") {
-        // 1) Build payload to add & log new materials
+        // Build payload to add & log new materials,
+        // using the shared newItemData fields for unit/minInv/reorder/cost
         const addAndLogPayload = bulkNewItems.map(item => ({
           materialName: item.name.trim(),
-          unit:         item.unit.trim(),
-          minInv:       item.minInv.trim(),
-          reorder:      item.reorder.trim(),
-          cost:         item.cost.trim(),
-          action:       item.action,     // either "Ordered" or "Received"
-          quantity:     item.quantity,   // the quantity entered
-          notes:        item.notes || "" // optional notes
+          unit:         newItemData.unit.trim(),
+          minInv:       newItemData.minInv.trim(),
+          reorder:      newItemData.reorder.trim(),
+          cost:         newItemData.cost.trim(),
+          action:       newItemData.action,     // must come from the modal’s O/R selector
+          quantity:     newItemData.quantity,   // from the modal’s quantity field
+          notes:        newItemData.notes || "" // any notes
         }));
 
-        // 2) POST to /materials → (adds to Inventory AND logs)
+        // POST to /materials → (adds to Inventory AND logs)
         await axios.post(
           `${process.env.REACT_APP_API_ROOT}/materials`,
           addAndLogPayload
         );
 
-        // 3) Refresh local dropdown list
+        // Refresh local dropdown list
         setMaterials(m => [
           ...m,
           ...bulkNewItems.map(i => i.name.trim())
@@ -367,6 +368,7 @@ const handleSaveBulkNewItems = async () => {
     setNewItemErrors({ general: "Failed to save. Try again." });
   }
 };
+
 
   // --- Section 6: Render -----------------------------------------------
   return (
