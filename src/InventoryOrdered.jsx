@@ -1,15 +1,16 @@
+// src/components/InventoryOrdered.jsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 export default function InventoryOrdered() {
-  const [entries, setEntries]       = useState([]);
-  const [selected, setSelected]     = useState(null);
+  const [entries, setEntries]   = useState([]);
+  const [selected, setSelected] = useState(null);
   const API = process.env.REACT_APP_API_ROOT;
 
-  // fetch only “Ordered” rows (your existing logic)
+  // load only Ordered entries
   const load = async () => {
-    const mat = await axios.get(`${API}/inventoryOrdered`);
-    setEntries(mat.data);
+    const res = await axios.get(`${API}/inventoryOrdered`);
+    setEntries(res.data);
     setSelected(null);
   };
 
@@ -21,12 +22,15 @@ export default function InventoryOrdered() {
     if (!selected) return;
     const { type, row } = selected;
     await axios.put(`${API}/inventoryOrdered`, { type, row });
-    // reload list: row will no longer appear
     load();
   };
 
   return (
-    <div>
+    <div style={{
+      maxWidth: 800,
+      margin: "2rem auto",
+      fontFamily: "sans-serif"
+    }}>
       <button
         onClick={handleReceive}
         disabled={!selected}
@@ -37,21 +41,37 @@ export default function InventoryOrdered() {
           backgroundColor: selected ? "#4caf50" : "#ccc",
           color: "#fff",
           border: "none",
-          borderRadius: 4
+          borderRadius: 4,
+          fontFamily: "sans-serif"
         }}
       >
         Receive
       </button>
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <table style={{
+        width: "100%",
+        borderCollapse: "collapse",
+        fontFamily: "sans-serif"
+      }}>
         <thead>
           <tr>
-            <th>Date</th><th>Type</th><th>Name</th><th>Quantity</th><th>O/R</th>
+            {["Date", "Type", "Name", "Quantity"].map(header => (
+              <th key={header} style={{
+                borderBottom: "1px solid #ddd",
+                padding: "0.5rem",
+                textAlign: "center"
+              }}>
+                {header}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {entries.map((e, i) => {
             const isSel = selected && selected.row === e.row;
+            const displayQty = e.type === "Material"
+              ? `${e.quantity} ${e.unit || ""}`.trim()
+              : e.quantity;
             return (
               <tr
                 key={i}
@@ -61,11 +81,18 @@ export default function InventoryOrdered() {
                   cursor: "pointer"
                 }}
               >
-                <td>{e.date}</td>
-                <td>{e.type}</td>
-                <td>{e.name}</td>
-                <td>{e.quantity}</td>
-                <td>{e.type==="Material" ? e.or : e.or}</td>
+                <td style={{ padding: "0.5rem", textAlign: "center" }}>
+                  {e.date}
+                </td>
+                <td style={{ padding: "0.5rem", textAlign: "center" }}>
+                  {e.type}
+                </td>
+                <td style={{ padding: "0.5rem", textAlign: "center" }}>
+                  {e.name}
+                </td>
+                <td style={{ padding: "0.5rem", textAlign: "center" }}>
+                  {displayQty}
+                </td>
               </tr>
             );
           })}
