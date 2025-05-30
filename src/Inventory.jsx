@@ -298,27 +298,25 @@ const handleSaveNewItem = async () => {
 
 // ─── Section 5b: Save Bulk New Items (Threads OR Materials) ───────────────
 const handleSaveBulkNewItems = async () => {
-  console.log("handleSaveBulkNewItems running", newItemData, bulkNewItems);
   try {
+    console.log("handleSaveBulkNewItems running", newItemData, newMaterialsBatch);
+
     if (newMaterialsBatch.length) {
       // --- MATERIAL BATCH ---
       if (newItemData.type === "Material") {
-        // Build payload to add & log new materials,
-        // using the shared newItemData fields for unit/minInv/reorder/cost
+        // Build payload to add & log new materials
         const addAndLogPayload = newMaterialsBatch.map(item => ({
-          materialName: item.name.trim(),
+          materialName: item.value.trim(),       // <-- use .value, not .name
           unit:         newItemData.unit.trim(),
           minInv:       newItemData.minInv.trim(),
           reorder:      newItemData.reorder.trim(),
           cost:         newItemData.cost.trim(),
-          action:       newItemData.action,     // must come from the modal’s O/R selector
-          quantity:     newItemData.quantity,   // from the modal’s quantity field
-          notes:        newItemData.notes || "" // any notes
+          action:       newItemData.action,      // "Ordered" or "Received"
+          quantity:     newItemData.quantity,    // the quantity entered
+          notes:        newItemData.notes || ""
         }));
 
-
-        console.log("🛠️ addAndLogPayload:", addAndLogPayload);
-
+        console.log("🛠 POST /materials payload:", addAndLogPayload);
 
         // POST to /materials → (adds to Inventory AND logs)
         await axios.post(
@@ -329,13 +327,16 @@ const handleSaveBulkNewItems = async () => {
         // Refresh local dropdown list
         setMaterials(m => [
           ...m,
-          ...newMaterialsBatch.map(i => i.value.trim())
+          ...newMaterialsBatch.map(i => i.value.trim())  // <-- use .value here too
         ]);
+
+        // Clear out the material batch
+        setNewMaterialsBatch([]);
       }
 
       // --- THREAD BATCH (unchanged) ---
       if (newItemData.type === "Thread") {
-        const payload = bulkNewItems.map(item => ({
+        const payload = newMaterialsBatch.map(item => ({
           threadColor: item.name,
           minInv:      item.minInv,
           reorder:     item.reorder,
@@ -345,11 +346,11 @@ const handleSaveBulkNewItems = async () => {
           `${process.env.REACT_APP_API_ROOT}/threadInventory`,
           payload
         );
-        setThreads(prev => [...prev, ...bulkNewItems.map(i => i.name)]);
+        setThreads(prev => [...prev, ...newMaterialsBatch.map(i => i.name)]);
       }
     }
 
-    // Close modal & clear state
+    // Close modal & reset state
     setIsNewItemModalOpen(false);
     setNewItemErrors({});
     setNewItemData({
@@ -363,9 +364,6 @@ const handleSaveBulkNewItems = async () => {
       quantity: "",
       notes:    ""
     });
-    setBulkNewItems([]);
-
-    // Reset grid and show confirmation
     setMaterialRows(initRows());
     alert("Submitted!");
   } catch (err) {
@@ -373,8 +371,6 @@ const handleSaveBulkNewItems = async () => {
     setNewItemErrors({ general: "Failed to save. Try again." });
   }
 };
-
-
   // --- Section 6: Render -----------------------------------------------
   return (
     <>
