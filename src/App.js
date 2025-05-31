@@ -343,8 +343,10 @@ function getChain(jobs, id) {
   return chain;
 }
 
-  // ─── Section 5: Fetch Helpers + Status Bar State ────────────────────────────────────
-  // Add two new state flags: isLoading=true whenever any fetch is in flight; hasError=true on any error
+  // ─── Section 5: Fetch Helpers + Initial Load & Polling ────────────────────
+  // Two new state flags:
+  //   • isLoading = true whenever any fetch is in flight
+  //   • hasError   = true if the most recent fetch attempt failed (non‐200)
   const [isLoading, setIsLoading] = useState(false);
   const [hasError,   setHasError]   = useState(false);
 
@@ -355,22 +357,23 @@ function getChain(jobs, id) {
     setHasError(false);
 
     try {
+      // 1) Fetch current manualState (which returns machine1, machine2, placeholders arrays)
       const { data: msData } = await axios.get(API_ROOT + '/manualState');
-      // 200 OK assumed if we reached here
-      // 1) Update local placeholders
+
+      // 2) Update local placeholders array
       setPlaceholders(msData.placeholders || []);
 
-      // 2) Rebuild only the machine1/machine2 assignments
+      // 3) Build a fresh copy of "columns" that we will modify:
       const newCols = { ...columns };
 
-      // Remove any placeholder jobs from existing machine lists
+      //    a) Remove any job that is listed as a placeholder from machine lists
       ['machine1', 'machine2'].forEach(colId => {
         newCols[colId].jobs = newCols[colId].jobs.filter(
           job => !msData.placeholders.some(p => p.id === job.id)
         );
       });
 
-      // Inject placeholders into machine1 (in server order)
+      //    b) Inject placeholders into machine1 in the exact order returned by the server:
       (msData.machine1 || []).forEach(jobId => {
         const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
         if (idx !== -1) {
@@ -378,7 +381,8 @@ function getChain(jobs, id) {
           newCols.machine1.jobs.push(jobObj);
         }
       });
-      // Inject placeholders into machine2
+
+      //    c) Inject placeholders into machine2 likewise:
       (msData.machine2 || []).forEach(jobId => {
         const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
         if (idx !== -1) {
@@ -387,7 +391,9 @@ function getChain(jobs, id) {
         }
       });
 
+      // 4) Overwrite state so these machine‐assignments appear immediately:
       setColumns(newCols);
+
       console.log('fetchManualState ▶ done');
       setHasError(false);
     } catch (err) {
@@ -398,18 +404,18 @@ function getChain(jobs, id) {
     }
   };
 
-  // ─── Section 5B: fetchOrdersEmbroLinks only (no manualState) ────────────────
+  // ─── Section 5B: fetchOrdersEmbroLinks only (preserve manual assignments) ───
   const fetchOrdersEmbroLinks = async () => {
     console.log('fetchOrdersEmbroLinks ▶ start');
     setIsLoading(true);
     setHasError(false);
 
     try {
-      // 1) Fetch orders, embroideryList, links in parallel
+      // 1) Fetch orders, embroideryList, and links in parallel
       const [ordersRes, embRes, linksRes] = await Promise.all([
         axios.get(API_ROOT + '/orders'),
         axios.get(API_ROOT + '/embroideryList'),
-        axios.get(API_ROOT + '/links')
+        axios.get(API_ROOT + '/links'),
       ]);
 
       const orders    = ordersRes.data   || [];
@@ -423,7 +429,7 @@ function getChain(jobs, id) {
         if (id) embMap[id] = r['Embroidery Start Time'] || '';
       });
 
-      // 3) Build jobById from orders + embroidery data
+      // 3) Construct jobById from orders + embroidery data
       const jobById = {};
       orders.forEach(o => {
         const sid = String(o['Order #'] || '').trim();
@@ -439,31 +445,43 @@ function getChain(jobs, id) {
           due_type:        o['Hard Date/Soft Date'] || '',
           embroidery_start: rawTs,
           start_date:       rawTs,
+          // default everyone to queue; will override below for manual assignments
           machineId:       'queue',
           linkedTo:        linksData[sid]   || null
         };
       });
 
-      // 4) Build queueJobs (sorted by due_date)
-      const queueJobs = Object.values(jobById).sort((a, b) => {
-        const da = parseDueDate(a.due_date);
-        const db = parseDueDate(b.due_date);
-        if (da && db) return da - db;
-        if (da) return -1;
-        if (db) return 1;
-        return 0;
+      // 4) Preserve any manual assignments seen in current columns state:
+      //    If a job currently sits in columns.machine1.jobs, set its machineId to 'machine1'.
+      columns.machine1.jobs.forEach(job => {
+        if (jobById[job.id]) {
+          jobById[job.id].machineId = 'machine1';
+        }
+      });
+      //    Same for machine2:
+      columns.machine2.jobs.forEach(job => {
+        if (jobById[job.id]) {
+          jobById[job.id].machineId = 'machine2';
+        }
       });
 
-      // 5) Build machine1Jobs & machine2Jobs (ignoring manualState placeholders)
-      const buildMachine = colId => {
-        return Object.values(jobById).filter(
-          j => j.machineId === colId && !Object.values(linksData).includes(j.id)
-        );
-      };
-      const machine1Jobs = buildMachine('machine1');
-      const machine2Jobs = buildMachine('machine2');
+      // 5) Build queueJobs as all jobs still marked 'queue'
+      const queueJobs = Object.values(jobById)
+        .filter(j => j.machineId === 'queue')
+        .sort((a, b) => {
+          const da = parseDueDate(a.due_date);
+          const db = parseDueDate(b.due_date);
+          if (da && db) return da - db;
+          if (da) return -1;
+          if (db) return  1;
+          return  0;
+        });
 
-      // 6) Update columns state (queue + machine containers)
+      // 6) Build machine1Jobs & machine2Jobs now from jobById
+      const machine1Jobs = Object.values(jobById).filter(j => j.machineId === 'machine1');
+      const machine2Jobs = Object.values(jobById).filter(j => j.machineId === 'machine2');
+
+      // 7) Update columns state—but merge in the “existing” columns for placeholders:
       setColumns(cols => ({
         queue:     { ...cols.queue,     jobs: queueJobs },
         machine1:  { ...cols.machine1,  jobs: scheduleMachineJobs(machine1Jobs) },
@@ -480,17 +498,17 @@ function getChain(jobs, id) {
     }
   };
 
-  // ─── Section 5.2: Initial load + Poll orders/embroidery/links every 20s ─────
+  // ─── Section 5.2: Initial load + Poll orders/embroidery/links every 20 s ───
   useEffect(() => {
     console.log("📡 Initial load: manualState + orders/embroidery/links");
 
-    // 1) Immediately load manualState
+    // 1) Immediately load manualState so placeholders & machine assignments appear
     fetchManualState();
 
-    // 2) Immediately load orders, embroideryList, links
+    // 2) Immediately load orders, embroideryList, links so queue + machines appear
     fetchOrdersEmbroLinks();
 
-    // 3) Continue polling only orders/embroideryList/links every 20 seconds
+    // 3) Then poll only orders/embroideryList/links every 20 s
     const handle = setInterval(() => {
       console.log("⏳ Poll: orders/embroidery/links");
       fetchOrdersEmbroLinks();
