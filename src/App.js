@@ -348,124 +348,145 @@ function getChain(jobs, id) {
   return chain;
 }
 
-// --- 5A: fetchManualState only ---
-const fetchManualState = async () => {
-  console.log('fetchManualState ▶ start');
-  try {
-    const { data: msData } = await axios.get(API_ROOT + '/manualState');
-    // msData looks like { machine1: [...], machine2: [...], placeholders: [ ... ] }
+  // ─── Section 5A: fetchManualState only ─────────────────────────────────
+  const fetchManualState = async () => {
+    console.log('fetchManualState ▶ start');
+    try {
+      // 1) Get manualState (machine1, machine2, placeholders)
+      const { data: msData } = await axios.get(API_ROOT + '/manualState');
 
-    // 1) Update local placeholders
-    setPlaceholders(msData.placeholders || []);
+      // 2) Update local placeholders array
+      setPlaceholders(msData.placeholders || []);
 
-    // 2) Update only the manually assigned machines:
-    //    We know `columns` still holds your existing queue/machine lists,
-    //    so we can “re-assign” placeholders back into columns.* without refetching orders.
-    const newCols = { ...columns };
+      // 3) Rebuild only the machine1/machine2 assignments based on new manualState
+      //    We start from the existing columns state, remove any placeholder jobs
+      //    in machine1/machine2 if needed, then re-inject per server order.
+      const newCols = { ...columns };
 
-    // first, remove any job that appears in placeholders from existing machine lists
-    ['machine1', 'machine2'].forEach(colId => {
-      newCols[colId].jobs = newCols[colId].jobs.filter(
-        job => !msData.placeholders.some(p => p.id === job.id)
-      );
-    });
+      ['machine1', 'machine2'].forEach(colId => {
+        newCols[colId].jobs = newCols[colId].jobs.filter(
+          job => !msData.placeholders.some(p => p.id === job.id)
+        );
+      });
 
-    // now inject placeholders in the order the server wants:
-    (msData.machine1 || []).forEach(jobId => {
-      const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
-      if (idx !== -1) {
-        // take that job out of queue and put into machine1:
-        const [jobObj] = newCols.queue.jobs.splice(idx, 1);
-        newCols.machine1.jobs.push(jobObj);
-      }
-    });
-    (msData.machine2 || []).forEach(jobId => {
-      const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
-      if (idx !== -1) {
-        const [jobObj] = newCols.queue.jobs.splice(idx, 1);
-        newCols.machine2.jobs.push(jobObj);
-      }
-    });
+      // Inject placeholders into machine1
+      (msData.machine1 || []).forEach(jobId => {
+        const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
+        if (idx !== -1) {
+          const [jobObj] = newCols.queue.jobs.splice(idx, 1);
+          newCols.machine1.jobs.push(jobObj);
+        }
+      });
 
-    setColumns(newCols);
-    console.log('fetchManualState ▶ done');
-  } catch (err) {
-    console.error('❌ fetchManualState error', err);
-  }
-};
+      // Inject placeholders into machine2
+      (msData.machine2 || []).forEach(jobId => {
+        const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
+        if (idx !== -1) {
+          const [jobObj] = newCols.queue.jobs.splice(idx, 1);
+          newCols.machine2.jobs.push(jobObj);
+        }
+      });
 
-// --- 5B: fetchOrdersEmbroLinks only (no manualState) ---
-const fetchOrdersEmbroLinks = async () => {
-  console.log('fetchOrdersEmbroLinks ▶ start');
-  try {
-    const [ordersRes, embRes, linksRes] = await Promise.all([
-      axios.get(API_ROOT + '/orders'),
-      axios.get(API_ROOT + '/embroideryList'),
-      axios.get(API_ROOT + '/links')
-    ]);
+      setColumns(newCols);
+      console.log('fetchManualState ▶ done');
+    } catch (err) {
+      console.error('❌ fetchManualState error', err);
+    }
+  };
 
-    const orders  = ordersRes.data   || [];
-    const embList = embRes.data      || [];
-    const linksData   = linksRes.data    || {};
+  // ─── Section 5B: fetchOrdersEmbroLinks only (no manualState) ───────────────
+  const fetchOrdersEmbroLinks = async () => {
+    console.log('fetchOrdersEmbroLinks ▶ start');
+    try {
+      // 1) Fetch orders, embroideryList, links in parallel
+      const [ordersRes, embRes, linksRes] = await Promise.all([
+        axios.get(API_ROOT + '/orders'),
+        axios.get(API_ROOT + '/embroideryList'),
+        axios.get(API_ROOT + '/links')
+      ]);
 
-    // Build jobById from orders & embroideryList & links,
-    // but do NOT touch placeholders (we’ll keep existing placeholders from state).
-    // This is the same logic you already have inside fetchAll but “minus” the manualState part.
+      const orders    = ordersRes.data   || [];
+      const embList   = embRes.data      || [];
+      const linksData = linksRes.data    || {};
 
-    // 1) Build jobById from orders
-    const jobById = {};
-    orders.forEach(o => {
-      const sid = String(o['Order #']||'').trim();
-      if (!sid) return;
-      // find any embroideryStart or preserved prevEmb for job
-      const rawTs = (embMap && embMap[sid]) || '';
-      jobById[sid] = {
-        id: sid,
-        company:      o['Company Name'] || '',
-        design:       o['Design']       || '',
-        quantity:    +o['Quantity']     || 0,
-        stitch_count:+o['Stitch Count'] || 0,
-        due_date:     o['Due Date']      || '',
-        due_type:     o['Hard Date/Soft Date'] || '',
-        embroidery_start: rawTs,
-        start_date:   rawTs,
-        machineId:    'queue',
-        linkedTo:     linksData[sid]        || null
+      // 2) Build a map of OrderID → Embroidery Start Time
+      const embMap = {};
+      embList.forEach(r => {
+        const id = String(r['Order #'] || '').trim();
+        if (id) embMap[id] = r['Embroidery Start Time'] || '';
+      });
+
+      // 3) Construct jobById from orders + embroidery data
+      const jobById = {};
+      orders.forEach(o => {
+        const sid = String(o['Order #'] || '').trim();
+        if (!sid) return;
+        const rawTs = embMap[sid] || '';
+        jobById[sid] = {
+          id: sid,
+          company:         o['Company Name'] || '',
+          design:          o['Design']       || '',
+          quantity:        +o['Quantity']    || 0,
+          stitch_count:    +o['Stitch Count']|| 0,
+          due_date:        o['Due Date']     || '',
+          due_type:        o['Hard Date/Soft Date'] || '',
+          embroidery_start: rawTs,
+          start_date:       rawTs,
+          machineId:       'queue',
+          linkedTo:        linksData[sid]   || null
+        };
+      });
+
+      // 4) Build queueJobs (sorted by due_date)
+      const queueJobs = Object.values(jobById).sort((a, b) => {
+        const da = parseDueDate(a.due_date);
+        const db = parseDueDate(b.due_date);
+        if (da && db) return da - db;
+        if (da) return -1;
+        if (db) return 1;
+        return 0;
+      });
+
+      // 5) Build machine1Jobs & machine2Jobs (ignoring manualState)
+      const buildMachine = colId => {
+        return Object.values(jobById).filter(
+          j => j.machineId === colId && !Object.values(linksData).includes(j.id)
+        );
       };
-    });
+      const machine1Jobs = buildMachine('machine1');
+      const machine2Jobs = buildMachine('machine2');
 
-    // 2) Apply links (but not placeholders—placeholders handled separately)
-    //    (Actually, links get accounted for when scheduling each machine below.)
+      // 6) Update columns state with these fresh lists
+      setColumns(cols => ({
+        queue:     { ...cols.queue,     jobs: queueJobs },
+        machine1:  { ...cols.machine1,  jobs: scheduleMachineJobs(machine1Jobs) },
+        machine2:  { ...cols.machine2,  jobs: scheduleMachineJobs(machine2Jobs) }
+      }));
 
-    // 3) Build the queue and machines just from orders + embroideryList + links:
-    const buildMachine = colId => {
-      const manualList = []; // we skip manualList here
-      const fromManual = []; // none, since manualState is not considered
-      const autoApp = Object.values(jobById)
-        .filter(j => j.machineId === colId && !manualList.includes(j.id));
-      return [...fromManual, ...autoApp];
-    };
+      console.log('fetchOrdersEmbroLinks ▶ done');
+    } catch (err) {
+      console.error('❌ fetchOrdersEmbroLinks error', err);
+    }
+  };
 
-    const queueJobs = Object.values(jobById).sort((a, b) => {
-      const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
-      if (da && db) return da - db;
-      if (da) return -1;
-      if (db) return 1;
-      return 0;
-    });
-    const machine1Jobs = buildMachine('machine1');
-    const machine2Jobs = buildMachine('machine2');
+  // ─── Section 5.2: Initial load + Poll orders/embroidery/links every 20s ─────
+  useEffect(() => {
+    console.log("📡 Initial load: manualState + orders/embroidery/links");
 
-    setColumns(cols => ({
-      queue:    { ...cols.queue,    jobs: queueJobs },
-      machine1:{ ...cols.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
-      machine2:{ ...cols.machine2, jobs: scheduleMachineJobs(machine2Jobs) }
-    }));
-    console.log('fetchOrdersEmbroLinks ▶ done');
-  } catch (err) {
-    console.error('❌ fetchOrdersEmbroLinks error', err);
-  }
-};
+    // 1) Immediately load manualState
+    fetchManualState();
+
+    // 2) Immediately load orders, embroideryList, links
+    fetchOrdersEmbroLinks();
+
+    // 3) Then poll only orders/embroideryList/links every 20 seconds
+    const handle = setInterval(() => {
+      console.log("⏳ Poll: orders/embroidery/links");
+      fetchOrdersEmbroLinks();
+    }, 20_000);
+
+    return () => clearInterval(handle);
+  }, []);
 
 // === Section 6: Placeholder Management ===
 
@@ -566,105 +587,97 @@ const toggleLink = async (colId, idx) => {
   }));
 };
 
-// === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState + placeholders) ===
-const onDragEnd = async (result) => {
-  // 🔍 DEBUGGING INSTRUMENTATION
-  console.log("🔍 DRAG-END result:", result);
-  console.log("🔍 BEFORE COLUMNS:", JSON.stringify(columns, null, 2));
+  // ─── Section 8: Drag & Drop Handler ────────────────────────────────────────
+  const onDragEnd = async (result) => {
+    // 🔍 DEBUGGING
+    console.log("🔍 DRAG-END result:", result);
+    console.log("🔍 BEFORE COLUMNS:", JSON.stringify(columns, null, 2));
 
-  const { source, destination, draggableId } = result;
-  if (!destination) {
-    console.log("→ No destination, aborting");
-    return;
-  }
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
 
-  const srcCol = source.droppableId;
-  const dstCol = destination.droppableId;
-  const srcIdx = source.index;
-  const dstIdx = destination.index;
-  if (srcCol === dstCol && srcIdx === dstIdx) return;
+    const srcCol = source.droppableId;
+    const dstCol = destination.droppableId;
+    const srcIdx = source.index;
+    const dstIdx = destination.index;
+    if (srcCol === dstCol && srcIdx === dstIdx) return;
 
-  // 1) Extract the full chain from the source column
-  const srcJobs   = Array.from(columns[srcCol].jobs);
-  const chainIds  = getChain(srcJobs, draggableId);
-  const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
-  const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
+    // 1) Extract the chain from the source column
+    const srcJobs    = Array.from(columns[srcCol].jobs);
+    const chainIds   = getChain(srcJobs, draggableId);
+    const chainJobs  = chainIds.map(id => srcJobs.find(j => j.id === id));
+    const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
-  // 2) If reordering within the same column:
-  if (srcCol === dstCol) {
-    let insertAt = dstIdx;
-    if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
-    newSrcJobs.splice(insertAt, 0, ...chainJobs);
-    const updatedJobs = srcCol === 'queue'
-      ? sortQueue(newSrcJobs)
-      : scheduleMachineJobs(newSrcJobs);
-    setColumns(cols => ({
-      ...cols,
-      [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
+    // 2) If reordering within the same column:
+    if (srcCol === dstCol) {
+      let insertAt = dstIdx;
+      if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
+      newSrcJobs.splice(insertAt, 0, ...chainJobs);
+      const updatedJobs = srcCol === 'queue'
+        ? sortQueue(newSrcJobs)
+        : scheduleMachineJobs(newSrcJobs);
+      setColumns(cols => ({
+        ...cols,
+        [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
+      }));
+      return;
+    }
+
+    // 3) Cross-column move: build destination jobs array
+    const dstJobs = Array.from(columns[dstCol].jobs);
+    const movedJobs = chainJobs.map(job => ({
+      ...job,
+      machineId: dstCol === 'queue' ? 'queue' : dstCol,
+      ...(dstCol === 'queue' && {
+        start: '', end: '', delivery: '',
+        _rawStart: null, _rawEnd: null,
+        isLate: false, linkedTo: null
+      })
     }));
-    console.log('⏹ onDragEnd end (reorder same col), new columns:', {
+    dstJobs.splice(dstIdx, 0, ...movedJobs);
+
+    // 4) If dropping into queue, remove any linked chains
+    if (dstCol === 'queue') {
+      const pruned = { ...links };
+      chainIds.forEach(id => delete pruned[id]);
+      Object.keys(pruned).forEach(key => {
+        if (chainIds.includes(pruned[key])) delete pruned[key];
+      });
+      saveLinks(pruned);
+      setLinks(pruned);
+    }
+
+    // 5) Assemble & reschedule all columns
+    const nextCols = {
       ...columns,
-      [srcCol]: { ...columns[srcCol], jobs: updatedJobs }
+      [srcCol]: { ...columns[srcCol],   jobs: newSrcJobs },
+      [dstCol]: { ...columns[dstCol],   jobs: dstJobs }
+    };
+    ['machine1', 'machine2'].forEach(machine => {
+      nextCols[machine].jobs = scheduleMachineJobs(nextCols[machine].jobs);
     });
-    return;
-  }
+    nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
 
-  // 3) Cross-column move: build the destination jobs array
-  const dstJobs = Array.from(columns[dstCol].jobs);
-  const movedJobs = chainJobs.map(job => ({
-    ...job,
-    machineId: dstCol === 'queue' ? 'queue' : dstCol,
-    ...(dstCol === 'queue' && {
-      start: '', end: '', delivery: '',
-      _rawStart: null, _rawEnd: null,
-      isLate: false, linkedTo: null
-    })
-  }));
-  dstJobs.splice(dstIdx, 0, ...movedJobs);
+    // Update state immediately so the UI moves
+    setColumns(nextCols);
 
-  // 4) If dropping into queue, unlink the chain from links
-  if (dstCol === 'queue') {
-    const pruned = { ...links };
-    chainIds.forEach(id => delete pruned[id]);
-    Object.keys(pruned).forEach(key => {
-      if (chainIds.includes(pruned[key])) delete pruned[key];
-    });
-    saveLinks(pruned);
-    setLinks(pruned);
-  }
+    // 6) Persist manualState (placeholders + machine assignments)
+    const manualState = {
+      machine1:    nextCols.machine1.jobs.map(j => j.id),
+      machine2:    nextCols.machine2.jobs.map(j => j.id),
+      placeholders // from your local state
+    };
+    console.log('⏹ Persisting manualState to server:', manualState);
+    try {
+      await axios.post(API_ROOT + '/manualState', manualState);
+      console.log('✅ manualState saved');
+    } catch (err) {
+      console.error('❌ manualState save failed', err);
+    }
 
-  // 5) Assemble and reschedule all columns
-  const nextCols = {
-    ...columns,
-    [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
-    [dstCol]: { ...columns[dstCol], jobs: dstJobs }
+    // 7) ONLY reload manualState (fast) — do NOT call fetchAll()
+    await fetchManualState();
   };
-  ['machine1', 'machine2'].forEach(machine => {
-    nextCols[machine].jobs = scheduleMachineJobs(nextCols[machine].jobs);
-  });
-  nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
-
-  // update state immediately
-  setColumns(nextCols);
-  console.log('⏹ onDragEnd end (cross-col), new columns:', nextCols);
-
-  // 6) Persist the shared manualState to backend (placeholders + machine assignments)
-  const manualState = {
-    machine1:    nextCols.machine1.jobs.map(j => j.id),
-    machine2:    nextCols.machine2.jobs.map(j => j.id),
-    placeholders // ← make sure to include this array from state
-  };
-  console.log('⏹ Persisting manualState to server:', manualState);
-  try {
-    await axios.post(API_ROOT + '/manualState', manualState);
-    console.log('✅ manualState saved');
-  } catch (err) {
-    console.error('❌ manualState save failed', err);
-  }
-
-  // 7) Only reload manualState (fast) — no full fetchAll()
-  await fetchManualState();
-};
 // === Section 9: Render via Section9.jsx ===
 
   return (
