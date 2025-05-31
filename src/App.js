@@ -343,230 +343,233 @@ function getChain(jobs, id) {
   return chain;
 }
 
-  // ─── Section 5: Fetch Helpers + Initial Load & Polling ───────────────────────────────────
-  // Two flags for the top status bar:
+  // ─── Section 5: Fetch Helpers + Combined Fetch Each 20 Seconds ─────────────────
+
+  // Two flags (for the top status bar if you have one):
   // • isLoading = true whenever any fetch is in flight
   // • hasError   = true if the most recent fetch attempt failed
   const [isLoading, setIsLoading] = useState(false);
   const [hasError,   setHasError]   = useState(false);
 
-  // ─── Section 5A: fetchManualState only ───────────────────────────────────────────────
-  const fetchManualState = async () => {
-    console.log('fetchManualState ▶ start');
-    setIsLoading(true);
-    setHasError(false);
+  // --- Step 5A: “Core” fetchOrdersEmbroLinks: build columns based on latest orders/embroidery/links
+  //     (This alone does NOT re‐assign manual placements—see Step 5C below.)
+  const fetchOrdersEmbroLinksCore = async () => {
+    // 1) Fetch orders, embroideryList, links in parallel
+    const [ordersRes, embRes, linksRes] = await Promise.all([
+      axios.get(API_ROOT + '/orders'),
+      axios.get(API_ROOT + '/embroideryList'),
+      axios.get(API_ROOT + '/links'),
+    ]);
 
+    const orders    = ordersRes.data   || [];
+    const embList   = embRes.data      || [];
+    const linksData = linksRes.data    || {};
+
+    // 2) Build embMap = { orderId → embroideryStartTime }
+    const embMap = {};
+    embList.forEach(r => {
+      const id = String(r['Order #'] || '').trim();
+      if (id) embMap[id] = r['Embroidery Start Time'] || '';
+    });
+
+    // 3) Construct a fresh map of all jobs (real orders + placeholders)
+    //    First, start with real orders
+    const jobById = {};
+    orders.forEach(o => {
+      const sid = String(o['Order #'] || '').trim();
+      if (!sid) return;
+      jobById[sid] = {
+        id:               sid,
+        company:          o['Company Name'] || '',
+        design:           o['Design']       || '',
+        quantity:         +o['Quantity']    || 0,
+        stitch_count:     +o['Stitch Count']|| 0,
+        due_date:         o['Due Date']     || '',
+        due_type:         o['Hard Date/Soft Date'] || '',
+        embroidery_start: embMap[sid] || '',
+        start_date:       embMap[sid] || '',
+        machineId:        'queue',            // default to queue
+        linkedTo:         linksData[sid]   || null
+      };
+    });
+
+    //    Then, inject any placeholders from local state so they never vanish
+    placeholders.forEach(ph => {
+      if (!jobById[ph.id]) {
+        jobById[ph.id] = {
+          id:               ph.id,
+          company:          ph.company || '',
+          design:           '',
+          quantity:         +ph.quantity    || 0,
+          stitch_count:     +ph.stitchCount || 0,
+          due_date:         ph.inHand       || '',
+          due_type:         ph.dueType      || '',
+          embroidery_start: '',
+          start_date:       '',
+          machineId:        'queue',
+          linkedTo:         null
+        };
+      } else {
+        // If placeholder ID already existed (unlikely), update its fields
+        const existingPh = jobById[ph.id];
+        existingPh.company       = ph.company       || '';
+        existingPh.quantity      = +ph.quantity     || 0;
+        existingPh.stitch_count  = +ph.stitchCount  || 0;
+        existingPh.due_date      = ph.inHand        || '';
+        existingPh.due_type      = ph.dueType       || '';
+      }
+    });
+
+    // 4) Build initial “newCols” based on what’s currently in state, so we don’t drop anything
+    //    We will overwrite each column’s jobs entirely in step 5c below, but by copying the
+    //    “machineId” from jobById, we preserve whatever assignments we choose next.
+    const newCols = {
+      queue:    { ...columns.queue,    jobs: [] },
+      machine1: { ...columns.machine1, jobs: [] },
+      machine2: { ...columns.machine2, jobs: [] },
+    };
+
+    // 5) Now decide which column each job belongs to:
+    //    a) If currently in columns.machine1.jobs, keep machineId='machine1'
+    columns.machine1.jobs.forEach(job => {
+      if (jobById[job.id]) {
+        jobById[job.id].machineId = 'machine1';
+      }
+    });
+    //    b) If currently in columns.machine2.jobs, keep machineId='machine2'
+    columns.machine2.jobs.forEach(job => {
+      if (jobById[job.id]) {
+        jobById[job.id].machineId = 'machine2';
+      }
+    });
+    //    c) Everything else remains machineId='queue'
+
+    // 6) Build array versions of each column from jobById:
+    Object.values(jobById).forEach(job => {
+      if (job.machineId === 'machine1') {
+        newCols.machine1.jobs.push(job);
+      } else if (job.machineId === 'machine2') {
+        newCols.machine2.jobs.push(job);
+      } else {
+        newCols.queue.jobs.push(job);
+      }
+    });
+
+    // 7) Sort only the queue by due_date (machines remain in the order you last arranged)
+    newCols.queue.jobs.sort((a, b) => {
+      const da = parseDueDate(a.due_date);
+      const db = parseDueDate(b.due_date);
+      if (da && db) return da - db;
+      if (da) return -1;
+      if (db) return 1;
+      return 0;
+    });
+
+    // 8) Re-run scheduleMachineJobs on the machine columns so their start/end times recalc
+    newCols.machine1.jobs = scheduleMachineJobs(newCols.machine1.jobs);
+    newCols.machine2.jobs = scheduleMachineJobs(newCols.machine2.jobs);
+
+    // 9) Return the newCols object (we’ll commit it in the combined step).
+    return newCols;
+  };
+
+  // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
+  const fetchManualStateCore = async (previousCols) => {
+    // previousCols should be the object returned by fetchOrdersEmbroLinksCore
+    // We’ll merge in any server‐specified placeholders and re‐assign those.
+    console.log('fetchManualStateCore ▶ start');
+    // We do not set loading flags here; the combined function handles that.
     try {
-      // 1) Fetch current manualState (machine1, machine2, placeholders)
+      // 1) Fetch manualState
       const { data: msData } = await axios.get(API_ROOT + '/manualState');
-      //   msData = {
-      //     machine1: [id1, id2, …],
-      //     machine2: [id3, id4, …],
-      //     placeholders: [ { id, company, quantity, stitchCount, inHand, dueType }, … ]
-      //   }
+      //   msData = { machine1: [ … ], machine2: [ … ], placeholders: [ … ] }
 
-      // 2) Overwrite local placeholders array
+      // 2) Overwrite local placeholders
       setPlaceholders(msData.placeholders || []);
 
-      // 3) Make a shallow copy of columns so we can modify in place
-      const newCols = { ...columns };
+      // 3) Build “mergedCols” starting from previousCols
+      const mergedCols = {
+        queue:    { ...previousCols.queue,    jobs: [...previousCols.queue.jobs] },
+        machine1: { ...previousCols.machine1, jobs: [...previousCols.machine1.jobs] },
+        machine2: { ...previousCols.machine2, jobs: [...previousCols.machine2.jobs] },
+      };
 
-      // 3a) Remove any placeholder job from machine1/machine2 if it had been moved
+      // 4) Remove any job that is now a placeholder from machine1/machine2
       ['machine1', 'machine2'].forEach(colId => {
-        newCols[colId].jobs = newCols[colId].jobs.filter(
+        mergedCols[colId].jobs = mergedCols[colId].jobs.filter(
           job => !msData.placeholders.some(p => p.id === job.id)
         );
       });
 
-      // 3b) Inject each placeholder ID (in server‐specified order) into machine1
+      // 5) Re‐inject placeholders into machine1 in exact server order
       ;(msData.machine1 || []).forEach(jobId => {
-        const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
+        // find that job in mergedCols.queue.jobs
+        const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
         if (idx !== -1) {
-          const [jobObj] = newCols.queue.jobs.splice(idx, 1);
-          newCols.machine1.jobs.push(jobObj);
+          const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
+          mergedCols.machine1.jobs.push(jobObj);
         }
       });
 
-      // 3c) Inject placeholders into machine2
+      // 6) Re‐inject placeholders into machine2
       ;(msData.machine2 || []).forEach(jobId => {
-        const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
+        const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
         if (idx !== -1) {
-          const [jobObj] = newCols.queue.jobs.splice(idx, 1);
-          newCols.machine2.jobs.push(jobObj);
+          const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
+          mergedCols.machine2.jobs.push(jobObj);
         }
       });
 
-      // 4) Update columns state so placeholders + assignments appear
-      setColumns(newCols);
-      console.log('fetchManualState ▶ done');
-      setHasError(false);
+      // 7) Leave all other jobs exactly where they are (in queue / machine1 / machine2).
+      //    Now re‐run scheduleMachineJobs on machines to recalc times.
+      mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs);
+      mergedCols.machine2.jobs = scheduleMachineJobs(mergedCols.machine2.jobs);
+
+      console.log('fetchManualStateCore ▶ done');
+      return mergedCols;
     } catch (err) {
-      console.error('❌ fetchManualState error', err);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
+      console.error('❌ fetchManualStateCore error', err);
+      throw err;
     }
   };
 
-  // ─── Section 5B: fetchOrdersEmbroLinks only (preserve manual assignments) ──────────────
-  const fetchOrdersEmbroLinks = async () => {
-    console.log('fetchOrdersEmbroLinks ▶ start');
+  // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
+  const fetchAllCombined = async () => {
+    console.log('fetchAllCombined ▶ start');
     setIsLoading(true);
     setHasError(false);
 
     try {
-      // 1) Fetch orders, embroideryList, links simultaneously
-      const [ordersRes, embRes, linksRes] = await Promise.all([
-        axios.get(API_ROOT + '/orders'),
-        axios.get(API_ROOT + '/embroideryList'),
-        axios.get(API_ROOT + '/links'),
-      ]);
+      // 1) First, build new columns from orders/embroidery/links only
+      const colsAfterOrders = await fetchOrdersEmbroLinksCore();
 
-      const orders    = ordersRes.data   || [];
-      const embList   = embRes.data      || [];
-      const linksData = linksRes.data    || {};
+      // 2) Then, apply manualState on top of that to enforce placeholders & machine1/machine2 order
+      const colsAfterManual = await fetchManualStateCore(colsAfterOrders);
 
-      // 2) Build embMap = { orderId → embroideryStartTime }
-      const embMap = {};
-      embList.forEach(r => {
-        const id = String(r['Order #'] || '').trim();
-        if (id) embMap[id] = r['Embroidery Start Time'] || '';
-      });
+      // 3) Finally, commit to React state
+      setColumns(colsAfterManual);
 
-      // 3) Make a copy of current columns (to update in place)
-      const newCols = {
-        queue:    { ...columns.queue,    jobs: [...columns.queue.jobs] },
-        machine1: { ...columns.machine1, jobs: [...columns.machine1.jobs] },
-        machine2: { ...columns.machine2, jobs: [...columns.machine2.jobs] },
-      };
-
-      // 4) Build a quick lookup of existing job IDs → reference to that job object
-      //    This ensures we update existing jobs rather than reassign them.
-      const existingMap = {};
-      ['queue','machine1','machine2'].forEach(colId => {
-        newCols[colId].jobs.forEach(job => {
-          existingMap[job.id] = job;
-        });
-      });
-
-      // 5) For each fetched order, either update fields on existing job or append a brand‐new job into queue
-      orders.forEach(o => {
-        const sid = String(o['Order #'] || '').trim();
-        if (!sid) return;
-        const rawTs = embMap[sid] || '';
-
-        if (existingMap[sid]) {
-          // a) Update fields on the existing job object (in whatever column it already lives)
-          const existingJob = existingMap[sid];
-          existingJob.company          = o['Company Name'] || '';
-          existingJob.design           = o['Design']       || '';
-          existingJob.quantity         = +o['Quantity']    || 0;
-          existingJob.stitch_count     = +o['Stitch Count']|| 0;
-          existingJob.due_date         = o['Due Date']     || '';
-          existingJob.due_type         = o['Hard Date/Soft Date'] || '';
-          existingJob.embroidery_start = rawTs;
-          existingJob.start_date       = rawTs;
-          existingJob.linkedTo         = linksData[sid]   || null;
-          // Do NOT modify existingJob.machineId here; that preserves manual placement.
-        } else {
-          // b) This is a brand‐new order → push into the end of queue
-          const newJob = {
-            id:               sid,
-            company:          o['Company Name'] || '',
-            design:           o['Design']       || '',
-            quantity:         +o['Quantity']    || 0,
-            stitch_count:     +o['Stitch Count']|| 0,
-            due_date:         o['Due Date']     || '',
-            due_type:         o['Hard Date/Soft Date'] || '',
-            embroidery_start: rawTs,
-            start_date:       rawTs,
-            machineId:        'queue',
-            linkedTo:         linksData[sid]   || null
-          };
-          newCols.queue.jobs.push(newJob);
-          existingMap[sid] = newJob;
-        }
-      });
-
-      // 6) Inject all placeholder jobs (from local `placeholders` state) so they never disappear
-      placeholders.forEach(ph => {
-        if (existingMap[ph.id]) {
-          // a) If placeholder ID already exists in some column, update its fields
-          const existingPh = existingMap[ph.id];
-          existingPh.company       = ph.company       || '';
-          existingPh.quantity      = +ph.quantity     || 0;
-          existingPh.stitch_count  = +ph.stitchCount  || 0;
-          existingPh.due_date      = ph.inHand        || '';
-          existingPh.due_type      = ph.dueType       || '';
-          // Do NOT change existingPh.machineId; keep it where it is.
-        } else {
-          // b) If placeholder ID does not yet exist, push into queue
-          const placeholderJob = {
-            id:               ph.id,
-            company:          ph.company       || '',
-            design:           '',
-            quantity:         +ph.quantity     || 0,
-            stitch_count:     +ph.stitchCount  || 0,
-            due_date:         ph.inHand        || '',
-            due_type:         ph.dueType       || '',
-            embroidery_start: '',
-            start_date:       '',
-            machineId:        'queue',
-            linkedTo:         null
-          };
-          newCols.queue.jobs.push(placeholderJob);
-          existingMap[ph.id] = placeholderJob;
-        }
-      });
-
-      // 7) Sort only the queue by due_date; leave machine1/machine2 in their current order
-      newCols.queue.jobs.sort((a, b) => {
-        const da = parseDueDate(a.due_date);
-        const db = parseDueDate(b.due_date);
-        if (da && db) return da - db;
-        if (da) return -1;
-        if (db) return 1;
-        return 0;
-      });
-
-      // 8) Re-run schedule logic on the two machine columns
-      const scheduledMachine1 = scheduleMachineJobs(newCols.machine1.jobs);
-      const scheduledMachine2 = scheduleMachineJobs(newCols.machine2.jobs);
-
-      // 9) Commit the merged/updated lists back into React state
-      setColumns({
-        queue:    { ...newCols.queue,    jobs: [...newCols.queue.jobs] },
-        machine1:{ ...newCols.machine1, jobs: scheduledMachine1 },
-        machine2:{ ...newCols.machine2, jobs: scheduledMachine2 }
-      });
-
-      console.log('fetchOrdersEmbroLinks ▶ done');
+      console.log('fetchAllCombined ▶ done');
       setHasError(false);
     } catch (err) {
-      console.error('❌ fetchOrdersEmbroLinks error', err);
+      console.error('❌ fetchAllCombined error', err);
       setHasError(true);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ─── Section 5.2: On mount, do ONE fetchManualState + ONE fetchOrdersEmbroLinks,
-  //                   then every 20 s fetch BOTH again ─────────────────────────────────
+  // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
   useEffect(() => {
-    console.log("📡 Initial load: manualState + orders/embroidery/links");
+    console.log("📡 Initial load: combined fetchAllCombined()");
 
-    // 1) Load manualState so placeholders & machine assignments appear
-    fetchManualState();
+    // 1) Run immediately on mount
+    fetchAllCombined();
 
-    // 2) Load orders/embroideryList/links so queue + machines appear
-    fetchOrdersEmbroLinks();
-
-    // 3) Every 20 seconds, refresh BOTH manualState and orders/embroidery/links
+    // 2) Then set up the 20 s interval
     const handle = setInterval(() => {
-      console.log("⏳ Poll: manualState + orders/embroidery/links");
-      // Note: fire‐and‐forget in parallel—ok if manualState lags slightly behind orders
-      fetchOrdersEmbroLinks();
-      fetchManualState();
+      console.log("⏳ Poll: combined fetchAllCombined()");
+      fetchAllCombined();
     }, 20_000);
 
     return () => clearInterval(handle);
