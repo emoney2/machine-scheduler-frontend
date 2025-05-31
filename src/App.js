@@ -343,128 +343,161 @@ function getChain(jobs, id) {
   return chain;
 }
 
-// === Section 5: FETCH & MERGE (with placeholders from server) ===
-const fetchAll = async () => {
-  console.log('fetchAll ▶ start');
-  try {
-    // 1) Fetch manualState (includes placeholders), orders, embroideryList, links
-    const [manualRes, ordersRes, embRes, linksRes] = await Promise.all([
-      axios.get(API_ROOT + '/manualState'),
-      axios.get(API_ROOT + '/orders'),
-      axios.get(API_ROOT + '/embroideryList'),
-      axios.get(API_ROOT + '/links')
-    ]);
+  // ─── Section 5: Fetch Helpers + Status Bar State ────────────────────────────────────
+  // Add two new state flags: isLoading=true whenever any fetch is in flight; hasError=true on any error
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError,   setHasError]   = useState(false);
 
-    // unpack
-    const { machine1, machine2, placeholders: serverPh = [] } = manualRes.data || {};
-    const orders  = ordersRes.data   || [];
-    const embList = embRes.data      || [];
-    const links   = linksRes.data    || {};
+  // ─── Section 5A: fetchManualState only ─────────────────────────────────
+  const fetchManualState = async () => {
+    console.log('fetchManualState ▶ start');
+    setIsLoading(true);
+    setHasError(false);
 
-    // 2) Mirror server placeholders into local state
-    setPlaceholders(serverPh);
+    try {
+      const { data: msData } = await axios.get(API_ROOT + '/manualState');
+      // 200 OK assumed if we reached here
+      // 1) Update local placeholders
+      setPlaceholders(msData.placeholders || []);
 
-    // 3) Preserve previous embroidery_start
-    const prevEmb = {};
-    Object.values(columns)
-      .flatMap(col => col.jobs)
-      .forEach(job => {
-        if (job.embroidery_start) prevEmb[job.id] = job.embroidery_start;
-        else if (job.start_date)  prevEmb[job.id] = job.start_date;
+      // 2) Rebuild only the machine1/machine2 assignments
+      const newCols = { ...columns };
+
+      // Remove any placeholder jobs from existing machine lists
+      ['machine1', 'machine2'].forEach(colId => {
+        newCols[colId].jobs = newCols[colId].jobs.filter(
+          job => !msData.placeholders.some(p => p.id === job.id)
+        );
       });
 
-    // 4) Build embroidery‐start lookup
-    const embMap = {};
-    embList.forEach(r => {
-      const id = String(r['Order #']||'').trim();
-      if (id) embMap[id] = r['Embroidery Start Time'] || '';
-    });
-
-    // 5) Build jobById from orders
-    const jobById = {};
-    orders.forEach(o => {
-      const sid = String(o['Order #']||'').trim();
-      if (!sid) return;
-      const rawTs = embMap[sid] ?? prevEmb[sid] ?? '';
-      jobById[sid] = {
-        id: sid,
-        company:      o['Company Name'] || '',
-        design:       o['Design']       || '',
-        quantity:    +o['Quantity']     || 0,
-        stitch_count:+o['Stitch Count'] || 0,
-        due_date:     o['Due Date']      || '',
-        due_type:     o['Hard Date/Soft Date'] || '',
-        embroidery_start: rawTs,
-        start_date:   rawTs,
-        machineId:    o['Machine ID']    || 'queue',
-        linkedTo:     links[sid]        || null
-      };
-    });
-
-    // 6) Inject placeholders from server
-    serverPh.forEach(ph => {
-      jobById[ph.id] = {
-        id:               ph.id,
-        company:          ph.company,
-        design:           ph.design || '',
-        quantity:         +ph.quantity  || 0,
-        stitch_count:     +ph.stitchCount|| 0,
-        due_date:         ph.inHand      || '',
-        due_type:         ph.dueType     || '',
-        embroidery_start: '',
-        start_date:       '',
-        machineId:        'queue',
-        linkedTo:         links[ph.id]   || null
-      };
-    });
-
-    // 7) Apply manual machine‐assignments
-    [ 'machine1', 'machine2' ].forEach(colId => {
-      (manualRes.data[colId]||[]).forEach(id => {
-        if (jobById[id]) jobById[id].machineId = colId;
+      // Inject placeholders into machine1 (in server order)
+      (msData.machine1 || []).forEach(jobId => {
+        const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
+        if (idx !== -1) {
+          const [jobObj] = newCols.queue.jobs.splice(idx, 1);
+          newCols.machine1.jobs.push(jobObj);
+        }
       });
-    });
+      // Inject placeholders into machine2
+      (msData.machine2 || []).forEach(jobId => {
+        const idx = newCols.queue.jobs.findIndex(j => j.id === jobId);
+        if (idx !== -1) {
+          const [jobObj] = newCols.queue.jobs.splice(idx, 1);
+          newCols.machine2.jobs.push(jobObj);
+        }
+      });
 
-    // 8) Build & sort queue
-    const queueJobs = Object.values(jobById)
-      .filter(j => !['machine1','machine2'].includes(j.machineId))
-      .sort((a,b)=> {
-        const da = parseDueDate(a.due_date), db = parseDueDate(b.due_date);
+      setColumns(newCols);
+      console.log('fetchManualState ▶ done');
+      setHasError(false);
+    } catch (err) {
+      console.error('❌ fetchManualState error', err);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ─── Section 5B: fetchOrdersEmbroLinks only (no manualState) ────────────────
+  const fetchOrdersEmbroLinks = async () => {
+    console.log('fetchOrdersEmbroLinks ▶ start');
+    setIsLoading(true);
+    setHasError(false);
+
+    try {
+      // 1) Fetch orders, embroideryList, links in parallel
+      const [ordersRes, embRes, linksRes] = await Promise.all([
+        axios.get(API_ROOT + '/orders'),
+        axios.get(API_ROOT + '/embroideryList'),
+        axios.get(API_ROOT + '/links')
+      ]);
+
+      const orders    = ordersRes.data   || [];
+      const embList   = embRes.data      || [];
+      const linksData = linksRes.data    || {};
+
+      // 2) Build a map of OrderID → Embroidery Start Time
+      const embMap = {};
+      embList.forEach(r => {
+        const id = String(r['Order #'] || '').trim();
+        if (id) embMap[id] = r['Embroidery Start Time'] || '';
+      });
+
+      // 3) Build jobById from orders + embroidery data
+      const jobById = {};
+      orders.forEach(o => {
+        const sid = String(o['Order #'] || '').trim();
+        if (!sid) return;
+        const rawTs = embMap[sid] || '';
+        jobById[sid] = {
+          id: sid,
+          company:         o['Company Name'] || '',
+          design:          o['Design']       || '',
+          quantity:        +o['Quantity']    || 0,
+          stitch_count:    +o['Stitch Count']|| 0,
+          due_date:        o['Due Date']     || '',
+          due_type:        o['Hard Date/Soft Date'] || '',
+          embroidery_start: rawTs,
+          start_date:       rawTs,
+          machineId:       'queue',
+          linkedTo:        linksData[sid]   || null
+        };
+      });
+
+      // 4) Build queueJobs (sorted by due_date)
+      const queueJobs = Object.values(jobById).sort((a, b) => {
+        const da = parseDueDate(a.due_date);
+        const db = parseDueDate(b.due_date);
         if (da && db) return da - db;
         if (da) return -1;
-        if (db) return  1;
-        return  0;
+        if (db) return 1;
+        return 0;
       });
 
-    // 9) Build each machine’s list (manual first, then auto)
-    const buildMachine = colId => {
-      const manualList = manualRes.data[colId] || [];
-      const fromManual = manualList.map(id => jobById[id]).filter(Boolean);
-      const autoApp    = Object.values(jobById)
-        .filter(j => j.machineId === colId && !manualList.includes(j.id));
-      return [...fromManual, ...autoApp];
-    };
-    const machine1Jobs = buildMachine('machine1');
-    const machine2Jobs = buildMachine('machine2');
+      // 5) Build machine1Jobs & machine2Jobs (ignoring manualState placeholders)
+      const buildMachine = colId => {
+        return Object.values(jobById).filter(
+          j => j.machineId === colId && !Object.values(linksData).includes(j.id)
+        );
+      };
+      const machine1Jobs = buildMachine('machine1');
+      const machine2Jobs = buildMachine('machine2');
 
-    // 10) Schedule & update columns
-    setColumns({
-      queue:    { ...columns.queue,    jobs: queueJobs },
-      machine1:{ ...columns.machine1, jobs: scheduleMachineJobs(machine1Jobs) },
-      machine2:{ ...columns.machine2, jobs: scheduleMachineJobs(machine2Jobs) }
-    });
-    console.log('fetchAll ▶ done');
-  }
-  catch(err) {
-    console.error('fetchAll ▶ error', err);
-  }
-};
+      // 6) Update columns state (queue + machine containers)
+      setColumns(cols => ({
+        queue:     { ...cols.queue,     jobs: queueJobs },
+        machine1:  { ...cols.machine1,  jobs: scheduleMachineJobs(machine1Jobs) },
+        machine2:  { ...cols.machine2,  jobs: scheduleMachineJobs(machine2Jobs) }
+      }));
 
-// === Section 5.1: Keep fetchAll in a ref ===
-const fetchAllRef = useRef(fetchAll);
-useEffect(() => {
-  fetchAllRef.current = fetchAll;
-}, [fetchAll]);
+      console.log('fetchOrdersEmbroLinks ▶ done');
+      setHasError(false);
+    } catch (err) {
+      console.error('❌ fetchOrdersEmbroLinks error', err);
+      setHasError(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ─── Section 5.2: Initial load + Poll orders/embroidery/links every 20s ─────
+  useEffect(() => {
+    console.log("📡 Initial load: manualState + orders/embroidery/links");
+
+    // 1) Immediately load manualState
+    fetchManualState();
+
+    // 2) Immediately load orders, embroideryList, links
+    fetchOrdersEmbroLinks();
+
+    // 3) Continue polling only orders/embroideryList/links every 20 seconds
+    const handle = setInterval(() => {
+      console.log("⏳ Poll: orders/embroidery/links");
+      fetchOrdersEmbroLinks();
+    }, 20_000);
+
+    return () => clearInterval(handle);
+  }, []);
 
 // === Section 6: Placeholder Management ===
 
@@ -665,6 +698,19 @@ const onDragEnd = async (result) => {
 
   return (
     <>
+      {/* ─── Status Bar ───────────────────────────────────────────────────────────── */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          height: '4px',
+          width: '100%',
+          backgroundColor: (isLoading || hasError) ? 'yellow' : 'green',
+          zIndex: 1000
+        }}
+      />
+
       {/* ─── Nav Bar ────────────────────────────────────────────────────────── */}
       <nav style={{
         display: 'flex',
