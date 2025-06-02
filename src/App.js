@@ -353,17 +353,23 @@ function getChain(jobs, id) {
 
   // --- Step 5A: “Core” fetchOrdersEmbroLinks: build columns based on latest orders/embroidery/links
   //     (This alone does NOT re‐assign manual placements—see Step 5C below.)
-  const fetchOrdersEmbroLinksCore = async () => {
-    // 1) Fetch orders, embroideryList, links in parallel
-    const [ordersRes, embRes, linksRes] = await Promise.all([
-      axios.get(API_ROOT + '/orders'),
-      axios.get(API_ROOT + '/embroideryList'),
-      axios.get(API_ROOT + '/links'),
-    ]);
+  const [ordersRes, embRes, linksRes] = await Promise.all([
+    axios.get(API_ROOT + '/orders'),
+    axios.get(API_ROOT + '/embroideryList'),
+    axios.get(API_ROOT + '/links'),
+  ]);
 
-    const orders    = ordersRes.data   || [];
-    const embList   = embRes.data      || [];
-    const linksData = linksRes.data    || {};
+  const orders  = ordersRes.data   || [];
+  const embList = embRes.data      || [];
+  let linksData = linksRes.data    || {};
+
+  // Remove any keys that were marked “do not relink”
+  const doNotRelink = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
+  doNotRelink.forEach(jobId => {
+    if (linksData[jobId]) {
+      delete linksData[jobId];
+    }
+  });
 
     // 2) Build embMap = { orderId → embroideryStartTime }
     const embMap = {};
@@ -639,41 +645,53 @@ const removePlaceholder = async (id) => {
   }
 };
 
-// === Section 7: toggleLink (full replacement) ===
+// === Section 7: toggleLink (with “do-not-relink” logic) ===
+
+// A helper that persists our “do-not-relink” set in localStorage
+const addToDoNotRelink = (jobId) => {
+  const existing = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
+  if (!existing.includes(jobId)) {
+    localStorage.setItem('doNotRelink', JSON.stringify([...existing, jobId]));
+  }
+};
+
 const toggleLink = async (colId, idx) => {
-  // 1) Copy current jobs in that column
   const jobs = Array.from(columns[colId].jobs);
   const job  = jobs[idx];
   const next = jobs[idx + 1];
 
-  // 2) Build a new links map
+  // Build a new links map
   const newLinks = { ...links };
   if (job.linkedTo === next?.id) {
-    // unlink
+    // unlink: RECORD this jobId so we don't re‐link it on refresh
     delete newLinks[job.id];
+    addToDoNotRelink(job.id);
   } else if (next) {
-    // link
-    newLinks[job.id] = next.id;
+    // link: ensure it's not marked “do not relink”
+    const doNot = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
+    if (!doNot.includes(job.id)) {
+      newLinks[job.id] = next.id;
+    }
   }
 
-  // 3) Persist to server so everyone sees it
+  // Persist to server
   try {
     await axios.post(API_ROOT + '/links', newLinks);
-    // server will broadcast a "linksUpdated" event
   } catch (err) {
     console.error('❌ failed to save links to server', err);
   }
 
-  // 4) Update local state immediately
+  // Update local state immediately
   setLinks(newLinks);
 
-  // 5) Reflect it in the UI right away
+  // Reflect in the UI
   jobs[idx] = { ...job, linkedTo: newLinks[job.id] || null };
-  setColumns(cols => ({
+  setColumns((cols) => ({
     ...cols,
-    [colId]: { ...cols[colId], jobs }
+    [colId]: { ...cols[colId], jobs },
   }));
 };
+
 
 // === Section 8: Drag & Drop Handler (with Chain‐aware Moves & shared manualState + placeholders) ===
 const onDragEnd = async (result) => {
