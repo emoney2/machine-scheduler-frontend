@@ -103,7 +103,7 @@ export default function App() {
   useEffect(() => {
     const handle = setInterval(() => {
       console.log("⏳ Auto-refresh polling");
-      fetchAll();
+      fetchAllCombined();
     }, 10_000);          // 10,000ms = 10 seconds
 
     return () => clearInterval(handle);
@@ -113,7 +113,7 @@ export default function App() {
   useEffect(() => {
     const handleUpdate = debounce(() => {
       console.log("🛰️ remote update – re-fetching");
-      fetchAll();
+      fetchAllCombined();
     }, 1000);
 
     socket.on("manualStateUpdated",   handleUpdate);
@@ -133,7 +133,7 @@ export default function App() {
   // Manual sync button handler
   const handleSync = async () => {
     setSyncStatus('');
-    await fetchAll();
+    await fetchAllCombined();
     setSyncStatus('updated');
     setTimeout(() => setSyncStatus(''), 2000);
   };
@@ -627,7 +627,7 @@ const submitPlaceholder = async (e) => {
     setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
 
     // **new**: re-fetch everything so the queue shows your placeholder immediately
-    await fetchAll();
+    await fetchAllCombined();
   } catch (err) {
     console.error('❌ failed to save placeholders', err);
   }
@@ -651,7 +651,7 @@ const removePlaceholder = async (id) => {
     await axios.post(API_ROOT + '/manualState', manualState);
     setPlaceholders(updated);
     // **new**: re-fetch so the card disappears without a full page reload
-    await fetchAll();
+    await fetchAllCombined();
   } catch (err) {
     console.error('❌ failed to remove placeholder', err);
   }
