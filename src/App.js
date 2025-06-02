@@ -490,6 +490,7 @@ function getChain(jobs, id) {
     }
   };
 
+const fetchAll = fetchAllCombined;
 
   // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
   const fetchManualStateCore = async (previousCols) => {
