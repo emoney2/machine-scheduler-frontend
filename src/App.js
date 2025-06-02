@@ -370,11 +370,16 @@ function getChain(jobs, id) {
       const embList   = embRes.data      || [];
       let linksData   = linksRes.data    || {};
 
-      // 2) Remove any keys that were marked “do not relink”
+      // 2) Remove any entry (key or value) that appears in doNotRelink
       const doNotRelink = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
-      doNotRelink.forEach(jobId => {
-        if (linksData[jobId]) delete linksData[jobId];
+      const filteredLinks = {};
+      Object.entries(linksData).forEach(([key, val]) => {
+        // drop any pair if either side was unlinked
+        if (!doNotRelink.includes(key) && !doNotRelink.includes(val)) {
+          filteredLinks[key] = val;
+        }
       });
+      linksData = filteredLinks;
 
       // 3) Build embMap = { orderId → embroideryStartTime }
       const embMap = {};
