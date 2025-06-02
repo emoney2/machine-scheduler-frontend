@@ -1122,41 +1122,6 @@ const handleSaveNewCompany = async () => {
                 />
               </label>
             </div>
-            <div>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                Production File(s)*
-                <input
-                  type="file"
-                  multiple
-                  required
-                  onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
-                  style={{
-                    width: "auto",       // shrink input to its intrinsic width (just the button)
-                    overflow: "hidden"   // hide any filename text that would overflow
-                  }}
-                />
-                <span style={{ fontSize: "0.85rem" }}>
-                  {prodFiles.map((f) => f.name).join(", ")}
-                </span>
-              </label>
-            </div>
-            <div>
-              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                Print File(s)
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews)}
-                  style={{
-                    width: "auto",
-                    overflow: "hidden"
-                  }}
-                />
-                <span style={{ fontSize: "0.85rem" }}>
-                  {printFiles.map((f) => f.name).join(", ")}
-                </span>
-              </label>
-            </div>
             <div style={{ textAlign: "center" }}>
               <button
                 type="submit"
@@ -1168,6 +1133,123 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
       </div>
+
+      {/* RIGHT COLUMN: Uploads + Previews */}
+      <div style={{ display: "grid", gap: "0.5rem" }}>
+        {/* ── Production Upload + Preview ─────────────────────────────── */}
+        <div>
+          <h3 style={{ margin: "0.25rem 0" }}>Production Files</h3>
+          <input
+            type="file"
+            multiple
+            required
+            onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
+            style={{ marginBottom: "0.5rem" }}
+          />
+          <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+            {prodFiles.map((f) => f.name).join(", ")}
+          </div>
+
+          <fieldset style={{ padding: "0.5rem", height: "50%" }}>
+            <legend>Production Preview</legend>
+            <div style={{ overflow: "auto", height: "100%" }}>
+              {prodPreviews.map((p, i) => (
+                <div key={i} style={{ position: "relative", marginBottom: "0.25rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => removeProdFile(i)}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      lineHeight: 1,
+                    }}
+                    aria-label="Remove file"
+                  >
+                    ×
+                  </button>
+                  {p.type.startsWith("image/") ? (
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      style={{ maxWidth: "100%", maxHeight: 80 }}
+                    />
+                  ) : p.type === "application/pdf" ? (
+                    <iframe
+                      src={p.url}
+                      title={p.name}
+                      style={{ width: "100%", height: 80 }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: "0.8rem" }}>📄 {p.name}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+
+        {/* ── Print Upload + Preview ──────────────────────────────────── */}
+        <div>
+          <h3 style={{ margin: "0.25rem 0" }}>Print Files</h3>
+          <input
+            type="file"
+            multiple
+            onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews)}
+            style={{ marginBottom: "0.5rem" }}
+          />
+          <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
+            {printFiles.map((f) => f.name).join(", ")}
+          </div>
+
+          <fieldset style={{ padding: "0.5rem", height: "50%" }}>
+            <legend>Print Preview</legend>
+            <div style={{ overflow: "auto", height: "100%" }}>
+              {printPreviews.map((p, i) => (
+                <div key={i} style={{ position: "relative", marginBottom: "0.25rem" }}>
+                  <button
+                    type="button"
+                    onClick={() => removePrintFile(i)}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      right: 0,
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "1rem",
+                      lineHeight: 1,
+                    }}
+                    aria-label="Remove file"
+                  >
+                    ×
+                  </button>
+                  {p.type.startsWith("image/") ? (
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      style={{ maxWidth: "100%", maxHeight: 80 }}
+                    />
+                  ) : p.type === "application/pdf" ? (
+                    <iframe
+                      src={p.url}
+                      title={p.name}
+                      style={{ width: "100%", height: 80 }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: "0.8rem" }}>📄 {p.name}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        </div>
+      </div>
+
     </form>  
   </>      
 );               
