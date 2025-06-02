@@ -490,7 +490,6 @@ function getChain(jobs, id) {
     }
   };
 
-const fetchAll = fetchAllCombined;
 
   // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
   const fetchManualStateCore = async (previousCols) => {
@@ -577,6 +576,8 @@ const fetchAll = fetchAllCombined;
       setIsLoading(false);
     }
   };
+
+const fetchAllCombined = async () => {
 
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
   useEffect(() => {
