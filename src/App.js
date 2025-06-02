@@ -351,133 +351,140 @@ function getChain(jobs, id) {
   const [isLoading, setIsLoading] = useState(false);
   const [hasError,   setHasError]   = useState(false);
 
-  // --- Step 5A: “Core” fetchOrdersEmbroLinks: build columns based on latest orders/embroidery/links
-  //     (This alone does NOT re‐assign manual placements—see Step 5C below.)
-  const [ordersRes, embRes, linksRes] = await Promise.all([
-    axios.get(API_ROOT + '/orders'),
-    axios.get(API_ROOT + '/embroideryList'),
-    axios.get(API_ROOT + '/links'),
-  ]);
+   // ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
+  // (This alone does NOT re‐assign manual placements—see Step 5C below.)
+  const fetchOrdersEmbroLinksCore = async () => {
+    console.log('fetchOrdersEmbroLinksCore ▶ start');
+    setIsLoading(true);
+    setHasError(false);
 
-  const orders  = ordersRes.data   || [];
-  const embList = embRes.data      || [];
-  let linksData = linksRes.data    || {};
+    try {
+      // 1) Fetch /orders, /embroideryList, and /links in parallel
+      const [ordersRes, embRes, linksRes] = await Promise.all([
+        axios.get(API_ROOT + '/orders'),
+        axios.get(API_ROOT + '/embroideryList'),
+        axios.get(API_ROOT + '/links'),
+      ]);
 
-  // Remove any keys that were marked “do not relink”
-  const doNotRelink = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
-  doNotRelink.forEach(jobId => {
-    if (linksData[jobId]) {
-      delete linksData[jobId];
-    }
-  });
+      const orders    = ordersRes.data   || [];
+      const embList   = embRes.data      || [];
+      let linksData   = linksRes.data    || {};
 
-    // 2) Build embMap = { orderId → embroideryStartTime }
-    const embMap = {};
-    embList.forEach(r => {
-      const id = String(r['Order #'] || '').trim();
-      if (id) embMap[id] = r['Embroidery Start Time'] || '';
-    });
+      // 2) Remove any keys that were marked “do not relink”
+      const doNotRelink = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
+      doNotRelink.forEach(jobId => {
+        if (linksData[jobId]) delete linksData[jobId];
+      });
 
-    // 3) Construct a fresh map of all jobs (real orders + placeholders)
-    //    First, start with real orders
-    const jobById = {};
-    orders.forEach(o => {
-      const sid = String(o['Order #'] || '').trim();
-      if (!sid) return;
-      jobById[sid] = {
-        id:               sid,
-        company:          o['Company Name'] || '',
-        design:           o['Design']       || '',
-        quantity:         +o['Quantity']    || 0,
-        stitch_count:     +o['Stitch Count']|| 0,
-        due_date:         o['Due Date']     || '',
-        due_type:         o['Hard Date/Soft Date'] || '',
-        embroidery_start: embMap[sid] || '',
-        start_date:       embMap[sid] || '',
-        machineId:        'queue',            // default to queue
-        linkedTo:         linksData[sid]   || null
-      };
-    });
+      // 3) Build embMap = { orderId → embroideryStartTime }
+      const embMap = {};
+      embList.forEach(r => {
+        const id = String(r['Order #'] || '').trim();
+        if (id) embMap[id] = r['Embroidery Start Time'] || '';
+      });
 
-    //    Then, inject any placeholders from local state so they never vanish
-    placeholders.forEach(ph => {
-      if (!jobById[ph.id]) {
-        jobById[ph.id] = {
-          id:               ph.id,
-          company:          ph.company || '',
-          design:           '',
-          quantity:         +ph.quantity    || 0,
-          stitch_count:     +ph.stitchCount || 0,
-          due_date:         ph.inHand       || '',
-          due_type:         ph.dueType      || '',
-          embroidery_start: '',
-          start_date:       '',
-          machineId:        'queue',
-          linkedTo:         null
+      // 4) Construct fresh map of all jobs (real orders + placeholders)
+      const jobById = {};
+      orders.forEach(o => {
+        const sid = String(o['Order #'] || '').trim();
+        if (!sid) return;
+        jobById[sid] = {
+          id:               sid,
+          company:          o['Company Name'] || '',
+          design:           o['Design']       || '',
+          quantity:         +o['Quantity']    || 0,
+          stitch_count:     +o['Stitch Count']|| 0,
+          due_date:         o['Due Date']     || '',
+          due_type:         o['Hard Date/Soft Date'] || '',
+          embroidery_start: embMap[sid] || '',
+          start_date:       embMap[sid] || '',
+          machineId:        'queue',            // default to queue
+          linkedTo:         linksData[sid]   || null
         };
-      } else {
-        // If placeholder ID already existed (unlikely), update its fields
-        const existingPh = jobById[ph.id];
-        existingPh.company       = ph.company       || '';
-        existingPh.quantity      = +ph.quantity     || 0;
-        existingPh.stitch_count  = +ph.stitchCount  || 0;
-        existingPh.due_date      = ph.inHand        || '';
-        existingPh.due_type      = ph.dueType       || '';
-      }
-    });
+      });
 
-    // 4) Build initial “newCols” based on what’s currently in state, so we don’t drop anything
-    //    We will overwrite each column’s jobs entirely in step 5c below, but by copying the
-    //    “machineId” from jobById, we preserve whatever assignments we choose next.
-    const newCols = {
-      queue:    { ...columns.queue,    jobs: [] },
-      machine1: { ...columns.machine1, jobs: [] },
-      machine2: { ...columns.machine2, jobs: [] },
-    };
+      // 5) Inject any placeholders from local state so they never vanish
+      placeholders.forEach(ph => {
+        if (!jobById[ph.id]) {
+          jobById[ph.id] = {
+            id:               ph.id,
+            company:          ph.company || '',
+            design:           '',
+            quantity:         +ph.quantity    || 0,
+            stitch_count:     +ph.stitchCount || 0,
+            due_date:         ph.inHand       || '',
+            due_type:         ph.dueType      || '',
+            embroidery_start: '',
+            start_date:       '',
+            machineId:        'queue',
+            linkedTo:         null
+          };
+        } else {
+          // If placeholder ID already existed, update its fields in place
+          const existingPh = jobById[ph.id];
+          existingPh.company      = ph.company      || '';
+          existingPh.quantity     = +ph.quantity    || 0;
+          existingPh.stitch_count = +ph.stitchCount || 0;
+          existingPh.due_date     = ph.inHand       || '';
+          existingPh.due_type     = ph.dueType      || '';
+        }
+      });
 
-    // 5) Now decide which column each job belongs to:
-    //    a) If currently in columns.machine1.jobs, keep machineId='machine1'
-    columns.machine1.jobs.forEach(job => {
-      if (jobById[job.id]) {
-        jobById[job.id].machineId = 'machine1';
-      }
-    });
-    //    b) If currently in columns.machine2.jobs, keep machineId='machine2'
-    columns.machine2.jobs.forEach(job => {
-      if (jobById[job.id]) {
-        jobById[job.id].machineId = 'machine2';
-      }
-    });
-    //    c) Everything else remains machineId='queue'
+      // 6) Build initial “newCols” based on what’s currently in state
+      const newCols = {
+        queue:    { ...columns.queue,    jobs: [] },
+        machine1: { ...columns.machine1, jobs: [] },
+        machine2: { ...columns.machine2, jobs: [] },
+      };
 
-    // 6) Build array versions of each column from jobById:
-    Object.values(jobById).forEach(job => {
-      if (job.machineId === 'machine1') {
-        newCols.machine1.jobs.push(job);
-      } else if (job.machineId === 'machine2') {
-        newCols.machine2.jobs.push(job);
-      } else {
-        newCols.queue.jobs.push(job);
-      }
-    });
+      // 7) Decide which column each job belongs to:
+      //    a) If currently in columns.machine1.jobs, keep machineId = 'machine1'
+      columns.machine1.jobs.forEach(job => {
+        if (jobById[job.id]) jobById[job.id].machineId = 'machine1';
+      });
+      //    b) If currently in columns.machine2.jobs, keep machineId = 'machine2'
+      columns.machine2.jobs.forEach(job => {
+        if (jobById[job.id]) jobById[job.id].machineId = 'machine2';
+      });
+      //    c) Everything else remains machineId = 'queue'
 
-    // 7) Sort only the queue by due_date (machines remain in the order you last arranged)
-    newCols.queue.jobs.sort((a, b) => {
-      const da = parseDueDate(a.due_date);
-      const db = parseDueDate(b.due_date);
-      if (da && db) return da - db;
-      if (da) return -1;
-      if (db) return 1;
-      return 0;
-    });
+      // 8) Build array version of each column from jobById
+      Object.values(jobById).forEach(job => {
+        if (job.machineId === 'machine1') {
+          newCols.machine1.jobs.push(job);
+        } else if (job.machineId === 'machine2') {
+          newCols.machine2.jobs.push(job);
+        } else {
+          newCols.queue.jobs.push(job);
+        }
+      });
 
-    // 8) Re-run scheduleMachineJobs on the machine columns so their start/end times recalc
-    newCols.machine1.jobs = scheduleMachineJobs(newCols.machine1.jobs);
-    newCols.machine2.jobs = scheduleMachineJobs(newCols.machine2.jobs);
+      // 9) Sort only the queue by due_date (machines remain in last arranged order)
+      newCols.queue.jobs.sort((a, b) => {
+        const da = parseDueDate(a.due_date);
+        const db = parseDueDate(b.due_date);
+        if (da && db) return da - db;
+        if (da) return -1;
+        if (db) return 1;
+        return 0;
+      });
 
-    // 9) Return the newCols object (we’ll commit it in the combined step).
-    return newCols;
+      // 10) Re-run scheduleMachineJobs on the machine columns
+      newCols.machine1.jobs = scheduleMachineJobs(newCols.machine1.jobs);
+      newCols.machine2.jobs = scheduleMachineJobs(newCols.machine2.jobs);
+
+      // 11) Return the newCols object (we’ll commit it in Step 5C)
+      return newCols;
+    } catch (err) {
+      console.error('❌ fetchOrdersEmbroLinksCore error', err);
+      setHasError(true);
+      // In case of error, return the existing columns unmodified:
+      return columns;
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
   const fetchManualStateCore = async (previousCols) => {
