@@ -577,8 +577,6 @@ function getChain(jobs, id) {
     }
   };
 
-const fetchAllCombined = async () => {
-
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
   useEffect(() => {
     console.log("📡 Initial load: combined fetchAllCombined()");
