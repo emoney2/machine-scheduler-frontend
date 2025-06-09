@@ -598,6 +598,12 @@ function getChain(jobs, id) {
 
 // === Section 6: Placeholder Management ===
 
+// Populate the modal for editing an existing placeholder
+const editPlaceholder = (job) => {
+  setPh(job);
+  setShowModal(true);
+};
+
 // Add or update a placeholder and persist to server
 const submitPlaceholder = async (e) => {
   if (e && e.preventDefault) e.preventDefault();
@@ -685,6 +691,7 @@ const removePlaceholder = async (id) => {
     console.error('❌ failed to remove placeholder', err);
   }
 };
+
 
 // === Section 7: toggleLink (with “do-not-relink” logic) ===
 
