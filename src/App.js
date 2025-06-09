@@ -606,7 +606,7 @@ const submitPlaceholder = async (e) => {
   let updated;
   if (ph.id) {
     // editing an existing placeholder
-    updated = placeholders.map(p => p.id === ph.id ? ph : p);
+    updated = placeholders.map(p => (p.id === ph.id ? ph : p));
   } else {
     // creating a brand-new placeholder
     const newPh = {
@@ -636,7 +636,14 @@ const submitPlaceholder = async (e) => {
 
     // close modal & reset form
     setShowModal(false);
-    setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
+    setPh({
+      id:           null,
+      company:      '',
+      quantity:     '',
+      stitchCount:  '',
+      inHand:       '',
+      dueType:      'Hard Date'
+    });
 
     // re-fetch everything so the new placeholder shows up immediately
     await fetchAllCombined();
@@ -652,19 +659,21 @@ const editPlaceholder = (job) => {
 };
 
 // Remove a placeholder from the list (and persist)
-// also filter out any blank rows before saving
+// also remove its card immediately
 const removePlaceholder = async (id) => {
-  // remove the one you clicked
-  const filtered = placeholders.filter(p => p.id !== id);
-  // also drop any entries where all fields are empty
-  const cleaned = filtered.filter(pl =>
-    pl.company   ||
-    pl.quantity  ||
-    pl.stitchCount ||
-    pl.inHand   ||
-    pl.dueType
-  );
+  // 1) Remove from local placeholders list
+  const cleaned = placeholders.filter(p => p.id !== id);
 
+  // 2) Remove its card immediately from the queue column
+  setColumns(cols => ({
+    ...cols,
+    queue: {
+      ...cols.queue,
+      jobs: cols.queue.jobs.filter(j => String(j.id) !== id)
+    }
+  }));
+
+  // 3) Persist the cleaned placeholder list
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
@@ -672,14 +681,11 @@ const removePlaceholder = async (id) => {
   };
 
   try {
-    // persist cleaned list
     await axios.post(API_ROOT + '/manualState', manualState);
+    console.log('✅ manualState saved (placeholder removed)');
 
-    // update local placeholders
+    // 4) Update local placeholders state
     setPlaceholders(cleaned);
-
-    // re-fetch so the card disappears without needing a full page reload
-    await fetchAllCombined();
   } catch (err) {
     console.error('❌ failed to remove placeholder', err);
   }
