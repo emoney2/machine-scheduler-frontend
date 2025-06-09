@@ -552,20 +552,25 @@ export default function Section9(props) {
                                           marginTop:  4
                                         }}
                                       >
-                                        {job.threadColors.split(',').map(code => (
-                                          <span
-                                            key={code.trim()}
-                                            style={{
-                                              background: '#000',
-                                              color:      '#fff',
-                                              borderRadius: 4,
-                                              padding:      '2px 4px',
-                                              fontSize:     12
-                                            }}
-                                          >
-                                            {code.trim()}
-                                          </span>
-                                        ))}
+                                        {job.threadColors
+                                          .split(',')
+                                          .map(code => code.trim())                    // trim whitespace
+                                          .filter(code => code !== '')                 // drop any empty entries
+                                          .sort((a, b) => Number(a) - Number(b))       // numeric ascending
+                                          .map(code => (
+                                            <span
+                                              key={code}
+                                              style={{
+                                                background: '#000',
+                                                color:      '#fff',
+                                                borderRadius: 4,
+                                                padding:      '2px 4px',
+                                                fontSize:     12
+                                              }}
+                                            >
+                                              {code}
+                                            </span>
+                                          ))}
                                       </div>
                                     )}
                                   </div>
