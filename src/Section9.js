@@ -561,8 +561,8 @@ export default function Section9(props) {
                                             <span
                                               key={code}
                                               style={{
-                                                background: '#000',
-                                                color:      '#fff',
+                                                background: '#ddd',
+                                                color:      '#000',
                                                 borderRadius: 4,
                                                 padding:      '2px 4px',
                                                 fontSize:     12
