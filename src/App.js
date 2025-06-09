@@ -596,9 +596,9 @@ function getChain(jobs, id) {
   }, []);
 
 
-// === Section 6: Placeholder Management ===
+// === Section 6: Placeholder Management (with quick re-fetch) ===
 
-// Populate the modal for editing an existing placeholder
+// Populate edit modal
 const editPlaceholder = (job) => {
   setPh(job);
   setShowModal(true);
@@ -608,15 +608,13 @@ const editPlaceholder = (job) => {
 const submitPlaceholder = async (e) => {
   if (e?.preventDefault) e.preventDefault();
 
-  // Build updated placeholders array
-  let updated;
-  let newPh;
+  let updated, newPh;
 
   if (ph.id) {
-    // Editing an existing placeholder
-    updated = placeholders.map(p => (p.id === ph.id ? ph : p));
+    // editing existing
+    updated = placeholders.map(p => p.id === ph.id ? ph : p);
   } else {
-    // Creating a brand-new placeholder
+    // creating new
     newPh = {
       id:           `ph-${Date.now()}`,
       company:      ph.company,
@@ -624,33 +622,22 @@ const submitPlaceholder = async (e) => {
       stitchCount:  Number(ph.stitchCount),
       inHand:       ph.inHand,
       dueType:      ph.dueType,
-      start:        '',
-      end:          '',
-      delivery:     '',
-      isLate:       false,
-      linkedTo:     null,
-      machineId:    'queue',
-      threadColors: ''
+      // minimal fields so the card renders
+      start: '', end: '', delivery: '', isLate: false, linkedTo: null,
+      machineId: 'queue', threadColors: ''
     };
     updated = [...placeholders, newPh];
+    // 1) show minimal card
+    setColumns(prev => ({
+      ...prev,
+      queue: {
+        ...prev.queue,
+        jobs: [newPh, ...prev.queue.jobs]
+      }
+    }));
   }
 
-  // 1) Update local placeholders state
-  setPlaceholders(updated);
-
-  // 2) Optimistically insert or update in queue column
-  setColumns(prev => {
-    const qJobs = prev.queue.jobs;
-    const newQueue = ph.id
-      ? qJobs.map(j => String(j.id) === ph.id ? { ...j, ...ph } : j)
-      : [newPh, ...qJobs];
-    return {
-      ...prev,
-      queue: { ...prev.queue, jobs: newQueue }
-    };
-  });
-
-  // 3) Persist manualState
+  // 2) persist
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
@@ -658,18 +645,24 @@ const submitPlaceholder = async (e) => {
   };
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
+    setPlaceholders(updated);
   } catch (err) {
-    console.error('❌ failed to save placeholder', err);
+    console.error(err);
   }
 
-  // 4) Close modal & reset form
+  // 3) quick re-fetch just the queue column to fill in real data
+  setTimeout(() => {
+    fetchOrdersEmbroLinksCore()  // or whatever function pulls and sets columns.queue
+  }, 200);
+
+  // 4) close modal
   setShowModal(false);
-  setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
+  setPh({ id:null, company:'', quantity:'', stitchCount:'', inHand:'', dueType:'Hard Date' });
 };
 
-// Remove a placeholder from the list and queue, then persist
+// Remove placeholder
 const removePlaceholder = async (id) => {
-  // 1) Optimistically remove from queue column
+  // 1) remove card
   setColumns(prev => ({
     ...prev,
     queue: {
@@ -677,22 +670,20 @@ const removePlaceholder = async (id) => {
       jobs: prev.queue.jobs.filter(j => String(j.id) !== id)
     }
   }));
-
-  // 2) Update local placeholders state
+  // 2) persist cleaned placeholders
   const cleaned = placeholders.filter(p => p.id !== id);
   setPlaceholders(cleaned);
-
-  // 3) Persist manualState
-  const manualState = {
-    machine1:     columns.machine1.jobs.map(j => j.id),
-    machine2:     columns.machine2.jobs.map(j => j.id),
-    placeholders: cleaned
-  };
   try {
-    await axios.post(API_ROOT + '/manualState', manualState);
-  } catch (err) {
-    console.error('❌ failed to remove placeholder', err);
-  }
+    await axios.post(API_ROOT + '/manualState', {
+      machine1:     columns.machine1.jobs.map(j => j.id),
+      machine2:     columns.machine2.jobs.map(j => j.id),
+      placeholders: cleaned
+    });
+  } catch (err) { console.error(err); }
+  // 3) quick re-fetch queue
+  setTimeout(() => {
+    fetchOrdersEmbroLinksCore()
+  }, 200);
 };
 
 
