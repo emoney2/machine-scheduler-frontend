@@ -541,34 +541,37 @@ export default function Section9(props) {
                                     )}
 
                                     {/* Thread‐Color Bubbles */}
+
                                     {job.threadColors && (
                                       <div
                                         style={{
-                                          gridRow:           5,
-                                          gridColumn:        '1 / span 2',
-                                          display:           'grid',
-                                          gridTemplateColumns: 'repeat(8, auto)', // 8 bubbles per row
-                                          gridAutoRows:      'auto',
-                                          gap:               4,
-                                          marginTop:         4,
-                                          maxHeight:         'calc((1.5em + 4px) * 2)', // approx 2 rows
-                                          overflow:          'hidden'                  // hide any extras
+                                          gridRow:            5,
+                                          gridColumn:         1,                          // ← only left column
+                                          display:            'grid',
+                                          gridTemplateColumns:'repeat(8, auto)',          // 8 per row
+                                          gridAutoRows:       'auto',                     // autobreak to next row
+                                          gridAutoFlow:       'row',                      // fill rows first
+                                          gap:                4,
+                                          marginTop:          4,
+                                          maxHeight:          '48px',                     // roughly 2×bubble height
+                                          overflow:           'hidden'                   // hide any extras
                                         }}
                                       >
                                         {job.threadColors
                                           .split(',')
-                                          .map(code => code.trim())                    // trim whitespace
-                                          .filter(code => code !== '')                 // drop any empty entries
-                                          .sort((a, b) => Number(a) - Number(b))       // numeric ascending
+                                          .map(c => c.trim())
+                                          .filter(c => c)
+                                          .sort((a,b) => Number(a)-Number(b))
                                           .map(code => (
                                             <span
                                               key={code}
                                               style={{
-                                                background: '#fff',
+                                                background: '#fff',  // white bubbles
                                                 color:      '#000',
                                                 borderRadius: 4,
                                                 padding:      '2px 4px',
-                                                fontSize:     12
+                                                fontSize:     12,
+                                                whiteSpace:   'nowrap',
                                               }}
                                             >
                                               {code}
