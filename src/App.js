@@ -596,20 +596,27 @@ function getChain(jobs, id) {
   }, []);
 
 
-// === Section 6: Placeholder Management (fixed) ===
+// === Section 6: Placeholder Management ===
+
+// Populate the modal for editing an existing placeholder
+const editPlaceholder = (job) => {
+  setPh(job);
+  setShowModal(true);
+};
 
 // Add or update a placeholder and persist to server
 const submitPlaceholder = async (e) => {
   if (e?.preventDefault) e.preventDefault();
 
+  // Build updated placeholders array
   let updated;
   let newPh;
 
   if (ph.id) {
-    // editing an existing placeholder
-    updated = placeholders.map(p => p.id === ph.id ? ph : p);
+    // Editing an existing placeholder
+    updated = placeholders.map(p => (p.id === ph.id ? ph : p));
   } else {
-    // creating a brand-new placeholder
+    // Creating a brand-new placeholder
     newPh = {
       id:           `ph-${Date.now()}`,
       company:      ph.company,
@@ -628,22 +635,22 @@ const submitPlaceholder = async (e) => {
     updated = [...placeholders, newPh];
   }
 
-  // 1) Update placeholders list
+  // 1) Update local placeholders state
   setPlaceholders(updated);
 
-  // 2) Optimistically insert or replace in queue
+  // 2) Optimistically insert or update in queue column
   setColumns(prev => {
-    const q = prev.queue.jobs;
-    const newJobs = ph.id
-      ? q.map(j => j.id === ph.id ? { ...j, ...ph } : j)
-      : [newPh, ...q];
+    const qJobs = prev.queue.jobs;
+    const newQueue = ph.id
+      ? qJobs.map(j => String(j.id) === ph.id ? { ...j, ...ph } : j)
+      : [newPh, ...qJobs];
     return {
       ...prev,
-      queue: { ...prev.queue, jobs: newJobs }
+      queue: { ...prev.queue, jobs: newQueue }
     };
   });
 
-  // 3) Persist manual state
+  // 3) Persist manualState
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
@@ -655,14 +662,14 @@ const submitPlaceholder = async (e) => {
     console.error('❌ failed to save placeholder', err);
   }
 
-  // 4) Close modal & reset
+  // 4) Close modal & reset form
   setShowModal(false);
   setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
 };
 
 // Remove a placeholder from the list and queue, then persist
 const removePlaceholder = async (id) => {
-  // 1) Optimistically remove from queue
+  // 1) Optimistically remove from queue column
   setColumns(prev => ({
     ...prev,
     queue: {
@@ -671,11 +678,11 @@ const removePlaceholder = async (id) => {
     }
   }));
 
-  // 2) Update placeholders list
+  // 2) Update local placeholders state
   const cleaned = placeholders.filter(p => p.id !== id);
   setPlaceholders(cleaned);
 
-  // 3) Persist manual state
+  // 3) Persist manualState
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
@@ -687,6 +694,7 @@ const removePlaceholder = async (id) => {
     console.error('❌ failed to remove placeholder', err);
   }
 };
+
 
 
 // === Section 7: toggleLink (with “do-not-relink” logic) ===
