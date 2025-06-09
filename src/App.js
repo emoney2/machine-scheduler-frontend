@@ -605,33 +605,43 @@ const submitPlaceholder = async (e) => {
   // build new placeholders array
   let updated;
   if (ph.id) {
+    // editing an existing placeholder
     updated = placeholders.map(p => p.id === ph.id ? ph : p);
   } else {
-    const newPh = { ...ph, id: `ph-${Date.now()}` };
+    // creating a brand-new placeholder
+    const newPh = {
+      id:           `ph-${Date.now()}`,
+      company:      ph.company,
+      quantity:     Number(ph.quantity),
+      stitchCount:  Number(ph.stitchCount),
+      inHand:       ph.inHand,
+      dueType:      ph.dueType
+    };
     updated = [...placeholders, newPh];
   }
 
   // prepare the manualState payload (machine order + placeholders)
   const manualState = {
-    machine1: columns.machine1.jobs.map(j => j.id),
-    machine2: columns.machine2.jobs.map(j => j.id),
+    machine1:     columns.machine1.jobs.map(j => j.id),
+    machine2:     columns.machine2.jobs.map(j => j.id),
     placeholders: updated
   };
 
   try {
+    // persist to sheet
     await axios.post(API_ROOT + '/manualState', manualState);
 
-    // update local placeholders array
+    // update local placeholders
     setPlaceholders(updated);
 
-    // close modal and reset form
+    // close modal & reset form
     setShowModal(false);
     setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
 
-    // **new**: re-fetch everything so the queue shows your placeholder immediately
+    // re-fetch everything so the new placeholder shows up immediately
     await fetchAllCombined();
   } catch (err) {
-    console.error('❌ failed to save placeholders', err);
+    console.error('❌ failed to save placeholder', err);
   }
 };
 
@@ -642,17 +652,33 @@ const editPlaceholder = (job) => {
 };
 
 // Remove a placeholder from the list (and persist)
+// also filter out any blank rows before saving
 const removePlaceholder = async (id) => {
-  const updated = placeholders.filter(p => p.id !== id);
+  // remove the one you clicked
+  const filtered = placeholders.filter(p => p.id !== id);
+  // also drop any entries where all fields are empty
+  const cleaned = filtered.filter(pl =>
+    pl.company   ||
+    pl.quantity  ||
+    pl.stitchCount ||
+    pl.inHand   ||
+    pl.dueType
+  );
+
   const manualState = {
-    machine1: columns.machine1.jobs.map(j => j.id),
-    machine2: columns.machine2.jobs.map(j => j.id),
-    placeholders: updated
+    machine1:     columns.machine1.jobs.map(j => j.id),
+    machine2:     columns.machine2.jobs.map(j => j.id),
+    placeholders: cleaned
   };
+
   try {
+    // persist cleaned list
     await axios.post(API_ROOT + '/manualState', manualState);
-    setPlaceholders(updated);
-    // **new**: re-fetch so the card disappears without a full page reload
+
+    // update local placeholders
+    setPlaceholders(cleaned);
+
+    // re-fetch so the card disappears without needing a full page reload
     await fetchAllCombined();
   } catch (err) {
     console.error('❌ failed to remove placeholder', err);
