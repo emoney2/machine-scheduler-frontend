@@ -551,7 +551,7 @@ export default function Section9(props) {
                                           overflowX:   'auto',        // allow horizontal scroll
                                           whiteSpace:  'nowrap',      // prevent line breaks
                                           gap:        4,
-                                          marginTop:  4
+                                          marginTop:  4,
                                           paddingBottom: 4,           // give a little breathing room under bubbles
                                         }}
                                       >
