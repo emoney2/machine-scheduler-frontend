@@ -183,12 +183,12 @@ export default function Section9(props) {
           {['queue', 'machine1', 'machine2'].map(colId => {
             const col = columns[colId] || {};
             const rawJobs = Array.isArray(col.jobs) ? col.jobs : [];
-            const jobs    = rawJobs.filter(j =>
-              j &&
-              j.id !== undefined &&
-              j.status !== 'Complete' &&
-              j.status !== 'Sewing'
-            );
+            const jobs = rawJobs.filter(j => {
+              if (!j || j.id === undefined) return false;
+              const st = String(j.status).trim().toLowerCase();
+              return st !== 'complete' && st !== 'sewing';
+             });
+            console.log('🤖 Column', colId, 'jobs after filter:', jobs.map(j => [j.id, `"${j.status}"`] ));
 
             const segments = [];
             let idx = 0;

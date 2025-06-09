@@ -403,6 +403,7 @@ function getChain(jobs, id) {
           due_type:         o['Hard Date/Soft Date'] || '',
           embroidery_start: embMap[sid] || '',
           start_date:       embMap[sid] || '',
+          status:           o['Stage']       || '', 
           machineId:        'queue',            // default to queue
           linkedTo:         linksData[sid]   || null
         };
