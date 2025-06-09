@@ -545,33 +545,35 @@ export default function Section9(props) {
                                     {job.threadColors && (
                                       <div
                                         style={{
-                                          gridRow:            5,
-                                          gridColumn:         1,                          // ← only left column
-                                          display:            'grid',
-                                          gridTemplateColumns:'repeat(8, auto)',          // 8 per row
-                                          gridAutoRows:       'auto',                     // autobreak to next row
-                                          gridAutoFlow:       'row',                      // fill rows first
-                                          gap:                4,
-                                          marginTop:          4,
-                                          maxHeight:          '48px',                     // roughly 2×bubble height
-                                          overflow:           'hidden'                   // hide any extras
+                                          gridRow:           5,
+                                          gridColumn:        1,
+                                          display:           'grid',
+                                          gridTemplateColumns: 'repeat(8, 1fr)',  // eight equal columns
+                                          gridTemplateRows:  'repeat(2, auto)',   // at most two rows
+                                          gap:               2,
+                                          marginTop:         4,
+                                          overflow:          'hidden'             // hide any beyond 16
                                         }}
                                       >
                                         {job.threadColors
                                           .split(',')
                                           .map(c => c.trim())
                                           .filter(c => c)
-                                          .sort((a,b) => Number(a)-Number(b))
+                                          .sort((a, b) => Number(a) - Number(b))
                                           .map(code => (
                                             <span
                                               key={code}
                                               style={{
-                                                background: '#fff',  // white bubbles
-                                                color:      '#000',
-                                                borderRadius: 4,
-                                                padding:      '2px 4px',
-                                                fontSize:     12,
+                                                background:   '#fff',
+                                                color:        '#000',
+                                                borderRadius: 3,
+                                                padding:      '1px 2px',
+                                                fontSize:     10,
+                                                textAlign:    'center',
+                                                overflow:     'hidden',
+                                                textOverflow: 'ellipsis',
                                                 whiteSpace:   'nowrap',
+                                                width:        '100%'          // fill its grid cell
                                               }}
                                             >
                                               {code}
