@@ -707,7 +707,7 @@ const toggleLink = async (colId, idx) => {
 };
 
 
-// === Section 8: Drag & Drop Handler (with Chain‐aware Moves & shared manualState + placeholders) ===
+// === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState + placeholders) ===
 const onDragEnd = async (result) => {
   // 🔍 DEBUGGING INSTRUMENTATION
   console.log("🔍 DRAG-END result:", result);
@@ -739,14 +739,32 @@ const onDragEnd = async (result) => {
     const updatedJobs = srcCol === 'queue'
       ? sortQueue(newSrcJobs)
       : scheduleMachineJobs(newSrcJobs);
+
+    // 2a) Update local state
     setColumns(cols => ({
       ...cols,
       [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
     }));
-    console.log('⏹ onDragEnd end (reorder same col), new columns:', {
+
+    // 2b) Persist manual ordering back to the server
+    const nextCols = {
       ...columns,
       [srcCol]: { ...columns[srcCol], jobs: updatedJobs }
-    });
+    };
+    const manualState = {
+      machine1:    nextCols.machine1.jobs.map(j => j.id),
+      machine2:    nextCols.machine2.jobs.map(j => j.id),
+      placeholders // ensure this is in scope
+    };
+    console.log('⏹ Persisting manualState (same-col) to server:', manualState);
+    try {
+      await axios.post(API_ROOT + '/manualState', manualState);
+      console.log('✅ manualState saved (same-col reorder)');
+    } catch (err) {
+      console.error('❌ manualState save failed (same-col reorder)', err);
+    }
+
+    console.log('⏹ onDragEnd end (reorder same col), new columns:', nextCols);
     return;
   }
 
@@ -793,14 +811,14 @@ const onDragEnd = async (result) => {
   const manualState = {
     machine1:    nextCols.machine1.jobs.map(j => j.id),
     machine2:    nextCols.machine2.jobs.map(j => j.id),
-    placeholders // ← make sure to include this
+    placeholders
   };
-  console.log('⏹ Persisting manualState to server:', manualState);
+  console.log('⏹ Persisting manualState (cross-col) to server:', manualState);
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
-    console.log('✅ manualState saved');
+    console.log('✅ manualState saved (cross-col)');
   } catch (err) {
-    console.error('❌ manualState save failed', err);
+    console.error('❌ manualState save failed (cross-col)', err);
   }
 };
 // === Section 9: Render via Section9.jsx ===
