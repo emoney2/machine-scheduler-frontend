@@ -546,13 +546,14 @@ export default function Section9(props) {
                                       <div
                                         style={{
                                           gridRow:           5,
-                                          gridColumn:        1,
+                                          gridColumn:        '1 / span 2',         // span both columns
                                           display:           'grid',
-                                          gridTemplateColumns: 'repeat(8, 1fr)',  // eight equal columns
-                                          gridTemplateRows:  'repeat(2, auto)',   // at most two rows
+                                          gridTemplateColumns: 'repeat(8, 1fr)',   // 8 equal columns
+                                          gridTemplateRows:  'repeat(2, auto)',    // max 2 rows
                                           gap:               2,
                                           marginTop:         4,
-                                          overflow:          'hidden'             // hide any beyond 16
+                                          paddingRight:      '32px',               // reserve 32px for the right strip
+                                          overflow:          'hidden'
                                         }}
                                       >
                                         {job.threadColors
@@ -573,7 +574,7 @@ export default function Section9(props) {
                                                 overflow:     'hidden',
                                                 textOverflow: 'ellipsis',
                                                 whiteSpace:   'nowrap',
-                                                width:        '100%'          // fill its grid cell
+                                                width:        '100%'
                                               }}
                                             >
                                               {code}
