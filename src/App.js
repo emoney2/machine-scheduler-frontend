@@ -404,6 +404,7 @@ function getChain(jobs, id) {
           embroidery_start: embMap[sid] || '',
           start_date:       embMap[sid] || '',
           status:           o['Stage']       || '', 
+          threadColors:     o['Threads']|| '',
           machineId:        'queue',            // default to queue
           linkedTo:         linksData[sid]   || null
         };

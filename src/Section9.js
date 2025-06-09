@@ -273,7 +273,7 @@ export default function Section9(props) {
                                       position: 'relative',
                                       display: 'grid',
                                       gridTemplateColumns: '1fr auto',
-                                      gridTemplateRows: 'repeat(4, auto)',
+                                      gridTemplateRows: 'repeat(5, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
                                       padding: `6px ${rightPadding}px 6px 6px`,
@@ -538,6 +538,35 @@ export default function Section9(props) {
                                       >
                                         {job.delivery}
                                       </span>
+                                    )}
+
+                                    {/* Thread‐Color Bubbles */}
+                                    {job.threadColors && (
+                                      <div
+                                        style={{
+                                          gridRow:    5,
+                                          gridColumn: '1 / span 2',
+                                          display:    'flex',
+                                          flexWrap:   'wrap',
+                                          gap:        4,
+                                          marginTop:  4
+                                        }}
+                                      >
+                                        {job.threadColors.split(',').map(code => (
+                                          <span
+                                            key={code.trim()}
+                                            style={{
+                                              background: '#000',
+                                              color:      '#fff',
+                                              borderRadius: 4,
+                                              padding:      '2px 4px',
+                                              fontSize:     12
+                                            }}
+                                          >
+                                            {code.trim()}
+                                          </span>
+                                        ))}
+                                      </div>
                                     )}
                                   </div>
                                 )}
