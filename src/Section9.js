@@ -547,9 +547,12 @@ export default function Section9(props) {
                                           gridRow:    5,
                                           gridColumn: '1 / span 2',
                                           display:    'flex',
-                                          flexWrap:   'wrap',
+                                          flexWrap:    'nowrap',      // force one row
+                                          overflowX:   'auto',        // allow horizontal scroll
+                                          whiteSpace:  'nowrap',      // prevent line breaks
                                           gap:        4,
                                           marginTop:  4
+                                          paddingBottom: 4,           // give a little breathing room under bubbles
                                         }}
                                       >
                                         {job.threadColors
