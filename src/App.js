@@ -602,7 +602,6 @@ function getChain(jobs, id) {
 const submitPlaceholder = async (e) => {
   if (e && e.preventDefault) e.preventDefault();
 
-  // build new placeholders array
   let updated;
   if (ph.id) {
     // editing an existing placeholder
@@ -615,12 +614,30 @@ const submitPlaceholder = async (e) => {
       quantity:     Number(ph.quantity),
       stitchCount:  Number(ph.stitchCount),
       inHand:       ph.inHand,
-      dueType:      ph.dueType
+      dueType:      ph.dueType,
+
+      // fields so it renders correctly as a card
+      start:        '',
+      end:          '',
+      delivery:     '',
+      isLate:       false,
+      linkedTo:     null,
+      machineId:    'queue',
+      threadColors: ''
     };
     updated = [...placeholders, newPh];
+
+    // Immediately show the new placeholder in the queue
+    setColumns(cols => ({
+      ...cols,
+      queue: {
+        ...cols.queue,
+        jobs: [newPh, ...cols.queue.jobs]
+      }
+    }));
   }
 
-  // prepare the manualState payload (machine order + placeholders)
+  // prepare the manualState payload
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
@@ -628,43 +645,20 @@ const submitPlaceholder = async (e) => {
   };
 
   try {
-    // persist to sheet
     await axios.post(API_ROOT + '/manualState', manualState);
-
-    // update local placeholders
+    // update local placeholder list
     setPlaceholders(updated);
-
     // close modal & reset form
     setShowModal(false);
-    setPh({
-      id:           null,
-      company:      '',
-      quantity:     '',
-      stitchCount:  '',
-      inHand:       '',
-      dueType:      'Hard Date'
-    });
-
-    // re-fetch everything so the new placeholder shows up immediately
-    await fetchAllCombined();
+    setPh({ id: null, company: '', quantity: '', stitchCount: '', inHand: '', dueType: 'Hard Date' });
   } catch (err) {
     console.error('❌ failed to save placeholder', err);
   }
 };
 
-// Populate the modal for editing an existing placeholder
-const editPlaceholder = (job) => {
-  setPh(job);
-  setShowModal(true);
-};
-
-// Remove a placeholder from the list (and persist)
-// also remove its card immediately
+// Remove a placeholder from the list (and persist), and remove its card immediately
 const removePlaceholder = async (id) => {
-  // 1) Remove from local placeholders list
-  const cleaned = placeholders.filter(p => p.id !== id);
-
-  // 2) Remove its card immediately from the queue column
+  // 1) Remove its card immediately from the queue
   setColumns(cols => ({
     ...cols,
     queue: {
@@ -673,7 +667,10 @@ const removePlaceholder = async (id) => {
     }
   }));
 
-  // 3) Persist the cleaned placeholder list
+  // 2) Clean the placeholders array
+  const cleaned = placeholders.filter(p => p.id !== id);
+
+  // 3) Persist cleaned list
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
@@ -682,9 +679,7 @@ const removePlaceholder = async (id) => {
 
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
-    console.log('✅ manualState saved (placeholder removed)');
-
-    // 4) Update local placeholders state
+    // update local placeholders state
     setPlaceholders(cleaned);
   } catch (err) {
     console.error('❌ failed to remove placeholder', err);
