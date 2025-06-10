@@ -8,6 +8,12 @@ import axios from 'axios';
 import Inventory from "./Inventory";
 import InventoryOrdered from "./InventoryOrdered";
 import "./axios-setup";
+import Section9 from './Section9';
+import OrderSubmission from './OrderSubmission';
+import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
+import { Routes, Route, NavLink } from 'react-router-dom';
+
+console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
 // send cookies on every API call so Flask session is preserved
 axios.defaults.withCredentials = true;
@@ -24,19 +30,13 @@ axios.interceptors.response.use(
   }
 );
 
-import Section9 from './Section9';
-import OrderSubmission from './OrderSubmission';
-import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
-import { Routes, Route, NavLink }        from 'react-router-dom';
-
-console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 // CONFIGURATION
 const API_ROOT   = process.env.REACT_APP_API_ROOT;
 const SOCKET_URL = API_ROOT.replace(/\/api$/, '');
-  const socket     = io(SOCKET_URL, {
-    transports: ['websocket','polling'],
-    withCredentials: true   // ← send the session cookie on the WS handshake
-  });
+const socket     = io(SOCKET_URL, {
+  transports: ['websocket','polling'],
+  withCredentials: true   // ← send the session cookie on the WS handshake
+});
 
 socket.on("connect",        () => console.log("⚡ socket connected, id =", socket.id));
 socket.on("disconnect",     reason => console.log("🛑 socket disconnected:", reason));
@@ -99,7 +99,6 @@ export default function App() {
     dueType:     'Hard Date'
   });
 
- 
   // Real-time updates listener
   useEffect(() => {
     const handleUpdate = debounce(() => {
@@ -128,6 +127,23 @@ export default function App() {
     setSyncStatus('updated');
     setTimeout(() => setSyncStatus(''), 2000);
   };
+// ─── Section 1.5: Auto‐bump setup ────────────────────────────────────────────
+// Track last‐seen top job on each machine
+const prevMachine1Top = useRef(null);
+const prevMachine2Top = useRef(null);
+
+// Send a new start time when needed
+const bumpJobStartTime = async (jobId) => {
+  try {
+    const now = new Date().toISOString();
+    await axios.post(API_ROOT + '/updateStartTime', {
+      id:        jobId,
+      startTime: now
+    });
+  } catch (err) {
+    console.error('Failed to bump start time', err);
+  }
+};
 // === Section 2: Helpers ===
 function isHoliday(dt) {
   return dt instanceof Date &&
