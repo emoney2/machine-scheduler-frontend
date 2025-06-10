@@ -488,19 +488,19 @@ function getChain(jobs, id) {
 const fetchManualStateCore = async (previousCols) => {
   console.log('fetchManualStateCore ▶ start');
   try {
-    // 1) Fetch manualState
+    // 1) Fetch manualState from server
     const { data: msData } = await axios.get(API_ROOT + '/manualState');
-    //    msData = { machineColumns: [ [...], [...] , …], placeholders: […] }
+    //    msData = { machineColumns: [ [...], [...] ], placeholders: [...] }
 
-    // 2) Overwrite local placeholders
+    // 2) Overwrite local placeholders state
     setPlaceholders(msData.placeholders || []);
 
-    // 3) Extract machine1 & machine2 from machineColumns
-    const cols = msData.machineColumns || [];
-    const machine1Ids = cols[0] || [];
-    const machine2Ids = cols[1] || [];
+    // 3) Extract machine1 & machine2 IDs
+    const cols          = msData.machineColumns || [];
+    const machine1Ids   = cols[0] || [];
+    const machine2Ids   = cols[1] || [];
 
-    // 4) Build “mergedCols” starting from previousCols
+    // 4) Start mergedCols from previousCols
     const mergedCols = {
       queue:    { ...previousCols.queue,    jobs: [...previousCols.queue.jobs] },
       machine1: { ...previousCols.machine1, jobs: [] },
@@ -514,7 +514,7 @@ const fetchManualStateCore = async (previousCols) => {
       );
     });
 
-    // 6) Re‐inject placeholders into machine1 in server order
+    // 6) Re‐inject placeholders into machine1 (in saved order)
     machine1Ids.forEach(jobId => {
       const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
       if (idx !== -1) {
@@ -532,17 +532,24 @@ const fetchManualStateCore = async (previousCols) => {
       }
     });
 
-     // 7.5) Re-inject placeholders still meant for the queue
-     msData.placeholders.forEach(ph => {
-       const onM1 = machine1Ids.includes(ph.id);
-       const onM2 = machine2Ids.includes(ph.id);
-       if (!onM1 && !onM2) {
-         // avoid duplicates
-         if (!mergedCols.queue.jobs.some(j => j.id === ph.id)) {
-           mergedCols.queue.jobs.push(ph);
-         }
-       }
-     });
+    // 7.5) Re‐inject any placeholders meant to stay in the queue
+    msData.placeholders.forEach(ph => {
+      const onM1 = machine1Ids.includes(ph.id);
+      const onM2 = machine2Ids.includes(ph.id);
+      if (!onM1 && !onM2) {
+        // avoid duplicates
+        if (!mergedCols.queue.jobs.some(j => j.id === ph.id)) {
+          mergedCols.queue.jobs.push(ph);
+        }
+      }
+    });
+
+    // 7.6) Sort the queue by due date (so placeholders and real jobs intermingle properly)
+    mergedCols.queue.jobs.sort((a, b) => {
+      const da = new Date(a.dueDate || a.delivery || 0);
+      const db = new Date(b.dueDate || b.delivery || 0);
+      return da - db;
+    });
 
     // 8) Re‐run scheduling on machines
     mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs);
@@ -556,6 +563,7 @@ const fetchManualStateCore = async (previousCols) => {
     throw err;
   }
 };
+
 
   // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
   const fetchAllCombined = async () => {
