@@ -644,7 +644,7 @@ const submitPlaceholder = async (e) => {
 
   // 3) quick re-fetch just the queue column to fill in real data
   setTimeout(() => {
-    fetchOrdersEmbroLinksCore()  // or whatever function pulls and sets columns.queue
+    fetchAllCombined();
   }, 200);
 
   // 4) close modal
