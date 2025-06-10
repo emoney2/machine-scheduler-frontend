@@ -532,6 +532,18 @@ const fetchManualStateCore = async (previousCols) => {
       }
     });
 
+     // 7.5) Re-inject placeholders still meant for the queue
+     msData.placeholders.forEach(ph => {
+       const onM1 = machine1Ids.includes(ph.id);
+       const onM2 = machine2Ids.includes(ph.id);
+       if (!onM1 && !onM2) {
+         // avoid duplicates
+         if (!mergedCols.queue.jobs.some(j => j.id === ph.id)) {
+           mergedCols.queue.jobs.push(ph);
+         }
+       }
+     });
+
     // 8) Re‐run scheduling on machines
     mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs);
     mergedCols.machine2.jobs = scheduleMachineJobs(mergedCols.machine2.jobs);
