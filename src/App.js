@@ -674,7 +674,7 @@ const removePlaceholder = async (id) => {
   } catch (err) { console.error(err); }
   // 3) quick re-fetch queue
   setTimeout(() => {
-    fetchOrdersEmbroLinksCore()
+    fetchAllCombined()
   }, 200);
 };
 
