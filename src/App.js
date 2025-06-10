@@ -640,7 +640,7 @@ useEffect(() => {
       if (oldTop !== null) {
         // 1) clear oldTop’s start time in Sheet
         console.log(`🗑️ Clearing start for ${oldTop}`);
-        await axios.post(API_ROOT + '/api/updateStartTime', {
+        await axios.post(API_ROOT + '/updateStartTime', {
           id:        oldTop,
           startTime: ""
         });
@@ -651,7 +651,7 @@ useEffect(() => {
           const clamped = clampToWorkHours(new Date());
           const iso     = clamped.toISOString();
           console.log(`🔔 ${machineName} bumped to ${newTop}`);
-          await axios.post(API_ROOT + '/api/updateStartTime', {
+          await axios.post(API_ROOT + '/updateStartTime', {
             id:        newTop,
             startTime: iso
           });
