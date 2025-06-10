@@ -135,10 +135,12 @@ const prevMachine2Top = useRef(null);
 // Send a new start time when needed
 const bumpJobStartTime = async (jobId) => {
   try {
-    const now = new Date().toISOString();
+    // clamp “now” to next valid work time (e.g. 8:30 next workday if after hours)
+    const clamped = clampToWorkHours(new Date());
+    const iso     = clamped.toISOString();
     await axios.post(API_ROOT + '/updateStartTime', {
       id:        jobId,
-      startTime: now
+      startTime: iso
     });
   } catch (err) {
     console.error('Failed to bump start time', err);
@@ -622,6 +624,31 @@ const fetchManualStateCore = async (previousCols) => {
 
     return () => clearInterval(handle);
   }, []);
+// ─── Section 5E: Auto‐bump when a job reaches top-of-list ───
+useEffect(() => {
+  const m1Jobs = columns.machine1.jobs;
+  const m2Jobs = columns.machine2.jobs;
+
+  const checkAndBump = async (prevRef, jobs, machineName) => {
+    const newTop = jobs[0]?.id || null;
+    if (newTop && prevRef.current !== newTop) {
+      // only after initial mount
+      if (prevRef.current !== null) {
+        const jobObj = jobs.find(j => j.id === newTop);
+        // skip if user already scanned in a start time
+        if (jobObj && !jobObj.embroidery_start) {
+          console.log(`🔔 ${machineName} bumped to ${newTop}`);
+          await bumpJobStartTime(newTop);
+          await fetchAllCombined();
+        }
+      }
+      prevRef.current = newTop;
+    }
+  };
+
+  checkAndBump(prevMachine1Top, m1Jobs, 'machine1');
+  checkAndBump(prevMachine2Top, m2Jobs, 'machine2');
+}, [columns.machine1.jobs, columns.machine2.jobs]);
 
 
 // === Section 6: Placeholder Management ===
