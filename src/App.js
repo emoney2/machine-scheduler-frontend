@@ -629,34 +629,47 @@ const fetchManualStateCore = async (previousCols) => {
 
     return () => clearInterval(handle);
   }, []);
-// ─── Section 5E: Auto‐bump when a job reaches top-of-list ───
+// ─── Section 5E: Auto‐clear old & bump new top‐of‐list ───────────────
 useEffect(() => {
-  console.log("🕵️‍♂️ Section 5E effect run: top1 =", columns.machine1.jobs[0]?.id, "; prev1 =", prevMachine1Top.current);
   const m1Jobs = columns.machine1.jobs;
   const m2Jobs = columns.machine2.jobs;
 
-  const checkAndBump = async (prevRef, jobs, machineName) => {
+  const handleTopChange = async (prevRef, jobs, machineName) => {
+    const oldTop = prevRef.current;
     const newTop = jobs[0]?.id || null;
-    if (newTop && prevRef.current !== newTop) {
-      // only after initial mount
-      if (prevRef.current !== null) {
+
+    // if the top job changed
+    if (newTop !== oldTop) {
+      // skip on initial mount
+      if (oldTop !== null) {
+        // 1) clear oldTop’s start time in Sheet
+        console.log(`🗑️ Clearing start for ${oldTop}`);
+        await axios.post(API_ROOT + '/api/updateStartTime', {
+          id:        oldTop,
+          startTime: ""
+        });
+
+        // 2) bump newTop if it has no manual start
         const jobObj = jobs.find(j => j.id === newTop);
-        // skip if user already scanned in a start time
-        if (jobObj && !jobObj.embroidery_start) {
+        if (newTop && jobObj && !jobObj.embroidery_start) {
+          const clamped = clampToWorkHours(new Date());
+          const iso     = clamped.toISOString();
           console.log(`🔔 ${machineName} bumped to ${newTop}`);
-          await bumpJobStartTime(newTop);
+          await axios.post(API_ROOT + '/api/updateStartTime', {
+            id:        newTop,
+            startTime: iso
+          });
           await fetchAllCombined();
         }
       }
+      // record for next comparison
       prevRef.current = newTop;
     }
   };
 
-  checkAndBump(prevMachine1Top, m1Jobs, 'machine1');
-  checkAndBump(prevMachine2Top, m2Jobs, 'machine2');
+  handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
+  handleTopChange(prevMachine2Top, m2Jobs, 'machine2');
 }, [columns.machine1.jobs, columns.machine2.jobs]);
-
-
 // === Section 6: Placeholder Management ===
 
 // Populate edit modal
