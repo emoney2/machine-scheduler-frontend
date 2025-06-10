@@ -377,7 +377,9 @@ function getChain(jobs, id) {
         axios.get(API_ROOT + '/links'),
       ]);
 
-      const orders    = ordersRes.data   || [];
+      let orders      = ordersRes.data   || [];
+      // Remove completed jobs so they fall off the machine
+      orders = orders.filter(o => (o['Stage'] || '').toLowerCase() !== 'complete');
       const embList   = embRes.data      || [];
       let linksData   = linksRes.data    || {};
 
