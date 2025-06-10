@@ -626,6 +626,7 @@ const fetchManualStateCore = async (previousCols) => {
   }, []);
 // ─── Section 5E: Auto‐bump when a job reaches top-of-list ───
 useEffect(() => {
+  console.log("🕵️‍♂️ Section 5E effect run: top1 =", columns.machine1.jobs[0]?.id, "; prev1 =", prevMachine1Top.current);
   const m1Jobs = columns.machine1.jobs;
   const m2Jobs = columns.machine2.jobs;
 
