@@ -493,65 +493,66 @@ function getChain(jobs, id) {
   };
 
 
-  // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
-  const fetchManualStateCore = async (previousCols) => {
-    // previousCols should be the object returned by fetchOrdersEmbroLinksCore
-    // We’ll merge in any server‐specified placeholders and re‐assign those.
-    console.log('fetchManualStateCore ▶ start');
-    // We do not set loading flags here; the combined function handles that.
-    try {
-      // 1) Fetch manualState
-      const { data: msData } = await axios.get(API_ROOT + '/manualState');
-      //   msData = { machine1: [ … ], machine2: [ … ], placeholders: [ … ] }
+// ─── Section 5B: fetchManualState only ───────────────────────────────────────────
+const fetchManualStateCore = async (previousCols) => {
+  console.log('fetchManualStateCore ▶ start');
+  try {
+    // 1) Fetch manualState
+    const { data: msData } = await axios.get(API_ROOT + '/manualState');
+    //    msData = { machineColumns: [ [...], [...] , …], placeholders: […] }
 
-      // 2) Overwrite local placeholders
-      setPlaceholders(msData.placeholders || []);
+    // 2) Overwrite local placeholders
+    setPlaceholders(msData.placeholders || []);
 
-      // 3) Build “mergedCols” starting from previousCols
-      const mergedCols = {
-        queue:    { ...previousCols.queue,    jobs: [...previousCols.queue.jobs] },
-        machine1: { ...previousCols.machine1, jobs: [...previousCols.machine1.jobs] },
-        machine2: { ...previousCols.machine2, jobs: [...previousCols.machine2.jobs] },
-      };
+    // 3) Extract machine1 & machine2 from machineColumns
+    const cols = msData.machineColumns || [];
+    const machine1Ids = cols[0] || [];
+    const machine2Ids = cols[1] || [];
 
-      // 4) Remove any job that is now a placeholder from machine1/machine2
-      ['machine1', 'machine2'].forEach(colId => {
-        mergedCols[colId].jobs = mergedCols[colId].jobs.filter(
-          job => !msData.placeholders.some(p => p.id === job.id)
-        );
-      });
+    // 4) Build “mergedCols” starting from previousCols
+    const mergedCols = {
+      queue:    { ...previousCols.queue,    jobs: [...previousCols.queue.jobs] },
+      machine1: { ...previousCols.machine1, jobs: [] },
+      machine2: { ...previousCols.machine2, jobs: [] },
+    };
 
-      // 5) Re‐inject placeholders into machine1 in exact server order
-      ;(msData.machine1 || []).forEach(jobId => {
-        // find that job in mergedCols.queue.jobs
-        const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
-        if (idx !== -1) {
-          const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
-          mergedCols.machine1.jobs.push(jobObj);
-        }
-      });
+    // 5) Remove any placeholder‐jobs from machine1/machine2
+    ['machine1','machine2'].forEach(colId => {
+      mergedCols[colId].jobs = previousCols[colId].jobs.filter(
+        job => !msData.placeholders.some(p => p.id === job.id)
+      );
+    });
 
-      // 6) Re‐inject placeholders into machine2
-      ;(msData.machine2 || []).forEach(jobId => {
-        const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
-        if (idx !== -1) {
-          const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
-          mergedCols.machine2.jobs.push(jobObj);
-        }
-      });
+    // 6) Re‐inject placeholders into machine1 in server order
+    machine1Ids.forEach(jobId => {
+      const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
+      if (idx !== -1) {
+        const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
+        mergedCols.machine1.jobs.push(jobObj);
+      }
+    });
 
-      // 7) Leave all other jobs exactly where they are (in queue / machine1 / machine2).
-      //    Now re‐run scheduleMachineJobs on machines to recalc times.
-      mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs);
-      mergedCols.machine2.jobs = scheduleMachineJobs(mergedCols.machine2.jobs);
+    // 7) Re‐inject placeholders into machine2
+    machine2Ids.forEach(jobId => {
+      const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
+      if (idx !== -1) {
+        const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
+        mergedCols.machine2.jobs.push(jobObj);
+      }
+    });
 
-      console.log('fetchManualStateCore ▶ done');
-      return mergedCols;
-    } catch (err) {
-      console.error('❌ fetchManualStateCore error', err);
-      throw err;
-    }
-  };
+    // 8) Re‐run scheduling on machines
+    mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs);
+    mergedCols.machine2.jobs = scheduleMachineJobs(mergedCols.machine2.jobs);
+
+    console.log('fetchManualStateCore ▶ done');
+    return mergedCols;
+
+  } catch (err) {
+    console.error('❌ fetchManualStateCore error', err);
+    throw err;
+  }
+};
 
   // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
   const fetchAllCombined = async () => {
