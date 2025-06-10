@@ -64,6 +64,26 @@ const BUBBLE_DELIV  = '#c8e6c9';
 export default function App() {
   console.log('🔔 App component mounted');
 
+  // ─── Section 1.5: Auto‐bump setup ────────────────────────────────────────────
+  // Track last‐seen top job on each machine
+  const prevMachine1Top = useRef(null);
+  const prevMachine2Top = useRef(null);
+
+  // Send a new start time when needed
+  const bumpJobStartTime = async (jobId) => {
+    try {
+      // clamp “now” to next valid work time (e.g. 8:30 next workday if after hours)
+      const clamped = clampToWorkHours(new Date());
+      const iso     = clamped.toISOString();
+      await axios.post(API_ROOT + '/updateStartTime', {
+        id:        jobId,
+        startTime: iso
+      });
+    } catch (err) {
+      console.error('Failed to bump start time', err);
+    }
+  };
+
   // live sheet data
   const [orders, setOrders]                 = useState([]);
   const [embroideryList, setEmbroideryList] = useState([]);
@@ -127,25 +147,7 @@ export default function App() {
     setSyncStatus('updated');
     setTimeout(() => setSyncStatus(''), 2000);
   };
-// ─── Section 1.5: Auto‐bump setup ────────────────────────────────────────────
-// Track last‐seen top job on each machine
-const prevMachine1Top = useRef(null);
-const prevMachine2Top = useRef(null);
 
-// Send a new start time when needed
-const bumpJobStartTime = async (jobId) => {
-  try {
-    // clamp “now” to next valid work time (e.g. 8:30 next workday if after hours)
-    const clamped = clampToWorkHours(new Date());
-    const iso     = clamped.toISOString();
-    await axios.post(API_ROOT + '/updateStartTime', {
-      id:        jobId,
-      startTime: iso
-    });
-  } catch (err) {
-    console.error('Failed to bump start time', err);
-  }
-};
 // === Section 2: Helpers ===
 function isHoliday(dt) {
   return dt instanceof Date &&
