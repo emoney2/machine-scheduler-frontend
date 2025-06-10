@@ -99,16 +99,7 @@ export default function App() {
     dueType:     'Hard Date'
   });
 
-  // Initial data load
-  useEffect(() => {
-    const handle = setInterval(() => {
-      console.log("⏳ Auto-refresh polling");
-      fetchAllCombined();
-    }, 10_000);          // 10,000ms = 10 seconds
-
-    return () => clearInterval(handle);
-  }, []);
-  
+ 
   // Real-time updates listener
   useEffect(() => {
     const handleUpdate = debounce(() => {
@@ -587,11 +578,11 @@ const fetchManualStateCore = async (previousCols) => {
     // 1) Run immediately on mount
     fetchAllCombined();
 
-    // 2) Then set up the 20 s interval
+    // 2) Then set up the 15 s interval
     const handle = setInterval(() => {
       console.log("⏳ Poll: combined fetchAllCombined()");
       fetchAllCombined();
-    }, 20_000);
+    }, 15_000);
 
     return () => clearInterval(handle);
   }, []);
