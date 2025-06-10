@@ -510,8 +510,8 @@ function getChain(jobs, id) {
 const fetchManualStateCore = async (previousCols) => {
   console.log('fetchManualStateCore ▶ start');
   try {
-    // 1) Fetch manualState from server
-    const { data: msData } = await axios.get(API_ROOT + '/api/manualState');
+    // 1) Fetch manualState from server (note no extra '/api' prefix)
+    const { data: msData } = await axios.get(API_ROOT + '/manualState');
     //    msData = { machineColumns: [ [...], [...] ], placeholders: [...] }
 
     // 2) Overwrite local placeholders state
@@ -532,10 +532,8 @@ const fetchManualStateCore = async (previousCols) => {
     // 5) Remove completed & placeholder jobs from machine1/machine2
     ['machine1','machine2'].forEach(colId => {
       mergedCols[colId].jobs = previousCols[colId].jobs.filter(job =>
-        // drop any placeholder
-        !msData.placeholders.some(p => p.id === job.id)
-        // drop any completed job
-        && String(job.status || '').toLowerCase() !== 'complete'
+        !msData.placeholders.some(p => p.id === job.id) &&
+        String(job.status || '').toLowerCase() !== 'complete'
       );
     });
 
@@ -561,10 +559,8 @@ const fetchManualStateCore = async (previousCols) => {
     msData.placeholders.forEach(ph => {
       const onM1 = machine1Ids.includes(ph.id);
       const onM2 = machine2Ids.includes(ph.id);
-      if (!onM1 && !onM2) {
-        if (!mergedCols.queue.jobs.some(j => j.id === ph.id)) {
-          mergedCols.queue.jobs.push(ph);
-        }
+      if (!onM1 && !onM2 && !mergedCols.queue.jobs.some(j => j.id === ph.id)) {
+        mergedCols.queue.jobs.push(ph);
       }
     });
 
