@@ -588,7 +588,7 @@ const fetchManualStateCore = async (previousCols) => {
   }, []);
 
 
-// === Section 6: Placeholder Management (with quick re-fetch) ===
+// === Section 6: Placeholder Management ===
 
 // Populate edit modal
 const editPlaceholder = (job) => {
@@ -614,22 +614,18 @@ const submitPlaceholder = async (e) => {
       stitchCount:  Number(ph.stitchCount),
       inHand:       ph.inHand,
       dueType:      ph.dueType,
-      // minimal fields so the card renders
-      start: '', end: '', delivery: '', isLate: false, linkedTo: null,
-      machineId: 'queue', threadColors: ''
+      start:        '',
+      end:          '',
+      delivery:     '',
+      isLate:       false,
+      linkedTo:     null,
+      machineId:    'queue',
+      threadColors: ''
     };
     updated = [...placeholders, newPh];
-    // 1) show minimal card
-    setColumns(prev => ({
-      ...prev,
-      queue: {
-        ...prev.queue,
-        jobs: [newPh, ...prev.queue.jobs]
-      }
-    }));
   }
 
-  // 2) persist
+  // 1) persist full manual state
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
@@ -638,47 +634,41 @@ const submitPlaceholder = async (e) => {
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
     setPlaceholders(updated);
+
+    // 2) re-fetch authoritative combined state
+    await fetchAllCombined();
+
   } catch (err) {
-    console.error(err);
+    console.error("Error saving placeholder:", err);
   }
 
-  // 3) quick re-fetch just the queue column to fill in real data
-  setTimeout(() => {
-    fetchAllCombined();
-  }, 200);
-
-  // 4) close modal
+  // 3) close modal & reset form
   setShowModal(false);
   setPh({ id:null, company:'', quantity:'', stitchCount:'', inHand:'', dueType:'Hard Date' });
 };
 
 // Remove placeholder
 const removePlaceholder = async (id) => {
-  // 1) remove card
-  setColumns(prev => ({
-    ...prev,
-    queue: {
-      ...prev.queue,
-      jobs: prev.queue.jobs.filter(j => String(j.id) !== id)
-    }
-  }));
-  // 2) persist cleaned placeholders
+  // 1) compute new placeholders list
   const cleaned = placeholders.filter(p => p.id !== id);
   setPlaceholders(cleaned);
+
+  // 2) persist updated manual state
+  const manualState = {
+    machine1:     columns.machine1.jobs.map(j => j.id),
+    machine2:     columns.machine2.jobs.map(j => j.id),
+    placeholders: cleaned
+  };
   try {
-    await axios.post(API_ROOT + '/manualState', {
-      machine1:     columns.machine1.jobs.map(j => j.id),
-      machine2:     columns.machine2.jobs.map(j => j.id),
-      placeholders: cleaned
-    });
-  } catch (err) { console.error(err); }
-  // 3) quick re-fetch queue
-  setTimeout(() => {
-    fetchAllCombined()
-  }, 200);
+    await axios.post(API_ROOT + '/manualState', manualState);
+
+    // 3) re-fetch authoritative combined state
+    await fetchAllCombined();
+
+  } catch (err) {
+    console.error("Error removing placeholder:", err);
+  }
 };
-
-
 
 // === Section 7: toggleLink (with “do-not-relink” logic) ===
 
