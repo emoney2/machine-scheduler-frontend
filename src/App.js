@@ -683,7 +683,6 @@ useEffect(() => {
   };
 
   handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
-  handleTopChange(prevMachine2Top, m2Jobs, 'machine2');
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 // === Section 6: Placeholder Management ===
 
