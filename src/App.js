@@ -675,7 +675,6 @@ useEffect(() => {
             id:        newTop,
             startTime: iso
           });
-          await fetchAllCombined();
         }
       }
       // record for next comparison
