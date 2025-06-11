@@ -127,18 +127,38 @@ export default function App() {
     }, 1000);
 
     socket.on("manualStateUpdated",   handleUpdate);
-    socket.on("orderUpdated",         handleUpdate);
     socket.on("linksUpdated",         handleUpdate);
     socket.on("placeholdersUpdated",  handleUpdate);
 
     return () => {
       socket.off("manualStateUpdated",   handleUpdate);
-      socket.off("orderUpdated",         handleUpdate);
       socket.off("linksUpdated",         handleUpdate);
       socket.off("placeholdersUpdated",  handleUpdate);
       handleUpdate.cancel();
     };
   }, []);
+
+// Listen for just-startTime updates, splice machine1 only
+useEffect(() => {
+  socket.on("startTimeUpdated", ({ orderId, startTime }) => {
+    setColumns(cols => {
+      const m1 = cols.machine1.jobs.filter(j => j.id !== orderId);
+      if (m1.length) {
+        // bump the next job’s start time
+        m1[0] = { ...m1[0], embroidery_start: startTime };
+      }
+      return {
+        ...cols,
+        machine1: { ...cols.machine1, jobs: m1 }
+        // machine2 is untouched
+      };
+    });
+  });
+  return () => {
+    socket.off("startTimeUpdated");
+  };
+}, []);
+
 
   // Manual sync button handler
   const handleSync = async () => {
