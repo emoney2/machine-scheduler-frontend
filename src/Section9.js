@@ -217,29 +217,7 @@ export default function Section9(props) {
                     }}
                   >
                     <h4 style={{ textAlign: 'center', margin: '8px 0', fontSize: 13 }}>
-                      <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                        {col.title}
-                        {colId !== 'queue' && (
-                          <>
-                            <input
-                              type="number"
-                              min="1"
-                              value={columns[colId].headCount}
-                              onChange={e =>
-                                setColumns(cols => ({
-                                  ...cols,
-                                  [colId]: {
-                                    ...cols[colId],
-                                    headCount: Math.max(1, parseInt(e.target.value, 10) || 1)
-                                  }
-                                }))
-                              }
-                              style={{ width: '3ch' }}
-                            />
-                            -Head
-                          </>
-                        )}
-                      </label>
+                      {col.title}
                     </h4>
                     {segments.map((seg, sIdx) => (
                       <div

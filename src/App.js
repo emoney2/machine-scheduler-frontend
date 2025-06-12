@@ -96,20 +96,20 @@ export default function App() {
     localStorage.setItem('placeholders', JSON.stringify(placeholders));
   }, [placeholders]);
 
-  // Core columns state
+  // ─── Core columns state, with fixed headCount baked into the title ───────────
   const [columns, setColumns] = useState({
     queue: {
       title: 'Queue',
       jobs: []
     },
     machine1: {
-      title: 'Machine 1',
-      headCount: 6,      // ← here
+      title: 'Machine 1 (1)',  // <-- headCount = 1
+      headCount: 1,             // <-- fixed
       jobs: []
     },
     machine2: {
-      title: 'Machine 2',
-      headCount: 6,      // ← and here
+      title: 'Machine 2 (6)',  // <-- headCount = 6
+      headCount: 6,             // <-- fixed
       jobs: []
     },
   });
