@@ -97,10 +97,21 @@ export default function App() {
   }, [placeholders]);
 
   // Core columns state
-  const [columns, setColumns]       = useState({
-    queue:    { title: 'Queue',     jobs: [] },
-    machine1: { title: 'Machine 1', jobs: [] },
-    machine2: { title: 'Machine 2', jobs: [] },
+  const [columns, setColumns] = useState({
+    queue: {
+      title: 'Queue',
+      jobs: []
+    },
+    machine1: {
+      title: 'Machine 1',
+      headCount: 6,      // ← here
+      jobs: []
+    },
+    machine2: {
+      title: 'Machine 2',
+      headCount: 6,      // ← and here
+      jobs: []
+    },
   });
   const [links, setLinks]           = useState(() => {
     try { return JSON.parse(localStorage.getItem('jobLinks') || '{}'); }
@@ -287,11 +298,11 @@ function sortQueue(arr) {
 }
 
 // === Section 3: Scheduling & Late (using embroidery_start) ===
-function scheduleMachineJobs(jobs) {
+function scheduleMachineJobs(jobs, headCount = 6) {
   let prevEnd = null;
 
   return jobs.map((job, idx) => {
-    // 1) Cutoff for late (6 work-days before due)
+    // 1) Late cutoff
     const eedDay = subWorkDays(parseDueDate(job.due_date), 6);
     const cutoff = new Date(eedDay);
     cutoff.setHours(WORK_END_HR, WORK_END_MIN, 0, 0);
@@ -299,27 +310,20 @@ function scheduleMachineJobs(jobs) {
     // 2) StartTime
     let start;
     if (idx === 0) {
-      if (job.embroidery_start) {
-        start = clampToWorkHours(new Date(job.embroidery_start));
-      } else {
-        start = clampToWorkHours(new Date());
-      }
+      start = job.embroidery_start
+        ? clampToWorkHours(new Date(job.embroidery_start))
+        : clampToWorkHours(prevEnd || new Date());
     } else {
-      start = clampToWorkHours(new Date(prevEnd.getTime() + 30 * 60000));
+      start = clampToWorkHours(prevEnd);
     }
 
-    // 3) Run → end
-    //   round quantity up to multiple of 6
-    const qty = job.quantity % 6 === 0
+    // 3) Run → EndTime
+    //   a) bump quantity to a multiple of headCount
+    const qty = job.quantity % headCount === 0
       ? job.quantity
-      : Math.ceil(job.quantity / 6) * 6;
-
-    //   if stitch_count is zero or missing, use 30000 as placeholder
-    const stitches = job.stitch_count > 0
-      ? job.stitch_count
-      : 30000;
-
-    const runMs = (stitches / 30000) * (qty / 6) * 3600000;
+      : Math.ceil(job.quantity / headCount) * headCount;
+    //   b) compute run duration (ms)
+    const runMs = (job.stitch_count / 30000) * (qty / headCount) * 3600000;
     const end   = addWorkTime(start, runMs);
 
     // 4) Decorate
@@ -334,6 +338,7 @@ function scheduleMachineJobs(jobs) {
     return job;
   });
 }
+
 
 
 // === Section 4: Link Utilities ===
@@ -510,8 +515,14 @@ function getChain(jobs, id) {
       });
 
       // 10) Re-run scheduleMachineJobs on the machine columns
-      newCols.machine1.jobs = scheduleMachineJobs(newCols.machine1.jobs);
-      newCols.machine2.jobs = scheduleMachineJobs(newCols.machine2.jobs);
+      nextCols.machine1.jobs = scheduleMachineJobs(
+        nextCols.machine1.jobs,
+        nextCols.machine1.headCount
+      );
+      nextCols.machine2.jobs = scheduleMachineJobs(
+        nextCols.machine2.jobs,
+        nextCols.machine2.headCount
+      );
 
       // 11) Return the newCols object (we’ll commit it in Step 5C)
       return newCols;
@@ -988,6 +999,7 @@ const onDragEnd = async (result) => {
           element={
             <Section9
               columns={columns}
+              setColumns={setColumns}
               handleSync={handleSync}
               syncStatus={syncStatus}
               showModal={showModal}
