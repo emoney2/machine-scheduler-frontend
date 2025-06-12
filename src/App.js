@@ -322,9 +322,9 @@ function scheduleMachineJobs(jobs, headCount = 6) {
     const qty = job.quantity % headCount === 0
       ? job.quantity
       : Math.ceil(job.quantity / headCount) * headCount;
-    //   b) compute run duration (ms)
-    const runMs = (job.stitch_count / 30000) * (qty / headCount) * 3600000;
-    const end   = addWorkTime(start, runMs);
+    //   b) default to 30000 stitches if none provided
+    const stitches = job.stitch_count > 0 ? job.stitch_count : 30000;
+    const runMs    = (stitches / 30000) * (qty / headCount) * 3600000;
 
     // 4) Decorate
     job._rawStart = start;
@@ -600,8 +600,15 @@ const fetchManualStateCore = async (previousCols) => {
     });
 
     // 8) Re-run scheduling on machines
-    mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs);
-    mergedCols.machine2.jobs = scheduleMachineJobs(mergedCols.machine2.jobs);
+    // re-schedule using each column’s headCount
+    mergedCols.machine1.jobs = scheduleMachineJobs(
+      mergedCols.machine1.jobs,
+      mergedCols.machine1.headCount
+    );
+    mergedCols.machine2.jobs = scheduleMachineJobs(
+      mergedCols.machine2.jobs,
+      mergedCols.machine2.headCount
+    );
 
     console.log('fetchManualStateCore ▶ done');
     return mergedCols;
