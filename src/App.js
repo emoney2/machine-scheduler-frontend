@@ -326,6 +326,9 @@ function scheduleMachineJobs(jobs, headCount = 6) {
     const stitches = job.stitch_count > 0 ? job.stitch_count : 30000;
     const runMs    = (stitches / 30000) * (qty / headCount) * 3600000;
 
+    //   c) calculate end time
+    const end = addWorkTime(start, runMs);
+
     // 4) Decorate
     job._rawStart = start;
     job._rawEnd   = end;
@@ -338,8 +341,6 @@ function scheduleMachineJobs(jobs, headCount = 6) {
     return job;
   });
 }
-
-
 
 // === Section 4: Link Utilities ===
 function loadLinks() {
