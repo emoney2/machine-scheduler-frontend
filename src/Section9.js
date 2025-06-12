@@ -216,9 +216,28 @@ export default function Section9(props) {
                       background: '#fafafa'
                     }}
                   >
-                    <h4 style={{ textAlign: 'center', margin: '8px 0', fontSize: 13 }}>
+                    <h4 style={{ textAlign: 'center', margin: '8px 0', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent:                                                             'center', gap: 6 }}>
                       {col.title}
+                      {colId !== 'queue' && (
+                        <span
+                          style={{
+                            display:        'inline-flex',
+                            alignItems:     'center',
+                            justifyContent: 'center',
+                            width:          24,
+                            height:         24,
+                            borderRadius:   '50%',
+                            backgroundColor:'#000',
+                            color:          '#fff',
+                            fontSize:       12,
+                            fontWeight:     'bold'
+                          }}
+                        >
+                          {columns[colId].headCount}
+                        </span>
+                      )}
                     </h4>
+
                     {segments.map((seg, sIdx) => (
                       <div
                         key={sIdx}

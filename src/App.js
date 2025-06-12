@@ -103,12 +103,12 @@ export default function App() {
       jobs: []
     },
     machine1: {
-      title: 'Machine 1 (1)',  // <-- headCount = 1
+      title: 'Machine 1',  // <-- headCount = 1
       headCount: 1,             // <-- fixed
       jobs: []
     },
     machine2: {
-      title: 'Machine 2 (6)',  // <-- headCount = 6
+      title: 'Machine 2',  // <-- headCount = 6
       headCount: 6,             // <-- fixed
       jobs: []
     },
