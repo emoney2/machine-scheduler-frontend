@@ -685,6 +685,7 @@ const fetchManualStateCore = async (previousCols) => {
     return () => clearInterval(handle);
   }, []);
 // ─── Section 5E: Auto‐clear old & bump new top‐of‐list ───────────────
+// ─── Section 5E: Auto‐clear old & bump new top‐of‐list ───────────────
 useEffect(() => {
   const m1Jobs = columns.machine1.jobs;
   const m2Jobs = columns.machine2.jobs;
@@ -698,11 +699,18 @@ useEffect(() => {
 
       console.log(`🧪 Top job ID: ${newTop}`);
       console.log(`🧪 embroidery_start value:`, jobObj?.embroidery_start);
+      console.log(`🧪 embroidery_start type:`, typeof jobObj?.embroidery_start);
 
-      const hasStartTime =
-        jobObj?.embroidery_start &&
-        jobObj.embroidery_start !== "null" &&
-        jobObj.embroidery_start !== "";
+      const startVal = jobObj?.embroidery_start;
+
+      const hasStartTime = (
+        startVal !== null &&
+        startVal !== undefined &&
+        startVal !== "" &&
+        startVal !== "null" &&
+        startVal !== "undefined" &&
+        !Number.isNaN(new Date(startVal).getTime())  // valid date
+      );
 
       if (jobObj && !hasStartTime) {
         const clamped = clampToWorkHours(new Date());
@@ -718,12 +726,13 @@ useEffect(() => {
         } catch (err) {
           console.error("❌ Failed to bump start time", err);
         }
+      } else {
+        console.log(`✅ Skipping bump: start time already exists for ${newTop}`);
       }
 
       prevRef.current = newTop;
     }
   };
-
 
   handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
   handleTopChange(prevMachine2Top, m2Jobs, 'machine2');
