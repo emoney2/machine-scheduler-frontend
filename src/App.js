@@ -685,7 +685,6 @@ const fetchManualStateCore = async (previousCols) => {
     return () => clearInterval(handle);
   }, []);
 // ─── Section 5E: Auto‐clear old & bump new top‐of‐list ───────────────
-// ─── Section 5E: Auto‐clear old & bump new top‐of‐list ───────────────
 useEffect(() => {
   const m1Jobs = columns.machine1.jobs;
   const m2Jobs = columns.machine2.jobs;
@@ -704,12 +703,10 @@ useEffect(() => {
       const startVal = jobObj?.embroidery_start;
 
       const hasStartTime = (
-        startVal !== null &&
-        startVal !== undefined &&
-        startVal !== "" &&
-        startVal !== "null" &&
-        startVal !== "undefined" &&
-        !Number.isNaN(new Date(startVal).getTime())  // valid date
+        typeof startVal === "string" &&
+        startVal.trim() !== "" &&
+        startVal.toLowerCase() !== "null" &&
+        !Number.isNaN(new Date(startVal).getTime())
       );
 
       if (jobObj && !hasStartTime) {
@@ -737,7 +734,6 @@ useEffect(() => {
   handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
   handleTopChange(prevMachine2Top, m2Jobs, 'machine2');
 }, [columns.machine1.jobs, columns.machine2.jobs]);
-
 // === Section 6: Placeholder Management ===
 
 // Populate edit modal
