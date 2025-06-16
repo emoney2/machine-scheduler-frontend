@@ -696,7 +696,9 @@ useEffect(() => {
     if (newTop !== oldTop) {
       const jobObj = jobs.find(j => j.id === newTop);
 
-      // 🔒 Only update if embroidery_start is not already set
+      console.log(`🧪 Top job ID: ${newTop}`);
+      console.log(`🧪 embroidery_start value:`, jobObj?.embroidery_start);
+
       const hasStartTime =
         jobObj?.embroidery_start &&
         jobObj.embroidery_start !== "null" &&
@@ -721,6 +723,7 @@ useEffect(() => {
       prevRef.current = newTop;
     }
   };
+
 
   handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
   handleTopChange(prevMachine2Top, m2Jobs, 'machine2');
