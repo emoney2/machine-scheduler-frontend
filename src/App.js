@@ -697,19 +697,11 @@ useEffect(() => {
       const jobObj = jobs.find(j => j.id === newTop);
 
       console.log(`🧪 Top job ID: ${newTop}`);
-      console.log(`🧪 embroidery_start value:`, jobObj?.embroidery_start);
-      console.log(`🧪 embroidery_start type:`, typeof jobObj?.embroidery_start);
+      console.log(`🧪 embroidery_start value: ${jobObj?.embroidery_start}`);
+      console.log(`🧪 embroidery_start type: ${typeof jobObj?.embroidery_start}`);
 
-      const startVal = jobObj?.embroidery_start;
-
-      const hasStartTime = (
-        typeof startVal === "string" &&
-        startVal.trim() !== "" &&
-        startVal.toLowerCase() !== "null" &&
-        !Number.isNaN(new Date(startVal).getTime())
-      );
-
-      if (jobObj && !hasStartTime) {
+      // Only set start time if missing or empty string
+      if (jobObj && (!jobObj.embroidery_start || jobObj.embroidery_start.trim() === '')) {
         const clamped = clampToWorkHours(new Date());
         const iso = clamped.toISOString();
 
@@ -723,8 +715,6 @@ useEffect(() => {
         } catch (err) {
           console.error("❌ Failed to bump start time", err);
         }
-      } else {
-        console.log(`✅ Skipping bump: start time already exists for ${newTop}`);
       }
 
       prevRef.current = newTop;
@@ -734,6 +724,7 @@ useEffect(() => {
   handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
   handleTopChange(prevMachine2Top, m2Jobs, 'machine2');
 }, [columns.machine1.jobs, columns.machine2.jobs]);
+
 // === Section 6: Placeholder Management ===
 
 // Populate edit modal
