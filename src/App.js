@@ -68,11 +68,13 @@ export default function App() {
   // Track last‐seen top job on each machine
   const prevMachine1Top = useRef(null);
   const prevMachine2Top = useRef(null);
+  const bumpedJobs = useRef(new Set());
+
 
   // Send a new start time when needed
   const bumpJobStartTime = async (jobId) => {
     try {
-      // clamp “now” to next valid work time (e.g. 8:30 next workday if after hours)
+      console.log("⏱️ Setting embroidery start time for job", jobId);
       const clamped = clampToWorkHours(new Date());
       const iso     = clamped.toISOString();
       await axios.post(API_ROOT + '/updateStartTime', {
@@ -169,6 +171,22 @@ useEffect(() => {
     socket.off("startTimeUpdated");
   };
 }, []);
+
+useEffect(() => {
+  const top1 = columns.machine1.jobs?.[0];
+  const top2 = columns.machine2.jobs?.[0];
+
+  if (top1 && !top1.embroidery_start && !bumpedJobs.current.has(top1.id)) {
+    bumpJobStartTime(top1.id);
+    bumpedJobs.current.add(top1.id);
+  }
+
+  if (top2 && !top2.embroidery_start && !bumpedJobs.current.has(top2.id)) {
+    bumpJobStartTime(top2.id);
+    bumpedJobs.current.add(top2.id);
+  }
+}, [columns.machine1.jobs, columns.machine2.jobs]);
+
 
 
   // Manual sync button handler
@@ -393,6 +411,8 @@ function getChain(jobs, id) {
     console.log('fetchOrdersEmbroLinksCore ▶ start');
     setIsLoading(true);
     setHasError(false);
+    bumpedJobs.current.clear();
+
 
     try {
       // 1) Fetch orders, embroideryList, and links in parallel
