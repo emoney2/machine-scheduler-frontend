@@ -693,33 +693,28 @@ useEffect(() => {
     const oldTop = prevRef.current;
     const newTop = jobs[0]?.id || null;
 
-    // if the top job changed
     if (newTop !== oldTop) {
-      // skip on initial mount
-      if (oldTop !== null) {
-        // 1) clear oldTop’s start time in Sheet
-        console.log(`🗑️ Clearing start for ${oldTop}`);
-        await axios.post(API_ROOT + '/updateStartTime', {
-          id:        oldTop,
-          startTime: ""
-        });
+      const jobObj = jobs.find(j => j.id === newTop);
 
-        // 2) bump newTop if it has no manual start
-        const jobObj = jobs.find(j => j.id === newTop);
-        if (newTop && jobObj && !jobObj.embroidery_start) {
-          const clamped = clampToWorkHours(new Date());
-          const iso     = clamped.toISOString();
-          console.log(`🔔 ${machineName} bumped to ${newTop}`);
-          await axios.post(API_ROOT + '/updateStartTime', {
-            id:        newTop,
-            startTime: iso
-          });
-        }
+      // ONLY bump the start time if it's missing
+      if (newTop && jobObj && !jobObj.embroidery_start) {
+        const clamped = clampToWorkHours(new Date());
+        const iso     = clamped.toISOString();
+        console.log(`🔔 ${machineName} bumped to ${newTop}`);
+        await axios.post(API_ROOT + '/updateStartTime', {
+          id:        newTop,
+          startTime: iso
+        });
       }
-      // record for next comparison
+
+      // Do NOT clear the old job's start time
       prevRef.current = newTop;
     }
   };
+
+  handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
+  handleTopChange(prevMachine2Top, m2Jobs, 'machine2');
+}, [columns.machine1.jobs, columns.machine2.jobs]);
 
   handleTopChange(prevMachine1Top, m1Jobs, 'machine1');
 }, [columns.machine1.jobs, columns.machine2.jobs]);
