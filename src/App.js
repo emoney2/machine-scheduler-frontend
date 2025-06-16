@@ -696,18 +696,22 @@ useEffect(() => {
     if (newTop !== oldTop) {
       const jobObj = jobs.find(j => j.id === newTop);
 
-      // ONLY bump the start time if it's missing
-      if (newTop && jobObj && !jobObj.embroidery_start) {
+      if (jobObj && !jobObj.embroidery_start) {
         const clamped = clampToWorkHours(new Date());
-        const iso     = clamped.toISOString();
-        console.log(`🔔 ${machineName} bumped to ${newTop}`);
-        await axios.post(API_ROOT + '/updateStartTime', {
-          id:        newTop,
-          startTime: iso
-        });
+        const iso = clamped.toISOString();
+
+        console.log(`🔔 Bumping start time for ${newTop}: ${iso}`);
+
+        try {
+          await axios.post(API_ROOT + '/updateStartTime', {
+            id: newTop,
+            startTime: iso
+          });
+        } catch (err) {
+          console.error("❌ Failed to bump start time", err);
+        }
       }
 
-      // Do NOT clear the old job's start time
       prevRef.current = newTop;
     }
   };
