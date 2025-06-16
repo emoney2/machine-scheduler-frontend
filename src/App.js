@@ -177,15 +177,18 @@ useEffect(() => {
   const top2 = columns.machine2.jobs?.[0];
 
   if (top1 && !top1.embroidery_start && !bumpedJobs.current.has(top1.id)) {
+    console.log("⏱️ Setting start time for Machine 1 top job:", top1.id);
     bumpJobStartTime(top1.id);
     bumpedJobs.current.add(top1.id);
   }
 
   if (top2 && !top2.embroidery_start && !bumpedJobs.current.has(top2.id)) {
+    console.log("⏱️ Setting start time for Machine 2 top job:", top2.id);
     bumpJobStartTime(top2.id);
     bumpedJobs.current.add(top2.id);
   }
 }, [columns.machine1.jobs, columns.machine2.jobs]);
+;
 
 
 
