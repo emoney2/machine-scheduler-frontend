@@ -696,7 +696,13 @@ useEffect(() => {
     if (newTop !== oldTop) {
       const jobObj = jobs.find(j => j.id === newTop);
 
-      if (jobObj && !jobObj.embroidery_start) {
+      // 🔒 Only update if embroidery_start is not already set
+      const hasStartTime =
+        jobObj?.embroidery_start &&
+        jobObj.embroidery_start !== "null" &&
+        jobObj.embroidery_start !== "";
+
+      if (jobObj && !hasStartTime) {
         const clamped = clampToWorkHours(new Date());
         const iso = clamped.toISOString();
 
