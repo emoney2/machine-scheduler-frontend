@@ -55,8 +55,13 @@ export default function Ship() {
   }
 
   useEffect(() => {
-    // EXAMPLE: You can replace this with actual scanned orders
-    prepareShipment(["9", "25"]).then(setResult);
+    async function start() {
+      const result = await prepareShipment(["9", "25"]);
+      if (result) {
+        setResult(result);
+      }
+    }
+    start();
   }, []);
 
   return (
