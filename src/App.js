@@ -1,6 +1,7 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
 
+import Ship from "./Ship";
 import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
 import { io } from 'socket.io-client';
@@ -1057,6 +1058,7 @@ const onDragEnd = async (result) => {
         <Route path="/submit" element={<OrderSubmission />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
+        <Route path="/ship" element={<Ship />} />
       </Routes>
     </>
   );
