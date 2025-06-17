@@ -1,13 +1,6 @@
-// File: frontend/src/Ship.jsx
+// File: src/Ship.jsx
 
 import React, { useState, useEffect } from "react";
-
-// Mocked job data for now
-const MOCK_JOBS = [
-  { orderId: "9", product: "Blade", company: "JR" },
-  { orderId: "25", product: "Driver Cover", company: "JR" },
-  { orderId: "32", product: "Fairway", company: "JR" }
-];
 
 export default function Ship() {
   const [jobs, setJobs] = useState([]);
@@ -15,40 +8,81 @@ export default function Ship() {
   const [loading, setLoading] = useState(false);
   const [boxes, setBoxes] = useState([]);
 
+  // 🔍 Parse ?company=JR from the URL
+  const query = new URLSearchParams(window.location.search);
+  const company = query.get("company");
+
   useEffect(() => {
-    // Later we’ll replace this with a fetch based on company from URL
-    setJobs(MOCK_JOBS);
-  }, []);
+    async function loadJobs() {
+      if (!company) {
+        alert("Missing company in URL (e.g. ?company=JR)");
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${company}`,
+          { credentials: "include" }
+        );
+        const data = await res.json();
+        if (res.ok) {
+          setJobs(data.jobs);
+        } else {
+          alert(data.error || "Failed to load jobs");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Network error loading jobs.");
+      }
+    }
+
+    loadJobs();
+  }, [company]);
 
   const toggleSelect = (orderId) => {
-    setSelected(prev =>
+    setSelected((prev) =>
       prev.includes(orderId)
-        ? prev.filter(id => id !== orderId)
+        ? prev.filter((id) => id !== orderId)
         : [...prev, orderId]
     );
   };
 
   const handleShip = async () => {
-    if (selected.length === 0) return alert("Select at least one job to ship.");
-    setLoading(true);
-
-    const response = await fetch("https://machine-scheduler-backend.onrender.com/api/prepare-shipment", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ order_ids: selected })
-    });
-
-    const result = await response.json();
-    setLoading(false);
-
-    if (!response.ok && result.missing_products) {
-      const confirmed = window.confirm("Missing volumes found. Reload the page to enter them?");
-      if (confirmed) window.location.reload();
+    if (selected.length === 0) {
+      alert("Select at least one job to ship.");
       return;
     }
 
-    setBoxes(result.boxes || []);
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ order_ids: selected }),
+        }
+      );
+
+      const result = await response.json();
+      setLoading(false);
+
+      if (!response.ok && result.missing_products) {
+        const confirmed = window.confirm(
+          "Missing volumes found. Reload the page to enter them?"
+        );
+        if (confirmed) window.location.reload();
+        return;
+      }
+
+      setBoxes(result.boxes || []);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to ship.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -65,8 +99,10 @@ export default function Ship() {
               marginBottom: "0.5rem",
               cursor: "pointer",
               borderRadius: "20px",
-              backgroundColor: selected.includes(job.orderId) ? "#4CAF50" : "#f0f0f0",
-              color: selected.includes(job.orderId) ? "white" : "black"
+              backgroundColor: selected.includes(job.orderId)
+                ? "#4CAF50"
+                : "#f0f0f0",
+              color: selected.includes(job.orderId) ? "white" : "black",
             }}
           >
             {job.product} – Order #{job.orderId}
