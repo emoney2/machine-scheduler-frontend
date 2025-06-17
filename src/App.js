@@ -999,10 +999,11 @@ const onDragEnd = async (result) => {
         borderBottom: '1px solid #ccc'
       }}>
         {[
-          { to: "/",                label: "Scheduler" },
-          { to: "/submit",          label: "Order Submission" },
-          { to: "/inventory",       label: "Inventory" },
+          { to: "/",                  label: "Scheduler" },
+          { to: "/submit",            label: "Order Submission" },
+          { to: "/inventory",         label: "Inventory" },
           { to: "/inventory-ordered", label: "Inventory Ordered" },
+          { to: "/ship",              label: "Ship" }  // ✅ Added this line
         ].map(({ to, label }) => (
           <NavLink
             key={to}
@@ -1011,7 +1012,7 @@ const onDragEnd = async (result) => {
               marginRight: 16,
               padding: '0.5rem 1rem',
               textDecoration: 'none',
-              color: '#333',                             // uniform dark text
+              color: '#333',
               backgroundColor: isActive ? '#e0e0e0' : 'transparent',
               border: isActive ? '1px solid #ccc' : '1px solid transparent',
               borderBottom: isActive ? 'none' : '1px solid #ccc',
