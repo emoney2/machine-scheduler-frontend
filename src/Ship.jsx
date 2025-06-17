@@ -29,6 +29,9 @@ export default function Ship() {
       }
     }
 
+    // ✅ Wait 2 seconds before retrying shipment prep
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     return true;
   }
 
