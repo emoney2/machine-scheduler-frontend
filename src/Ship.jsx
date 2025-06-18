@@ -89,6 +89,38 @@ export default function Ship() {
     );
   };
 
+  const promptDimensionsForProduct = async (product) => {
+    const length = prompt(`Enter LENGTH in inches for "${product}"`);
+    const width = prompt(`Enter WIDTH in inches for "${product}"`);
+    const height = prompt(`Enter HEIGHT in inches for "${product}"`);
+
+    if (!length || !width || !height) {
+      alert("Volume entry canceled. Shipping aborted.");
+      return false;
+    }
+
+    try {
+      const res = await fetch(
+        "https://machine-scheduler-backend.onrender.com/api/set-volume",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ product, length, width, height }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        alert(`Failed to set volume for ${product}: ${data.error}`);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      alert("Failed to save volume");
+      return false;
+    }
+  };
+
   const handleShip = async () => {
     if (selected.length === 0) {
       alert("Select at least one job to ship.");
@@ -97,8 +129,8 @@ export default function Ship() {
 
     setLoading(true);
     try {
-      // Step 1: calculate boxes
-      const response = await fetch(
+      // Step 1: try preparing shipment
+      let response = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
         {
           method: "POST",
@@ -108,19 +140,36 @@ export default function Ship() {
         }
       );
 
-      const result = await response.json();
+      let result = await response.json();
+
+      // If missing volume, prompt for dimensions
       if (!response.ok && result.missing_products) {
-        const confirmed = window.confirm(
-          "Missing volumes found. Reload the page to enter them?"
+        for (let product of result.missing_products) {
+          const success = await promptDimensionsForProduct(product);
+          if (!success) {
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Retry shipment after saving volumes
+        response = await fetch(
+          "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ order_ids: selected }),
+          }
         );
-        if (confirmed) window.location.reload();
-        return;
+
+        result = await response.json();
       }
 
       const packedBoxes = result.boxes || [];
       setBoxes(packedBoxes);
 
-      // Step 2: simulate UPS + invoice + slips
+      // Step 2: simulate shipping
       const shipRes = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/process-shipment",
         {
@@ -136,9 +185,7 @@ export default function Ship() {
       if (shipRes.ok) {
         // Open each label
         shipData.labels.forEach((url) => window.open(url, "_blank"));
-        // Open invoice
         window.open(shipData.invoice, "_blank");
-        // Open packing slips
         shipData.slips.forEach((url) => window.open(url, "_blank"));
       } else {
         alert(shipData.error || "Shipment failed.");
@@ -174,7 +221,6 @@ export default function Ship() {
         ))}
       </datalist>
 
-      {/* 🔠 Header Row */}
       {jobs.length > 0 && (
         <div
           style={{
@@ -234,17 +280,7 @@ export default function Ship() {
           </div>
           <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
           <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job.date)}</div>
-          <div
-            style={{
-              width: 200,
-              textAlign: "center",
-              overflow: "hidden",
-              whiteSpace: "nowrap",
-              textOverflow: "ellipsis"
-            }}
-          >
-            {job.design}
-          </div>
+          <div style={{ width: 200, textAlign: "center" }}>{job.design}</div>
           <div style={{ width: 70, textAlign: "center" }}>{job.quantity}</div>
           <div style={{ width: 120, textAlign: "center" }}>{job.product}</div>
           <div style={{ width: 120, textAlign: "center" }}>{job.stage}</div>
