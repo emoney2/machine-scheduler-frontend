@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from "react";
 
+function formatDateMMDD(dateStr) {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-").map((part) => parseInt(part));
+  if (!month || !day) return dateStr;
+  return `${month.toString().padStart(2, "0")}/${day.toString().padStart(2, "0")}`;
+}
+
 export default function Ship() {
   const [jobs, setJobs] = useState([]);
   const [allCompanies, setAllCompanies] = useState([]);
@@ -131,6 +138,31 @@ export default function Ship() {
         ))}
       </datalist>
 
+      {/* ✅ Header Row */}
+      {jobs.length > 0 && (
+        <div
+          style={{
+            display: "flex",
+            fontWeight: "bold",
+            padding: "0.5rem 1rem",
+            borderBottom: "2px solid #333",
+            marginBottom: "0.5rem",
+            marginTop: "1rem",
+            fontSize: "0.85rem"
+          }}
+        >
+          <div style={{ width: 60 }}></div>
+          <div style={{ width: 50 }}>#</div>
+          <div style={{ width: 70 }}>Date</div>
+          <div style={{ width: 160 }}>Design</div>
+          <div style={{ width: 60 }}>Qty</div>
+          <div style={{ width: 100 }}>Product</div>
+          <div style={{ width: 80 }}>Stage</div>
+          <div style={{ width: 70 }}>Price</div>
+          <div style={{ width: 80 }}>Due</div>
+        </div>
+      )}
+
       {/* ✅ Job Row Display */}
       {jobs.map((job) => (
         <div
@@ -141,53 +173,47 @@ export default function Ship() {
             alignItems: "center",
             border: "1px solid #ccc",
             padding: "0.5rem 1rem",
-            marginBottom: "0.5rem",
-            borderRadius: "8px",
+            marginBottom: "0.3rem",
+            borderRadius: "6px",
             backgroundColor: selected.includes(job.orderId)
               ? "#4CAF50"
               : "#fff",
             color: selected.includes(job.orderId) ? "#fff" : "#000",
-            cursor: "pointer",
-            gap: "1rem",
-            overflow: "hidden"
+            cursor: "pointer"
           }}
         >
-          {job.image && (
-            <img
-              src={job.image}
-              alt="Preview"
-              style={{
-                width: "60px",
-                height: "60px",
-                objectFit: "cover",
-                borderRadius: "4px",
-                border: "1px solid #999"
-              }}
-            />
-          )}
+          <div style={{ width: 60 }}>
+            {job.image && (
+              <img
+                src={job.image}
+                alt="Preview"
+                style={{
+                  width: "50px",
+                  height: "50px",
+                  objectFit: "cover",
+                  borderRadius: "4px",
+                  border: "1px solid #999"
+                }}
+              />
+            )}
+          </div>
+          <div style={{ width: 50 }}>{job.orderId}</div>
+          <div style={{ width: 70 }}>{formatDateMMDD(job.date)}</div>
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns:
-                "80px 80px 120px 160px 60px 100px 80px 80px 80px",
-              gap: "1rem",
-              fontSize: "0.9rem",
+              width: 160,
               overflow: "hidden",
               whiteSpace: "nowrap",
-              textOverflow: "ellipsis",
-              width: "100%"
+              textOverflow: "ellipsis"
             }}
           >
-            <div><strong>{job.orderId}</strong></div>
-            <div>{job.date}</div>
-            <div>{job.company}</div>
-            <div>{job.design}</div>
-            <div>{job.quantity}</div>
-            <div>{job.product}</div>
-            <div>{job.stage}</div>
-            <div>${job.price}</div>
-            <div>{job.due}</div>
+            {job.design}
           </div>
+          <div style={{ width: 60 }}>{job.quantity}</div>
+          <div style={{ width: 100 }}>{job.product}</div>
+          <div style={{ width: 80 }}>{job.stage}</div>
+          <div style={{ width: 70 }}>${job.price}</div>
+          <div style={{ width: 80 }}>{formatDateMMDD(job.due)}</div>
         </div>
       ))}
 
