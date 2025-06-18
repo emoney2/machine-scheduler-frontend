@@ -201,6 +201,7 @@ export default function Ship() {
       }
 
       setLoading(false);
+      window.location.reload();
     } catch (err) {
       console.error(err);
       alert("Failed to ship.");
