@@ -152,14 +152,14 @@ export default function Ship() {
           }}
         >
           <div style={{ width: 60 }}></div>
-          <div style={{ width: 50 }}>#</div>
-          <div style={{ width: 70 }}>Date</div>
-          <div style={{ width: 160 }}>Design</div>
-          <div style={{ width: 60 }}>Qty</div>
-          <div style={{ width: 100 }}>Product</div>
-          <div style={{ width: 80 }}>Stage</div>
-          <div style={{ width: 70 }}>Price</div>
-          <div style={{ width: 80 }}>Due</div>
+          <div style={{ width: 60 }}>#</div>
+          <div style={{ width: 80 }}>Date</div>
+          <div style={{ width: 200 }}>Design</div>
+          <div style={{ width: 70 }}>Qty</div>
+          <div style={{ width: 120 }}>Product</div>
+          <div style={{ width: 90 }}>Stage</div>
+          <div style={{ width: 80 }}>Price</div>
+          <div style={{ width: 90 }}>Due</div>
         </div>
       )}
 
@@ -197,11 +197,11 @@ export default function Ship() {
               />
             )}
           </div>
-          <div style={{ width: 50 }}>{job.orderId}</div>
-          <div style={{ width: 70 }}>{formatDateMMDD(job.date)}</div>
+          <div style={{ width: 60 }}>{job.orderId}</div>
+          <div style={{ width: 80 }}>{formatDateMMDD(job.date)}</div>
           <div
             style={{
-              width: 160,
+              width: 200,
               overflow: "hidden",
               whiteSpace: "nowrap",
               textOverflow: "ellipsis"
@@ -209,11 +209,11 @@ export default function Ship() {
           >
             {job.design}
           </div>
-          <div style={{ width: 60 }}>{job.quantity}</div>
-          <div style={{ width: 100 }}>{job.product}</div>
-          <div style={{ width: 80 }}>{job.stage}</div>
-          <div style={{ width: 70 }}>${job.price}</div>
-          <div style={{ width: 80 }}>{formatDateMMDD(job.due)}</div>
+          <div style={{ width: 70 }}>{job.quantity}</div>
+          <div style={{ width: 120 }}>{job.product}</div>
+          <div style={{ width: 90 }}>{job.stage}</div>
+          <div style={{ width: 80 }}>${job.price}</div>
+          <div style={{ width: 90 }}>{formatDateMMDD(job.due)}</div>
         </div>
       ))}
 
