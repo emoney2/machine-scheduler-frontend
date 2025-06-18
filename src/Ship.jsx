@@ -71,6 +71,16 @@ export default function Ship() {
     return () => clearInterval(interval); // Cleanup
   }, []);
 
+  useEffect(() => {
+    if (!companyInput || !allCompanies.includes(companyInput)) return;
+
+    const interval = setInterval(() => {
+      fetchJobs(companyInput);
+    }, 15000); // Refresh every 15 seconds
+
+    return () => clearInterval(interval); // Clear on unmount or input change
+  }, [companyInput, allCompanies]);
+
 
   async function fetchCompanyNames() {
     try {
