@@ -63,7 +63,8 @@ export default function Ship() {
       );
       const data = await res.json();
       if (res.ok) {
-        setJobs(data.jobs);
+        const jobsWithQty = data.jobs.map(job => ({ ...job, shipQty: job.quantity }));
+        setJobs(jobsWithQty);
       } else {
         alert(data.error || "Failed to load jobs");
       }
@@ -173,7 +174,6 @@ export default function Ship() {
     });
   };
 
-
   const handleShip = async () => {
     if (selected.length === 0) {
       alert("Select at least one job to ship.");
@@ -183,7 +183,6 @@ export default function Ship() {
     setLoading(true);
 
     try {
-      // Step 1: try preparing shipment
       let response = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
         {
@@ -196,7 +195,6 @@ export default function Ship() {
 
       let result = await response.json();
 
-      // If missing volume, prompt for dimensions
       if (!response.ok && result.missing_products) {
         for (let product of result.missing_products) {
           const success = await promptDimensionsForProduct(product);
@@ -206,7 +204,6 @@ export default function Ship() {
           }
         }
 
-        // Retry shipment after saving volumes
         response = await fetch(
           "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
           {
@@ -223,14 +220,17 @@ export default function Ship() {
       const packedBoxes = result.boxes || [];
       setBoxes(packedBoxes);
 
-      // Step 2: simulate shipping
+      const shippedQuantities = Object.fromEntries(
+        jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
+      );
+
       const shipRes = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/process-shipment",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ order_ids: selected, boxes: packedBoxes }),
+          body: JSON.stringify({ order_ids: selected, boxes: packedBoxes, shipped_quantities: shippedQuantities }),
         }
       );
 
@@ -241,12 +241,11 @@ export default function Ship() {
         window.open(shipData.invoice, "_blank");
         shipData.slips.forEach((url) => window.open(url, "_blank"));
         setLoading(false);
-        window.location.reload();  // ✅ Refresh after successful ship
+        window.location.reload();
       } else {
         alert(shipData.error || "Shipment failed.");
         setLoading(false);
       }
-
     } catch (err) {
       console.error(err);
       alert("Failed to ship.");
@@ -257,18 +256,12 @@ export default function Ship() {
   return (
     <div style={{ padding: "2rem" }}>
       <h2>📦 Ship Jobs</h2>
-
       <input
         list="company-options"
         placeholder="Start typing a company..."
         value={companyInput}
         onChange={handleSelectCompany}
-        style={{
-          fontSize: "1rem",
-          padding: "0.5rem",
-          width: "300px",
-          marginBottom: "2rem"
-        }}
+        style={{ fontSize: "1rem", padding: "0.5rem", width: "300px", marginBottom: "2rem" }}
       />
       <datalist id="company-options">
         {allCompanies.map((c) => (
@@ -277,17 +270,7 @@ export default function Ship() {
       </datalist>
 
       {jobs.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            fontWeight: "bold",
-            padding: "0.5rem 1rem",
-            borderBottom: "2px solid #333",
-            marginBottom: "0.5rem",
-            marginTop: "1rem",
-            fontSize: "0.85rem"
-          }}
-        >
+        <div style={{ display: "flex", fontWeight: "bold", padding: "0.5rem 1rem", borderBottom: "2px solid #333", marginBottom: "0.5rem", marginTop: "1rem", fontSize: "0.85rem" }}>
           <div style={{ width: 60 }}></div>
           <div style={{ width: 60, textAlign: "center" }}>#</div>
           <div style={{ width: 80, textAlign: "center" }}>Date</div>
@@ -304,39 +287,29 @@ export default function Ship() {
         <div
           key={job.orderId}
           onClick={() => toggleSelect(job.orderId)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            border: "1px solid #ccc",
-            padding: "0.5rem 1rem",
-            marginBottom: "0.3rem",
-            borderRadius: "6px",
-            backgroundColor: selected.includes(job.orderId)
-              ? "#4CAF50"
-              : "#fff",
-            color: selected.includes(job.orderId) ? "#fff" : "#000",
-            cursor: "pointer"
-          }}
+          style={{ display: "flex", alignItems: "center", border: "1px solid #ccc", padding: "0.5rem 1rem", marginBottom: "0.3rem", borderRadius: "6px", backgroundColor: selected.includes(job.orderId) ? "#4CAF50" : "#fff", color: selected.includes(job.orderId) ? "#fff" : "#000", cursor: "pointer" }}
         >
-          <div style={{ width: 60 }}>
-            {job.image && (
-              <img
-                src={job.image}
-                alt="Preview"
-                style={{
-                  width: "50px",
-                  height: "50px",
-                  objectFit: "cover",
-                  borderRadius: "4px",
-                  border: "1px solid #999"
-                }}
-              />
-            )}
-          </div>
+          <div style={{ width: 60 }}>{job.image && <img src={job.image} alt="Preview" style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "4px", border: "1px solid #999" }} />}</div>
           <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
           <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job.date)}</div>
           <div style={{ width: 200, textAlign: "center" }}>{job.design}</div>
-          <div style={{ width: 70, textAlign: "center" }}>{job.quantity}</div>
+          <div style={{ width: 70, textAlign: "center" }}>
+            <input
+              type="number"
+              value={job.shipQty}
+              min="1"
+              style={{ width: "50px" }}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                setJobs((prev) =>
+                  prev.map((j) =>
+                    j.orderId === job.orderId ? { ...j, shipQty: value } : j
+                  )
+                );
+              }}
+            />
+          </div>
           <div style={{ width: 120, textAlign: "center" }}>{job.product}</div>
           <div style={{ width: 120, textAlign: "center" }}>{job.stage}</div>
           <div style={{ width: 80, textAlign: "center" }}>${job.price}</div>
