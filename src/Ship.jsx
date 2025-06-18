@@ -196,17 +196,13 @@ export default function Ship() {
         shipData.labels.forEach((url) => window.open(url, "_blank"));
         window.open(shipData.invoice, "_blank");
         shipData.slips.forEach((url) => window.open(url, "_blank"));
+
+        setLoading(false);
+        window.location.reload(); // Refresh list after successful shipment
       } else {
         alert(shipData.error || "Shipment failed.");
+        setLoading(false); // Only called on failure now
       }
-
-      setLoading(false);
-      window.location.reload();
-    } catch (err) {
-      console.error(err);
-      alert("Failed to ship.");
-      setLoading(false);
-    }
   };
 
   return (
