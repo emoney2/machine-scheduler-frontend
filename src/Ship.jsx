@@ -137,6 +137,7 @@ export default function Ship() {
     }
 
     setLoading(true);
+
     try {
       // Step 1: try preparing shipment
       let response = await fetch(
@@ -192,17 +193,21 @@ export default function Ship() {
       const shipData = await shipRes.json();
 
       if (shipRes.ok) {
-        // Open each label
         shipData.labels.forEach((url) => window.open(url, "_blank"));
         window.open(shipData.invoice, "_blank");
         shipData.slips.forEach((url) => window.open(url, "_blank"));
-
         setLoading(false);
-        window.location.reload(); // Refresh list after successful shipment
+        window.location.reload();  // ✅ Refresh after successful ship
       } else {
         alert(shipData.error || "Shipment failed.");
-        setLoading(false); // Only called on failure now
+        setLoading(false);
       }
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to ship.");
+      setLoading(false);
+    }
   };
 
   return (
