@@ -140,7 +140,7 @@ export default function Ship() {
             display: "flex",
             alignItems: "center",
             border: "1px solid #ccc",
-            padding: "0.75rem",
+            padding: "0.5rem 1rem",
             marginBottom: "0.5rem",
             borderRadius: "8px",
             backgroundColor: selected.includes(job.orderId)
@@ -148,7 +148,8 @@ export default function Ship() {
               : "#fff",
             color: selected.includes(job.orderId) ? "#fff" : "#000",
             cursor: "pointer",
-            gap: "1rem"
+            gap: "1rem",
+            overflow: "hidden"
           }}
         >
           {job.image && (
@@ -164,17 +165,28 @@ export default function Ship() {
               }}
             />
           )}
-
-          <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-            <div><strong>Order #{job.orderId}</strong></div>
-            <div>Date: {job.date}</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "80px 80px 120px 160px 60px 100px 80px 80px 80px",
+              gap: "1rem",
+              fontSize: "0.9rem",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
+              textOverflow: "ellipsis",
+              width: "100%"
+            }}
+          >
+            <div><strong>{job.orderId}</strong></div>
+            <div>{job.date}</div>
             <div>{job.company}</div>
-            <div>Design: {job.design}</div>
-            <div>Qty: {job.quantity}</div>
-            <div>Product: {job.product}</div>
-            <div>Stage: {job.stage}</div>
-            <div>Price: ${job.price}</div>
-            <div>Due: {job.due}</div>
+            <div>{job.design}</div>
+            <div>{job.quantity}</div>
+            <div>{job.product}</div>
+            <div>{job.stage}</div>
+            <div>${job.price}</div>
+            <div>{job.due}</div>
           </div>
         </div>
       ))}
