@@ -114,20 +114,25 @@ export default function Ship() {
   }
 
   async function fetchJobs(company) {
-    setJobs([]);
-    setBoxes([]);
-    setSelected([]);
     try {
       const res = await fetch(
-        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(
-          company
-        )}`,
+        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
         { credentials: "include" }
       );
       const data = await res.json();
       if (res.ok) {
-        const jobsWithQty = data.jobs.map(job => ({ ...job, shipQty: job.quantity }));
-        setJobs(jobsWithQty);
+        const newJobs = data.jobs.map(job => ({ ...job, shipQty: job.quantity }));
+        setJobs(prevJobs => {
+          // Create a map from existing jobs for fast lookup
+          const jobMap = Object.fromEntries(prevJobs.map(j => [j.orderId, j]));
+          // Update only changed jobs, retain shipQty edits
+          return newJobs.map(job => {
+            const existing = jobMap[job.orderId];
+            return existing
+              ? { ...job, shipQty: existing.shipQty ?? job.quantity }
+              : job;
+          });
+        });
       } else {
         alert(data.error || "Failed to load jobs");
       }
