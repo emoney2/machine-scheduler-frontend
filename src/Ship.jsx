@@ -90,14 +90,22 @@ export default function Ship() {
   };
 
   const promptDimensionsForProduct = async (product) => {
-    const length = prompt(`Enter LENGTH in inches for "${product}"`);
-    const width = prompt(`Enter WIDTH in inches for "${product}"`);
-    const height = prompt(`Enter HEIGHT in inches for "${product}"`);
+    const input = prompt(
+      `Enter dimensions for "${product}" (in inches).\nFormat: Length x Width x Height`
+    );
 
-    if (!length || !width || !height) {
+    if (!input) {
       alert("Volume entry canceled. Shipping aborted.");
       return false;
     }
+
+    const match = input.match(/^(\d+)\s*[xX*]\s*(\d+)\s*[xX*]\s*(\d+)$/);
+    if (!match) {
+      alert("Invalid format. Use something like 10x5x3.");
+      return false;
+    }
+
+    const [, length, width, height] = match;
 
     try {
       const res = await fetch(
@@ -120,6 +128,7 @@ export default function Ship() {
       return false;
     }
   };
+
 
   const handleShip = async () => {
     if (selected.length === 0) {
