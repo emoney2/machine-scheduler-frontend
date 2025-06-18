@@ -89,44 +89,88 @@ export default function Ship() {
     );
   };
 
-  const promptDimensionsForProduct = async (product) => {
-    const input = prompt(
-      `Enter dimensions for "${product}" (in inches).\nFormat: Length x Width x Height`
-    );
+  const promptDimensionsForProduct = (product) => {
+    return new Promise((resolve) => {
+      const container = document.createElement("div");
+      container.style.display = "flex";
+      container.style.flexDirection = "column";
+      container.style.fontSize = "1rem";
 
-    if (!input) {
-      alert("Volume entry canceled. Shipping aborted.");
-      return false;
-    }
+      const label = document.createElement("label");
+      label.innerText = `Enter dimensions for "${product}" (in inches):`;
+      label.style.marginBottom = "0.5rem";
 
-    const match = input.match(/^(\d+)\s*[xX*]\s*(\d+)\s*[xX*]\s*(\d+)$/);
-    if (!match) {
-      alert("Invalid format. Use something like 10x5x3.");
-      return false;
-    }
+      const inputL = document.createElement("input");
+      const inputW = document.createElement("input");
+      const inputH = document.createElement("input");
 
-    const [, length, width, height] = match;
+      [inputL, inputW, inputH].forEach((input, i) => {
+        input.placeholder = ["Length", "Width", "Height"][i];
+        input.type = "number";
+        input.style.marginBottom = "0.5rem";
+        input.style.padding = "0.25rem";
+        input.style.fontSize = "1rem";
+      });
 
-    try {
-      const res = await fetch(
-        "https://machine-scheduler-backend.onrender.com/api/set-volume",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ product, length, width, height }),
+      const submitBtn = document.createElement("button");
+      submitBtn.innerText = "Save";
+      submitBtn.style.padding = "0.5rem";
+      submitBtn.style.fontSize = "1rem";
+
+      submitBtn.onclick = async () => {
+        const length = inputL.value;
+        const width = inputW.value;
+        const height = inputH.value;
+
+        if (!length || !width || !height) {
+          alert("Please enter all three dimensions.");
+          return;
         }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        alert(`Failed to set volume for ${product}: ${data.error}`);
-        return false;
-      }
-      return true;
-    } catch (err) {
-      alert("Failed to save volume");
-      return false;
-    }
+
+        try {
+          const res = await fetch(
+            "https://machine-scheduler-backend.onrender.com/api/set-volume",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ product, length, width, height }),
+            }
+          );
+          const data = await res.json();
+          if (res.ok) {
+            document.body.removeChild(dialog);
+            resolve(true);
+          } else {
+            alert(`Failed to set volume: ${data.error}`);
+            resolve(false);
+          }
+        } catch (err) {
+          alert("Failed to save volume.");
+          resolve(false);
+        }
+      };
+
+      container.appendChild(label);
+      container.appendChild(inputL);
+      container.appendChild(inputW);
+      container.appendChild(inputH);
+      container.appendChild(submitBtn);
+
+      const dialog = document.createElement("div");
+      dialog.style.position = "fixed";
+      dialog.style.top = "50%";
+      dialog.style.left = "50%";
+      dialog.style.transform = "translate(-50%, -50%)";
+      dialog.style.backgroundColor = "#fff";
+      dialog.style.padding = "1rem";
+      dialog.style.border = "1px solid #ccc";
+      dialog.style.borderRadius = "8px";
+      dialog.style.zIndex = 9999;
+      dialog.appendChild(container);
+
+      document.body.appendChild(dialog);
+    });
   };
 
 
