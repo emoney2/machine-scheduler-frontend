@@ -2,9 +2,22 @@ import React, { useState, useEffect } from "react";
 
 function formatDateMMDD(dateStr) {
   if (!dateStr) return "";
-  const [year, month, day] = dateStr.split("-").map((part) => parseInt(part));
-  if (!month || !day) return dateStr;
-  return `${month.toString().padStart(2, "0")}/${day.toString().padStart(2, "0")}`;
+  const parts = dateStr.includes("-")
+    ? dateStr.split("-")
+    : dateStr.includes("/")
+    ? dateStr.split("/")
+    : [];
+
+  if (parts.length !== 3) return dateStr;
+
+  const [a, b, c] = parts.map(p => parseInt(p));
+  if (dateStr.includes("-")) {
+    // format YYYY-MM-DD
+    return `${b.toString().padStart(2, "0")}/${c.toString().padStart(2, "0")}`;
+  } else {
+    // format MM/DD/YYYY
+    return `${a.toString().padStart(2, "0")}/${b.toString().padStart(2, "0")}`;
+  }
 }
 
 export default function Ship() {
@@ -119,7 +132,6 @@ export default function Ship() {
     <div style={{ padding: "2rem" }}>
       <h2>📦 Ship Jobs</h2>
 
-      {/* 🔍 Type-ahead search */}
       <input
         list="company-options"
         placeholder="Start typing a company..."
@@ -138,7 +150,7 @@ export default function Ship() {
         ))}
       </datalist>
 
-      {/* ✅ Header Row */}
+      {/* 🔠 Header Row */}
       {jobs.length > 0 && (
         <div
           style={{
@@ -152,18 +164,18 @@ export default function Ship() {
           }}
         >
           <div style={{ width: 60 }}></div>
-          <div style={{ width: 60 }}>#</div>
-          <div style={{ width: 80 }}>Date</div>
-          <div style={{ width: 200 }}>Design</div>
-          <div style={{ width: 70 }}>Qty</div>
-          <div style={{ width: 120 }}>Product</div>
-          <div style={{ width: 90 }}>Stage</div>
-          <div style={{ width: 80 }}>Price</div>
-          <div style={{ width: 90 }}>Due</div>
+          <div style={{ width: 60, textAlign: "center" }}>#</div>
+          <div style={{ width: 80, textAlign: "center" }}>Date</div>
+          <div style={{ width: 200, textAlign: "center" }}>Design</div>
+          <div style={{ width: 70, textAlign: "center" }}>Qty</div>
+          <div style={{ width: 120, textAlign: "center" }}>Product</div>
+          <div style={{ width: 120, textAlign: "center" }}>Stage</div>
+          <div style={{ width: 80, textAlign: "center" }}>Price</div>
+          <div style={{ width: 90, textAlign: "center" }}>Due</div>
         </div>
       )}
 
-      {/* ✅ Job Row Display */}
+      {/* 📋 Job Rows */}
       {jobs.map((job) => (
         <div
           key={job.orderId}
@@ -197,11 +209,12 @@ export default function Ship() {
               />
             )}
           </div>
-          <div style={{ width: 60 }}>{job.orderId}</div>
-          <div style={{ width: 80 }}>{formatDateMMDD(job.date)}</div>
+          <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
+          <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job.date)}</div>
           <div
             style={{
               width: 200,
+              textAlign: "center",
               overflow: "hidden",
               whiteSpace: "nowrap",
               textOverflow: "ellipsis"
@@ -209,15 +222,14 @@ export default function Ship() {
           >
             {job.design}
           </div>
-          <div style={{ width: 70 }}>{job.quantity}</div>
-          <div style={{ width: 120 }}>{job.product}</div>
-          <div style={{ width: 90 }}>{job.stage}</div>
-          <div style={{ width: 80 }}>${job.price}</div>
-          <div style={{ width: 90 }}>{formatDateMMDD(job.due)}</div>
+          <div style={{ width: 70, textAlign: "center" }}>{job.quantity}</div>
+          <div style={{ width: 120, textAlign: "center" }}>{job.product}</div>
+          <div style={{ width: 120, textAlign: "center" }}>{job.stage}</div>
+          <div style={{ width: 80, textAlign: "center" }}>${job.price}</div>
+          <div style={{ width: 90, textAlign: "center" }}>{formatDateMMDD(job.due)}</div>
         </div>
       ))}
 
-      {/* 🚚 Ship Buttons */}
       <div style={{ marginTop: "2rem" }}>
         <button onClick={handleShip} disabled={loading}>
           {loading ? "Calculating..." : "🚚 Ship"}
@@ -227,7 +239,6 @@ export default function Ship() {
         </button>
       </div>
 
-      {/* 📦 Box Summary */}
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
           <h3>📦 Packed Boxes</h3>
