@@ -12,10 +12,8 @@ function formatDateMMDD(dateStr) {
 
   const [a, b, c] = parts.map(p => parseInt(p));
   if (dateStr.includes("-")) {
-    // format YYYY-MM-DD
     return `${b.toString().padStart(2, "0")}/${c.toString().padStart(2, "0")}`;
   } else {
-    // format MM/DD/YYYY
     return `${a.toString().padStart(2, "0")}/${b.toString().padStart(2, "0")}`;
   }
 }
@@ -99,6 +97,7 @@ export default function Ship() {
 
     setLoading(true);
     try {
+      // Step 1: calculate boxes
       const response = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
         {
@@ -110,8 +109,6 @@ export default function Ship() {
       );
 
       const result = await response.json();
-      setLoading(false);
-
       if (!response.ok && result.missing_products) {
         const confirmed = window.confirm(
           "Missing volumes found. Reload the page to enter them?"
@@ -120,7 +117,34 @@ export default function Ship() {
         return;
       }
 
-      setBoxes(result.boxes || []);
+      const packedBoxes = result.boxes || [];
+      setBoxes(packedBoxes);
+
+      // Step 2: simulate UPS + invoice + slips
+      const shipRes = await fetch(
+        "https://machine-scheduler-backend.onrender.com/api/process-shipment",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ order_ids: selected, boxes: packedBoxes }),
+        }
+      );
+
+      const shipData = await shipRes.json();
+
+      if (shipRes.ok) {
+        // Open each label
+        shipData.labels.forEach((url) => window.open(url, "_blank"));
+        // Open invoice
+        window.open(shipData.invoice, "_blank");
+        // Open packing slips
+        shipData.slips.forEach((url) => window.open(url, "_blank"));
+      } else {
+        alert(shipData.error || "Shipment failed.");
+      }
+
+      setLoading(false);
     } catch (err) {
       console.error(err);
       alert("Failed to ship.");
@@ -175,7 +199,6 @@ export default function Ship() {
         </div>
       )}
 
-      {/* 📋 Job Rows */}
       {jobs.map((job) => (
         <div
           key={job.orderId}
@@ -232,7 +255,7 @@ export default function Ship() {
 
       <div style={{ marginTop: "2rem" }}>
         <button onClick={handleShip} disabled={loading}>
-          {loading ? "Calculating..." : "🚚 Ship"}
+          {loading ? "Shipping..." : "🚚 Ship"}
         </button>
         <button onClick={() => setSelected([])} style={{ marginLeft: "1rem" }}>
           Cancel
