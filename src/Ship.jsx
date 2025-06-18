@@ -2,39 +2,66 @@ import React, { useState, useEffect } from "react";
 
 export default function Ship() {
   const [jobs, setJobs] = useState([]);
+  const [allCompanies, setAllCompanies] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
   const [boxes, setBoxes] = useState([]);
+  const [companyInput, setCompanyInput] = useState("");
 
   const query = new URLSearchParams(window.location.search);
-  const company = query.get("company");
+  const defaultCompany = query.get("company");
 
   useEffect(() => {
-    async function loadJobs() {
-      if (!company) {
-        alert("Missing company in URL (e.g. ?company=ClientName)");
-        return;
-      }
-
-      try {
-        const res = await fetch(
-          `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${company}`,
-          { credentials: "include" }
-        );
-        const data = await res.json();
-        if (res.ok) {
-          setJobs(data.jobs);
-        } else {
-          alert(data.error || "Failed to load jobs");
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Network error loading jobs.");
-      }
+    if (defaultCompany) {
+      setCompanyInput(defaultCompany);
+      fetchJobs(defaultCompany);
     }
+    fetchCompanyNames();
+  }, []);
 
-    loadJobs();
-  }, [company]);
+  async function fetchCompanyNames() {
+    try {
+      const res = await fetch(
+        "https://machine-scheduler-backend.onrender.com/api/company-list",
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      setAllCompanies(data.companies || []);
+    } catch (err) {
+      console.error("Company fetch failed", err);
+    }
+  }
+
+  async function fetchJobs(company) {
+    setJobs([]);
+    setBoxes([]);
+    setSelected([]);
+    try {
+      const res = await fetch(
+        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(
+          company
+        )}`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setJobs(data.jobs);
+      } else {
+        alert(data.error || "Failed to load jobs");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error loading jobs.");
+    }
+  }
+
+  const handleSelectCompany = (e) => {
+    const value = e.target.value;
+    setCompanyInput(value);
+    if (allCompanies.includes(value)) {
+      fetchJobs(value);
+    }
+  };
 
   const toggleSelect = (orderId) => {
     setSelected((prev) =>
@@ -51,7 +78,6 @@ export default function Ship() {
     }
 
     setLoading(true);
-
     try {
       const response = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
@@ -84,22 +110,44 @@ export default function Ship() {
 
   return (
     <div style={{ padding: "2rem" }}>
-      <h2>📦 Select Jobs to Ship</h2>
+      <h2>📦 Ship Jobs</h2>
 
+      {/* 🔍 Type-ahead search */}
+      <input
+        list="company-options"
+        placeholder="Start typing a company..."
+        value={companyInput}
+        onChange={handleSelectCompany}
+        style={{
+          fontSize: "1rem",
+          padding: "0.5rem",
+          width: "300px",
+          marginBottom: "2rem"
+        }}
+      />
+      <datalist id="company-options">
+        {allCompanies.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
+
+      {/* ✅ Job Row Display */}
       {jobs.map((job) => (
         <div
           key={job.orderId}
           onClick={() => toggleSelect(job.orderId)}
           style={{
-            padding: "1rem",
-            marginBottom: "1rem",
-            borderRadius: "12px",
-            border: "1px solid #ccc",
-            backgroundColor: selected.includes(job.orderId) ? "#4CAF50" : "#fff",
-            color: selected.includes(job.orderId) ? "#fff" : "#000",
-            cursor: "pointer",
             display: "flex",
             alignItems: "center",
+            border: "1px solid #ccc",
+            padding: "0.75rem",
+            marginBottom: "0.5rem",
+            borderRadius: "8px",
+            backgroundColor: selected.includes(job.orderId)
+              ? "#4CAF50"
+              : "#fff",
+            color: selected.includes(job.orderId) ? "#fff" : "#000",
+            cursor: "pointer",
             gap: "1rem"
           }}
         >
@@ -108,31 +156,40 @@ export default function Ship() {
               src={job.image}
               alt="Preview"
               style={{
-                width: "100px",
-                height: "100px",
+                width: "60px",
+                height: "60px",
                 objectFit: "cover",
-                borderRadius: "8px",
+                borderRadius: "4px",
                 border: "1px solid #999"
               }}
             />
           )}
-          <div>
-            <div><strong>Order #{job.orderId}</strong> – {job.company}</div>
-            <div>Date: {job.date} | Due: {job.due}</div>
+
+          <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
+            <div><strong>Order #{job.orderId}</strong></div>
+            <div>Date: {job.date}</div>
+            <div>{job.company}</div>
             <div>Design: {job.design}</div>
-            <div>Product: {job.product} | Qty: {job.quantity}</div>
-            <div>Price: ${job.price} | Stage: {job.stage}</div>
+            <div>Qty: {job.quantity}</div>
+            <div>Product: {job.product}</div>
+            <div>Stage: {job.stage}</div>
+            <div>Price: ${job.price}</div>
+            <div>Due: {job.due}</div>
           </div>
         </div>
       ))}
 
-      <button onClick={handleShip} disabled={loading}>
-        {loading ? "Calculating..." : "🚚 Ship"}
-      </button>
-      <button onClick={() => setSelected([])} style={{ marginLeft: "1rem" }}>
-        Cancel
-      </button>
+      {/* 🚚 Ship Buttons */}
+      <div style={{ marginTop: "2rem" }}>
+        <button onClick={handleShip} disabled={loading}>
+          {loading ? "Calculating..." : "🚚 Ship"}
+        </button>
+        <button onClick={() => setSelected([])} style={{ marginLeft: "1rem" }}>
+          Cancel
+        </button>
+      </div>
 
+      {/* 📦 Box Summary */}
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
           <h3>📦 Packed Boxes</h3>
