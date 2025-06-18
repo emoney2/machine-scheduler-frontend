@@ -30,12 +30,47 @@ export default function Ship() {
   const defaultCompany = query.get("company");
 
   useEffect(() => {
-    if (defaultCompany) {
-      setCompanyInput(defaultCompany);
-      fetchJobs(defaultCompany);
+    let interval;
+
+    async function loadJobsForCompany(company) {
+      try {
+        const res = await fetch(
+          `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
+          { credentials: "include" }
+        );
+        const data = await res.json();
+        if (res.ok) {
+          const jobsWithQty = data.jobs.map(job => ({ ...job, shipQty: job.quantity }));
+          setJobs(jobsWithQty);
+        } else {
+          console.error("Fetch error:", data.error);
+        }
+      } catch (err) {
+        console.error("Error loading jobs:", err);
+      }
     }
-    fetchCompanyNames();
+
+    async function setup() {
+      await fetchCompanyNames();
+
+      if (defaultCompany) {
+        setCompanyInput(defaultCompany);
+        await loadJobsForCompany(defaultCompany);
+      }
+
+      interval = setInterval(() => {
+        const selectedCompany = defaultCompany || companyInput;
+        if (selectedCompany && allCompanies.includes(selectedCompany)) {
+          loadJobsForCompany(selectedCompany);
+        }
+      }, 15000); // Every 15 seconds
+    }
+
+    setup();
+
+    return () => clearInterval(interval); // Cleanup
   }, []);
+
 
   async function fetchCompanyNames() {
     try {
