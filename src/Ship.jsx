@@ -29,9 +29,8 @@ export default function Ship() {
   const query = new URLSearchParams(window.location.search);
   const defaultCompany = query.get("company");
 
+// === useEffect 1: Initial load ===
   useEffect(() => {
-    let interval;
-
     async function loadJobsForCompany(company) {
       try {
         const res = await fetch(
@@ -40,8 +39,15 @@ export default function Ship() {
         );
         const data = await res.json();
         if (res.ok) {
-          const jobsWithQty = data.jobs.map(job => ({ ...job, shipQty: job.quantity }));
-          setJobs(jobsWithQty);
+          setJobs(prev =>
+            data.jobs.map(newJob => {
+              const existing = prev.find(j => j.orderId === newJob.orderId);
+              return {
+                ...newJob,
+                shipQty: existing?.shipQty ?? newJob.quantity,
+              };
+            })
+          );
         } else {
           console.error("Fetch error:", data.error);
         }
@@ -57,29 +63,41 @@ export default function Ship() {
         setCompanyInput(defaultCompany);
         await loadJobsForCompany(defaultCompany);
       }
-
-      interval = setInterval(() => {
-        const selectedCompany = defaultCompany || companyInput;
-        if (selectedCompany && allCompanies.includes(selectedCompany)) {
-          loadJobsForCompany(selectedCompany);
-        }
-      }, 15000); // Every 15 seconds
     }
 
     setup();
-
-    return () => clearInterval(interval); // Cleanup
   }, []);
+// === End useEffect 1 ===
 
+// === useEffect 2: Live update polling ===
   useEffect(() => {
     if (!companyInput || !allCompanies.includes(companyInput)) return;
 
     const interval = setInterval(() => {
-      fetchJobs(companyInput);
-    }, 15000); // Refresh every 15 seconds
+      fetch(
+        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
+        { credentials: "include" }
+      )
+        .then(res => res.json())
+        .then(data => {
+          if (data.jobs) {
+            setJobs(prev =>
+              data.jobs.map(newJob => {
+                const existing = prev.find(j => j.orderId === newJob.orderId);
+                return {
+                  ...newJob,
+                  shipQty: existing?.shipQty ?? newJob.quantity,
+                };
+              })
+            );
+          }
+        })
+        .catch(err => console.error("Live update error", err));
+    }, 15000);
 
-    return () => clearInterval(interval); // Clear on unmount or input change
+    return () => clearInterval(interval);
   }, [companyInput, allCompanies]);
+// === End useEffect 2 ===
 
 
   async function fetchCompanyNames() {
