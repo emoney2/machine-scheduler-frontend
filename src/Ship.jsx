@@ -224,6 +224,12 @@ export default function Ship() {
         jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
       );
 
+      console.log("📦 Sending to /api/process-shipment:", {
+        order_ids: selected,
+        boxes: packedBoxes,
+        shipped_quantities: shippedQuantities,
+      });
+
       const shipRes = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/process-shipment",
         {
