@@ -407,50 +407,41 @@ const furColorNames = furColors;
 const handleSubmit = async (e) => {
   e.preventDefault();
   console.log("handleSubmit – isSubmitting before:", isSubmitting);
-
   if (isSubmitting) return;
-
   setIsSubmitting(true);
 
-  const fd = new FormData(formRef.current);
+  const fd = new FormData(e.target);
 
   try {
-    const submitUrl = process.env.REACT_APP_ORDER_SUBMIT_URL;
-
-    // 1. Submit the new order
+    // 1. Submit product data as usual
     await axios.post(submitUrl, fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
-    // 2. Check if product volume is missing and prompt
+    // 2. Send volume if all dimensions are provided
     const product = fd.get("product");
+    const len = parseFloat(fd.get("length") || "");
+    const wid = parseFloat(fd.get("width") || "");
+    const hei = parseFloat(fd.get("height") || "");
 
-    const volumeCheckRes = await fetch(
-      `${process.env.REACT_APP_API_ROOT}/api/check-volume?product=${encodeURIComponent(product)}`,
-      { credentials: "include" }
-    );
+    if (product && len && wid && hei) {
+      const volume = Math.round(len * wid * hei);
+      const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ product, volume }),
+      });
 
-    const checkData = await volumeCheckRes.json();
-    if (volumeCheckRes.ok && checkData.missing) {
-      const length = prompt("Enter length (in inches):");
-      const width = prompt("Enter width (in inches):");
-      const height = prompt("Enter height (in inches):");
-
-      if (length && width && height) {
-        await fetch(`${process.env.REACT_APP_API_ROOT}/api/set-volume`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ product, length, width, height }),
-        });
+      if (!volRes.ok) {
+        throw new Error("Failed to save volume");
       }
     }
 
-    alert("Order submitted successfully.");
-    formRef.current.reset();
+    alert("Submitted!");
   } catch (err) {
-    console.error("Order submission error:", err);
-    alert("Failed to submit order.");
+    console.error("Error during handleSubmit:", err);
+    alert("Submission failed.");
   } finally {
     setIsSubmitting(false);
   }
