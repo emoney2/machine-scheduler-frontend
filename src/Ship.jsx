@@ -55,6 +55,23 @@ function getButtonColor(deliveryDateStr, selectedJobs, allJobs) {
   return "#f5c2c2"; // red
 }
 
+function parseDateFromText(text) {
+  // Attempts to parse dates like "Mon 06/24" or "Sat 06/22 before noon"
+  const match = text.match(/(\d{2})\/(\d{2})/);
+  if (!match) return null;
+  const [, mm, dd] = match;
+  const now = new Date();
+  return new Date(now.getFullYear(), parseInt(mm) - 1, parseInt(dd));
+}
+
+function getEarliestDueDate(selected, jobs) {
+  const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
+  const dueDates = selectedJobs
+    .map(j => new Date(j.due))
+    .filter(d => !isNaN(d));
+  return dueDates.length > 0 ? new Date(Math.min(...dueDates.map(d => d.getTime()))) : null;
+}
+
 export default function Ship() {
   const [searchParams] = useSearchParams();
   const targetCompany = searchParams.get("company");
@@ -484,40 +501,49 @@ const shippingOptions = [
         </div>
       ))}
 
-      <div style={{ marginTop: "2rem" }}>
-        <h4>Select UPS Shipping Option:</h4>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginTop: "1rem" }}>
-          {shippingOptions.map(({ method, rate, delivery }) => {
-            const buttonColor = getButtonColor(delivery, selected, jobs);
-            return (
-              <button
-                key={method}
-                onClick={() => handleRateAndShip(method, rate, delivery)}
-                style={{
-                  backgroundColor: buttonColor,
-                  color: "#000",
-                  padding: "1rem",
-                  width: "220px",
-                  textAlign: "left",
-                  borderRadius: "6px",
-                  border: "1px solid #999",
-                  lineHeight: "1.4",
-                  fontSize: "0.95rem"
-                }}
-              >
-                <div style={{ fontWeight: "bold" }}>{method}</div>
-                <div>Price: {rate}</div>
-                <div>Est. delivery: {new Date(delivery).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</div>
-              </button>
-            );
-          })}
-        </div>
-        <div style={{ marginTop: "1rem" }}>
-          <button onClick={() => setSelected([])} style={{ padding: "0.5rem 1rem" }}>
+      {selected.length > 0 && (
+        <div style={{ marginTop: "2rem" }}>
+          <h4>Select UPS Shipping Option:</h4>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+            {shippingOptions.map(({ method, rate, delivery }) => {
+              const deliveryDate = parseDateFromText(delivery);
+              const earliestDue = getEarliestDueDate(selected, jobs);
+
+              let bg = "#ccc"; // default gray
+              if (earliestDue && deliveryDate) {
+                if (deliveryDate < earliestDue) bg = "#c7f7c7"; // green
+                else if (deliveryDate.getTime() === earliestDue.getTime()) bg = "#fff4b3"; // yellow
+                else bg = "#f7cccc"; // red
+              }
+
+              return (
+                <button
+                  key={method}
+                  onClick={() => handleRateAndShip(method, rate, delivery)}
+                  style={{
+                    backgroundColor: bg,
+                    color: "#000",
+                    width: "220px",
+                    padding: "1rem",
+                    fontSize: "1rem",
+                    border: "1px solid #999",
+                    borderRadius: "8px",
+                    flex: "0 0 auto",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  <div style={{ fontWeight: "bold" }}>{method}</div>
+                  <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {delivery}</div>
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={() => setSelected([])} style={{ marginTop: "1rem" }}>
             Cancel
           </button>
         </div>
-      </div>
+      )}
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
           <h3>📦 Packed Boxes</h3>
