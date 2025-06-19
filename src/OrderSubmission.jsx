@@ -453,58 +453,58 @@ async function checkProductVolume(productName) {
 }
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  console.log("handleSubmit – isSubmitting before:", isSubmitting);
-  if (isSubmitting) return;
-  setIsSubmitting(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    console.log("handleSubmit – isSubmitting before:", isSubmitting);
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-  const fd = new FormData(e.target);
-  const product = fd.get("product");
-  const volume = await checkProductVolume(product);
-
-  if (!volume) {
-    setMissingVolumeProduct(product);
-    setIsVolumeModalOpen(true);
-    setIsSubmitting(false);
-    return;
-  }
-
-
-  try {
-    // 1. Submit product data as usual
-    await axios.post(submitUrl, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    // 2. Send volume if all dimensions are provided
+    const fd = new FormData(e.target);
     const product = fd.get("product");
-    const len = parseFloat(fd.get("length") || "");
-    const wid = parseFloat(fd.get("width") || "");
-    const hei = parseFloat(fd.get("height") || "");
+    const volume = await checkProductVolume(product);
 
-    if (product && len && wid && hei) {
-      const volume = Math.round(len * wid * hei);
-      const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ product, volume }),
-      });
-
-      if (!volRes.ok) {
-        throw new Error("Failed to save volume");
-      }
+    if (!volume) {
+      setMissingVolumeProduct(product);
+      setIsVolumeModalOpen(true);
+      setIsSubmitting(false);
+      return;
     }
 
-    alert("Submitted!");
-  } catch (err) {
-    console.error("Error during handleSubmit:", err);
-    alert("Submission failed.");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+
+    try {
+      // 1. Submit product data as usual
+      await axios.post(submitUrl, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // 2. Send volume if all dimensions are provided
+      const product = fd.get("product");
+      const len = parseFloat(fd.get("length") || "");
+      const wid = parseFloat(fd.get("width") || "");
+      const hei = parseFloat(fd.get("height") || "");
+
+      if (product && len && wid && hei) {
+        const volume = Math.round(len * wid * hei);
+        const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ product, volume }),
+        });
+
+        if (!volRes.ok) {
+          throw new Error("Failed to save volume");
+        }
+      }
+
+      alert("Submitted!");
+    } catch (err) {
+      console.error("Error during handleSubmit:", err);
+      alert("Submission failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // ─── If company not in our directory, open modal ───────────────
   if (!companyNames.includes(form.company.trim())) {
