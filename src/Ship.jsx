@@ -448,38 +448,46 @@ const shippingOptions = [
         </div>
       ))}
 
-      <div style={{ marginTop: "2rem" }}>
-        {boxes.length === 0 ? (
-          <button onClick={handleShip} disabled={loading}>
-            {loading ? "Packing..." : "🚚 Pack for Shipping"}
-          </button>
-        ) : (
-          <div>
-            <h3>Select UPS Shipping Option:</h3>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginTop: "1rem" }}>
-              {shippingOptions.map(({ method, rate, delivery }) => (
-                <button
-                  key={method}
-                  onClick={() => handleRateAndShip(method, rate, delivery)}
-                  style={{
-                    padding: "1rem",
-                    fontSize: "1rem",
-                    width: "250px",
-                    border: "2px solid #333",
-                    borderRadius: "10px",
-                    backgroundColor: "#f2f2f2",
-                    cursor: "pointer",
-                    lineHeight: "1.5"
-                  }}
-                >
-                  <div><strong>{method}</strong></div>
-                  <div>{rate}</div>
-                  <div>{delivery}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+        {["Ground", "2nd Day Air", "Next Day Air", "Next Day Air Early AM", "Saturday Delivery"].map((method) => {
+          const mockRates = {
+            "Ground": "$12.34",
+            "2nd Day Air": "$24.10",
+            "Next Day Air": "$41.00",
+            "Next Day Air Early AM": "$55.20",
+            "Saturday Delivery": "$60.00"
+          };
+
+          const mockDates = {
+            "Ground": "Arrives Mon",
+            "2nd Day Air": "Arrives Thu",
+            "Next Day Air": "Arrives Wed",
+            "Next Day Air Early AM": "Arrives Wed AM",
+            "Saturday Delivery": "Arrives Sat"
+          };
+
+    return (
+      <button
+        key={method}
+        onClick={() => handleRateAndShip(method)}
+        style={{
+          flex: "1 1 200px",
+          padding: "1rem",
+          fontSize: "1rem",
+          border: "2px solid #333",
+          borderRadius: "8px",
+          textAlign: "center",
+          backgroundColor: "#f8f8f8"
+        }}
+      >
+        <div style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{method}</div>
+        <div style={{ fontSize: "0.95rem" }}>{mockRates[method]}</div>
+        <div style={{ fontSize: "0.9rem", color: "#666" }}>{mockDates[method]}</div>
+      </button>
+    );
+  })}
+</div>
+
         <button onClick={() => setSelected([])} style={{ marginLeft: "1rem", marginTop: "1rem" }}>
           Cancel
         </button>
