@@ -537,7 +537,6 @@ const furColorNames = furColors;
       "furColor",
       "notes",
     ].forEach((k) => fd.append(k, form[k] || ""));
-
     form.materials.forEach((m) => fd.append("materials", m));
 
     // ensure the designName file is first
@@ -550,9 +549,27 @@ const furColorNames = furColors;
       const [match] = filesToUpload.splice(idx, 1);
       filesToUpload.unshift(match);
     }
-
     filesToUpload.forEach((f) => fd.append("prodFiles", f));
     printFiles.forEach((f) => fd.append("printFiles", f));
+
+    // ─── actually submit ─────────────────────────────────────────
+    await axios.post(submitUrl, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    alert("Order submitted!");
+
+    // ─── reset form & previews ───────────────────────────────────
+    setForm(initialForm);
+    setProdFiles([]);
+    setPrintFiles([]);
+    setProdPreviews([]);
+    setPrintPreviews([]);
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.error || "Submission failed");
+  } finally {
+    setIsSubmitting(false);
+  }
 
   // ─── Save the new company to Google Sheets ─────────────────────
 const handleSaveNewCompany = async () => {
