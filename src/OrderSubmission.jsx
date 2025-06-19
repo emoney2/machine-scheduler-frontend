@@ -442,7 +442,7 @@ const handleSubmit = async (e) => {
 
 
     // Then store the volume for the product
-    const volRes = await fetch("https://machine-scheduler-backend.onrender.com/api/set-volume", {
+    const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
