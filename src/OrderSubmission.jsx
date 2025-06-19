@@ -391,6 +391,72 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   console.log("handleSubmit – isSubmitting before:", isSubmitting);
 
+  if (isSubmitting) return;
+  setIsSubmitting(true);
+
+  if (!form.company || !form.product || !form.design) {
+    alert("Company, Product, and Design are required.");
+    setIsSubmitting(false);
+    return;
+  }
+
+  // ✅ Prompt for volume during order submission
+  const length = prompt("Enter box LENGTH (inches) for this product:");
+  const width = prompt("Enter box WIDTH (inches) for this product:");
+  const height = prompt("Enter box HEIGHT (inches) for this product:");
+
+  if (!length || !width || !height) {
+    alert("All three dimensions are required.");
+    setIsSubmitting(false);
+    return;
+  }
+
+  try {
+    // Submit the order first
+    const res = await fetch("https://machine-scheduler-backend.onrender.com/api/submit-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(form),
+    });
+
+    const result = await res.json();
+
+    if (res.ok) {
+      alert("✅ Order submitted!");
+      setForm(initialForm);
+    } else {
+      alert(result.error || "Order submission failed.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Then store the volume for the product
+    const volRes = await fetch("https://machine-scheduler-backend.onrender.com/api/set-volume", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        product: form.product,
+        length,
+        width,
+        height,
+      }),
+    });
+
+    const volResult = await volRes.json();
+    if (!volRes.ok) {
+      alert(`⚠️ Failed to save volume: ${volResult.error}`);
+    }
+  } catch (err) {
+    console.error("Submission error:", err);
+    alert("❌ Network error submitting order.");
+  } finally {
+    setIsSubmitting(false);
+    console.log("handleSubmit – isSubmitting after:", isSubmitting);
+  }
+};
+
   // ─── If company not in our directory, open modal ───────────────
   if (!companyNames.includes(form.company.trim())) {
     setNewCompanyData((prev) => ({
