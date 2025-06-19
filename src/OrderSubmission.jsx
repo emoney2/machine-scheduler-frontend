@@ -386,6 +386,23 @@ const furColorNames = furColors;
     }
   };
 
+    // Then store the volume for the product
+    async function saveVolume(productName, volume) {
+      const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          product: productName,
+          volume,
+        }),
+      });
+
+  if (!volRes.ok) {
+    throw new Error("Failed to save volume");
+  }
+})();
+
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -438,25 +455,6 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
-
-
-
-    // Then store the volume for the product
-    await (async () => {
-      const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          product: data.get("product"),
-          volume: length * width * height,
-        }),
-      });
-
-  if (!volRes.ok) {
-    throw new Error("Failed to set volume");
-  }
-})();
 
     const volResult = await volRes.json();
     if (!volRes.ok) {
