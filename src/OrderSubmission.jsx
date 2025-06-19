@@ -427,7 +427,6 @@ const furColorNames = furColors;
 // ─── UPDATED handleSubmit ───────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("handleSubmit – isSubmitting before:", isSubmitting);
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -442,37 +441,37 @@ const furColorNames = furColors;
       return;
     }
 
-
     try {
-      // 1. Submit product data as usual
+      // submit form data
       await axios.post(submitUrl, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      // 2. Send volume if all dimensions are provided
-      const product = fd.get("product");
-      const len = parseFloat(fd.get("length") || "");
-      const wid = parseFloat(fd.get("width") || "");
-      const hei = parseFloat(fd.get("height") || "");
+      alert("Order submitted!");
 
-      if (product && len && wid && hei) {
-        const volume = Math.round(len * wid * hei);
-        const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ product, volume }),
-        });
-
-        if (!volRes.ok) {
-          throw new Error("Failed to save volume");
-        }
-      }
-
-      alert("Submitted!");
+      // reset form + previews
+      setForm({
+        company: "",
+        designName: "",
+        quantity: "",
+        product: "",
+        price: "",
+        dueDate: "",
+        dateType: "Hard Date",
+        referral: "",
+        materials: ["", "", "", "", ""],
+        backMaterial: "",
+        embBacking: "",
+        furColor: "",
+        notes: "",
+      });
+      setProdFiles([]);
+      setPrintFiles([]);
+      setProdPreviews([]);
+      setPrintPreviews([]);
     } catch (err) {
-      console.error("Error during handleSubmit:", err);
-      alert("Submission failed.");
+      console.error(err);
+      alert(err.response?.data?.error || "Submission failed");
     } finally {
       setIsSubmitting(false);
     }
