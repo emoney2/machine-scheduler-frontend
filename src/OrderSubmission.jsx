@@ -389,39 +389,56 @@ const furColorNames = furColors;
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   e.preventDefault();
+  console.log("handleSubmit – isSubmitting before:", isSubmitting);
+
   if (isSubmitting) return;
+
   setIsSubmitting(true);
 
-  const form = formRef.current;
-  const formData = new FormData(form);
-
-  const product = formData.get("product");
-  const isNewProduct = !knownProducts.includes(product);
-
-  // 🔍 Prompt for volume dimensions if this is a new product
-  if (isNewProduct) {
-    const confirmed = await promptDimensionsForProduct(product);
-    if (!confirmed) {
-      setIsSubmitting(false);
-      return;
-    }
-  }
+  const fd = new FormData(formRef.current);
 
   try {
-    await axios.post(submitUrl, formData, {
+    const submitUrl = process.env.REACT_APP_ORDER_SUBMIT_URL;
+
+    // 1. Submit the new order
+    await axios.post(submitUrl, fd, {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
-    alert("Order submitted successfully!");
-    form.reset();
-    setImagePreview(null);
-  } catch (error) {
-    console.error("Submission error:", error);
-    alert("Submission failed.");
-  }
+    // 2. Check if product volume is missing and prompt
+    const product = fd.get("product");
 
-  setIsSubmitting(false);
+    const volumeCheckRes = await fetch(
+      `${process.env.REACT_APP_API_ROOT}/api/check-volume?product=${encodeURIComponent(product)}`,
+      { credentials: "include" }
+    );
+
+    const checkData = await volumeCheckRes.json();
+    if (volumeCheckRes.ok && checkData.missing) {
+      const length = prompt("Enter length (in inches):");
+      const width = prompt("Enter width (in inches):");
+      const height = prompt("Enter height (in inches):");
+
+      if (length && width && height) {
+        await fetch(`${process.env.REACT_APP_API_ROOT}/api/set-volume`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ product, length, width, height }),
+        });
+      }
+    }
+
+    alert("Order submitted successfully.");
+    formRef.current.reset();
+  } catch (err) {
+    console.error("Order submission error:", err);
+    alert("Failed to submit order.");
+  } finally {
+    setIsSubmitting(false);
+  }
 };
+
 
 
     // Then store the volume for the product
