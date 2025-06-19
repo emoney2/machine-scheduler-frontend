@@ -508,7 +508,7 @@ const shippingOptions = [
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
             {shippingOptions.map((opt) => {
               const { method, rate, delivery } = opt;
-              const deliveryDate = parseDeliveryDate(delivery);
+              const deliveryDate = parseDateFromString(delivery);
 
               const dueDates = jobs
                 .filter(j => selected.includes(j.orderId.toString()))
@@ -556,7 +556,7 @@ const shippingOptions = [
                 >
                   <div style={{ fontWeight: "bold" }}>{method}</div>
                   <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {delivery}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {formatDateMMDD(delivery)}</div>
                 </button>
               );
             })}
