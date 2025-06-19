@@ -55,14 +55,15 @@ function getButtonColor(deliveryDateStr, selectedJobs, allJobs) {
   return "#f5c2c2"; // red
 }
 
-function parseDateFromText(text) {
-  // Attempts to parse dates like "Mon 06/24" or "Sat 06/22 before noon"
+// Parses delivery date text like "Fri 06/21" into a JS Date object
+function parseDeliveryDate(text) {
   const match = text.match(/(\d{2})\/(\d{2})/);
   if (!match) return null;
   const [, mm, dd] = match;
   const now = new Date();
   return new Date(now.getFullYear(), parseInt(mm) - 1, parseInt(dd));
 }
+
 
 function getEarliestDueDate(selected, jobs) {
   const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
@@ -506,7 +507,7 @@ const shippingOptions = [
           <h4>Select UPS Shipping Option:</h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
             {shippingOptions.map(({ method, rate, delivery }) => {
-              const deliveryDate = parseDateFromText(delivery);
+              const deliveryDate = parseDeliveryDate(opt.delivery);
 
               const dueDates = jobs
                 .filter(j => selected.includes(j.orderId.toString()))
