@@ -25,11 +25,13 @@ axios.interceptors.response.use(
   err => {
     if (err.response && err.response.status === 401) {
       const base = process.env.REACT_APP_API_ROOT.replace(/\/api$/, '');
-      window.location.href = `${base}/login?next=/`;
+      const currentPath = window.location.pathname + window.location.search;
+      window.location.href = `${base}/login?next=${encodeURIComponent(currentPath)}`;
     }
     return Promise.reject(err);
   }
 );
+
 
 // CONFIGURATION
 const API_ROOT   = process.env.REACT_APP_API_ROOT;
