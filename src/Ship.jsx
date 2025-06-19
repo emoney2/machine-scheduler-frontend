@@ -10,22 +10,24 @@ function parseDateFromString(dateStr) {
     ? dateStr.split("/")
     : [];
 
-  if (parts.length !== 3) return null;
-
-  let [year, month, day] = parts;
-
-  if (parts[0].length <= 2 && parts[2].length === 4) {
-    // Format is MM/DD/YYYY or M/D/YYYY
-    [month, day, year] = parts;
-  } else if (parts[0].length === 4) {
-    // Format is YYYY-MM-DD
-    [year, month, day] = parts;
-  } else {
-    return null; // unknown format
+  if (parts.length === 2) {
+    // Format is MM/DD or M/D (assume current year)
+    const [mm, dd] = parts;
+    const now = new Date();
+    return new Date(now.getFullYear(), parseInt(mm) - 1, parseInt(dd));
   }
 
-  return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`);
+  if (parts.length === 3) {
+    let [year, month, day] = parts;
+    if (parts[0].length <= 2 && parts[2].length === 4) {
+      [month, day, year] = parts;
+    }
+    return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`);
+  }
+
+  return null;
 }
+
 
 
 function formatDateMMDD(dateStr) {
