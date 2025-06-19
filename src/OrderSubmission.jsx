@@ -695,6 +695,7 @@ const handleSaveNewCompany = async () => {
         dimensions:   { length, width, height }
       })
     });
+   }; 
 
   const checkProductVolume = async (productName) => {
     const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
