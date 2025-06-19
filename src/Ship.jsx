@@ -154,33 +154,41 @@ export default function Ship() {
 // === End useEffect 1 ===
 
 // === useEffect 2: Live update polling ===
-  useEffect(() => {
-    if (!companyInput || !allCompanies.includes(companyInput)) return;
+useEffect(() => {
+  if (!companyInput || !allCompanies.includes(companyInput)) return;
 
-    const interval = setInterval(() => {
-      fetch(
-        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
-        { credentials: "include" }
-      )
-        .then(res => res.json())
-        .then(data => {
-          if (data.jobs) {
-            setJobs(prev =>
-              data.jobs.map(newJob => {
-                const existing = prev.find(j => j.orderId === newJob.orderId);
-                return {
-                  ...newJob,
-                  shipQty: existing?.shipQty ?? newJob.quantity,
-                };
-              })
-            );
-          }
-        })
-        .catch(err => console.error("Live update error", err));
-    }, 15000);
+  const interval = setInterval(() => {
+    fetch(
+      `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
+      { credentials: "include" }
+    )
+      .then(res => res.json())
+      .then(data => {
+        if (data.jobs) {
+          setJobs(prev => {
+            const prevMap = Object.fromEntries(prev.map(j => [j.orderId, j]));
+            return data.jobs.map(newJob => {
+              const existing = prevMap[newJob.orderId];
+              return {
+                ...newJob,
+                shipQty: existing?.shipQty ?? newJob.quantity,
+              };
+            });
+          });
 
-    return () => clearInterval(interval);
-  }, [companyInput, allCompanies]);
+          // 🧼 Remove any selected jobs that no longer exist
+          setSelected(prevSelected => {
+            const newOrderIds = new Set(data.jobs.map(j => j.orderId.toString()));
+            return prevSelected.filter(id => newOrderIds.has(id));
+          });
+        }
+      })
+      .catch(err => console.error("Live update error", err));
+  }, 15000);
+
+  return () => clearInterval(interval);
+}, [companyInput, allCompanies]);
+
 // === End useEffect 2 ===
 
   useEffect(() => {
