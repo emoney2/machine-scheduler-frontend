@@ -629,6 +629,24 @@ const handleSaveNewCompany = async () => {
   }
 };
 
+  const saveVolumeAndResubmit = async () => {
+    const { length, width, height } = dimensions;
+    const volume = Math.round(length * width * height);
+    await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ product: missingVolumeProduct, volume }),
+    });
+
+    setIsVolumeModalOpen(false);
+
+    // Programmatically trigger form resubmission
+    const formElem = document.querySelector("form");
+    if (formElem) {
+      formElem.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+    }
+  };
   // ─── Save the new material to Google Sheets ───────────────────
   const handleSaveNewMaterial = async () => {
     // validate name, unit, minInv, reorder, cost
@@ -978,22 +996,12 @@ const handleSaveNewCompany = async () => {
                 Cancel
               </button>
               <button
-                onClick={async () => {
-                  const { length, width, height } = dimensions;
-                  const volume = Math.round(length * width * height);
-                  await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({ product: missingVolumeProduct, volume }),
-                  });
-                  setIsVolumeModalOpen(false);
-                  handleSubmit(new Event("submit")); // Resubmit
-                }}
+                onClick={saveVolumeAndResubmit}
                 style={{ padding: "0.5rem 1rem" }}
               >
                 Save & Resubmit
               </button>
+
             </div>
           </div>
         </div>
