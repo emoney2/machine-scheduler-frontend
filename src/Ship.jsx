@@ -473,26 +473,6 @@ const shippingOptions = [
           Cancel
         </button>
       </div>
-
-    return (
-      <button
-        key={method}
-        onClick={() => handleRateAndShip(method)}
-        style={{
-          flex: "1 1 200px",
-          padding: "1rem",
-          fontSize: "1rem",
-          border: "2px solid #333",
-          borderRadius: "8px",
-          textAlign: "center",
-          backgroundColor: "#f8f8f8"
-        }}
-      >
-        <div style={{ fontWeight: "bold", fontSize: "1.1rem" }}>{method}</div>
-        <div style={{ fontSize: "0.95rem" }}>{mockRates[method]}</div>
-        <div style={{ fontSize: "0.9rem", color: "#666" }}>{mockDates[method]}</div>
-      </button>
-    );
   })}
 </div>
 
