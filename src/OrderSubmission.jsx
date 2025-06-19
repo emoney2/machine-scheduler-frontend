@@ -734,15 +734,6 @@ const handleSaveNewCompany = async () => {
       })
     });
 
-        setIsVolumeModalOpen(false);
-
-    // Programmatically trigger form resubmission
-    const formElem = document.querySelector("form");
-    if (formElem) {
-      formElem.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-    }
-  };
-
   const checkProductVolume = async (productName) => {
     const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
       credentials: "include",
