@@ -354,23 +354,24 @@ const handleShip = async () => {
 };
 
 // 🧠 New rate-based shipping handler (mockup version)
-const handleRateAndShip = (method) => {
-  const mockRates = {
-    "Ground": "$12.34",
-    "2nd Day Air": "$24.10",
-    "Next Day Air": "$41.00",
-    "Next Day Air Early AM": "$55.20",
-    "Saturday Delivery": "$60.00"
-  };
-
+const handleRateAndShip = (method, rate, deliveryDate) => {
   const confirmed = window.confirm(
-    `Ship via ${method}? Estimated cost: ${mockRates[method]}\nProceed?`
+    `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${deliveryDate}\nProceed?`
   );
   if (!confirmed) return;
 
-  alert(`Pretend we're shipping with ${method} and printing labels...`);
+  alert(`Pretending to ship with ${method}...`);
   handleShip();
 };
+
+// Mock shipping options (replace with live API later)
+const shippingOptions = [
+  { method: "Ground", rate: "$12.34", delivery: "Mon 06/24" },
+  { method: "2nd Day Air", rate: "$24.10", delivery: "Sat 06/22" },
+  { method: "Next Day Air", rate: "$41.00", delivery: "Fri 06/21" },
+  { method: "Next Day Air Early AM", rate: "$55.20", delivery: "Fri 06/21 8AM" },
+  { method: "Saturday Delivery", rate: "$60.00", delivery: "Sat 06/22 before noon" },
+];
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -454,19 +455,32 @@ const handleRateAndShip = (method) => {
           </button>
         ) : (
           <div>
-            <h4>Select UPS Shipping Option:</h4>
-            {["Ground", "2nd Day Air", "Next Day Air", "Next Day Air Early AM", "Saturday Delivery"].map((method) => (
-              <button
-                key={method}
-                onClick={() => handleRateAndShip(method)}
-                style={{ marginRight: "1rem", marginBottom: "1rem" }}
-              >
-                {method}
-              </button>
-            ))}
+            <h3>Select UPS Shipping Option:</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginTop: "1rem" }}>
+              {shippingOptions.map(({ method, rate, delivery }) => (
+                <button
+                  key={method}
+                  onClick={() => handleRateAndShip(method, rate, delivery)}
+                  style={{
+                    padding: "1rem",
+                    fontSize: "1rem",
+                    width: "250px",
+                    border: "2px solid #333",
+                    borderRadius: "10px",
+                    backgroundColor: "#f2f2f2",
+                    cursor: "pointer",
+                    lineHeight: "1.5"
+                  }}
+                >
+                  <div><strong>{method}</strong></div>
+                  <div>{rate}</div>
+                  <div>{delivery}</div>
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        <button onClick={() => setSelected([])} style={{ marginLeft: "1rem" }}>
+        <button onClick={() => setSelected([])} style={{ marginLeft: "1rem", marginTop: "1rem" }}>
           Cancel
         </button>
       </div>
