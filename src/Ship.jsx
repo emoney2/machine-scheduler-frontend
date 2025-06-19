@@ -402,11 +402,11 @@ const handleRateAndShip = (method, rate, deliveryDate) => {
 
 // Mock shipping options (replace with live API later)
 const shippingOptions = [
-  { method: "Ground", rate: "$12.34", deliveryLabel: "Mon 06/24", deliveryDate: new Date("2025-06-24") },
-  { method: "2nd Day Air", rate: "$24.10", deliveryLabel: "Sat 06/22", deliveryDate: new Date("2025-06-22") },
-  { method: "Next Day Air", rate: "$41.00", deliveryLabel: "Fri 06/21", deliveryDate: new Date("2025-06-21") },
-  { method: "Next Day Air Early AM", rate: "$55.20", deliveryLabel: "Fri 06/21 8AM", deliveryDate: new Date("2025-06-21") },
-  { method: "Saturday Delivery", rate: "$60.00", deliveryLabel: "Sat 06/22 before noon", deliveryDate: new Date("2025-06-22") },
+  { method: "Ground", rate: "$12.34", delivery: "2025-06-24" },
+  { method: "2nd Day Air", rate: "$24.10", delivery: "2025-06-22" },
+  { method: "Next Day Air", rate: "$41.00", delivery: "2025-06-21" },
+  { method: "Next Day Air Early AM", rate: "$55.20", delivery: "2025-06-21" },
+  { method: "Saturday Delivery", rate: "$60.00", delivery: "2025-06-22" },
 ];
 
   return (
@@ -507,7 +507,7 @@ const shippingOptions = [
               >
                 <div style={{ fontWeight: "bold" }}>{method}</div>
                 <div>Price: {rate}</div>
-                <div>Est. delivery: {delivery}</div>
+                <div>Est. delivery: {new Date(delivery).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}</div>
               </button>
             );
           })}
