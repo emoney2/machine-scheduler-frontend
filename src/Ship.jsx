@@ -268,16 +268,37 @@ export default function Ship() {
     });
   };
 
-  const handleShip = async () => {
-    if (selected.length === 0) {
-      alert("Select at least one job to ship.");
-      return;
-    }
+const handleShip = async () => {
+  if (selected.length === 0) {
+    alert("Select at least one job to ship.");
+    return;
+  }
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      let response = await fetch(
+  try {
+    let response = await fetch(
+      "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ order_ids: selected }),
+      }
+    );
+
+    let result = await response.json();
+
+    if (!response.ok && result.missing_products) {
+      for (let product of result.missing_products) {
+        const success = await promptDimensionsForProduct(product);
+        if (!success) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      response = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
         {
           method: "POST",
@@ -287,71 +308,69 @@ export default function Ship() {
         }
       );
 
-      let result = await response.json();
+      result = await response.json();
+    }
 
-      if (!response.ok && result.missing_products) {
-        for (let product of result.missing_products) {
-          const success = await promptDimensionsForProduct(product);
-          if (!success) {
-            setLoading(false);
-            return;
-          }
-        }
+    const packedBoxes = result.boxes || [];
+    setBoxes(packedBoxes);
 
-        response = await fetch(
-          "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ order_ids: selected }),
-          }
-        );
+    const shippedQuantities = Object.fromEntries(
+      jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
+    );
 
-        result = await response.json();
+    console.log("📦 Sending to /api/process-shipment:", {
+      order_ids: selected,
+      boxes: packedBoxes,
+      shipped_quantities: shippedQuantities,
+    });
+
+    const shipRes = await fetch(
+      "https://machine-scheduler-backend.onrender.com/api/process-shipment",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ order_ids: selected, boxes: packedBoxes, shipped_quantities: shippedQuantities }),
       }
+    );
 
-      const packedBoxes = result.boxes || [];
-      setBoxes(packedBoxes);
+    const shipData = await shipRes.json();
 
-      const shippedQuantities = Object.fromEntries(
-        jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
-      );
-
-      console.log("📦 Sending to /api/process-shipment:", {
-        order_ids: selected,
-        boxes: packedBoxes,
-        shipped_quantities: shippedQuantities,
-      });
-
-      const shipRes = await fetch(
-        "https://machine-scheduler-backend.onrender.com/api/process-shipment",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ order_ids: selected, boxes: packedBoxes, shipped_quantities: shippedQuantities }),
-        }
-      );
-
-      const shipData = await shipRes.json();
-
-      if (shipRes.ok) {
-        shipData.labels.forEach((url) => window.open(url, "_blank"));
-        window.open(shipData.invoice, "_blank");
-        shipData.slips.forEach((url) => window.open(url, "_blank"));
-        setLoading(false);
-        window.location.reload();
-      } else {
-        alert(shipData.error || "Shipment failed.");
-        setLoading(false);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to ship.");
+    if (shipRes.ok) {
+      shipData.labels.forEach((url) => window.open(url, "_blank"));
+      window.open(shipData.invoice, "_blank");
+      shipData.slips.forEach((url) => window.open(url, "_blank"));
+      setLoading(false);
+      window.location.reload();
+    } else {
+      alert(shipData.error || "Shipment failed.");
       setLoading(false);
     }
+  } catch (err) {
+    console.error(err);
+    alert("Failed to ship.");
+    setLoading(false);
+  }
+};
+
+// 🧠 New rate-based shipping handler (mockup version)
+const handleRateAndShip = (method) => {
+  const mockRates = {
+    "Ground": "$12.34",
+    "2nd Day Air": "$24.10",
+    "Next Day Air": "$41.00",
+    "Next Day Air Early AM": "$55.20",
+    "Saturday Delivery": "$60.00"
   };
+
+  const confirmed = window.confirm(
+    `Ship via ${method}? Estimated cost: ${mockRates[method]}\nProceed?`
+  );
+  if (!confirmed) return;
+
+  alert(`Pretend we're shipping with ${method} and printing labels...`);
+  handleShip();
+};
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -429,8 +448,24 @@ export default function Ship() {
       ))}
 
       <div style={{ marginTop: "2rem" }}>
-        <button onClick={handleShip} disabled={loading}>
-          {loading ? "Shipping..." : "🚚 Ship"}
+        {boxes.length === 0 ? (
+          <button onClick={handleShip} disabled={loading}>
+            {loading ? "Packing..." : "🚚 Pack for Shipping"}
+          </button>
+        ) : (
+          <div>
+            <h4>Select UPS Shipping Option:</h4>
+            {["Ground", "2nd Day Air", "Next Day Air", "Next Day Air Early AM", "Saturday Delivery"].map((method) => (
+              <button
+                key={method}
+                onClick={() => handleRateAndShip(method)}
+                style={{ marginRight: "1rem", marginBottom: "1rem" }}
+              >
+                {method}
+              </button>
+            ))}
+          </div>
+        )}
         </button>
         <button onClick={() => setSelected([])} style={{ marginLeft: "1rem" }}>
           Cancel
