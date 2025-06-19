@@ -466,7 +466,6 @@ const handleRateAndShip = (method) => {
             ))}
           </div>
         )}
-        </button>
         <button onClick={() => setSelected([])} style={{ marginLeft: "1rem" }}>
           Cancel
         </button>
