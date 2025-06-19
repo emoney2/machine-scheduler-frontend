@@ -514,7 +514,7 @@ const shippingOptions = [
                 .filter(j => selected.includes(j.orderId.toString()))
                 .map(j => {
                   const d = parseDateFromString(j.due);
-                  return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+                  return d instanceof Date && !isNaN(d) ? d : null;
                 })
                 .filter(Boolean);
 
