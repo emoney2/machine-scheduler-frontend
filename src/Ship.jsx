@@ -506,8 +506,9 @@ const shippingOptions = [
         <div style={{ marginTop: "2rem" }}>
           <h4>Select UPS Shipping Option:</h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-            {shippingOptions.map(({ method, rate, delivery }) => {
-              const deliveryDate = parseDeliveryDate(opt.delivery);
+            {shippingOptions.map((opt) => {
+              const { method, rate, delivery } = opt;
+              const deliveryDate = parseDeliveryDate(delivery);
 
               const dueDates = jobs
                 .filter(j => selected.includes(j.orderId.toString()))
