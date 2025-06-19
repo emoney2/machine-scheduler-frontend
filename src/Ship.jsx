@@ -116,15 +116,22 @@ export default function Ship() {
         );
         const data = await res.json();
         if (res.ok) {
-          setJobs(prev =>
-            data.jobs.map(newJob => {
+          setJobs(prev => {
+            const updatedJobs = data.jobs.map(newJob => {
               const existing = prev.find(j => j.orderId === newJob.orderId);
               return {
                 ...newJob,
                 shipQty: existing?.shipQty ?? newJob.quantity,
               };
-            })
-          );
+            });
+
+            // 🧹 Clean up selected list based on new jobs
+            const updatedOrderIds = updatedJobs.map(j => j.orderId.toString());
+            setSelected(prevSelected => prevSelected.filter(id => updatedOrderIds.includes(id)));
+
+            return updatedJobs;
+          });
+
         } else {
           console.error("Fetch error:", data.error);
         }
