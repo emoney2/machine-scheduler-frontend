@@ -440,6 +440,7 @@ const furColorNames = furColors;
   if (!volRes.ok) {
     throw new Error("Failed to save volume");
   }
+  }
 
 async function checkProductVolume(productName) {
   const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
