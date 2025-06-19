@@ -647,6 +647,37 @@ const handleSaveNewCompany = async () => {
       formElem.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
     }
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const fd = new FormData(e.target);
+    const product = fd.get("product");
+
+    const volume = await checkProductVolume(product);
+    if (!volume) {
+      setMissingVolumeProduct(product);
+      setIsVolumeModalOpen(true);
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const submitUrl = `${process.env.REACT_APP_API_ROOT}/submit-order`;
+      const res = await axios.post(submitUrl, fd, { withCredentials: true });
+      if (res.data.error) {
+        alert("Error: " + res.data.error);
+      } else {
+        window.location.reload(); // reset the form
+      }
+    } catch (err) {
+      alert("Submission failed. Please try again.");
+    }
+
+    setIsSubmitting(false);
+  };
+
   // ─── Save the new material to Google Sheets ───────────────────
   const handleSaveNewMaterial = async () => {
     // validate name, unit, minInv, reorder, cost
