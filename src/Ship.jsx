@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
-  const jobRefs = useRef({});
-
-
 function formatDateMMDD(dateStr) {
   if (!dateStr) return "";
   const parts = dateStr.includes("-")
