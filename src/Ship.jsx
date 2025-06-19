@@ -366,11 +366,11 @@ const handleRateAndShip = (method, rate, deliveryDate) => {
 
 // Mock shipping options (replace with live API later)
 const shippingOptions = [
-  { method: "Ground", rate: "$12.34", delivery: "Mon 06/24" },
-  { method: "2nd Day Air", rate: "$24.10", delivery: "Sat 06/22" },
-  { method: "Next Day Air", rate: "$41.00", delivery: "Fri 06/21" },
-  { method: "Next Day Air Early AM", rate: "$55.20", delivery: "Fri 06/21 8AM" },
-  { method: "Saturday Delivery", rate: "$60.00", delivery: "Sat 06/22 before noon" },
+  { method: "Ground", rate: "$12.34", deliveryLabel: "Mon 06/24", deliveryDate: new Date("2025-06-24") },
+  { method: "2nd Day Air", rate: "$24.10", deliveryLabel: "Sat 06/22", deliveryDate: new Date("2025-06-22") },
+  { method: "Next Day Air", rate: "$41.00", deliveryLabel: "Fri 06/21", deliveryDate: new Date("2025-06-21") },
+  { method: "Next Day Air Early AM", rate: "$55.20", deliveryLabel: "Fri 06/21 8AM", deliveryDate: new Date("2025-06-21") },
+  { method: "Saturday Delivery", rate: "$60.00", deliveryLabel: "Sat 06/22 before noon", deliveryDate: new Date("2025-06-22") },
 ];
 
   return (
@@ -450,32 +450,51 @@ const shippingOptions = [
 
       <div style={{ marginTop: "2rem" }}>
         <h4>Select UPS Shipping Option:</h4>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginTop: "1rem" }}>
-          {["Ground", "2nd Day Air", "Next Day Air", "Next Day Air Early AM", "Saturday Delivery"].map((method) => (
+        {shippingOptions.map(({ method, rate, deliveryLabel, deliveryDate }) => {
+          const allSelectedDueDates = jobs
+            .filter(j => selected.includes(j.orderId))
+            .map(j => new Date(j.due))
+            .filter(d => !isNaN(d));
+
+          const latestDueDate = allSelectedDueDates.length > 0
+            ? new Date(Math.max(...allSelectedDueDates.map(d => d.getTime())))
+            : null;
+
+          const isLate = latestDueDate && deliveryDate > latestDueDate;
+          const bgColor = latestDueDate
+            ? (isLate ? "#ffcccc" : "#ccffcc")
+            : "#eee";
+
+          return (
             <button
               key={method}
-              onClick={() => handleRateAndShip(method)}
+              onClick={() => handleRateAndShip(method, rate, deliveryLabel)}
               style={{
-                flex: "0 0 auto",
-                width: "220px",
+                display: "inline-block",
+                width: "280px",
                 padding: "1rem",
                 fontSize: "1rem",
+                marginRight: "1rem",
+                marginBottom: "1rem",
+                backgroundColor: bgColor,
+                color: "#000",
                 textAlign: "left",
                 lineHeight: "1.4",
-                border: "1px solid #ccc",
+                border: "1px solid #999",
                 borderRadius: "8px",
-                backgroundColor: "#f7f7f7"
               }}
             >
               <div style={{ fontWeight: "bold" }}>{method}</div>
-              <div style={{ fontSize: "0.9rem" }}>Price: [mock]</div>
-              <div style={{ fontSize: "0.85rem", color: "#666" }}>Est. delivery: [mock]</div>
+              <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
+              <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {deliveryLabel}</div>
             </button>
-          ))}
+          );
+        })}
+        <div style={{ marginTop: "1rem" }}>
+          <button onClick={() => setSelected([])} style={{ padding: "0.5rem 1rem" }}>
+            Cancel
+          </button>
         </div>
-        <button onClick={() => setSelected([])} style={{ marginTop: "1.5rem" }}>
-          Cancel
-        </button>
       </div>
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
