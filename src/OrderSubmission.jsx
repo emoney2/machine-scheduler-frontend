@@ -550,43 +550,7 @@ const furColorNames = furColors;
     filesToUpload.forEach((f) => fd.append("prodFiles", f));
     printFiles.forEach((f) => fd.append("printFiles", f));
 
-    // send to server
-    await axios.post(submitUrl, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-    alert("Order submitted!");
-
-    // reset form + state
-    setForm({
-      company: "",
-      designName: "",
-      quantity: "",
-      product: "",
-      price: "",
-      dueDate: "",
-      dateType: "Hard Date",
-      referral: "",
-      materials: ["", "", "", "", ""],
-      backMaterial: "",
-      embBacking: "",
-      furColor: "",
-      notes: "",
-    });
-    setProdFiles([]);
-    setPrintFiles([]);
-    setProdPreviews([]);
-    setPrintPreviews([]);
-  } catch (err) {
-    console.error(err);
-    alert(err.response?.data?.error || "Submission failed");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
-
-
-// ─── Save the new company to Google Sheets ─────────────────────
+  // ─── Save the new company to Google Sheets ─────────────────────
 const handleSaveNewCompany = async () => {
   // 1) Validate required fields (everything except streetAddress2)
   const required = [
