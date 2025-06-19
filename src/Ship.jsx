@@ -2,15 +2,31 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
 function parseDateFromString(dateStr) {
-  const parts = dateStr.includes("-") ? dateStr.split("-") : dateStr.split("/");
+  if (!dateStr) return null;
+
+  const parts = dateStr.includes("-")
+    ? dateStr.split("-")
+    : dateStr.includes("/")
+    ? dateStr.split("/")
+    : [];
+
   if (parts.length !== 3) return null;
+
   let [year, month, day] = parts;
 
-  if (parseInt(month) > 12) [month, day, year] = [day, month, year];
-  if (year.length === 2) year = "20" + year;
+  if (parts[0].length <= 2 && parts[2].length === 4) {
+    // Format is MM/DD/YYYY or M/D/YYYY
+    [month, day, year] = parts;
+  } else if (parts[0].length === 4) {
+    // Format is YYYY-MM-DD
+    [year, month, day] = parts;
+  } else {
+    return null; // unknown format
+  }
 
-  return new Date(`${year}-${month}-${day}`);
+  return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`);
 }
+
 
 function formatDateMMDD(dateStr) {
   if (!dateStr) return "";
