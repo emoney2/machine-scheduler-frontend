@@ -417,6 +417,23 @@ async function checkProductVolume(productName) {
   return volume ? parseFloat(volume) : null;
 }
 
+  const checkProductVolume = async (productName) => {
+    const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      console.error("Failed to fetch Table data");
+      return null;
+    }
+
+    const table = await res.json();
+    const row = table.find(row =>
+      row.Product?.toLowerCase().trim() === productName.toLowerCase().trim()
+    );
+    const volume = row?.Volume;
+    return volume ? parseFloat(volume) : null;
+  };
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
