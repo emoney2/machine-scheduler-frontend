@@ -389,47 +389,40 @@ const furColorNames = furColors;
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   e.preventDefault();
-  console.log("handleSubmit – isSubmitting before:", isSubmitting);
-
   if (isSubmitting) return;
   setIsSubmitting(true);
 
-  if (!form.company || !form.product || !form.design) {
-    alert("Company, Product, and Design are required.");
-    setIsSubmitting(false);
-    return;
-  }
+  const form = formRef.current;
+  const formData = new FormData(form);
 
-  // ✅ Prompt for volume during order submission
-  const length = prompt("Enter box LENGTH (inches) for this product:");
-  const width = prompt("Enter box WIDTH (inches) for this product:");
-  const height = prompt("Enter box HEIGHT (inches) for this product:");
+  const product = formData.get("product");
+  const isNewProduct = !knownProducts.includes(product);
 
-  if (!length || !width || !height) {
-    alert("All three dimensions are required.");
-    setIsSubmitting(false);
-    return;
-  }
-
-  try {
-    // Submit the order first
-    const res = await fetch("https://machine-scheduler-backend.onrender.com/api/submit-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(form),
-    });
-
-    const result = await res.json();
-
-    if (res.ok) {
-      alert("✅ Order submitted!");
-      setForm(initialForm);
-    } else {
-      alert(result.error || "Order submission failed.");
+  // 🔍 Prompt for volume dimensions if this is a new product
+  if (isNewProduct) {
+    const confirmed = await promptDimensionsForProduct(product);
+    if (!confirmed) {
       setIsSubmitting(false);
       return;
     }
+  }
+
+  try {
+    await axios.post(submitUrl, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    alert("Order submitted successfully!");
+    form.reset();
+    setImagePreview(null);
+  } catch (error) {
+    console.error("Submission error:", error);
+    alert("Submission failed.");
+  }
+
+  setIsSubmitting(false);
+};
+
 
     // Then store the volume for the product
     const volRes = await fetch("https://machine-scheduler-backend.onrender.com/api/set-volume", {
