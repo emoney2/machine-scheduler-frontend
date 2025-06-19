@@ -734,13 +734,7 @@ const handleSaveNewCompany = async () => {
       })
     });
 
-    setIsVolumeModalOpen(false);
-    // re-trigger submit:
-    document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true }));
-  };
-
-
-    setIsVolumeModalOpen(false);
+        setIsVolumeModalOpen(false);
 
     // Programmatically trigger form resubmission
     const formElem = document.querySelector("form");
