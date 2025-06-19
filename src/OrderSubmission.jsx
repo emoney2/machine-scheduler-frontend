@@ -401,7 +401,6 @@ const furColorNames = furColors;
   if (!volRes.ok) {
     throw new Error("Failed to save volume");
   }
-})();
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
