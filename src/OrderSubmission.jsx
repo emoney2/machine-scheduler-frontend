@@ -77,6 +77,11 @@ export default function OrderSubmission() {
   const [newCompanyErrors, setNewCompanyErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [isVolumeModalOpen, setIsVolumeModalOpen] = useState(false);
+  const [missingVolumeProduct, setMissingVolumeProduct] = useState("");
+  const [dimensions, setDimensions] = useState({ length: "", width: "", height: "" });
+
+
   const handleNewCompanyChange = (e) => {
     const { name, value } = e.target;
     setNewCompanyData((prev) => ({ ...prev, [name]: value }));
@@ -402,6 +407,17 @@ const furColorNames = furColors;
     throw new Error("Failed to save volume");
   }
 
+async function checkProductVolume(productName) {
+  const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
+    credentials: "include",
+  });
+  const table = await res.json();
+  const row = table.find(row => row.Product?.toLowerCase() === productName.toLowerCase());
+  const volume = row?.Volume;
+  return volume ? parseFloat(volume) : null;
+}
+
+
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   e.preventDefault();
@@ -410,6 +426,16 @@ const handleSubmit = async (e) => {
   setIsSubmitting(true);
 
   const fd = new FormData(e.target);
+  const product = fd.get("product");
+  const volume = await checkProductVolume(product);
+
+  if (!volume) {
+    setMissingVolumeProduct(product);
+    setIsVolumeModalOpen(true);
+    setIsSubmitting(false);
+    return;
+  }
+
 
   try {
     // 1. Submit product data as usual
@@ -445,6 +471,7 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
+
   // ─── If company not in our directory, open modal ───────────────
   if (!companyNames.includes(form.company.trim())) {
     setNewCompanyData((prev) => ({
@@ -890,6 +917,82 @@ const handleSaveNewCompany = async () => {
                 style={{ padding: "0.5rem 1rem" }}
               >
                 Save Material
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isVolumeModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0, left: 0,
+            width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "1.5rem",
+              borderRadius: "0.5rem",
+              width: "400px",
+              maxHeight: "90%",
+              overflowY: "auto",
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>Enter Dimensions for New Product: {missingVolumeProduct}</h2>
+            <label>Length (in):<br />
+              <input
+                type="number"
+                value={dimensions.length}
+                onChange={(e) => setDimensions({ ...dimensions, length: e.target.value })}
+                style={{ width: "100%", padding: "0.4rem", marginBottom: "0.5rem" }}
+              />
+            </label>
+            <label>Width (in):<br />
+              <input
+                type="number"
+                value={dimensions.width}
+                onChange={(e) => setDimensions({ ...dimensions, width: e.target.value })}
+                style={{ width: "100%", padding: "0.4rem", marginBottom: "0.5rem" }}
+              />
+            </label>
+            <label>Height (in):<br />
+              <input
+                type="number"
+                value={dimensions.height}
+                onChange={(e) => setDimensions({ ...dimensions, height: e.target.value })}
+                style={{ width: "100%", padding: "0.4rem", marginBottom: "1rem" }}
+              />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+              <button
+                onClick={() => setIsVolumeModalOpen(false)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const { length, width, height } = dimensions;
+                  const volume = Math.round(length * width * height);
+                  await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ product: missingVolumeProduct, volume }),
+                  });
+                  setIsVolumeModalOpen(false);
+                  handleSubmit(new Event("submit")); // Resubmit
+                }}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Save & Resubmit
               </button>
             </div>
           </div>
