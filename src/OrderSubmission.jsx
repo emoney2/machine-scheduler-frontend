@@ -445,20 +445,6 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
-
-    const volResult = await volRes.json();
-    if (!volRes.ok) {
-      alert(`⚠️ Failed to save volume: ${volResult.error}`);
-    }
-  } catch (err) {
-    console.error("Submission error:", err);
-    alert("❌ Network error submitting order.");
-  } finally {
-    setIsSubmitting(false);
-    console.log("handleSubmit – isSubmitting after:", isSubmitting);
-  }
-};
-
   // ─── If company not in our directory, open modal ───────────────
   if (!companyNames.includes(form.company.trim())) {
     setNewCompanyData((prev) => ({
