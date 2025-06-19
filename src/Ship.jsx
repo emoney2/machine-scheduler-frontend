@@ -1,6 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 
+function parseDateFromString(dateStr) {
+  const parts = dateStr.includes("-") ? dateStr.split("-") : dateStr.split("/");
+  if (parts.length !== 3) return null;
+  let [year, month, day] = parts;
+
+  if (parseInt(month) > 12) [month, day, year] = [day, month, year];
+  if (year.length === 2) year = "20" + year;
+
+  return new Date(`${year}-${month}-${day}`);
+}
+
 function formatDateMMDD(dateStr) {
   if (!dateStr) return "";
   const parts = dateStr.includes("-")
@@ -450,46 +461,46 @@ const shippingOptions = [
 
       <div style={{ marginTop: "2rem" }}>
         <h4>Select UPS Shipping Option:</h4>
-        {shippingOptions.map(({ method, rate, deliveryLabel, deliveryDate }) => {
-          const allSelectedDueDates = jobs
-            .filter(j => selected.includes(j.orderId))
-            .map(j => new Date(j.due))
-            .filter(d => !isNaN(d));
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+          {shippingOptions.map(({ method, rate, deliveryLabel, deliveryDate }) => {
+            const allDueDates = jobs
+              .filter(j => selected.includes(j.orderId))
+              .map(j => parseDateFromString(j.due))
+              .filter(d => d instanceof Date && !isNaN(d));
 
-          const latestDueDate = allSelectedDueDates.length > 0
-            ? new Date(Math.max(...allSelectedDueDates.map(d => d.getTime())))
-            : null;
+            const latestDueDate = allDueDates.length > 0
+              ? new Date(Math.max(...allDueDates.map(d => d.getTime())))
+              : null;
 
-          const isLate = latestDueDate && deliveryDate > latestDueDate;
-          const bgColor = latestDueDate
-            ? (isLate ? "#ffcccc" : "#ccffcc")
-            : "#eee";
+            const isLate = latestDueDate && deliveryDate > latestDueDate;
+            const bgColor = latestDueDate
+              ? (isLate ? "#ffcccc" : "#ccffcc")
+              : "#eee";
 
-          return (
-            <button
-              key={method}
-              onClick={() => handleRateAndShip(method, rate, deliveryLabel)}
-              style={{
-                display: "inline-block",
-                width: "280px",
-                padding: "1rem",
-                fontSize: "1rem",
-                marginRight: "1rem",
-                marginBottom: "1rem",
-                backgroundColor: bgColor,
-                color: "#000",
-                textAlign: "left",
-                lineHeight: "1.4",
-                border: "1px solid #999",
-                borderRadius: "8px",
-              }}
-            >
-              <div style={{ fontWeight: "bold" }}>{method}</div>
-              <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
-              <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {deliveryLabel}</div>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={method}
+                onClick={() => handleRateAndShip(method, rate, deliveryLabel)}
+                style={{
+                  width: "270px",
+                  padding: "1rem",
+                  fontSize: "1rem",
+                  backgroundColor: bgColor,
+                  color: "#000",
+                  textAlign: "left",
+                  lineHeight: "1.4",
+                  border: "1px solid #999",
+                  borderRadius: "8px",
+                }}
+              >
+                <div style={{ fontWeight: "bold" }}>{method}</div>
+                <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
+                <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {deliveryLabel}</div>
+              </button>
+            );
+          })}
+        </div>
+
         <div style={{ marginTop: "1rem" }}>
           <button onClick={() => setSelected([])} style={{ padding: "0.5rem 1rem" }}>
             Cancel
