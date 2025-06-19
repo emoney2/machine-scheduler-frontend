@@ -30,6 +30,31 @@ function formatDateMMDD(dateStr) {
   }
 }
 
+function getButtonColor(deliveryDateStr, selectedJobs, allJobs) {
+  if (!deliveryDateStr || selectedJobs.length === 0) return "#ccc";
+
+  const deliveryDate = new Date(deliveryDateStr);
+
+  const dueDates = selectedJobs
+    .map(id => allJobs.find(j => j.orderId.toString() === id)?.due)
+    .filter(Boolean)
+    .map(dateStr => new Date(dateStr));
+
+  if (dueDates.length === 0) return "#ccc";
+
+  const earliestDueDate = new Date(Math.min(...dueDates));
+
+  if (deliveryDate < earliestDueDate) return "#c2f0c2"; // green
+  if (
+    deliveryDate.getFullYear() === earliestDueDate.getFullYear() &&
+    deliveryDate.getMonth() === earliestDueDate.getMonth() &&
+    deliveryDate.getDate() === earliestDueDate.getDate()
+  ) {
+    return "#fff5ba"; // yellow
+  }
+  return "#f5c2c2"; // red
+}
+
 export default function Ship() {
   const [searchParams] = useSearchParams();
   const targetCompany = searchParams.get("company");
@@ -461,46 +486,32 @@ const shippingOptions = [
 
       <div style={{ marginTop: "2rem" }}>
         <h4>Select UPS Shipping Option:</h4>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-          {shippingOptions.map(({ method, rate, deliveryLabel, deliveryDate }) => {
-            const allDueDates = jobs
-              .filter(j => selected.includes(j.orderId))
-              .map(j => parseDateFromString(j.due))
-              .filter(d => d instanceof Date && !isNaN(d));
-
-            const latestDueDate = allDueDates.length > 0
-              ? new Date(Math.max(...allDueDates.map(d => d.getTime())))
-              : null;
-
-            const isLate = latestDueDate && deliveryDate > latestDueDate;
-            const bgColor = latestDueDate
-              ? (isLate ? "#ffcccc" : "#ccffcc")
-              : "#eee";
-
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginTop: "1rem" }}>
+          {shippingOptions.map(({ method, rate, delivery }) => {
+            const buttonColor = getButtonColor(delivery, selected, jobs);
             return (
               <button
                 key={method}
-                onClick={() => handleRateAndShip(method, rate, deliveryLabel)}
+                onClick={() => handleRateAndShip(method, rate, delivery)}
                 style={{
-                  width: "270px",
-                  padding: "1rem",
-                  fontSize: "1rem",
-                  backgroundColor: bgColor,
+                  backgroundColor: buttonColor,
                   color: "#000",
+                  padding: "1rem",
+                  width: "220px",
                   textAlign: "left",
-                  lineHeight: "1.4",
+                  borderRadius: "6px",
                   border: "1px solid #999",
-                  borderRadius: "8px",
+                  lineHeight: "1.4",
+                  fontSize: "0.95rem"
                 }}
               >
                 <div style={{ fontWeight: "bold" }}>{method}</div>
-                <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
-                <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {deliveryLabel}</div>
+                <div>Price: {rate}</div>
+                <div>Est. delivery: {delivery}</div>
               </button>
             );
           })}
         </div>
-
         <div style={{ marginTop: "1rem" }}>
           <button onClick={() => setSelected([])} style={{ padding: "0.5rem 1rem" }}>
             Cancel
