@@ -513,10 +513,11 @@ const shippingOptions = [
               const dueDates = jobs
                 .filter(j => selected.includes(j.orderId.toString()))
                 .map(j => {
-                  const d = parseDate(j.due);
-                  return d instanceof Date ? d : null;
+                  const d = parseDateFromString(j.due);
+                  return d instanceof Date && !isNaN(d.getTime()) ? d : null;
                 })
                 .filter(Boolean);
+
 
               const earliestDueDate = dueDates.length > 0 ? new Date(Math.min(...dueDates)) : null;
 
