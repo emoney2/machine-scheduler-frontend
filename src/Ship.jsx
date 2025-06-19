@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+
+  const jobRefs = useRef({});
+
 
 function formatDateMMDD(dateStr) {
   if (!dateStr) return "";
@@ -19,6 +23,10 @@ function formatDateMMDD(dateStr) {
 }
 
 export default function Ship() {
+  const [searchParams] = useSearchParams();
+  const targetCompany = searchParams.get("company");
+  const targetOrder = searchParams.get("order");
+  const jobRefs = useRef({});
   const [jobs, setJobs] = useState([]);
   const [allCompanies, setAllCompanies] = useState([]);
   const [selected, setSelected] = useState([]);
@@ -99,6 +107,25 @@ export default function Ship() {
   }, [companyInput, allCompanies]);
 // === End useEffect 2 ===
 
+  useEffect(() => {
+    if (targetOrder && jobs.length > 0) {
+      const match = jobs.find(j => j.orderId.toString() === targetOrder);
+      if (match) {
+        const el = jobRefs.current[targetOrder];
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        // Select it using string ID
+        setSelected(prev => {
+          if (!prev.includes(targetOrder)) {
+            return [...prev, targetOrder];
+          }
+          return prev;
+        });
+      }
+    }
+  }, [jobs, targetOrder]);
 
   async function fetchCompanyNames() {
     try {
@@ -151,12 +178,14 @@ export default function Ship() {
   };
 
   const toggleSelect = (orderId) => {
+    const idStr = orderId.toString();
     setSelected((prev) =>
-      prev.includes(orderId)
-        ? prev.filter((id) => id !== orderId)
-        : [...prev, orderId]
+      prev.includes(idStr)
+        ? prev.filter((id) => id !== idStr)
+        : [...prev, idStr]
     );
   };
+
 
   const promptDimensionsForProduct = (product) => {
     return new Promise((resolve) => {
@@ -360,8 +389,19 @@ export default function Ship() {
       {jobs.map((job) => (
         <div
           key={job.orderId}
+          ref={el => { if (el) jobRefs.current[job.orderId] = el; }}
           onClick={() => toggleSelect(job.orderId)}
-          style={{ display: "flex", alignItems: "center", border: "1px solid #ccc", padding: "0.5rem 1rem", marginBottom: "0.3rem", borderRadius: "6px", backgroundColor: selected.includes(job.orderId) ? "#4CAF50" : "#fff", color: selected.includes(job.orderId) ? "#fff" : "#000", cursor: "pointer" }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            border: "1px solid #ccc",
+            padding: "0.5rem 1rem",
+            marginBottom: "0.3rem",
+            borderRadius: "6px",
+            backgroundColor: selected.includes(job.orderId.toString()) ? "#4CAF50" : "#fff",
+            color: selected.includes(job.orderId.toString()) ? "#fff" : "#000",
+            cursor: "pointer"
+          }}
         >
           <div style={{ width: 60 }}>{job.image && <img src={job.image} alt="Preview" style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "4px", border: "1px solid #999" }} />}</div>
           <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
