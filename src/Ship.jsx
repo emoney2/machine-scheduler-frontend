@@ -473,14 +473,6 @@ const shippingOptions = [
           Cancel
         </button>
       </div>
-  })}
-</div>
-
-        <button onClick={() => setSelected([])} style={{ marginLeft: "1rem", marginTop: "1rem" }}>
-          Cancel
-        </button>
-      </div>
-
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
           <h3>📦 Packed Boxes</h3>
