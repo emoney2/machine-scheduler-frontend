@@ -424,34 +424,6 @@ const furColorNames = furColors;
       setForm(prev => ({ ...prev, designName: name }));
     }
   };
-
-    // Then store the volume for the product
-    async function saveVolume(productName, volume) {
-      const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          product: productName,
-          volume,
-        }),
-      });
-
-  if (!volRes.ok) {
-    throw new Error("Failed to save volume");
-  }
-  }
-
-async function checkProductVolume(productName) {
-  const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
-    credentials: "include",
-  });
-  const table = await res.json();
-  const row = table.find(row => row.Product?.toLowerCase() === productName.toLowerCase());
-  const volume = row?.Volume;
-  return volume ? parseFloat(volume) : null;
-}
-
 // ─── UPDATED handleSubmit ───────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
