@@ -425,11 +425,29 @@ const furColorNames = furColors;
     }
   };
 // ─── UPDATED handleSubmit ───────────────────────────────────────
+// at the top of your component, if you like, define this for resetting:
+  const initialForm = {
+    company: "",
+    designName: "",
+    quantity: "",
+    product: "", 
+    price: "",
+    dueDate: "",
+    dateType: "Hard Date",
+    referral: "",
+    materials: ["", "", "", "", ""],
+    backMaterial: "",
+    embBacking: "",
+    furColor: "",
+    notes: "",
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
-
+  
+    // build payload
     const fd = new FormData(e.target);
     const product = fd.get("product");
     const volume = await checkProductVolume(product);
@@ -442,29 +460,15 @@ const furColorNames = furColors;
     }
 
     try {
-      // submit form data
+      // send to server
       await axios.post(submitUrl, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       alert("Order submitted!");
 
-      // reset form + previews
-      setForm({
-        company: "",
-        designName: "",
-        quantity: "",
-        product: "",
-        price: "",
-        dueDate: "",
-        dateType: "Hard Date",
-        referral: "",
-        materials: ["", "", "", "", ""],
-        backMaterial: "",
-        embBacking: "",
-        furColor: "",
-        notes: "",
-      });
+      // reset everything
+      setForm(initialForm);
       setProdFiles([]);
       setPrintFiles([]);
       setProdPreviews([]);
@@ -476,6 +480,7 @@ const furColorNames = furColors;
       setIsSubmitting(false);
     }
   };
+
 
   // ─── If company not in our directory, open modal ───────────────
   if (!companyNames.includes(form.company.trim())) {
