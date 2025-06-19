@@ -442,17 +442,21 @@ const handleSubmit = async (e) => {
 
 
     // Then store the volume for the product
-    const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        product: form.product,
-        length,
-        width,
-        height,
-      }),
-    });
+    await (async () => {
+      const volRes = await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          product: data.get("product"),
+          volume: length * width * height,
+        }),
+      });
+
+  if (!volRes.ok) {
+    throw new Error("Failed to set volume");
+  }
+})();
 
     const volResult = await volRes.json();
     if (!volRes.ok) {
