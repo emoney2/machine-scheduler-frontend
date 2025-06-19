@@ -507,29 +507,48 @@ const shippingOptions = [
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
             {shippingOptions.map(({ method, rate, delivery }) => {
               const deliveryDate = parseDateFromText(delivery);
-              const earliestDue = getEarliestDueDate(selected, jobs);
 
-              let bg = "#ccc"; // default gray
-              if (earliestDue && deliveryDate) {
-                if (deliveryDate < earliestDue) bg = "#c7f7c7"; // green
-                else if (deliveryDate.getTime() === earliestDue.getTime()) bg = "#fff4b3"; // yellow
-                else bg = "#f7cccc"; // red
+              const dueDates = jobs
+                .filter(j => selected.includes(j.orderId.toString()))
+                .map(j => {
+                  const d = parseDate(j.due);
+                  return d instanceof Date ? d : null;
+                })
+                .filter(Boolean);
+
+              const earliestDueDate = dueDates.length > 0 ? new Date(Math.min(...dueDates)) : null;
+
+              let backgroundColor = "#ccc"; // default grey
+
+              if (earliestDueDate && deliveryDate) {
+                if (deliveryDate < earliestDueDate) {
+                  backgroundColor = "#b2fab4"; // green
+                } else if (
+                  deliveryDate.getFullYear() === earliestDueDate.getFullYear() &&
+                  deliveryDate.getMonth() === earliestDueDate.getMonth() &&
+                  deliveryDate.getDate() === earliestDueDate.getDate()
+                ) {
+                  backgroundColor = "#fff9c4"; // yellow
+                } else {
+                  backgroundColor = "#ffcdd2"; // red
+                }
               }
 
               return (
                 <button
                   key={method}
-                  onClick={() => handleRateAndShip(method, rate, delivery)}
+                  onClick={() => handleRateAndShip(method)}
                   style={{
-                    backgroundColor: bg,
+                    backgroundColor,
                     color: "#000",
-                    width: "220px",
                     padding: "1rem",
-                    fontSize: "1rem",
-                    border: "1px solid #999",
-                    borderRadius: "8px",
-                    flex: "0 0 auto",
-                    lineHeight: "1.4",
+                    marginRight: "1rem",
+                    marginBottom: "1rem",
+                    minWidth: "200px",
+                    border: "1px solid #333",
+                    borderRadius: "6px",
+                    textAlign: "left",
+                    lineHeight: "1.4"
                   }}
                 >
                   <div style={{ fontWeight: "bold" }}>{method}</div>
@@ -538,6 +557,7 @@ const shippingOptions = [
                 </button>
               );
             })}
+
           </div>
           <button onClick={() => setSelected([])} style={{ marginTop: "1rem" }}>
             Cancel
