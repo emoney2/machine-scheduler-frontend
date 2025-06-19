@@ -77,10 +77,83 @@ export default function OrderSubmission() {
   const [newCompanyErrors, setNewCompanyErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [printTime,    setPrintTime]    = useState("");
+  const [perYard,      setPerYard]      = useState("");
+  const [foamHalf,     setFoamHalf]     = useState("");
+  const [foam38,       setFoam38]       = useState("");
+  const [foam14,       setFoam14]       = useState("");
+  const [foam18,       setFoam18]       = useState("");
+  const [magnetN,      setMagnetN]      = useState("");
+  const [magnetS,      setMagnetS]      = useState("");
+  const [elasticHalf,  setElasticHalf]  = useState("");
+  const [computedVolume, setComputedVolume] = useState("");
+
+  // 2️⃣ – new save‐handler for your product‐specs modal
+  const handleSaveProductSpecs = async () => {
+    // (a) compute volume however you like; if you already have it in state, skip this
+    // setComputedVolume(length * width * height);
+
+    // (b) post everything up
+    await fetch(`${process.env.REACT_APP_API_ROOT}/api/product-specs`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        product:    form.product,
+        printTime,    // minutes to print one
+        perYard,      // how many per yard
+        foamHalf,     // 1/2" foam count
+        foam38,       // 3/8" foam count
+        foam14,       // 1/4" foam count
+        foam18,       // 1/8" foam count
+        magnetN,      // N magnets count
+        magnetS,      // S magnets count
+        elasticHalf,  // 1/2" elastic length or count
+        volume:       computedVolume
+      })
+    });
+
+    // (c) close the modal
+    setIsVolumeModalOpen(false);
+
+    // (d) optional: trigger any downstream refresh or re-submit logic here
+  };
+
+
   const [isVolumeModalOpen, setIsVolumeModalOpen] = useState(false);
   const [missingVolumeProduct, setMissingVolumeProduct] = useState("");
   const [dimensions, setDimensions] = useState({ length: "", width: "", height: "" });
+  const [newProdSpecs, setNewProdSpecs] = useState({
+    printTime: "",
+    foamCounts: { half: "", threeEighth: "", quarter: "", eighth: "" },
+    magnetCounts: { north: "", south: "" },
+    halfFoamLength: "",
+    // (you could store computedVolume here too, or derive it on-the-fly) 
+  });
 
+
+  const handleNewProdSpecsChange = (e) => {
+    const { name, value } = e.target;
+    // names like "printTime", "halfFoamLength"
+    if (["printTime","halfFoamLength"].includes(name)) {
+      setNewProdSpecs(prev => ({ ...prev, [name]: value }));
+    }
+    // foamCounts.* or magnetCounts.*
+    else if (name.startsWith("foam_")) {
+      const key = name.replace("foam_","");
+      setNewProdSpecs(prev => ({
+        ...prev,
+        foamCounts: { ...prev.foamCounts, [key]: value }
+      }));
+    }
+    else if (name.startsWith("magnet_")) {
+      const key = name.replace("magnet_","");
+      setNewProdSpecs(prev => ({
+        ...prev,
+        magnetCounts: { ...prev.magnetCounts, [key]: value }
+      }));
+    }
+  };
 
   const handleNewCompanyChange = (e) => {
     const { name, value } = e.target;
@@ -630,13 +703,42 @@ const handleSaveNewCompany = async () => {
 
   const saveVolumeAndResubmit = async () => {
     const { length, width, height } = dimensions;
-    const volume = Math.round(length * width * height);
-    await fetch(`${process.env.REACT_APP_API_ROOT}/set-volume`, {
+    const volume   = Math.round(length * width * height);
+    const {
+      printTime,
+      foamCounts,
+      magnetCounts,
+      halfFoamLength
+    } = newProdSpecs;
+
+    await fetch(`${process.env.REACT_APP_API_ROOT}/set-product-specs`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ product: missingVolumeProduct, volume }),
+      body: JSON.stringify({
+        product:      missingVolumeProduct,
+        volume,
+        printTime:    Number(printTime),
+        foamCounts:   {
+          half:       Number(foamCounts.half),
+          threeEighth:Number(foamCounts.threeEighth),
+          quarter:    Number(foamCounts.quarter),
+          eighth:     Number(foamCounts.eighth)
+        },
+        magnetCounts: {
+          north:      Number(magnetCounts.north),
+          south:      Number(magnetCounts.south)
+        },
+        halfFoamLength: Number(halfFoamLength),
+        dimensions:   { length, width, height }
+      })
     });
+
+    setIsVolumeModalOpen(false);
+    // re-trigger submit:
+    document.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true }));
+  };
+
 
     setIsVolumeModalOpen(false);
 
@@ -990,71 +1092,112 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
       {isVolumeModalOpen && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0, left: 0,
-            width: "100%", height: "100%",
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "1.5rem",
-              borderRadius: "0.5rem",
-              width: "400px",
-              maxHeight: "90%",
-              overflowY: "auto",
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>Enter Dimensions for New Product: {missingVolumeProduct}</h2>
-            <label>Length (in):<br />
+        <div style={{/* existing overlay styles */}}>
+          <div style={{/* existing modal box styles */}}>
+            <h2>New-Product Specs: {missingVolumeProduct}</h2>
+
+            {/* Print Time */}      
+            <label>Print Time (min):
               <input
+                name="printTime"
                 type="number"
-                value={dimensions.length}
-                onChange={(e) => setDimensions({ ...dimensions, length: e.target.value })}
-                style={{ width: "100%", padding: "0.4rem", marginBottom: "0.5rem" }}
+                value={newProdSpecs.printTime}
+                onChange={handleNewProdSpecsChange}
+                style={{ width: "100%", marginBottom: ".5rem" }}
               />
             </label>
-            <label>Width (in):<br />
+
+            {/* Yield per Yard (computed) */}
+            <div style={{ marginBottom: ".5rem" }}>
+              Yield per yard:
+              {dimensions.length && dimensions.width && dimensions.height
+                ? Math.floor(46656 / (dimensions.length * dimensions.width * dimensions.height))
+                : "–"}
+            </div>
+
+            {/* Foam counts */}
+            <fieldset style={{ marginBottom: ".5rem" }}>
+              <legend>Foam per piece</legend>
+              {[
+                ["half", "1/2\" Foam"],
+                ["threeEighth", "3/8\" Foam"],
+                ["quarter", "1/4\" Foam"],
+                ["eighth", "1/8\" Foam"]
+              ].map(([key,label]) => (
+                <label key={key} style={{ display: "block", marginBottom: ".25rem" }}>
+                  {label}: 
+                  <input
+                    name={`foam_${key}`}
+                    type="number"
+                    value={newProdSpecs.foamCounts[key]}
+                    onChange={handleNewProdSpecsChange}
+                    style={{ width: "60px", marginLeft: ".5rem" }}
+                  />
+                </label>
+              ))}
+            </fieldset>
+
+            {/* Magnet counts */}
+            <fieldset style={{ marginBottom: ".5rem" }}>
+              <legend>Magnets</legend>
+              {[
+                ["north", "North (N) magnets"],
+                ["south", "South (S) magnets"]
+              ].map(([key,label]) => (
+                <label key={key} style={{ display: "block", marginBottom: ".25rem" }}>
+                  {label}:
+                  <input
+                    name={`magnet_${key}`}
+                    type="number"
+                    value={newProdSpecs.magnetCounts[key]}
+                    onChange={handleNewProdSpecsChange}
+                    style={{ width: "60px", marginLeft: ".5rem" }}
+                  />
+                </label>
+              ))}
+            </fieldset>
+
+            {/* 1/2" foam strip length */}
+            <label style={{ display: "block", marginBottom: ".5rem" }}>
+              1/2" Foam strip length (in):
               <input
+                name="halfFoamLength"
                 type="number"
-                value={dimensions.width}
-                onChange={(e) => setDimensions({ ...dimensions, width: e.target.value })}
-                style={{ width: "100%", padding: "0.4rem", marginBottom: "0.5rem" }}
+                value={newProdSpecs.halfFoamLength}
+                onChange={handleNewProdSpecsChange}
+                style={{ width: "100%", marginTop: ".25rem" }}
               />
             </label>
-            <label>Height (in):<br />
-              <input
-                type="number"
-                value={dimensions.height}
-                onChange={(e) => setDimensions({ ...dimensions, height: e.target.value })}
-                style={{ width: "100%", padding: "0.4rem", marginBottom: "1rem" }}
-              />
-            </label>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-              <button
-                onClick={() => setIsVolumeModalOpen(false)}
-                style={{ padding: "0.5rem 1rem" }}
-              >
+
+            {/* Dimensions */}
+            <fieldset style={{ marginBottom: ".5rem" }}>
+              <legend>Dimensions (in)</legend>
+              {["length","width","height"].map(dim => (
+                <label key={dim} style={{ display: "block", marginBottom: ".25rem" }}>
+                  {dim.charAt(0).toUpperCase()+dim.slice(1)}:
+                  <input
+                    type="number"
+                    value={dimensions[dim]}
+                    onChange={e => setDimensions(d => ({ ...d, [dim]: e.target.value }))}
+                    style={{ width: "100%", marginTop: ".25rem" }}
+                  />
+                </label>
+              ))}
+            </fieldset>
+
+            {/* Actions */}
+            <div style={{ textAlign: "right", marginTop: "1rem" }}>
+              <button onClick={() => setIsVolumeModalOpen(false)} style={{ marginRight: ".5rem" }}>
                 Cancel
               </button>
-              <button
-                onClick={saveVolumeAndResubmit}
-                style={{ padding: "0.5rem 1rem" }}
-              >
-                Save & Resubmit
+              <button onClick={saveVolumeAndResubmit}>
+                Save Specs & Resubmit
               </button>
-
             </div>
           </div>
         </div>
       )}
+
 
       {/* Loading bar */}
       {isSubmitting && (
