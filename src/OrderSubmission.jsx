@@ -1525,4 +1525,3 @@ const handleSaveNewCompany = async () => {
     </form>  
   </>      
 );               
-}
