@@ -450,26 +450,30 @@ const shippingOptions = [
 
       <div style={{ marginTop: "2rem" }}>
         <h4>Select UPS Shipping Option:</h4>
-        {["Ground", "2nd Day Air", "Next Day Air", "Next Day Air Early AM", "Saturday Delivery"].map((method) => (
-          <button
-            key={method}
-            onClick={() => handleRateAndShip(method)}
-            style={{
-              display: "block",
-              width: "280px",
-              padding: "1rem",
-              fontSize: "1rem",
-              marginBottom: "1rem",
-              textAlign: "left",
-              lineHeight: "1.4"
-            }}
-          >
-            <div style={{ fontWeight: "bold" }}>{method}</div>
-            <div style={{ fontSize: "0.9rem" }}>Price: [mock]</div>
-            <div style={{ fontSize: "0.85rem", color: "#666" }}>Est. delivery: [mock]</div>
-          </button>
-        ))}
-        <button onClick={() => setSelected([])} style={{ marginTop: "1rem" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginTop: "1rem" }}>
+          {["Ground", "2nd Day Air", "Next Day Air", "Next Day Air Early AM", "Saturday Delivery"].map((method) => (
+            <button
+              key={method}
+              onClick={() => handleRateAndShip(method)}
+              style={{
+                flex: "0 0 auto",
+                width: "220px",
+                padding: "1rem",
+                fontSize: "1rem",
+                textAlign: "left",
+                lineHeight: "1.4",
+                border: "1px solid #ccc",
+                borderRadius: "8px",
+                backgroundColor: "#f7f7f7"
+              }}
+            >
+              <div style={{ fontWeight: "bold" }}>{method}</div>
+              <div style={{ fontSize: "0.9rem" }}>Price: [mock]</div>
+              <div style={{ fontSize: "0.85rem", color: "#666" }}>Est. delivery: [mock]</div>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setSelected([])} style={{ marginTop: "1.5rem" }}>
           Cancel
         </button>
       </div>
