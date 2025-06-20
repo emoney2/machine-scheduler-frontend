@@ -881,11 +881,12 @@ const handleSaveNewCompany = async () => {
                       { Product: newProductName },
                       { withCredentials: true }
                     );
-                    console.log("✅ POST /table response:", resp);
+                    console.log("✅ POST /table response data:", resp.data);
                     alert(`“${newProductName}” added to Table! Please click Submit again.`);
                   } catch (err) {
-                    console.error("❌ Failed to add new product:", err);
-                    alert("Error adding product. Please try again.");
+                    // Log the server’s error payload if any, or fallback to the message
+                    console.error("❌ Failed to add new product:", err.response?.data || err.message);
+                    alert("Error adding product. See console for details.");
                   } finally {
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
