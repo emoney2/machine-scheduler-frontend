@@ -412,47 +412,44 @@ const furColorNames = furColors;
       .map((row) => row.Product?.toString().trim().toLowerCase())
       .filter(Boolean);
 
-    // ─── DEBUG LOGS ───────────────────────────────────────────────
-    console.log("🔍 Existing products from Table:", existingProducts);
-
-    // The product the user entered:
+    // The product the user entered
     const requested = form.product.trim().toLowerCase();
-    console.log("🔍 Requested product:", requested);
 
-    // Check membership:
-    const exists = existingProducts.includes(requested);
-    console.log("🔍 Found in list?", exists);
+    // ─── 2) EARLY‐EXIT if product not in list ────────────────────
+    if (!existingProducts.includes(requested)) {
+      setNewProductName(form.product);
+      setIsNewProductModalOpen(true);
+      return;
+    }
 
-  // ─── 3) Product exists: pull its Volume ────────────────────────
+    // ─── 3) Product exists: pull its Volume ──────────────────────
     const matchRow = table.find(
-      (row) =>
-        row.Product?.toString().trim().toLowerCase() === requested
+      (row) => row.Product?.toString().trim().toLowerCase() === requested
     );
     const volume =
       matchRow && matchRow.Volume != null
         ? parseFloat(matchRow.Volume)
         : null;
 
-  // ─── 4) If Volume missing, you could handle here ─────────────
+    // ─── 4) If Volume missing (but product does exist) ───────────
     if (volume == null) {
       alert("This product is in the list but has no volume set.");
-      // Optionally open your volume‐entry modal here…
       return;
     }
 
-  // ─── 5) Proceed with normal submission ─────────────────────────
+    // ─── 5) Proceed with normal submission ────────────────────────
     setIsSubmitting(true);
     try {
       const fd = new FormData();
-    // append form fields
-      Object.entries(form).forEach(([k, v]) => {
-        if (k === "materials") {
-          v.forEach((m) => fd.append("materials", m));
+      // append all form fields
+      Object.entries(form).forEach(([key, value]) => {
+        if (key === "materials") {
+          value.forEach((m) => fd.append("materials", m));
         } else {
-          fd.append(k, v);
+          fd.append(key, value);
         }
       });
-    // append files as needed…
+      // append any file inputs here if needed...
       const submitUrl =
         process.env.REACT_APP_ORDER_SUBMIT_URL ||
         `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
@@ -460,10 +457,10 @@ const furColorNames = furColors;
         headers: { "Content-Type": "multipart/form-data" },
       });
       alert("Order submitted!");
-      // reset form…
+      // reset form state
       setForm({
         company: "",
-       designName: "",
+        designName: "",
         quantity: "",
         product: "",
         price: "",
@@ -476,6 +473,10 @@ const furColorNames = furColors;
         furColor: "",
         notes: "",
       });
+      setProdFiles([]);
+      setPrintFiles([]);
+      setProdPreviews([]);
+      setPrintPreviews([]);
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.error || "Submission failed");
