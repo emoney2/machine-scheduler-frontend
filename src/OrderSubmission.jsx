@@ -424,7 +424,6 @@ const furColorNames = furColors;
     console.log("🔍 Found in list?", exists);
 
     // ─── 2) If the product isn't in Column A, open New-Product popup ─
-    const requested = form.product.trim().toLowerCase();
     if (!existingProducts.includes(requested)) {
       console.log("🚨 Triggering New-Product popup for:", requested);
       setNewProductName(form.product);
