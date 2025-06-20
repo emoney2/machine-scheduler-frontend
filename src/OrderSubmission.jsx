@@ -412,9 +412,21 @@ const furColorNames = furColors;
       .map((row) => row.Product?.toString().trim().toLowerCase())
       .filter(Boolean);
 
+    // ─── DEBUG LOGS ───────────────────────────────────────────────
+    console.log("🔍 Existing products from Table:", existingProducts);
+
+    // The product the user entered:
+    const requested = form.product.trim().toLowerCase();
+    console.log("🔍 Requested product:", requested);
+
+    // Check membership:
+    const exists = existingProducts.includes(requested);
+    console.log("🔍 Found in list?", exists);
+
     // ─── 2) If the product isn't in Column A, open New-Product popup ─
     const requested = form.product.trim().toLowerCase();
     if (!existingProducts.includes(requested)) {
+      console.log("🚨 Triggering New-Product popup for:", requested);
       setNewProductName(form.product);
       setIsNewProductModalOpen(true);
       return;
@@ -825,7 +837,9 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
-      {isNewProductModalOpen && (
+      {isNewProductModalOpen &&
+        console.log("🔔 Rendering New-Product Modal"),
+        (
         <div
           style={{
             position: "fixed",
