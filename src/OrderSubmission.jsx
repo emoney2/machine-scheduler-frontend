@@ -860,9 +860,25 @@ const handleSaveNewCompany = async () => {
             <div style={{ marginTop: "1rem", textAlign: "right" }}>
               <button
                 type="button"
-                onClick={() => {
-                  setIsNewProductModalOpen(false);
-                  setNewProductName("");
+               onClick={async () => {
+                  try {
+                    // 1) Add the new product to the Table
+                    await axios.post(
+                      `${process.env.REACT_APP_API_ROOT}/table`,
+                      { Product: newProductName },
+                      { credentials: 'include' }
+                    );
+                    // 2) Give the user feedback
+                    alert(`“${newProductName}” added to Table! Please click Submit again.`);
+                  } catch (err) {
+                    console.error("Failed to add new product:", err);
+                    alert("Error adding product. Please try again.");
+                  } finally {
+                    // 3) Reset modal state
+                    setIsNewProductModalOpen(false);
+                    setNewProductName("");
+                  }
+
                 }}
                 style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
               >
