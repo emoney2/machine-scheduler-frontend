@@ -828,7 +828,7 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
-      {isNewProductModalOpen &&
+      {isNewProductModalOpen && newProductName && (
         console.log("🔔 Rendering New-Product Modal"),
         (
         <div
@@ -871,6 +871,7 @@ const handleSaveNewCompany = async () => {
                 onClick={() => {
                   // TODO: hook up “add to table” API call here
                   setIsNewProductModalOpen(false);
+                  setNewProductName("");       // clear it out
                 }}
                 style={{ padding: "0.5rem 1rem" }}
               >
