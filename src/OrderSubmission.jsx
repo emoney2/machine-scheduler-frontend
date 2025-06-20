@@ -76,6 +76,9 @@ export default function OrderSubmission() {
   });
   const [newCompanyErrors, setNewCompanyErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // ─── NEW: track “unknown product” pop-up ───────────────────────
+  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
+  const [newProductName, setNewProductName]         = useState("");
 
   const handleNewCompanyChange = (e) => {
     const { name, value } = e.target;
@@ -387,116 +390,96 @@ const furColorNames = furColors;
   };
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  console.log("handleSubmit – isSubmitting before:", isSubmitting);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  // ─── If company not in our directory, open modal ───────────────
-  if (!companyNames.includes(form.company.trim())) {
-    setNewCompanyData((prev) => ({
-      ...prev,
-      companyName: form.company.trim(),
-    }));
-    setNewCompanyErrors({});
-    setIsNewCompanyModalOpen(true);
-    return;
-  }
-
-    // ─── If any material field is unknown, open material modal ────
-    const firstUnknown = form.materials.find(
-      (m) => m.trim() && !materialNames.includes(m.trim())
-    );
-    const backUnknown = form.backMaterial.trim() && !materialNames.includes(form.backMaterial.trim());
-    const furUnknown = form.furColor.trim() && !materialNames.includes(form.furColor.trim());
-
-    if (firstUnknown || backUnknown || furUnknown) {
-      // decide which field
-      if (firstUnknown) {
-        const idx = form.materials.findIndex((m) => m.trim() === firstUnknown.trim());
-        setModalMaterialField({ type: "materials", index: idx });
-        setNewMaterialData((prev) => ({ ...prev, materialName: firstUnknown.trim() }));
-      } else if (backUnknown) {
-        setModalMaterialField({ type: "backMaterial" });
-        setNewMaterialData((prev) => ({ ...prev, materialName: form.backMaterial.trim() }));
-      } else {
-        setModalMaterialField({ type: "furColor" });
-        setNewMaterialData((prev) => ({ ...prev, materialName: form.furColor.trim() }));
-      }
-      setNewMaterialErrors({});
-      setIsNewMaterialModalOpen(true);
+    // ─── 1) Fetch the full Table and get Column A ─────────────────
+    let table;
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Table fetch failed");
+      table = await res.json();
+    } catch (err) {
+      console.error("Could not load Table data:", err);
+      alert("Unable to verify product list. Please try again later.");
       return;
     }
 
-  // ─── start loading ───────────────────────────────────────────
-  setIsSubmitting(true);
-  try {
-    // build the form payload
-    const fd = new FormData();
-    [
-      "company",
-      "designName",
-      "quantity",
-      "product",
-      "price",
-      "dueDate",
-      "dateType",
-      "referral",
-      "backMaterial",
-      "embBacking",
-      "furColor",
-      "notes",
-    ].forEach((k) => fd.append(k, form[k] || ""));
+    // Build a lowercase list of existing products
+    const existingProducts = table
+      .map((row) => row.Product?.toString().trim().toLowerCase())
+      .filter(Boolean);
 
-    form.materials.forEach((m) => fd.append("materials", m));
-
-    // ensure the designName file is first
-    let filesToUpload = [...prodFiles];
-    const baseName = form.designName.replace(/\.\.$/, "");
-    const idx = filesToUpload.findIndex(
-      (f) => f.name.replace(/\.[^/.]+$/, "") === baseName
-    );
-    if (idx > 0) {
-      const [match] = filesToUpload.splice(idx, 1);
-      filesToUpload.unshift(match);
+    // ─── 2) If the product isn't in Column A, open New-Product popup ─
+    const requested = form.product.trim().toLowerCase();
+    if (!existingProducts.includes(requested)) {
+      setNewProductName(form.product);
+      setIsNewProductModalOpen(true);
+      return;
     }
 
-    filesToUpload.forEach((f) => fd.append("prodFiles", f));
-    printFiles.forEach((f) => fd.append("printFiles", f));
+  // ─── 3) Product exists: pull its Volume ────────────────────────
+    const matchRow = table.find(
+      (row) =>
+        row.Product?.toString().trim().toLowerCase() === requested
+    );
+    const volume =
+      matchRow && matchRow.Volume != null
+        ? parseFloat(matchRow.Volume)
+        : null;
 
-    // send to server
-    await axios.post(submitUrl, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+  // ─── 4) If Volume missing, you could handle here ─────────────
+    if (volume == null) {
+      alert("This product is in the list but has no volume set.");
+      // Optionally open your volume‐entry modal here…
+      return;
+    }
 
-    alert("Order submitted!");
-
-    // reset form + state
-    setForm({
-      company: "",
-      designName: "",
-      quantity: "",
-      product: "",
-      price: "",
-      dueDate: "",
-      dateType: "Hard Date",
-      referral: "",
-      materials: ["", "", "", "", ""],
-      backMaterial: "",
-      embBacking: "",
-      furColor: "",
-      notes: "",
-    });
-    setProdFiles([]);
-    setPrintFiles([]);
-    setProdPreviews([]);
-    setPrintPreviews([]);
-  } catch (err) {
-    console.error(err);
-    alert(err.response?.data?.error || "Submission failed");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  // ─── 5) Proceed with normal submission ─────────────────────────
+    setIsSubmitting(true);
+    try {
+      const fd = new FormData();
+    // append form fields
+      Object.entries(form).forEach(([k, v]) => {
+        if (k === "materials") {
+          v.forEach((m) => fd.append("materials", m));
+        } else {
+          fd.append(k, v);
+        }
+      });
+    // append files as needed…
+      const submitUrl =
+        process.env.REACT_APP_ORDER_SUBMIT_URL ||
+        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
+      await axios.post(submitUrl, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      alert("Order submitted!");
+      // reset form…
+      setForm({
+        company: "",
+       designName: "",
+        quantity: "",
+        product: "",
+        price: "",
+        dueDate: "",
+        dateType: "Hard Date",
+        referral: "",
+        materials: ["", "", "", "", ""],
+        backMaterial: "",
+        embBacking: "",
+        furColor: "",
+        notes: "",
+      });
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.error || "Submission failed");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
 
 // ─── Save the new company to Google Sheets ─────────────────────
@@ -836,6 +819,57 @@ const handleSaveNewCompany = async () => {
                 style={{ padding: "0.5rem 1rem" }}
               >
                 Save Material
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ─── New Product Modal ───────────────────────────────────────── */}
+      {isNewProductModalOpen && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0, left: 0,
+            width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "1.5rem",
+              borderRadius: "0.5rem",
+              width: "400px",
+              maxHeight: "90%",
+              overflowY: "auto",
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>New Product Detected</h2>
+            <p>
+              “<strong>{newProductName}</strong>” isn’t on your Table yet.<br/>
+              Would you like to add it now?
+            </p>
+            <div style={{ marginTop: "1rem", textAlign: "right" }}>
+              <button
+                type="button"
+                onClick={() => setIsNewProductModalOpen(false)}
+                style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // TODO: hook up “add to table” API call here
+                  setIsNewProductModalOpen(false);
+                }}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Add to Table
               </button>
             </div>
           </div>
