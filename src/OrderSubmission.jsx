@@ -858,40 +858,38 @@ const handleSaveNewCompany = async () => {
               Would you like to add it now?
             </p>
             <div style={{ marginTop: "1rem", textAlign: "right" }}>
+              {/* Cancel button */}
               <button
                 type="button"
-               onClick={async () => {
-                  console.log("▶️ Adding new product to Table:", newProductName);
-                  try {
-                    // 1) Add the new product to the Table
-                    await axios.post(
-                      `${process.env.REACT_APP_API_ROOT}/table`,
-                      { Product: newProductName },
-                      { credentials: 'include' }
-                    );
-                    // 2) Give the user feedback
-                    console.log("✅ POST /table response:", resp);
-                    alert(`“${newProductName}” added to Table! Please click Submit again.`);
-                  } catch (err) {
-                    console.error("Failed to add new product:", err);
-                    alert("Error adding product. Please try again.");
-                  } finally {
-                    // 3) Reset modal state
-                    setIsNewProductModalOpen(false);
-                    setNewProductName("");
-                  }
-
+                onClick={() => {
+                  setIsNewProductModalOpen(false);
+                  setNewProductName("");
                 }}
                 style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
               >
                 Cancel
               </button>
+
+              {/* Add to Table button */}
               <button
                 type="button"
-                onClick={() => {
-                  // TODO: hook up “add to table” API call here
-                  setIsNewProductModalOpen(false);
-                  setNewProductName("");
+                onClick={async () => {
+                  console.log("▶️ Adding new product to Table:", newProductName);
+                  try {
+                    const resp = await axios.post(
+                      `${process.env.REACT_APP_API_ROOT}/table`,
+                      { Product: newProductName },
+                      { withCredentials: true }
+                    );
+                    console.log("✅ POST /table response:", resp);
+                    alert(`“${newProductName}” added to Table! Please click Submit again.`);
+                  } catch (err) {
+                    console.error("❌ Failed to add new product:", err);
+                    alert("Error adding product. Please try again.");
+                  } finally {
+                    setIsNewProductModalOpen(false);
+                    setNewProductName("");
+                  }
                 }}
                 style={{ padding: "0.5rem 1rem" }}
               >
