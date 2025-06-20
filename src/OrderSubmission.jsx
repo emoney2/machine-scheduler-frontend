@@ -861,6 +861,7 @@ const handleSaveNewCompany = async () => {
               <button
                 type="button"
                onClick={async () => {
+                  console.log("▶️ Adding new product to Table:", newProductName);
                   try {
                     // 1) Add the new product to the Table
                     await axios.post(
@@ -869,6 +870,7 @@ const handleSaveNewCompany = async () => {
                       { credentials: 'include' }
                     );
                     // 2) Give the user feedback
+                    console.log("✅ POST /table response:", resp);
                     alert(`“${newProductName}” added to Table! Please click Submit again.`);
                   } catch (err) {
                     console.error("Failed to add new product:", err);
