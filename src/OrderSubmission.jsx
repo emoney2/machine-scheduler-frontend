@@ -423,14 +423,6 @@ const furColorNames = furColors;
     const exists = existingProducts.includes(requested);
     console.log("🔍 Found in list?", exists);
 
-    // ─── 2) If the product isn't in Column A, open New-Product popup ─
-    if (!existingProducts.includes(requested)) {
-      console.log("🚨 Triggering New-Product popup for:", requested);
-      setNewProductName(form.product);
-      setIsNewProductModalOpen(true);
-      return;
-    }
-
   // ─── 3) Product exists: pull its Volume ────────────────────────
     const matchRow = table.find(
       (row) =>
