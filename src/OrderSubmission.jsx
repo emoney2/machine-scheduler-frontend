@@ -829,8 +829,6 @@ const handleSaveNewCompany = async () => {
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
-        console.log("🔔 Rendering New-Product Modal"),
-        (
         <div
           style={{
             position: "fixed",
@@ -861,7 +859,10 @@ const handleSaveNewCompany = async () => {
             <div style={{ marginTop: "1rem", textAlign: "right" }}>
               <button
                 type="button"
-                onClick={() => setIsNewProductModalOpen(false)}
+                onClick={() => {
+                  setIsNewProductModalOpen(false);
+                  setNewProductName("");
+                }}
                 style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
               >
                 Cancel
@@ -871,7 +872,7 @@ const handleSaveNewCompany = async () => {
                 onClick={() => {
                   // TODO: hook up “add to table” API call here
                   setIsNewProductModalOpen(false);
-                  setNewProductName("");       // clear it out
+                  setNewProductName("");
                 }}
                 style={{ padding: "0.5rem 1rem" }}
               >
