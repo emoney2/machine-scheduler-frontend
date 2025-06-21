@@ -987,7 +987,7 @@ const handleSaveNewCompany = async () => {
                                           const vol = length * width * depth;
                                           const perYard = Math.floor((36/length)*(55/width));
                                           const payload = {
-                                                Product:                   product,
+                                                Products:                  product,
                                                 "Print Times (1 Machine)": printTime,
                                                 "How Many Products Per Yard": perYard,
                                                 "1/2\" Foam":              foamHalf,
