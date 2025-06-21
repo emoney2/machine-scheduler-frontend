@@ -99,6 +99,18 @@ const handleNewProductChange = (e) => {
   // ─── NEW: track “unknown product” pop-up ───────────────────────
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [newProductName, setNewProductName]         = useState("");
+  const [newProductData, setNewProductData] = useState({
+    product: "",
+    length: "",
+    width: "",
+    depth: "",
+  });
+  const formRef = useRef(null); // for automatic resubmit
+
+  const handleNewProductChange = (e) => {
+    const { name, value } = e.target;
+    setNewProductData((p) => ({ ...p, [name]: value }));
+  };
 
   const handleNewCompanyChange = (e) => {
     const { name, value } = e.target;
@@ -851,167 +863,133 @@ const handleSaveNewCompany = async () => {
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0, left: 0,
-            width: "100%", height: "100%",
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "1.5rem",
-              borderRadius: "0.5rem",
-              width: "400px",
-              maxHeight: "90%",
-              overflowY: "auto",
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>New Product Detected</h2>
+        <div style={{
+          position:"fixed",top:0,left:0,
+          width:"100%",height:"100%",
+          background:"rgba(0,0,0,0.5)",
+          display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000
+        }}>
+          <div style={{
+            background:"#fff",padding:"1.5rem",borderRadius:"0.5rem",
+            width:"400px",maxHeight:"90%",overflowY:"auto"
+          }}>
+            <h2 style={{marginTop:0}}>New Product: {newProductData.product}</h2>
 
-            {/* 1️⃣ Inputs for all Table columns */}
-            <div style={{ display: "grid", gap: "0.5rem", marginTop: "1rem" }}>
+            <div style={{display:"grid",gap:"0.75rem",marginTop:"1rem"}}>
               <label>
-                Product Name<br/>
+                Length (in)<br/>
                 <input
-                  name="product"
-                  value={newProductData.product}
+                  name="length"
+                  type="number"
+                  value={newProductData.length}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{width:"100%"}}
+                />
+              </label>
+
+              <label>
+                Width (in)<br/>
+                <input
+                  name="width"
+                  type="number"
+                  value={newProductData.width}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{width:"100%"}}
+                />
+              </label>
+
+              <label>
+                Depth (in)<br/>
+                <input
+                  name="depth"
+                  type="number"
+                  value={newProductData.depth}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{width:"100%"}}
+                />
+              </label>
+
+              <label style={{position:"relative"}}>
+                Pieces per Yard&nbsp;
+                <span
+                  style={{cursor:"help"}}
+                  title={"Take a 36\"×55\" area ÷ (length × width), rounded down."}
+                >ℹ️</span><br/>
+                <input
+                  type="number"
                   readOnly
-                  style={{ width: "100%" }}
+                  value={
+                    (newProductData.length && newProductData.width)
+                      ? Math.floor((36/newProductData.length)*(55/newProductData.width))
+                      : ""
+                  }
+                  required
+                  style={{width:"100%",background:"#f5f5f5"}}
                 />
               </label>
 
               <label>
-                Print Time (min)<br/>
+                Volume (L×W×D)<br/>
                 <input
-                  name="printTime"
                   type="number"
-                  value={newProductData.printTime}
-                  onChange={handleNewProductChange}
-                  style={{ width: "100%" }}
-                />
-              </label>
-
-              <label>
-                Products per Yard<br/>
-                <input
-                  name="perYard"
-                  type="number"
-                  value={newProductData.perYard}
-                  onChange={handleNewProductChange}
-                  style={{ width: "100%" }}
-                />
-              </label>
-
-              <fieldset>
-                <legend>Foam per piece</legend>
-                {[
-                  ["foamHalf", '1/2" Foam'],
-                  ["foam38", '3/8" Foam'],
-                  ["foam14", '1/4" Foam'],
-                  ["foam18", '1/8" Foam'],
-                ].map(([key,label]) => (
-                  <label key={key} style={{ display: "block" }}>
-                    {label}:&nbsp;
-                    <input
-                      name={key}
-                      type="number"
-                      value={newProductData[key]}
-                      onChange={handleNewProductChange}
-                      style={{ width: "60px" }}
-                    />
-                  </label>
-                ))}
-              </fieldset>
-
-              <fieldset>
-                <legend>Magnets</legend>
-                {[
-                  ["magnetN", "North (N) magnets"],
-                  ["magnetS", "South (S) magnets"],
-                ].map(([key,label]) => (
-                  <label key={key} style={{ display: "block" }}>
-                    {label}:&nbsp;
-                    <input
-                      name={key}
-                      type="number"
-                      value={newProductData[key]}
-                      onChange={handleNewProductChange}
-                      style={{ width: "60px" }}
-                    />
-                  </label>
-                ))}
-              </fieldset>
-
-              <label>
-                1/2" Elastic (inches)<br/>
-                <input
-                  name="elasticHalf"
-                  type="number"
-                  value={newProductData.elasticHalf}
-                  onChange={handleNewProductChange}
-                  style={{ width: "100%" }}
-                />
-              </label>
-
-              <label>
-                Volume<br/>
-                <input
-                  name="volume"
-                  type="number"
-                  value={newProductData.volume}
-                  onChange={handleNewProductChange}
-                  style={{ width: "100%" }}
+                  readOnly
+                  value={
+                    (newProductData.length && newProductData.width && newProductData.depth)
+                      ? (newProductData.length * newProductData.width * newProductData.depth)
+                      : ""
+                  }
+                  required
+                  style={{width:"100%",background:"#f5f5f5"}}
                 />
               </label>
             </div>
 
-            {/* 2️⃣ Action buttons */}
-            <div style={{ marginTop: "1rem", textAlign: "right" }}>
+            <div style={{textAlign:"right",marginTop:"1rem"}}>
               <button
                 type="button"
-                onClick={() => {
+                onClick={()=>{
                   setIsNewProductModalOpen(false);
                   setNewProductName("");
                 }}
-                style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
-              >
-                Cancel
-              </button>
+                style={{marginRight:"0.5rem",padding:"0.5rem 1rem"}}
+              >Cancel</button>
 
               <button
                 type="button"
-                onClick={async () => {
-                  console.log("▶️ Adding new product with data:", newProductData);
+                onClick={async ()=>{
+                  // 1) Write to Table
                   try {
-                    const resp = await axios.post(
+                    await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
-                      newProductData,
+                      {
+                        product: newProductData.product,
+                        printTime: 6,                                        // fixed 6
+                        perYard: Math.floor((36/newProductData.length)*(55/newProductData.width)),
+                        foamHalf: newProductData.foamHalf || 0,              // if you still collect foam
+                        foam38:   newProductData.foam38   || 0,
+                        foam14:   newProductData.foam14   || 0,
+                        foam18:   newProductData.foam18   || 0,
+                        magnetN:  newProductData.magnetN  || 0,
+                        magnetS:  newProductData.magnetS  || 0,
+                        elasticHalf: newProductData.elasticHalf || 0,
+                        volume:   newProductData.length * newProductData.width * newProductData.depth
+                      },
                       { withCredentials: true }
                     );
-                    console.log("✅ POST /table response:", resp.data);
-                    alert(`“${newProductData.product}” added! Click Submit again.`);
-                  } catch (err) {
-                    console.error(
-                      "❌ Failed to add product:",
-                      err.response?.data || err
-                    );
-                    alert("Error adding product. See console for details.");
-                  } finally {
+                    // 2) auto-submit the order
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
+                    formRef.current.dispatchEvent(new Event("submit", {cancelable:true, bubbles:true}));
+                  } catch (err) {
+                    console.error("Error adding product:", err.response?.data||err);
+                    alert("Error adding product. See console.");
                   }
                 }}
-                style={{ padding: "0.5rem 1rem" }}
-              >
-                Add to Table
-              </button>
+                style={{padding:"0.5rem 1rem"}}
+              >Add & Submit</button>
             </div>
           </div>
         </div>
@@ -1030,6 +1008,7 @@ const handleSaveNewCompany = async () => {
       )}
 
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         style={{
           display: "grid",
