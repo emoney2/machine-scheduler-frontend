@@ -846,7 +846,6 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
-      {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
             <div
                   style={{
@@ -1003,6 +1002,7 @@ const handleSaveNewCompany = async () => {
                                           if (modalSubmitting) return;
                                           setModalSubmitting(true);
 
+                                          // build new-product payload
                                           const {
                                                 product,
                                                 printTime,
@@ -1034,54 +1034,32 @@ const handleSaveNewCompany = async () => {
                                           };
 
                                           try {
-                                                // add product row
+                                                // add product row to Table
                                                 await axios.post(
                                                       `${process.env.REACT_APP_API_ROOT}/table`,
                                                       tablePayload,
                                                       { withCredentials: true }
                                                 );
 
-                                                // submit order
-                                                const orderForm = formRef.current;
-                                                const fd = new FormData(orderForm);
-                                                const submitUrl =
-                                                      process.env.REACT_APP_ORDER_SUBMIT_URL ||
-                                                      `${process.env.REACT_APP_API_ROOT.replace(/\\api$/, "")}/submit`;
+                                                // close modal
+                                                setIsNewProductModalOpen(false);
+                                                setNewProductName("");
 
-                                                await axios.post(submitUrl, fd, {
-                                                      headers: { "Content-Type": "multipart/form-data" },
-                                                      withCredentials: true,
-                                                });
-
-                                                // clear order form
-                                                setForm({
-                                                      company: "",
-                                                      designName: "",
-                                                      quantity: "",
-                                                      product: "",
-                                                      price: "",
-                                                      dueDate: "",
-                                                      dateType: "Hard Date",
-                                                      referral: "",
-                                                      materials: ["", "", "", "", ""],
-                                                      backMaterial: "",
-                                                      embBacking: "",
-                                                      furColor: "",
-                                                      notes: "",
-                                                });
-                                                setProdFiles([]);
-                                                setProdPreviews([]);
-                                                setPrintFiles([]);
-                                                setPrintPreviews([]);
+                                                // trigger main form submit
+                                                if (typeof formRef.current.requestSubmit === "function") {
+                                                      formRef.current.requestSubmit();
+                                                } else {
+                                                      formRef.current.dispatchEvent(
+                                                            new Event("submit", { cancelable: true, bubbles: true })
+                                                      );
+                                                }
                                           } catch (err) {
                                                 console.error("Modal workflow error:", err);
                                                 alert(
-                                                      "Failed to save new product or submit order. Check console."
+                                                      "Failed to add product. Check console."
                                                 );
                                           } finally {
                                                 setModalSubmitting(false);
-                                                setIsNewProductModalOpen(false);
-                                                setNewProductName("");
                                           }
                                     }}
                                     style={{ padding: "0.5rem 1rem" }}
