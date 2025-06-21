@@ -987,17 +987,17 @@ const handleSaveNewCompany = async () => {
                                           const vol = length * width * depth;
                                           const perYard = Math.floor((36/length)*(55/width));
                                           const payload = {
-                                                Products:                  product,
-                                                "Print Times (1 Machine)": printTime,
-                                                "How Many Products Per Yard": perYard,
-                                                "1/2\" Foam":              foamHalf,
-                                                "3/8\" Foam":              foam38,
-                                                "1/4\" Foam":              foam14,
-                                                "1/8\" Foam":              foam18,
-                                                "N Magnets":               magnetN,
-                                                "S Magnets":               magnetS,
-                                                "1/2\" Elastic":           elasticHalf,
-                                                Volume:                    vol
+                                            product:      product,
+                                            printTime:    printTime,
+                                            perYard:      perYard,
+                                            foamHalf:     foamHalf,
+                                            foam38:       foam38,
+                                            foam14:       foam14,
+                                            foam18:       foam18,
+                                            magnetN:      magnetN,
+                                            magnetS:      magnetS,
+                                            elasticHalf:  elasticHalf,
+                                            volume:       vol
                                           };
                                           console.log("📤 Posting new Product payload:", payload);
                                           try {
