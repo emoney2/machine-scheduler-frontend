@@ -440,8 +440,9 @@ const furColorNames = furColors;
 
     // ─── 3) Product exists: pull its Volume ──────────────────────
     const matchRow = table.find(
-      (row) => row.Product?.toString().trim().toLowerCase() === requested
+      row => row.Products?.toString().trim().toLowerCase() === requested
     );
+
     const volume =
       matchRow && matchRow.Volume != null
         ? parseFloat(matchRow.Volume)
