@@ -424,7 +424,7 @@ const furColorNames = furColors;
 
     // Build a lowercase list of existing products
     const existingProducts = table
-      .map((row) => row.Product?.toString().trim().toLowerCase())
+      .map((row) => row.Products?.toString().trim().toLowerCase())
       .filter(Boolean);
 
     // The product the user entered
