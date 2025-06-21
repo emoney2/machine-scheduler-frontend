@@ -877,7 +877,7 @@ const handleSaveNewCompany = async () => {
                 Print Time (min)&nbsp;
                 <span
                   style={{ cursor: "help" }}
-                  title='6 divided by number of pieces that fit in a 13"x30" square'
+                  title={"6 divided by number of pieces that fit in a 13\"×30\" square"}
                 >
                   ℹ️
                 </span>
@@ -999,6 +999,7 @@ const handleSaveNewCompany = async () => {
 
                   try {
                     // 2) write to Table
+                    console.log("💬 POST /table payload:", payload);
                     await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
                       {
