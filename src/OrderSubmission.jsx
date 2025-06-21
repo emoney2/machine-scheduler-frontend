@@ -32,25 +32,20 @@ export default function OrderSubmission() {
   const [products, setProducts] = useState([]);
   const productInputRef = useRef(null);
 
-  const [newProductData, setNewProductData] = useState({
-    product:        "",  // will be seeded from newProductName
-    printTime:      "",
-    perYard:        "",
-    foamHalf:       "",
-    foam38:         "",
-    foam14:         "",
-    foam18:         "",
-    magnetN:        "",
-    magnetS:        "",
-    elasticHalf:    "",
-    volume:         "",
+  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductData, setNewProductData]   = useState({
+    product: "",
+    length:  "",
+    width:   "",
+    depth:   "",
   });
+  const formRef = useRef(null);
 
-const handleNewProductChange = (e) => {
-  const { name, value } = e.target;
-  setNewProductData((prev) => ({ ...prev, [name]: value }));
-};
-
+  const handleNewProductChange = (e) => {
+    const { name, value } = e.target;
+    setNewProductData((p) => ({ ...p, [name]: value }));
+  };
 
   // ─── MATERIALS inventory + refs ───────────────────────────────
   const [materialsInv, setMaterialsInv] = useState([]);
