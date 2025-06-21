@@ -872,12 +872,12 @@ const handleSaveNewCompany = async () => {
             </h2>
 
             <div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
-              {/* Print Time with info‐icon */}
+              {/* Print Time */}
               <label style={{ position: "relative" }}>
                 Print Time (min){" "}
                 <span
                   style={{ cursor: "help" }}
-                  title="6 divided by number of pieces that fit in a 13&quot;x30&quot; square"
+                  title='6 divided by number of pieces that fit in a 13"x30" square'
                 >
                   ℹ️
                 </span>
@@ -891,7 +891,7 @@ const handleSaveNewCompany = async () => {
                 />
               </label>
 
-              {/* Foam counts */}
+              {/* Foam */}
               {[
                 ["foamHalf", `1/2" Foam`],
                 ["foam38", `3/8" Foam`],
@@ -912,7 +912,7 @@ const handleSaveNewCompany = async () => {
                 </label>
               ))}
 
-              {/* Magnet counts */}
+              {/* Magnets */}
               {[
                 ["magnetN", "N Magnets"],
                 ["magnetS", "S Magnets"],
@@ -961,7 +961,7 @@ const handleSaveNewCompany = async () => {
                 </label>
               ))}
 
-              {/* Pieces per Yard (read‐only) */}
+              {/* Pieces per Yard */}
               <label>
                 Pieces per Yard
                 <br />
@@ -992,10 +992,10 @@ const handleSaveNewCompany = async () => {
                 Cancel
               </button>
 
-              {/* ─── Add & Submit New‐Product Button ─────────────────────────── */}
               <button
                 type="button"
                 onClick={async () => {
+                  // 1) build the new-product payload
                   const {
                     product,
                     printTime,
@@ -1010,11 +1010,9 @@ const handleSaveNewCompany = async () => {
                     width,
                     depth,
                   } = newProductData;
-      
                   const volume = length * width * depth;
                   const perYard = Math.floor((36 / length) * (55 / width));
-
-                  const payload = {
+                  const tablePayload = {
                     product,
                     printTime,
                     perYard,
@@ -1029,37 +1027,38 @@ const handleSaveNewCompany = async () => {
                   };
 
                   try {
-                    // 1) add the product row
+                    // 2) add the row to your Table
                     await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
-                      payload,
+                      tablePayload,
                       { withCredentials: true }
                     );
-      
-                    // 2) close the modal & clear its state
+
+                    // 3) grab & submit the main form directly
+                    const orderForm = formRef.current;
+                    const fd = new FormData(orderForm);
+                    const submitUrl =
+                      process.env.REACT_APP_ORDER_SUBMIT_URL ||
+                      `${process.env.REACT_APP_API_ROOT.replace(
+                        /\/api$/,
+                        ""
+                      )}/submit`;
+                    await axios.post(submitUrl, fd, {
+                      headers: { "Content-Type": "multipart/form-data" },
+                      withCredentials: true,
+                    });
+
+                    // 4) close the modal
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
-      
-                    // 3) small pause to let the Google Sheet finish writing
-                    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-                    // 4) re‐fire your main form’s submit via requestSubmit()
-                    if (typeof formRef.current.requestSubmit === "function") {
-                      formRef.current.requestSubmit();
-                    } else {
-                      // fallback for older browsers
-                      formRef.current.dispatchEvent(
-                        new Event("submit", { cancelable: true, bubbles: true })
-                      );
-                    }
                   } catch (err) {
-                    console.error("Error adding product:", err);
-                    alert("Error adding product. See console.");
+                    console.error("Error in modal workflow:", err);
+                    alert("Failed to add product or submit order. See console.");
                   }
                 }}
                 style={{ padding: "0.5rem 1rem" }}
               >
-                Add & Submit
+                Add &amp; Submit
               </button>
             </div>
           </div>
