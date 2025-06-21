@@ -843,33 +843,52 @@ const handleSaveNewCompany = async () => {
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0,
-          width: "100%", height: "100%",
-          background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1000,
-        }}>
-          <div style={{
-            background: "#fff", padding: "1.5rem", borderRadius: "0.5rem",
-            width: "400px", maxHeight: "90%", overflowY: "auto"
-          }}>
-            <h2 style={{ marginTop: 0 }}>New Product: {newProductData.product}</h2>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "1.5rem",
+              borderRadius: "0.5rem",
+              width: "400px",
+              maxHeight: "90%",
+              overflowY: "auto",
+            }}
+          >
+            <h2 style={{ marginTop: 0 }}>
+              New Product: {newProductData.product}
+            </h2>
+
             <div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
-              {/* Print Time with info‐icon */}
+              {/* Print Time with info-icon */}
               <label style={{ position: "relative" }}>
-                Print Time (min){" "}
+                Print Time (min)&nbsp;
                 <span
                   style={{ cursor: "help" }}
-                  title="Take 6 minutes ÷ pieces-per-yard."
-                >ℹ️</span><br/>
+                  title='6 divided by number of pieces that fit in a 13"x30" square'
+                >
+                  ℹ️
+                </span>
+                <br />
                 <input
+                  name="printTime"
                   type="number"
-                  readOnly
-                  value={6}
+                  value={newProductData.printTime || ""}
+                  onChange={handleNewProductChange}
                   required
-                  style={{ width: "100%", background: "#f5f5f5" }}
+                  style={{ width: "100%" }}
                 />
               </label>
 
@@ -878,10 +897,11 @@ const handleSaveNewCompany = async () => {
                 ["foamHalf", '1/2" Foam'],
                 ["foam38", '3/8" Foam'],
                 ["foam14", '1/4" Foam'],
-                ["foam18", '1/8" Foam']
+                ["foam18", '1/8" Foam'],
               ].map(([key, label]) => (
                 <label key={key}>
-                  {label}<br/>
+                  {label}
+                  <br />
                   <input
                     name={key}
                     type="number"
@@ -896,10 +916,11 @@ const handleSaveNewCompany = async () => {
               {/* Magnet counts */}
               {[
                 ["magnetN", "N Magnets"],
-                ["magnetS", "S Magnets"]
-              ].map(([key,label]) => (
+                ["magnetS", "S Magnets"],
+              ].map(([key, label]) => (
                 <label key={key}>
-                  {label}<br/>
+                  {label}
+                  <br />
                   <input
                     name={key}
                     type="number"
@@ -913,7 +934,8 @@ const handleSaveNewCompany = async () => {
 
               {/* Elastic */}
               <label>
-                1/2" Elastic<br/>
+                1/2" Elastic
+                <br />
                 <input
                   name="elasticHalf"
                   type="number"
@@ -925,9 +947,10 @@ const handleSaveNewCompany = async () => {
               </label>
 
               {/* Dimensions */}
-              {["length","width","depth"].map((dim) => (
+              {["length", "width", "depth"].map((dim) => (
                 <label key={dim}>
-                  {dim.charAt(0).toUpperCase()+dim.slice(1)} (in)<br/>
+                  {dim.charAt(0).toUpperCase() + dim.slice(1)} (in)
+                  <br />
                   <input
                     name={dim}
                     type="number"
@@ -951,43 +974,54 @@ const handleSaveNewCompany = async () => {
               >
                 Cancel
               </button>
+
               <button
                 type="button"
                 onClick={async () => {
-                  // 1) compute everything
+                  // 1) compute values
                   const {
-                    product, length, width, depth,
-                    foamHalf, foam38, foam14, foam18,
-                    magnetN, magnetS, elasticHalf
+                    product,
+                    length,
+                    width,
+                    depth,
+                    foamHalf,
+                    foam38,
+                    foam14,
+                    foam18,
+                    magnetN,
+                    magnetS,
+                    elasticHalf,
+                    printTime,
                   } = newProductData;
+
                   const vol = length * width * depth;
-                  const perYard = Math.floor((36/length)*(55/width));
+                  const perYard = Math.floor((36 / length) * (55 / width));
 
                   try {
                     // 2) write to Table
                     await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
                       {
-                        Product:             product,
-                        "Print Times (1 Machine)": 6,
+                        Product: product,
+                        "Print Times (1 Machine)": printTime,
                         "How Many Products Per Yard": perYard,
-                        "1/2\" Foam":        foamHalf,
-                        "3/8\" Foam":        foam38,
-                        "1/4\" Foam":        foam14,
-                        "1/8\" Foam":        foam18,
-                        "N Magnets":         magnetN,
-                        "S Magnets":         magnetS,
-                        "1/2\" Elastic":     elasticHalf,
-                        Volume:              vol
+                        '1/2" Foam': foamHalf,
+                        '3/8" Foam': foam38,
+                        '1/4" Foam': foam14,
+                        '1/8" Foam': foam18,
+                        "N Magnets": magnetN,
+                        "S Magnets": magnetS,
+                        '1/2" Elastic': elasticHalf,
+                        Volume: vol,
                       },
                       { withCredentials: true }
                     );
 
-                    // 3) close modal *before* re-submit
+                    // 3) close modal
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
 
-                    // 4) dispatch original form submit
+                    // 4) re-submit original form
                     formRef.current.dispatchEvent(
                       new Event("submit", { cancelable: true, bubbles: true })
                     );
@@ -998,7 +1032,7 @@ const handleSaveNewCompany = async () => {
                 }}
                 style={{ padding: "0.5rem 1rem" }}
               >
-                Add & Submit
+                Add &amp; Submit
               </button>
             </div>
           </div>
