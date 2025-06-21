@@ -843,205 +843,185 @@ const handleSaveNewCompany = async () => {
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100%",
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "1.5rem",
-              borderRadius: "0.5rem",
-              width: "400px",
-              maxHeight: "90%",
-              overflowY: "auto",
-            }}
-          >
-            <h2 style={{ marginTop: 0 }}>
-              New Product: {newProductData.product}
-            </h2>
+            <div style={{
+                  position: "fixed",
+                  top: 0, left: 0,
+                  width: "100%", height: "100%",
+                  background: "rgba(0,0,0,0.5)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  zIndex: 1000,
+            }}>
+                  <div style={{
+                        background: "#fff",
+                        padding: "1.5rem",
+                        borderRadius: "0.5rem",
+                        width: "400px",
+                        maxHeight: "90%",
+                        overflowY: "auto"
+                  }}>
+                        <h2 style={{ marginTop: 0 }}>
+                              New Product: {newProductData.product}
+                        </h2>
+                        <div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
+                              {/* Print Time with info‐icon */}
+                              <label style={{ position: "relative" }}>
+                                    Print Time (min){" "}
+                                    <span
+                                          style={{ cursor: "help" }}
+                                          title="6 divided by number of pieces that fit in a 13&quot;x30&quot; square"
+                                    >ℹ️</span><br/>
+                                    <input
+                                          name="printTime"
+                                          type="number"
+                                          value={newProductData.printTime || ""}
+                                          onChange={handleNewProductChange}
+                                          required
+                                          style={{ width: "100%" }}
+                                    />
+                              </label>
 
-            <div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
-              {/* Print Time with info-icon */}
-              <label style={{ position: "relative" }}>
-                Print Time (min)&nbsp;
-                <span
-                  style={{ cursor: "help" }}
-                  title={"6 divided by number of pieces that fit in a 13\"×30\" square"}
-                >
-                  ℹ️
-                </span>
-                <br />
-                <input
-                  name="printTime"
-                  type="number"
-                  value={newProductData.printTime || ""}
-                  onChange={handleNewProductChange}
-                  required
-                  style={{ width: "100%" }}
-                />
-              </label>
+                              {/* Foam counts */}
+                              {[
+                                    ["foamHalf", `1/2" Foam`],
+                                    ["foam38", `3/8" Foam`],
+                                    ["foam14", `1/4" Foam`],
+                                    ["foam18", `1/8" Foam`]
+                              ].map(([key, label]) => (
+                                    <label key={key}>
+                                          {label}<br/>
+                                          <input
+                                                name={key}
+                                                type="number"
+                                                value={newProductData[key] || ""}
+                                                onChange={handleNewProductChange}
+                                                required
+                                                style={{ width: "100%" }}
+                                          />
+                                    </label>
+                              ))}
 
-              {/* Foam counts */}
-              {[
-                ["foamHalf", '1/2" Foam'],
-                ["foam38", '3/8" Foam'],
-                ["foam14", '1/4" Foam'],
-                ["foam18", '1/8" Foam'],
-              ].map(([key, label]) => (
-                <label key={key}>
-                  {label}
-                  <br />
-                  <input
-                    name={key}
-                    type="number"
-                    value={newProductData[key] || ""}
-                    onChange={handleNewProductChange}
-                    required
-                    style={{ width: "100%" }}
-                  />
-                </label>
-              ))}
+                              {/* Magnet counts */}
+                              {[
+                                    ["magnetN", "N Magnets"],
+                                    ["magnetS", "S Magnets"]
+                              ].map(([key,label]) => (
+                                    <label key={key}>
+                                          {label}<br/>
+                                          <input
+                                                name={key}
+                                                type="number"
+                                                value={newProductData[key] || ""}
+                                                onChange={handleNewProductChange}
+                                                required
+                                                style={{ width: "100%" }}
+                                          />
+                                    </label>
+                              ))}
 
-              {/* Magnet counts */}
-              {[
-                ["magnetN", "N Magnets"],
-                ["magnetS", "S Magnets"],
-              ].map(([key, label]) => (
-                <label key={key}>
-                  {label}
-                  <br />
-                  <input
-                    name={key}
-                    type="number"
-                    value={newProductData[key] || ""}
-                    onChange={handleNewProductChange}
-                    required
-                    style={{ width: "100%" }}
-                  />
-                </label>
-              ))}
+                              {/* Elastic */}
+                              <label>
+                                    1/2" Elastic<br/>
+                                    <input
+                                          name="elasticHalf"
+                                          type="number"
+                                          value={newProductData.elasticHalf || ""}
+                                          onChange={handleNewProductChange}
+                                          required
+                                          style={{ width: "100%" }}
+                                    />
+                              </label>
 
-              {/* Elastic */}
-              <label>
-                1/2" Elastic
-                <br />
-                <input
-                  name="elasticHalf"
-                  type="number"
-                  value={newProductData.elasticHalf || ""}
-                  onChange={handleNewProductChange}
-                  required
-                  style={{ width: "100%" }}
-                />
-              </label>
+                              {/* Dimensions */}
+                              {["length","width","depth"].map((dim) => (
+                                    <label key={dim}>
+                                          {dim.charAt(0).toUpperCase()+dim.slice(1)} (in)<br/>
+                                          <input
+                                                name={dim}
+                                                type="number"
+                                                value={newProductData[dim] || ""}
+                                                onChange={handleNewProductChange}
+                                                required
+                                                style={{ width: "100%" }}
+                                          />
+                                    </label>
+                              ))}
 
-              {/* Dimensions */}
-              {["length", "width", "depth"].map((dim) => (
-                <label key={dim}>
-                  {dim.charAt(0).toUpperCase() + dim.slice(1)} (in)
-                  <br />
-                  <input
-                    name={dim}
-                    type="number"
-                    value={newProductData[dim] || ""}
-                    onChange={handleNewProductChange}
-                    required
-                    style={{ width: "100%" }}
-                  />
-                </label>
-              ))}
+                              {/* Pieces per Yard */}
+                              <label>
+                                    Pieces per Yard<br/>
+                                    <input
+                                          type="number"
+                                          readOnly
+                                          value={
+                                                newProductData.length && newProductData.width
+                                                ? Math.floor((36 / newProductData.length) * (55 / newProductData.width))
+                                                : ""
+                                          }
+                                          style={{ width: "100%", background: "#f5f5f5" }}
+                                    />
+                              </label>
+                        </div>
+
+                        <div style={{ textAlign: "right", marginTop: "1rem" }}>
+                              <button
+                                    type="button"
+                                    onClick={() => {
+                                          setIsNewProductModalOpen(false);
+                                          setNewProductName("");
+                                    }}
+                                    style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
+                              >
+                                    Cancel
+                              </button>
+                              <button
+                                    type="button"
+                                    onClick={async () => {
+                                          const {
+                                                product, printTime,
+                                                foamHalf, foam38, foam14, foam18,
+                                                magnetN, magnetS, elasticHalf,
+                                                length, width, depth
+                                          } = newProductData;
+                                          const vol = length * width * depth;
+                                          const perYard = Math.floor((36/length)*(55/width));
+                                          const payload = {
+                                                Product:                   product,
+                                                "Print Times (1 Machine)": printTime,
+                                                "How Many Products Per Yard": perYard,
+                                                "1/2\" Foam":              foamHalf,
+                                                "3/8\" Foam":              foam38,
+                                                "1/4\" Foam":              foam14,
+                                                "1/8\" Foam":              foam18,
+                                                "N Magnets":               magnetN,
+                                                "S Magnets":               magnetS,
+                                                "1/2\" Elastic":           elasticHalf,
+                                                Volume:                    vol
+                                          };
+                                          console.log("📤 Posting new Product payload:", payload);
+                                          try {
+                                                await axios.post(
+                                                      `${process.env.REACT_APP_API_ROOT}/table`,
+                                                      payload,
+                                                      { withCredentials: true }
+                                                );
+                                                setIsNewProductModalOpen(false);
+                                                setNewProductName("");
+                                                formRef.current.dispatchEvent(
+                                                      new Event("submit", { cancelable: true, bubbles: true })
+                                                );
+                                          } catch (err) {
+                                                console.error("Error adding product:", err);
+                                                alert("Error adding product. See console.");
+                                          }
+                                    }}
+                                    style={{ padding: "0.5rem 1rem" }}
+                              >
+                                    Add & Submit
+                              </button>
+                        </div>
+                  </div>
             </div>
-
-            <div style={{ textAlign: "right", marginTop: "1rem" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsNewProductModalOpen(false);
-                  setNewProductName("");
-                }}
-                style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  // 1) compute values
-                  const {
-                    product,
-                    length,
-                    width,
-                    depth,
-                    foamHalf,
-                    foam38,
-                    foam14,
-                    foam18,
-                    magnetN,
-                    magnetS,
-                    elasticHalf,
-                    printTime,
-                  } = newProductData;
-
-                  const vol = length * width * depth;
-                  const perYard = Math.floor((36 / length) * (55 / width));
-
-                  try {
-                    // 2) build the payload
-                    const payload = {
-                      Product: newProductData.product,
-                      "Print Times (1 Machine)": Number(newProductData.printTime),
-                      "How Many Products Per Yard": Math.floor((36/newProductData.length)*(55/newProductData.width)),
-                      "1/2\" Foam": Number(newProductData.foamHalf),
-                      "3/8\" Foam": Number(newProductData.foam38),
-                      "1/4\" Foam": Number(newProductData.foam14),
-                      "1/8\" Foam": Number(newProductData.foam18),
-                      "N Magnets": Number(newProductData.magnetN),
-                      "S Magnets": Number(newProductData.magnetS),
-                      "1/2\" Elastic": Number(newProductData.elasticHalf),
-                      Volume: newProductData.length * newProductData.width * newProductData.depth
-                    };
-                    console.log("📤 Posting new Product payload:", payload);
-
-                    // 3) write to Table
-                    await axios.post(
-                      `${process.env.REACT_APP_API_ROOT}/table`,
-                      payload,
-                      { withCredentials: true }
-                    );
-                    // 3) close modal
-                    setIsNewProductModalOpen(false);
-                    setNewProductName("");
-
-                    // 4) re-submit original form
-                    formRef.current.dispatchEvent(
-                      new Event("submit", { cancelable: true, bubbles: true })
-                    );
-                  } catch (err) {
-                    console.error("Error adding product:", err);
-                    alert("Error adding product. See console.");
-                  }
-                }}
-                style={{ padding: "0.5rem 1rem" }}
-              >
-                Add &amp; Submit
-              </button>
-            </div>
-          </div>
-        </div>
       )}
-
       {/* Loading bar */}
       {isSubmitting && (
         <progress
