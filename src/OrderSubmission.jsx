@@ -845,6 +845,7 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
       {/* ─── New Product Modal ───────────────────────────────────────── */}
+      {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
             <div
                   style={{
@@ -880,7 +881,7 @@ const handleSaveNewCompany = async () => {
                                     Print Time (min){" "}
                                     <span
                                           style={{ cursor: "help" }}
-                                          title="6 divided by number of pieces that fit in a 13\"x30\" square"
+                                          title='6 divided by number of pieces that fit in a 13"x30" square'
                                     >
                                           ℹ️
                                     </span>
@@ -1044,7 +1045,7 @@ const handleSaveNewCompany = async () => {
                                                 const fd = new FormData(orderForm);
                                                 const submitUrl =
                                                       process.env.REACT_APP_ORDER_SUBMIT_URL ||
-                                                      `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
+                                                      `${process.env.REACT_APP_API_ROOT.replace(/\\api$/, "")}/submit`;
 
                                                 await axios.post(submitUrl, fd, {
                                                       headers: { "Content-Type": "multipart/form-data" },
