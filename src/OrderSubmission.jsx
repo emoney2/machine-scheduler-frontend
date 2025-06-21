@@ -1043,10 +1043,15 @@ const handleSaveNewCompany = async () => {
                     // 3) small pause to let the Google Sheet finish writing
                     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-                    // 4) re‐fire your main form’s submit
-                    formRef.current.dispatchEvent(
-                      new Event("submit", { cancelable: true, bubbles: true })
-                    );
+                    // 4) re‐fire your main form’s submit via requestSubmit()
+                    if (typeof formRef.current.requestSubmit === "function") {
+                      formRef.current.requestSubmit();
+                    } else {
+                      // fallback for older browsers
+                      formRef.current.dispatchEvent(
+                        new Event("submit", { cancelable: true, bubbles: true })
+                      );
+                    }
                   } catch (err) {
                     console.error("Error adding product:", err);
                     alert("Error adding product. See console.");
