@@ -868,7 +868,7 @@ const handleSaveNewCompany = async () => {
                                     Print Time (min){" "}
                                     <span
                                       style={{ cursor: "help" }}
-                                      title={`6 divided by number of pieces that fit in a 13"x30" square`}
+                                      title="6 divided by number of pieces that fit in a 13"x30" square"
                                     >
                                       ℹ️
                                     </span>
@@ -1003,19 +1003,7 @@ const handleSaveNewCompany = async () => {
                                           try {
                                                 await axios.post(
                                                   `${process.env.REACT_APP_API_ROOT}/table`,
-                                                  {
-                                                    Product:             product,
-                                                    "Print Times (1 Machine)": 6,
-                                                    "How Many Products Per Yard": perYard,
-                                                    "1/2\" Foam":        foamHalf,
-                                                    "3/8\" Foam":        foam38,
-                                                    "1/4\" Foam":        foam14,
-                                                    "1/8\" Foam":        foam18,
-                                                    "N Magnets":         magnetN,
-                                                    "S Magnets":         magnetS,
-                                                    "1/2\" Elastic":     elasticHalf,
-                                                    Volume:              vol
-                                                  },
+                                                  payload,
                                                   { withCredentials: true }
                                                 );
                                                 setIsNewProductModalOpen(false);
