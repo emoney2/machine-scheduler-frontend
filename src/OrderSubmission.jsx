@@ -844,132 +844,162 @@ const handleSaveNewCompany = async () => {
       {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
         <div style={{
-          position:"fixed",top:0,left:0,
-          width:"100%",height:"100%",
-          background:"rgba(0,0,0,0.5)",
-          display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000
+          position: "fixed",
+          top: 0, left: 0,
+          width: "100%", height: "100%",
+          background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000,
         }}>
           <div style={{
-            background:"#fff",padding:"1.5rem",borderRadius:"0.5rem",
-            width:"400px",maxHeight:"90%",overflowY:"auto"
+            background: "#fff", padding: "1.5rem", borderRadius: "0.5rem",
+            width: "400px", maxHeight: "90%", overflowY: "auto"
           }}>
-            <h2 style={{marginTop:0}}>New Product: {newProductData.product}</h2>
-
-            <div style={{display:"grid",gap:"0.75rem",marginTop:"1rem"}}>
-              <label>
-                Length (in)<br/>
-                <input
-                  name="length"
-                  type="number"
-                  value={newProductData.length}
-                  onChange={handleNewProductChange}
-                  required
-                  style={{width:"100%"}}
-                />
-              </label>
-
-              <label>
-                Width (in)<br/>
-                <input
-                  name="width"
-                  type="number"
-                  value={newProductData.width}
-                  onChange={handleNewProductChange}
-                  required
-                  style={{width:"100%"}}
-                />
-              </label>
-
-              <label>
-                Depth (in)<br/>
-                <input
-                  name="depth"
-                  type="number"
-                  value={newProductData.depth}
-                  onChange={handleNewProductChange}
-                  required
-                  style={{width:"100%"}}
-                />
-              </label>
-
-              <label style={{position:"relative"}}>
-                Pieces per Yard&nbsp;
+            <h2 style={{ marginTop: 0 }}>New Product: {newProductData.product}</h2>
+            <div style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}>
+              {/* Print Time with info‐icon */}
+              <label style={{ position: "relative" }}>
+                Print Time (min){" "}
                 <span
-                  style={{cursor:"help"}}
-                  title={"Take a 36\"×55\" area ÷ (length × width), rounded down."}
+                  style={{ cursor: "help" }}
+                  title="Take 6 minutes ÷ pieces-per-yard."
                 >ℹ️</span><br/>
                 <input
                   type="number"
                   readOnly
-                  value={
-                    (newProductData.length && newProductData.width)
-                      ? Math.floor((36/newProductData.length)*(55/newProductData.width))
-                      : ""
-                  }
+                  value={6}
                   required
-                  style={{width:"100%",background:"#f5f5f5"}}
+                  style={{ width: "100%", background: "#f5f5f5" }}
                 />
               </label>
 
+              {/* Foam counts */}
+              {[
+                ["foamHalf", '1/2" Foam'],
+                ["foam38", '3/8" Foam'],
+                ["foam14", '1/4" Foam'],
+                ["foam18", '1/8" Foam']
+              ].map(([key, label]) => (
+                <label key={key}>
+                  {label}<br/>
+                  <input
+                    name={key}
+                    type="number"
+                    value={newProductData[key] || ""}
+                    onChange={handleNewProductChange}
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </label>
+              ))}
+
+              {/* Magnet counts */}
+              {[
+                ["magnetN", "N Magnets"],
+                ["magnetS", "S Magnets"]
+              ].map(([key,label]) => (
+                <label key={key}>
+                  {label}<br/>
+                  <input
+                    name={key}
+                    type="number"
+                    value={newProductData[key] || ""}
+                    onChange={handleNewProductChange}
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </label>
+              ))}
+
+              {/* Elastic */}
               <label>
-                Volume (L×W×D)<br/>
+                1/2" Elastic<br/>
                 <input
+                  name="elasticHalf"
                   type="number"
-                  readOnly
-                  value={
-                    (newProductData.length && newProductData.width && newProductData.depth)
-                      ? (newProductData.length * newProductData.width * newProductData.depth)
-                      : ""
-                  }
+                  value={newProductData.elasticHalf || ""}
+                  onChange={handleNewProductChange}
                   required
-                  style={{width:"100%",background:"#f5f5f5"}}
+                  style={{ width: "100%" }}
                 />
               </label>
+
+              {/* Dimensions */}
+              {["length","width","depth"].map((dim) => (
+                <label key={dim}>
+                  {dim.charAt(0).toUpperCase()+dim.slice(1)} (in)<br/>
+                  <input
+                    name={dim}
+                    type="number"
+                    value={newProductData[dim] || ""}
+                    onChange={handleNewProductChange}
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </label>
+              ))}
             </div>
 
-            <div style={{textAlign:"right",marginTop:"1rem"}}>
+            <div style={{ textAlign: "right", marginTop: "1rem" }}>
               <button
                 type="button"
-                onClick={()=>{
+                onClick={() => {
                   setIsNewProductModalOpen(false);
                   setNewProductName("");
                 }}
-                style={{marginRight:"0.5rem",padding:"0.5rem 1rem"}}
-              >Cancel</button>
-
+                style={{ marginRight: "0.5rem", padding: "0.5rem 1rem" }}
+              >
+                Cancel
+              </button>
               <button
                 type="button"
-                onClick={async ()=>{
-                  // 1) Write to Table
+                onClick={async () => {
+                  // 1) compute everything
+                  const {
+                    product, length, width, depth,
+                    foamHalf, foam38, foam14, foam18,
+                    magnetN, magnetS, elasticHalf
+                  } = newProductData;
+                  const vol = length * width * depth;
+                  const perYard = Math.floor((36/length)*(55/width));
+
                   try {
+                    // 2) write to Table
                     await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
                       {
-                        product: newProductData.product,
-                        printTime: 6,                                        // fixed 6
-                        perYard: Math.floor((36/newProductData.length)*(55/newProductData.width)),
-                        foamHalf: newProductData.foamHalf || 0,              // if you still collect foam
-                        foam38:   newProductData.foam38   || 0,
-                        foam14:   newProductData.foam14   || 0,
-                        foam18:   newProductData.foam18   || 0,
-                        magnetN:  newProductData.magnetN  || 0,
-                        magnetS:  newProductData.magnetS  || 0,
-                        elasticHalf: newProductData.elasticHalf || 0,
-                        volume:   newProductData.length * newProductData.width * newProductData.depth
+                        Product:             product,
+                        "Print Times (1 Machine)": 6,
+                        "How Many Products Per Yard": perYard,
+                        "1/2\" Foam":        foamHalf,
+                        "3/8\" Foam":        foam38,
+                        "1/4\" Foam":        foam14,
+                        "1/8\" Foam":        foam18,
+                        "N Magnets":         magnetN,
+                        "S Magnets":         magnetS,
+                        "1/2\" Elastic":     elasticHalf,
+                        Volume:              vol
                       },
                       { withCredentials: true }
                     );
-                    // 2) auto-submit the order
+
+                    // 3) close modal *before* re-submit
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
-                    formRef.current.dispatchEvent(new Event("submit", {cancelable:true, bubbles:true}));
+
+                    // 4) dispatch original form submit
+                    formRef.current.dispatchEvent(
+                      new Event("submit", { cancelable: true, bubbles: true })
+                    );
                   } catch (err) {
-                    console.error("Error adding product:", err.response?.data||err);
+                    console.error("Error adding product:", err);
                     alert("Error adding product. See console.");
                   }
                 }}
-                style={{padding:"0.5rem 1rem"}}
-              >Add & Submit</button>
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Add & Submit
+              </button>
             </div>
           </div>
         </div>
