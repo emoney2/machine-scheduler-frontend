@@ -32,7 +32,6 @@ export default function OrderSubmission() {
   const [products, setProducts] = useState([]);
   const productInputRef = useRef(null);
 
-  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [newProductName, setNewProductName] = useState("");
   const [newProductData, setNewProductData]   = useState({
     product: "",
