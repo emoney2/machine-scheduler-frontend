@@ -32,6 +32,26 @@ export default function OrderSubmission() {
   const [products, setProducts] = useState([]);
   const productInputRef = useRef(null);
 
+  const [newProductData, setNewProductData] = useState({
+    product:        "",  // will be seeded from newProductName
+    printTime:      "",
+    perYard:        "",
+    foamHalf:       "",
+    foam38:         "",
+    foam14:         "",
+    foam18:         "",
+    magnetN:        "",
+    magnetS:        "",
+    elasticHalf:    "",
+    volume:         "",
+  });
+
+const handleNewProductChange = (e) => {
+  const { name, value } = e.target;
+  setNewProductData((prev) => ({ ...prev, [name]: value }));
+};
+
+
   // ─── MATERIALS inventory + refs ───────────────────────────────
   const [materialsInv, setMaterialsInv] = useState([]);
   // an array of refs for Material1–5
@@ -418,6 +438,7 @@ const furColorNames = furColors;
     // ─── 2) EARLY‐EXIT if product not in list ────────────────────
     if (!existingProducts.includes(requested)) {
       setNewProductName(form.product);
+      setNewProductData((p) => ({ ...p, product: form.product }));
       setIsNewProductModalOpen(true);
       return;
     }
@@ -853,12 +874,106 @@ const handleSaveNewCompany = async () => {
             }}
           >
             <h2 style={{ marginTop: 0 }}>New Product Detected</h2>
-            <p>
-              “<strong>{newProductName}</strong>” isn’t on your Table yet.<br/>
-              Would you like to add it now?
-            </p>
+
+            {/* 1️⃣ Inputs for all Table columns */}
+            <div style={{ display: "grid", gap: "0.5rem", marginTop: "1rem" }}>
+              <label>
+                Product Name<br/>
+                <input
+                  name="product"
+                  value={newProductData.product}
+                  readOnly
+                  style={{ width: "100%" }}
+                />
+              </label>
+
+              <label>
+                Print Time (min)<br/>
+                <input
+                  name="printTime"
+                  type="number"
+                  value={newProductData.printTime}
+                  onChange={handleNewProductChange}
+                  style={{ width: "100%" }}
+                />
+              </label>
+
+              <label>
+                Products per Yard<br/>
+                <input
+                  name="perYard"
+                  type="number"
+                  value={newProductData.perYard}
+                  onChange={handleNewProductChange}
+                  style={{ width: "100%" }}
+                />
+              </label>
+
+              <fieldset>
+                <legend>Foam per piece</legend>
+                {[
+                  ["foamHalf", '1/2" Foam'],
+                  ["foam38", '3/8" Foam'],
+                  ["foam14", '1/4" Foam'],
+                  ["foam18", '1/8" Foam'],
+                ].map(([key,label]) => (
+                  <label key={key} style={{ display: "block" }}>
+                    {label}:&nbsp;
+                    <input
+                      name={key}
+                      type="number"
+                      value={newProductData[key]}
+                      onChange={handleNewProductChange}
+                      style={{ width: "60px" }}
+                    />
+                  </label>
+                ))}
+              </fieldset>
+
+              <fieldset>
+                <legend>Magnets</legend>
+                {[
+                  ["magnetN", "North (N) magnets"],
+                  ["magnetS", "South (S) magnets"],
+                ].map(([key,label]) => (
+                  <label key={key} style={{ display: "block" }}>
+                    {label}:&nbsp;
+                    <input
+                      name={key}
+                      type="number"
+                      value={newProductData[key]}
+                      onChange={handleNewProductChange}
+                      style={{ width: "60px" }}
+                    />
+                  </label>
+                ))}
+              </fieldset>
+
+              <label>
+                1/2" Elastic (inches)<br/>
+                <input
+                  name="elasticHalf"
+                  type="number"
+                  value={newProductData.elasticHalf}
+                  onChange={handleNewProductChange}
+                  style={{ width: "100%" }}
+                />
+              </label>
+
+              <label>
+                Volume<br/>
+                <input
+                  name="volume"
+                  type="number"
+                  value={newProductData.volume}
+                  onChange={handleNewProductChange}
+                  style={{ width: "100%" }}
+                />
+              </label>
+            </div>
+
+            {/* 2️⃣ Action buttons */}
             <div style={{ marginTop: "1rem", textAlign: "right" }}>
-              {/* Cancel button */}
               <button
                 type="button"
                 onClick={() => {
@@ -870,22 +985,23 @@ const handleSaveNewCompany = async () => {
                 Cancel
               </button>
 
-              {/* Add to Table button */}
               <button
                 type="button"
                 onClick={async () => {
-                  console.log("▶️ Adding new product to Table:", newProductName);
+                  console.log("▶️ Adding new product with data:", newProductData);
                   try {
                     const resp = await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
-                      { Product: newProductName },
+                      newProductData,
                       { withCredentials: true }
                     );
-                    console.log("✅ POST /table response data:", resp.data);
-                    alert(`“${newProductName}” added to Table! Please click Submit again.`);
+                    console.log("✅ POST /table response:", resp.data);
+                    alert(`“${newProductData.product}” added! Click Submit again.`);
                   } catch (err) {
-                    // Log the server’s error payload if any, or fallback to the message
-                    console.error("❌ Failed to add new product:", err.response?.data || err.message);
+                    console.error(
+                      "❌ Failed to add product:",
+                      err.response?.data || err
+                    );
                     alert("Error adding product. See console for details.");
                   } finally {
                     setIsNewProductModalOpen(false);
