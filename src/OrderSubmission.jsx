@@ -32,20 +32,6 @@ export default function OrderSubmission() {
   const [products, setProducts] = useState([]);
   const productInputRef = useRef(null);
 
-  const [newProductName, setNewProductName] = useState("");
-  const [newProductData, setNewProductData]   = useState({
-    product: "",
-    length:  "",
-    width:   "",
-    depth:   "",
-  });
-  const formRef = useRef(null);
-
-  const handleNewProductChange = (e) => {
-    const { name, value } = e.target;
-    setNewProductData((p) => ({ ...p, [name]: value }));
-  };
-
   // ─── MATERIALS inventory + refs ───────────────────────────────
   const [materialsInv, setMaterialsInv] = useState([]);
   // an array of refs for Material1–5
