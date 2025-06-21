@@ -998,26 +998,28 @@ const handleSaveNewCompany = async () => {
                   const perYard = Math.floor((36 / length) * (55 / width));
 
                   try {
-                    // 2) write to Table
-                    console.log("💬 POST /table payload:", payload);
+                    // 2) build the payload
+                    const payload = {
+                      Product: newProductData.product,
+                      "Print Times (1 Machine)": Number(newProductData.printTime),
+                      "How Many Products Per Yard": Math.floor((36/newProductData.length)*(55/newProductData.width)),
+                      "1/2\" Foam": Number(newProductData.foamHalf),
+                      "3/8\" Foam": Number(newProductData.foam38),
+                      "1/4\" Foam": Number(newProductData.foam14),
+                      "1/8\" Foam": Number(newProductData.foam18),
+                      "N Magnets": Number(newProductData.magnetN),
+                      "S Magnets": Number(newProductData.magnetS),
+                      "1/2\" Elastic": Number(newProductData.elasticHalf),
+                      Volume: newProductData.length * newProductData.width * newProductData.depth
+                    };
+                    console.log("📤 Posting new Product payload:", payload);
+
+                    // 3) write to Table
                     await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
-                      {
-                        Product: product,
-                        "Print Times (1 Machine)": printTime,
-                        "How Many Products Per Yard": perYard,
-                        '1/2" Foam': foamHalf,
-                        '3/8" Foam': foam38,
-                        '1/4" Foam': foam14,
-                        '1/8" Foam': foam18,
-                        "N Magnets": magnetN,
-                        "S Magnets": magnetS,
-                        '1/2" Elastic': elasticHalf,
-                        Volume: vol,
-                      },
+                      payload,
                       { withCredentials: true }
                     );
-
                     // 3) close modal
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
