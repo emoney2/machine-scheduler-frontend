@@ -1089,7 +1089,8 @@ const handleSaveNewCompany = async () => {
                         </div>
                   </div>
             </div>
-      )}      {/* Loading bar */}
+      )}
+      {/* Loading bar */}
       {isSubmitting && (
         <progress
           style={{
