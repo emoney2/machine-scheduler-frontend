@@ -920,7 +920,7 @@ const handleSaveNewCompany = async () => {
                     Print Time (min){' '}
                     <span
                       style={{ cursor: 'help' }}
-                      title="6 divided by how many pieces can fit in 13\"x30\""
+                      title={'6 divided by how many pieces can fit in 13"x30"'}
                     >
                       ℹ️
                     </span>
@@ -961,11 +961,11 @@ const handleSaveNewCompany = async () => {
               {/* Column 2: foam fields & elastic */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {[
-                  ["foamHalf", '1/2\" Foam'],
-                  ["foam38", '3/8\" Foam'],
-                  ["foam14", '1/4\" Foam'],
-                  ["foam18", '1/8\" Foam'],
-                  ["elasticHalf", '1/2\" Elastic'],
+                  ["foamHalf", '1/2" Foam'],
+                  ["foam38", '3/8" Foam'],
+                  ["foam14", '1/4" Foam'],
+                  ["foam18", '1/8" Foam'],
+                  ["elasticHalf", '1/2" Elastic'],
                 ].map(([key, label]) => (
                   <div key={key}>
                     <label>{label}</label>
