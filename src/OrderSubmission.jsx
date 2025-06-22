@@ -894,7 +894,7 @@ const handleSaveNewCompany = async () => {
                     Print Time (min){' '}
                     <span
                       style={{ cursor: 'help' }}
-                      title="6 divided by how many pieces can fit in 13\"x30\""
+                      title={'6 divided by how many pieces can fit in 13"x30"'}
                     >
                       ℹ️
                     </span>
