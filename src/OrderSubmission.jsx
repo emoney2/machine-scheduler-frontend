@@ -1060,14 +1060,24 @@ const handleSaveNewCompany = async () => {
                       { withCredentials: true }
                     );
 
+                    // Close modal and return to order form without submitting
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
-
-                    if (typeof formRef.current.requestSubmit === "function") {
-                      formRef.current.requestSubmit();
-                    } else {
-                      formRef.current.dispatchEvent(
-                        new Event("submit", { cancelable: true, bubbles: true })
+                  } catch (err) {
+                    console.error("Modal workflow error:", err);
+                    alert("Failed to add product. Check console.");
+                  } finally {
+                    setModalSubmitting(false);
+                  }
+                }}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                {modalSubmitting ? "Adding…" : "Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
                       );
                     }
                   } catch (err) {
@@ -1085,7 +1095,6 @@ const handleSaveNewCompany = async () => {
           </div>
         </div>
       )}
-
 
       {/* Loading bar */}
       {isSubmitting && (
