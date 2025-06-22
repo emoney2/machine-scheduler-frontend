@@ -920,7 +920,7 @@ const handleSaveNewCompany = async () => {
                     Print Time (min){' '}
                     <span
                       style={{ cursor: 'help' }}
-                      title={'6 divided by how many pieces can fit in 13"x30"'}
+                      title="6 divided by how many pieces can fit in 13\"x30\""
                     >
                       ℹ️
                     </span>
@@ -961,11 +961,11 @@ const handleSaveNewCompany = async () => {
               {/* Column 2: foam fields & elastic */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {[
-                  ["foamHalf", '1/2" Foam'],
-                  ["foam38", '3/8" Foam'],
-                  ["foam14", '1/4" Foam'],
-                  ["foam18", '1/8" Foam'],
-                  ["elasticHalf", '1/2" Elastic'],
+                  ["foamHalf", '1/2\" Foam'],
+                  ["foam38", '3/8\" Foam'],
+                  ["foam14", '1/4\" Foam'],
+                  ["foam18", '1/8\" Foam'],
+                  ["elasticHalf", '1/2\" Elastic'],
                 ].map(([key, label]) => (
                   <div key={key}>
                     <label>{label}</label>
@@ -1060,7 +1060,7 @@ const handleSaveNewCompany = async () => {
                       { withCredentials: true }
                     );
 
-                    // Close modal and return to order form without submitting
+                    // Close modal and return to order form
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
                   } catch (err) {
@@ -1073,23 +1073,6 @@ const handleSaveNewCompany = async () => {
                 style={{ padding: "0.5rem 1rem" }}
               >
                 {modalSubmitting ? "Adding…" : "Add"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-                      );
-                    }
-                  } catch (err) {
-                    console.error("Modal workflow error:", err);
-                    alert("Failed to add product. Check console.");
-                  } finally {
-                    setModalSubmitting(false);
-                  }
-                }}
-                style={{ padding: "0.5rem 1rem" }}
-              >
-                {modalSubmitting ? "Submitting…" : "Add & Submit"}
               </button>
             </div>
           </div>
