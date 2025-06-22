@@ -3,6 +3,7 @@ import axios from "axios";
 import "./FileInput.css";
 
 
+
 export default function OrderSubmission() {
   const [form, setForm] = useState({
     company: "",
@@ -467,6 +468,9 @@ const furColorNames = furColors;
         }
       });
       // append any file inputs here if needed...
+
+      prodFiles.forEach(file => fd.append("prodFiles", file));
+      printFiles.forEach(file => fd.append("printFiles", file));
       const submitUrl =
         process.env.REACT_APP_ORDER_SUBMIT_URL ||
         `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
