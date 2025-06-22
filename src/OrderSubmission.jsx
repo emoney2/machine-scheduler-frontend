@@ -406,105 +406,117 @@ const furColorNames = furColors;
   };
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    // ─── 1) Fetch the full Table and get Column A ─────────────────
-    let table;
-    try {
-      const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Table fetch failed");
-      table = await res.json();
-    } catch (err) {
-      console.error("Could not load Table data:", err);
-      alert("Unable to verify product list. Please try again later.");
-      return;
-    }
+  // 1) Company check
+  const companyLower = form.company.trim().toLowerCase();
+  const knownCompanies = companies.map(c => c.value.toLowerCase());
+  if (!knownCompanies.includes(companyLower)) {
+    setNewCompanyData(dc => ({ ...dc, companyName: form.company }));
+    return setIsNewCompanyModalOpen(true);
+  }
 
-    // Build a lowercase list of existing products
-    const existingProducts = table
-      .map((row) => row.Products?.toString().trim().toLowerCase())
-      .filter(Boolean);
+  // 2) Product check
+  let table;
+  try {
+    const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Table fetch failed");
+    table = await res.json();
+  } catch (err) {
+    console.error("Could not load Table data:", err);
+    alert("Unable to verify product list. Please try again later.");
+    return;
+  }
+  const existingProducts = table
+    .map(r => r.Products?.toString().trim().toLowerCase())
+    .filter(Boolean);
+  const requested = form.product.trim().toLowerCase();
+  if (!existingProducts.includes(requested)) {
+    setNewProductName(form.product);
+    setNewProductData(p => ({ ...p, product: form.product }));
+    return setIsNewProductModalOpen(true);
+  }
 
-    // The product the user entered
-    const requested = form.product.trim().toLowerCase();
+  // 3) Materials check
+  const allMaterials = [
+    ...form.materials.filter(m => m.trim()),
+    form.backMaterial,
+    form.furColor
+  ].filter(Boolean);
+  const missingMat = allMaterials.find(m =>
+    !materialsInv.map(v => v.toLowerCase()).includes(m.trim().toLowerCase())
+  );
+  if (missingMat) {
+    // determine which field is missing
+    const matIndex = form.materials.indexOf(missingMat);
+    setModalMaterialField({
+      type: matIndex >= 0 ? "materials" : "backMaterial",
+      index: matIndex >= 0 ? matIndex : null
+    });
+    setNewMaterialData({
+      materialName: missingMat,
+      unit: "",
+      minInv: "",
+      reorder: "",
+      cost: ""
+    });
+    return setIsNewMaterialModalOpen(true);
+  }
 
-    // ─── 2) EARLY‐EXIT if product not in list ────────────────────
-    if (!existingProducts.includes(requested)) {
-      setNewProductName(form.product);
-      setNewProductData((p) => ({ ...p, product: form.product }));
-      setIsNewProductModalOpen(true);
-      return;
-    }
+  // 4) All good → submit
+  setIsSubmitting(true);
+  try {
+    const fd = new FormData();
+    // append form fields
+    Object.entries(form).forEach(([key, value]) => {
+      if (key === "materials") {
+        value.forEach(m => fd.append("materials", m));
+      } else {
+        fd.append(key, value);
+      }
+    });
+    // append files
+    prodFiles.forEach(f => fd.append("prodFiles", f));
+    printFiles.forEach(f => fd.append("printFiles", f));
 
-    // ─── 3) Product exists: pull its Volume ──────────────────────
-    const matchRow = table.find(
-      row => row.Products?.toString().trim().toLowerCase() === requested
-    );
+    const submitUrl =
+      process.env.REACT_APP_ORDER_SUBMIT_URL ||
+      `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
+    await axios.post(submitUrl, fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-    const volume =
-      matchRow && matchRow.Volume != null
-        ? parseFloat(matchRow.Volume)
-        : null;
-
-    // ─── 4) If Volume missing (but product does exist) ───────────
-    if (volume == null) {
-      alert("This product is in the list but has no volume set.");
-      return;
-    }
-
-    // ─── 5) Proceed with normal submission ────────────────────────
-    setIsSubmitting(true);
-    try {
-      const fd = new FormData();
-      // append all form fields
-      Object.entries(form).forEach(([key, value]) => {
-        if (key === "materials") {
-          value.forEach((m) => fd.append("materials", m));
-        } else {
-          fd.append(key, value);
-        }
-      });
-      // append any file inputs here if needed...
-
-      prodFiles.forEach(file => fd.append("prodFiles", file));
-      printFiles.forEach(file => fd.append("printFiles", file));
-      const submitUrl =
-        process.env.REACT_APP_ORDER_SUBMIT_URL ||
-        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
-      await axios.post(submitUrl, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      alert("Order submitted!");
-      // reset form state
-      setForm({
-        company: "",
-        designName: "",
-        quantity: "",
-        product: "",
-        price: "",
-        dueDate: "",
-        dateType: "Hard Date",
-        referral: "",
-        materials: ["", "", "", "", ""],
-        backMaterial: "",
-        embBacking: "",
-        furColor: "",
-        notes: "",
-      });
-      setProdFiles([]);
-      setPrintFiles([]);
-      setProdPreviews([]);
-      setPrintPreviews([]);
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || "Submission failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    alert("Order submitted!");
+    // reset
+    setForm({
+      company: "",
+      designName: "",
+      quantity: "",
+      product: "",
+      price: "",
+      dueDate: "",
+      dateType: "Hard Date",
+      referral: "",
+      materials: ["", "", "", "", ""],
+      backMaterial: "",
+      embBacking: "",
+      furColor: "",
+      notes: "",
+    });
+    setProdFiles([]);
+    setPrintFiles([]);
+    setProdPreviews([]);
+    setPrintPreviews([]);
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.error || "Submission failed");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
 
 // ─── Save the new company to Google Sheets ─────────────────────
