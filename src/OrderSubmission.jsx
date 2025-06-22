@@ -889,15 +889,8 @@ const handleSaveNewCompany = async () => {
             >
               {/* Column 1: print time & magnets */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                  <span>Print Time (min)</span>
-                  <span
-                    style={{ cursor: "help" }}
-                    title={'6 divided by how many pieces can fit in 13"x30"'}
-                  >
-                    ℹ️
-                  </span>
-                  <br />
+                <div>
+                  <label>Print Time (min) <span style={{ cursor: "help" }} title="6 divided by how many pieces can fit in 13\"x30\"">ℹ️</span></label>
                   <input
                     name="printTime"
                     type="number"
@@ -906,10 +899,9 @@ const handleSaveNewCompany = async () => {
                     required
                     style={{ width: "100%" }}
                   />
-                </label>
-                <label>
-                  N Magnets
-                  <br />
+                </div>
+                <div>
+                  <label>N Magnets</label>
                   <input
                     name="magnetN"
                     type="number"
@@ -918,10 +910,9 @@ const handleSaveNewCompany = async () => {
                     required
                     style={{ width: "100%" }}
                   />
-                </label>
-                <label>
-                  S Magnets
-                  <br />
+                </div>
+                <div>
+                  <label>S Magnets</label>
                   <input
                     name="magnetS"
                     type="number"
@@ -930,21 +921,20 @@ const handleSaveNewCompany = async () => {
                     required
                     style={{ width: "100%" }}
                   />
-                </label>
+                </div>
               </div>
 
-              {/* Column 2: foam fields + elastic */}
+              {/* Column 2: foam fields & elastic */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {[
-                  ["foamHalf", `1/2\" Foam`],
-                  ["foam38", `3/8\" Foam`],
-                  ["foam14", `1/4\" Foam`],
-                  ["foam18", `1/8\" Foam`],
-                  ["elasticHalf", `1/2\" Elastic`],
+                  ["foamHalf", `1/2" Foam`],
+                  ["foam38", `3/8" Foam`],
+                  ["foam14", `1/4" Foam`],
+                  ["foam18", `1/8" Foam`],
+                  ["elasticHalf", `1/2" Elastic`],
                 ].map(([key, label]) => (
-                  <label key={key}>
-                    {label}
-                    <br />
+                  <div key={key}>
+                    <label>{label}</label>
                     <input
                       name={key}
                       type="number"
@@ -953,7 +943,7 @@ const handleSaveNewCompany = async () => {
                       required
                       style={{ width: "100%" }}
                     />
-                  </label>
+                  </div>
                 ))}
               </div>
 
@@ -964,9 +954,8 @@ const handleSaveNewCompany = async () => {
                   ["width", "Width (in)"],
                   ["depth", "Depth (in)"],
                 ].map(([dim, label]) => (
-                  <label key={dim}>
-                    {label}
-                    <br />
+                  <div key={dim}>
+                    <label>{label}</label>
                     <input
                       name={dim}
                       type="number"
@@ -975,7 +964,7 @@ const handleSaveNewCompany = async () => {
                       required
                       style={{ width: "100%" }}
                     />
-                  </label>
+                  </div>
                 ))}
               </div>
             </div>
@@ -1062,6 +1051,7 @@ const handleSaveNewCompany = async () => {
           </div>
         </div>
       )}
+
 
       {/* Loading bar */}
       {isSubmitting && (
