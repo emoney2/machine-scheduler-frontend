@@ -889,8 +889,14 @@ const handleSaveNewCompany = async () => {
             >
               {/* Column 1: print time & magnets */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <label>
-                  Print Time (min)
+                <label style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                  <span>Print Time (min)</span>
+                  <span
+                    style={{ cursor: "help" }}
+                    title={'6 divided by how many pieces can fit in 13"x30"'}
+                  >
+                    ℹ️
+                  </span>
                   <br />
                   <input
                     name="printTime"
@@ -1056,6 +1062,7 @@ const handleSaveNewCompany = async () => {
           </div>
         </div>
       )}
+
       {/* Loading bar */}
       {isSubmitting && (
         <progress
