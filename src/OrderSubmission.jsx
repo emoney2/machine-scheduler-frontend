@@ -612,13 +612,15 @@ const handleSaveNewCompany = async () => {
 
   return (
     <>
-      {/* Company Modal */}
+      {/* ─── Company Modal ───────────────────────────────────── */}
       {isNewCompanyModalOpen && (
         <div
           style={{
             position: "fixed",
-            top: 0, left: 0,
-            width: "100%", height: "100%",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
             background: "rgba(0,0,0,0.5)",
             display: "flex",
             alignItems: "center",
@@ -631,7 +633,7 @@ const handleSaveNewCompany = async () => {
               background: "#fff",
               padding: "1.5rem",
               borderRadius: "0.5rem",
-              width: "400px",
+              width: "500px",
               maxHeight: "90%",
               overflowY: "auto",
             }}
@@ -642,9 +644,20 @@ const handleSaveNewCompany = async () => {
                 {newCompanyErrors.general}
               </div>
             )}
-            {[ /* company fields array */ ].map(({ key, label }) => (
-              <div key={key} style={{ marginBottom: "0.75rem" }}>
-                <label style={{ display: "block", fontSize: "0.9rem" }}>
+            {[
+              { key: 'companyName', label: 'Company Name' },
+              { key: 'contactFirstName', label: 'Contact First Name' },
+              { key: 'contactLastName', label: 'Contact Last Name' },
+              { key: 'contactEmailAddress', label: 'Contact Email Address' },
+              { key: 'streetAddress1', label: 'Street Address 1' },
+              { key: 'streetAddress2', label: 'Street Address 2' },
+              { key: 'city', label: 'City' },
+              { key: 'state', label: 'State' },
+              { key: 'zipCode', label: 'Zip Code' },
+              { key: 'phoneNumber', label: 'Phone Number' },
+            ].map(({ key, label }) => (
+              <div key={key} style={{ marginBottom: '0.75rem' }}>
+                <label style={{ display: 'block', fontSize: '0.9rem' }}>
                   {label}
                 </label>
                 <input
@@ -652,34 +665,35 @@ const handleSaveNewCompany = async () => {
                   value={newCompanyData[key]}
                   onChange={handleNewCompanyChange}
                   style={{
-                    width: "100%",
-                    padding: "0.4rem",
-                    fontSize: "0.9rem",
+                    width: '100%',
+                    padding: '0.4rem',
+                    fontSize: '0.9rem',
                     border: newCompanyErrors[key]
-                      ? "1px solid red"
-                      : "1px solid #ccc",
-                    borderRadius: "0.25rem",
+                      ? '1px solid red'
+                      : '1px solid #ccc',
+                    borderRadius: '0.25rem',
                   }}
+                  required={key !== 'streetAddress2'}
                 />
                 {newCompanyErrors[key] && (
-                  <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  <div style={{ color: 'red', fontSize: '0.8rem' }}>
                     {newCompanyErrors[key]}
                   </div>
                 )}
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
               <button
                 type="button"
                 onClick={() => setIsNewCompanyModalOpen(false)}
-                style={{ padding: "0.5rem 1rem" }}
+                style={{ padding: '0.5rem 1rem' }}
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleSaveNewCompany}
-                style={{ padding: "0.5rem 1rem" }}
+                style={{ padding: '0.5rem 1rem' }}
               >
                 Save Company
               </button>
