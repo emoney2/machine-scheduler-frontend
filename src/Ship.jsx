@@ -566,15 +566,24 @@ const shippingOptions = [
               let backgroundColor = "#ccc"; // default grey
 
               if (earliestDueDate && deliveryDate) {
-                const dueMid = stripTime(earliestDueDate).getTime();
-                const delMid = stripTime(deliveryDate).getTime();
+                // strip times so we’re only comparing dates
+                const due = new Date(
+                  earliestDueDate.getFullYear(),
+                  earliestDueDate.getMonth(),
+                  earliestDueDate.getDate()
+                ).getTime();
+                const del = new Date(
+                  deliveryDate.getFullYear(),
+                  deliveryDate.getMonth(),
+                  deliveryDate.getDate()
+                ).getTime();
 
-                if (delMid < dueMid) {
-                  backgroundColor = "#b2fab4"; // green
-                } else if (delMid === dueMid) {
-                  backgroundColor = "#fff9c4"; // yellow
+                if (del < due) {
+                  backgroundColor = "#b2fab4"; // green: early
+                } else if (del === due) {
+                  backgroundColor = "#fff9c4"; // yellow: same day
                 } else {
-                  backgroundColor = "#ffcdd2"; // red
+                  backgroundColor = "#ffcdd2"; // red: late
                 }
               }
               return (
