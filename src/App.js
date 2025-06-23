@@ -996,6 +996,7 @@ const onDragEnd = async (result) => {
       {/* ─── Nav Bar ────────────────────────────────────────────────────────── */}
       <nav style={{
         display: 'flex',
+        alignItems: 'center',
         padding: 8,
         backgroundColor: '#fafafa',
         borderBottom: '1px solid #ccc'
@@ -1005,25 +1006,32 @@ const onDragEnd = async (result) => {
           { to: "/submit",            label: "Order Submission" },
           { to: "/inventory",         label: "Inventory" },
           { to: "/inventory-ordered", label: "Inventory Ordered" },
-          { to: "/ship",              label: "Ship" }  // ✅ Added this line
+          { to: "/ship",              label: "Ship" }
         ].map(({ to, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            style={({ isActive }) => ({
-              marginRight: 16,
-              padding: '0.5rem 1rem',
-              textDecoration: 'none',
-              color: '#333',
-              backgroundColor: isActive ? '#e0e0e0' : 'transparent',
-              border: isActive ? '1px solid #ccc' : '1px solid transparent',
-              borderBottom: isActive ? 'none' : '1px solid #ccc',
-              borderRadius: '4px 4px 0 0'
-            })}
-          >
+          <NavLink key={to} to={to} style={/* ... */}>
             {label}
           </NavLink>
         ))}
+
+        {/* ← push this button as far right as possible */}
+        <button
+          onClick={() => {
+            // redirect to backend logout endpoint
+            const base = process.env.REACT_APP_API_ROOT.replace(/\/api$/, '');
+            window.location.href = `${base}/logout`;
+          }}
+          style={{
+            marginLeft: 'auto',
+            padding: '0.5rem 1rem',
+            border: '1px solid transparent',
+            background: 'transparent',
+            cursor: 'pointer',
+            color: '#333',
+            fontWeight: '400'
+          }}
+        >
+          Logout
+        </button>
       </nav>
 
       {/* ─── Route Outlet ─────────────────────────────────────────────────────── */}
