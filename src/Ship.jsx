@@ -551,7 +551,6 @@ const shippingOptions = [
                 })
                 .filter(Boolean);
 
-
               const earliestDueDate = dueDates.length > 0
                 ? new Date(Math.min(...dueDates.map(d => d.getTime())))
                 : null;
@@ -559,16 +558,15 @@ const shippingOptions = [
               let backgroundColor = "#ccc"; // default grey
 
               if (earliestDueDate && deliveryDate) {
-                if (deliveryDate < earliestDueDate) {
-                  backgroundColor = "#b2fab4"; // green
-                } else if (
-                  deliveryDate.getFullYear() === earliestDueDate.getFullYear() &&
-                  deliveryDate.getMonth() === earliestDueDate.getMonth() &&
-                  deliveryDate.getDate() === earliestDueDate.getDate()
-                ) {
-                  backgroundColor = "#fff9c4"; // yellow
+                const dl = deliveryDate.getTime();
+                const dd = earliestDueDate.getTime();
+
+                if (dl < dd) {
+                  backgroundColor = "#b2fab4"; // green: delivery before due
+                } else if (dl === dd) {
+                  backgroundColor = "#fff9c4"; // yellow: delivery same day
                 } else {
-                  backgroundColor = "#ffcdd2"; // red
+                  backgroundColor = "#ffcdd2"; // red: delivery after due
                 }
               }
 
