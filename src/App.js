@@ -994,13 +994,15 @@ const onDragEnd = async (result) => {
       />
 
       {/* ─── Nav Bar ────────────────────────────────────────────────────────── */}
-      <nav style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: 8,
-        backgroundColor: '#fafafa',
-        borderBottom: '1px solid #ccc'
-      }}>
+      <nav
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: 8,
+          backgroundColor: '#fafafa',
+          borderBottom: '1px solid #ccc'
+        }}
+      >
         {[
           { to: "/",                  label: "Scheduler" },
           { to: "/submit",            label: "Order Submission" },
@@ -1008,7 +1010,17 @@ const onDragEnd = async (result) => {
           { to: "/inventory-ordered", label: "Inventory Ordered" },
           { to: "/ship",              label: "Ship" }
         ].map(({ to, label }) => (
-          <NavLink key={to} to={to} style={/* ... */}>
+          <NavLink
+            key={to}
+            to={to}
+            style={({ isActive }) => ({
+              padding: '0.5rem 1rem',
+              textDecoration: 'none',
+              color: '#333',
+              fontWeight: isActive ? '600' : '400',
+              borderBottom: isActive ? '2px solid #333' : 'none'
+            })}
+          >
             {label}
           </NavLink>
         ))}
