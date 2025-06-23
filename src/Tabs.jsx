@@ -8,22 +8,21 @@ export default function Tabs({ tabs, activeTab, onSelect }) {
         `${process.env.REACT_APP_API_ROOT}/logout`,
         { withCredentials: true }
       );
+      // Redirect to frontend login or home page
+      window.location.href = window.location.origin;
     } catch (err) {
       console.error("Logout failed:", err);
+      alert("Logout failed. Please try again.");
     }
-    // Redirect back to frontend
-    window.location.href = "https://machineschedule.netlify.app/";
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        borderBottom: "1px solid #ccc",
-        backgroundColor: "#fafafa",
-        alignItems: "center"
-      }}
-    >
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      borderBottom: "1px solid #ccc",
+      backgroundColor: "#fafafa"
+    }}>
       {tabs.map(tab => {
         const isActive = tab === activeTab;
         return (
@@ -47,25 +46,22 @@ export default function Tabs({ tabs, activeTab, onSelect }) {
           </div>
         );
       })}
-
-      {/* Spacer to push logout button right */}
-      <div style={{ flex: 1 }} />
-
-      {/* Logout Button */}
-      <button
-        onClick={handleLogout}
-        style={{
-          padding: "0.75rem 1rem",
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          fontWeight: "500",
-          color: "#333",
-          marginRight: "1rem"
-        }}
-      >
-        Logout
-      </button>
+      {/* Spacer to push logout button to the right */}
+      <div style={{ marginLeft: "auto", padding: "0 1.5rem" }}>
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: "0.5rem 1rem",
+            backgroundColor: "#f44336",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer"
+          }}
+        >
+          Logout
+        </button>
+      </div>
     </div>
   );
 }
