@@ -552,7 +552,9 @@ const shippingOptions = [
                 .filter(Boolean);
 
 
-              const earliestDueDate = dueDates.length > 0 ? new Date(Math.min(...dueDates)) : null;
+              const earliestDueDate = dueDates.length > 0
+                ? new Date(Math.min(...dueDates.map(d => d.getTime())))
+                : null;
 
               let backgroundColor = "#ccc"; // default grey
 
