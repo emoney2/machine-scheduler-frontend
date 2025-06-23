@@ -559,18 +559,22 @@ const shippingOptions = [
                 ? new Date(Math.min(...dueDates.map(d => d.getTime())))
                 : null;
 
+              function stripTime(d) {
+                return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+              }
+
               let backgroundColor = "#ccc"; // default grey
 
               if (earliestDueDate && deliveryDate) {
-                const normDue = toDateOnly(earliestDueDate);
-                const normDel = toDateOnly(deliveryDate);
+                const dueMid = stripTime(earliestDueDate).getTime();
+                const delMid = stripTime(deliveryDate).getTime();
 
-                if (normDel > normDue) {
-                  backgroundColor = "#ffcdd2"; // red: arriving after due
-                } else if (normDel.getTime() === normDue.getTime()) {
-                  backgroundColor = "#fff9c4"; // yellow: arriving exactly on due
+                if (delMid < dueMid) {
+                  backgroundColor = "#b2fab4"; // green
+                } else if (delMid === dueMid) {
+                  backgroundColor = "#fff9c4"; // yellow
                 } else {
-                  backgroundColor = "#b2fab4"; // green: arriving before due
+                  backgroundColor = "#ffcdd2"; // red
                 }
               }
               return (
