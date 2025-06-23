@@ -543,6 +543,10 @@ const shippingOptions = [
               const { method, rate, delivery } = opt;
               const deliveryDate = parseDateFromString(delivery);
 
+              function toDateOnly(d) {
+                return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+              }
+
               const dueDates = jobs
                 .filter(j => selected.includes(j.orderId.toString()))
                 .map(j => {
@@ -558,18 +562,17 @@ const shippingOptions = [
               let backgroundColor = "#ccc"; // default grey
 
               if (earliestDueDate && deliveryDate) {
-                const dl = deliveryDate.getTime();
-                const dd = earliestDueDate.getTime();
+                const normDue = toDateOnly(earliestDueDate);
+                const normDel = toDateOnly(deliveryDate);
 
-                if (dl < dd) {
-                  backgroundColor = "#b2fab4"; // green: delivery before due
-                } else if (dl === dd) {
-                  backgroundColor = "#fff9c4"; // yellow: delivery same day
+                if (normDel > normDue) {
+                  backgroundColor = "#ffcdd2"; // red: arriving after due
+                } else if (normDel.getTime() === normDue.getTime()) {
+                  backgroundColor = "#fff9c4"; // yellow: arriving exactly on due
                 } else {
-                  backgroundColor = "#ffcdd2"; // red: delivery after due
+                  backgroundColor = "#b2fab4"; // green: arriving before due
                 }
               }
-
               return (
                 <button
                   key={method}
