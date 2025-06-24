@@ -39,8 +39,8 @@ export default function InventoryOrdered() {
         return sortConfig.direction === "asc" ? aTime - bTime : bTime - aTime;
       }
 
-      let aVal = a[sortConfig.key] || "";
-      let bVal = b[sortConfig.key] || "";
+      let aVal = a[sortConfig.key] ?? "";
+      let bVal = b[sortConfig.key] ?? "";
 
       if (sortConfig.key === "quantity") {
         // Numeric sort
@@ -50,6 +50,12 @@ export default function InventoryOrdered() {
         bVal = numB;
       }
 
+      // For strings (like Name), use localeCompare for proper alphabetic order
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        const cmp = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: "base" });
+        return sortConfig.direction === "asc" ? cmp : -cmp;
+      }
+      // Fallback for any other types
       if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
       return 0;
