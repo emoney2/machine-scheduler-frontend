@@ -32,19 +32,31 @@ export default function InventoryOrdered() {
   const sortedEntries = React.useMemo(() => {
     const sorted = [...entries];
     sorted.sort((a, b) => {
+      // If sorting by date, parse strings into timestamps
+      if (sortConfig.key === "date") {
+        const aTime = Date.parse(a.date) || 0;
+        const bTime = Date.parse(b.date) || 0;
+        return sortConfig.direction === "asc" ? aTime - bTime : bTime - aTime;
+      }
+
       let aVal = a[sortConfig.key] || "";
       let bVal = b[sortConfig.key] || "";
+
       if (sortConfig.key === "quantity") {
+        // Numeric sort
         const numA = parseFloat(aVal) || 0;
         const numB = parseFloat(bVal) || 0;
-        aVal = numA; bVal = numB;
+        aVal = numA;
+        bVal = numB;
       }
+
       if (aVal < bVal) return sortConfig.direction === "asc" ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === "asc" ? 1  : -1;
+      if (aVal > bVal) return sortConfig.direction === "asc" ? 1 : -1;
       return 0;
     });
     return sorted;
   }, [entries, sortConfig]);
+
 
   const displayQty = (e) =>
     e.type === "Material"
