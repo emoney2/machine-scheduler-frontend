@@ -575,6 +575,7 @@ const handleSaveNewCompany = async () => {
       `${process.env.REACT_APP_API_ROOT}/directory`,
       newCompanyData
     );
+    alert("Company successfully added");
     // 3) On success, add to local company list so it’s available immediately
     setCompanies((prev) => [
       ...prev,
@@ -611,6 +612,7 @@ const handleSaveNewCompany = async () => {
         `${process.env.REACT_APP_API_ROOT}/materials`,
         newMaterialData
       );
+      alert("Material successfully added");
 
       // 1) Add to local list
       setMaterialsInv((prev) => [...prev, newMaterialData.materialName]);
@@ -1207,6 +1209,7 @@ const handleSaveNewCompany = async () => {
                       tablePayload,
                       { withCredentials: true }
                     );
+                    alert("Product successfully added");
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
                   } catch (err) {
