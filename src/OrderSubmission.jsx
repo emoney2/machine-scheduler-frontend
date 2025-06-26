@@ -923,13 +923,26 @@ const handleSaveNewCompany = async () => {
                 gridTemplateColumns: "repeat(4, 1fr)",    // ← equal-width columns
                 columnGap: "1rem",                        // horizontal gap
                 rowGap: "0.5rem",                         // vertical gap between rows
-                alignItems: "center",                     // center‐align labels & inputs
+                alignItems:     "start",    // ← top-aligns all columns
+                justifyItems:   "start",    // ← ensures each column starts flush left
               }}
             >
               {/* Column 1 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                alignSelf: "start"
+              }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
-                  <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                  <label style={{
+                    whiteSpace: "nowrap",
+                    width:       "7ch",
+                    marginRight: "0.5ch",
+                    fontSize:    "0.85rem",
+                    display:     "inline-block",
+                    lineHeight:  "1"
+                  }}>
                     Print Time (min)
                   </label>
                   <input
@@ -942,7 +955,14 @@ const handleSaveNewCompany = async () => {
                   />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
-                  <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                  <label style={{
+                    whiteSpace: "nowrap",
+                    width:       "7ch",
+                    marginRight: "0.5ch",
+                    fontSize:    "0.85rem",
+                    display:     "inline-block",
+                    lineHeight:  "1"
+                  }}>
                     N Magnets
                   </label>
                   <input
@@ -955,7 +975,14 @@ const handleSaveNewCompany = async () => {
                   />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
-                  <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                  <label style={{
+                    whiteSpace: "nowrap",
+                    width:       "7ch",
+                    marginRight: "0.5ch",
+                    fontSize:    "0.85rem",
+                    display:     "inline-block",
+                    lineHeight:  "1"
+                  }}>
                     S Magnets
                   </label>
                   <input
@@ -970,7 +997,12 @@ const handleSaveNewCompany = async () => {
               </div>
 
               {/* Column 2 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                alignSelf: "start"
+              }}>
                 {[
                   ["foamHalf",    '1/2" Foam'],
                   ["foam38",      '3/8" Foam'],
@@ -982,7 +1014,14 @@ const handleSaveNewCompany = async () => {
                     key={key}
                     style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
                   >
-                    <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                    <label style={{
+                      whiteSpace: "nowrap",
+                      width:       "7ch",
+                      marginRight: "0.5ch",
+                      fontSize:    "0.85rem",
+                      display:     "inline-block",
+                      lineHeight:  "1"
+                    }}>
                       {label}
                     </label>
                     <input
@@ -998,7 +1037,12 @@ const handleSaveNewCompany = async () => {
               </div>
 
               {/* Column 3 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                alignSelf: "start"
+              }}>
                 {[
                   ["length", "Length (in)"],
                   ["width",  "Width (in)"],
@@ -1008,7 +1052,14 @@ const handleSaveNewCompany = async () => {
                     key={key}
                     style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
                   >
-                    <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                    <label style={{
+                      whiteSpace: "nowrap",
+                      width:       "7ch",
+                      marginRight: "0.5ch",
+                      fontSize:    "0.85rem",
+                      display:     "inline-block",
+                      lineHeight:  "1"
+                    }}>
                       {label}
                     </label>
                     <input
@@ -1024,7 +1075,12 @@ const handleSaveNewCompany = async () => {
               </div>
 
               {/* Column 4 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+              <div style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+                alignSelf: "start"
+              }}>
                 {[
                   ["blackGrommets", `1/4" Black Grommets`],
                   ["paracordFt",     "Paracord (ft)"],
@@ -1034,7 +1090,14 @@ const handleSaveNewCompany = async () => {
                     key={key}
                     style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
                   >
-                    <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                    <label style={{
+                      whiteSpace: "nowrap",
+                      width:       "7ch",
+                      marginRight: "0.5ch",
+                      fontSize:    "0.85rem",
+                      display:     "inline-block",
+                      lineHeight:  "1"
+                    }}>
                       {label}
                     </label>
                     <input
