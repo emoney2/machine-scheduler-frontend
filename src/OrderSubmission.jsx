@@ -916,6 +916,7 @@ const handleSaveNewCompany = async () => {
               New Product: {newProductData.product}
             </h2>
 
+            {/* 4-column grid */}
             <div
               style={{
                 display: "grid",
@@ -930,7 +931,7 @@ const handleSaveNewCompany = async () => {
                   <label>
                     Print Time (min){' '}
                     <span
-                      style={{ cursor: 'help' }}
+                      style={{ cursor: "help" }}
                       title={'6 divided by how many pieces can fit in 13"x30"'}
                     >
                       ℹ️
@@ -969,14 +970,14 @@ const handleSaveNewCompany = async () => {
                 </div>
               </div>
 
-              {/* Column 2: foam fields & elastic */}
+              {/* Column 2: foam & elastic */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {[
                   ["foamHalf", '1/2" Foam'],
                   ["foam38", '3/8" Foam'],
                   ["foam14", '1/4" Foam'],
                   ["foam18", '1/8" Foam'],
-                  ["elasticHalf", '1/2" Elastic'],
+                  ["elasticHalf", '1/2" Elastic']
                 ].map(([key, label]) => (
                   <div key={key}>
                     <label>{label}</label>
@@ -996,15 +997,36 @@ const handleSaveNewCompany = async () => {
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {[
                   ["length", "Length (in)"],
-                  ["width", "Width (in)"],
-                  ["depth", "Depth (in)"],
-                ].map(([dim, label]) => (
-                  <div key={dim}>
+                  ["width",  "Width (in)"],
+                  ["depth",  "Depth (in)"]
+                ].map(([key, label]) => (
+                  <div key={key}>
                     <label>{label}</label>
                     <input
-                      name={dim}
+                      name={key}
                       type="number"
-                      value={newProductData[dim] || ""}
+                      value={newProductData[key] || ""}
+                      onChange={handleNewProductChange}
+                      required
+                      style={{ width: "100%" }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              {/* Column 4: pouch-specific parts */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {[
+                  ["blackGrommets", `1/4" Black Grommets`],
+                  ["paracordFt",     "Paracord (ft)"],
+                  ["cordStoppers",   "Cord Stoppers"]
+                ].map(([key, label]) => (
+                  <div key={key}>
+                    <label>{label}</label>
+                    <input
+                      name={key}
+                      type="number"
+                      value={newProductData[key] || ""}
                       onChange={handleNewProductChange}
                       required
                       style={{ width: "100%" }}
@@ -1013,28 +1035,9 @@ const handleSaveNewCompany = async () => {
                 ))}
               </div>
             </div>
-            {/* Column 4: pouch-specific parts */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {[
-                ["blackGrommets", `1/4\" Black Grommets`],
-                ["paracordFt",      "Paracord (ft)"],
-                ["cordStoppers",    "Cord Stoppers"]
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <label>{label}</label>
-                  <input
-                    name={key}
-                    type="number"
-                    value={newProductData[key] || ""}
-                    onChange={handleNewProductChange}
-                    required
-                    style={{ width: "100%" }}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
+            {/* end grid */}
 
+            {/* Buttons inside white box */}
             <div style={{ textAlign: "right", marginTop: "1rem" }}>
               <button
                 type="button"
@@ -1047,14 +1050,12 @@ const handleSaveNewCompany = async () => {
               >
                 Cancel
               </button>
-
               <button
                 type="button"
                 disabled={modalSubmitting}
                 onClick={async () => {
                   if (modalSubmitting) return;
                   setModalSubmitting(true);
-
                   const {
                     product,
                     printTime,
@@ -1068,9 +1069,9 @@ const handleSaveNewCompany = async () => {
                     length,
                     width,
                     depth,
-                    blackGrommets,   
-                    paracordFt,     
-                    cordStoppers,  
+                    blackGrommets,
+                    paracordFt,
+                    cordStoppers,
                   } = newProductData;
                   const volume = length * width * depth;
                   const perYard = Math.floor((36 / length) * (55 / width));
@@ -1086,19 +1087,16 @@ const handleSaveNewCompany = async () => {
                     magnetS,
                     elasticHalf,
                     volume,
-                    blackGrommets,   
-                    paracordFt,     
+                    blackGrommets,
+                    paracordFt,
                     cordStoppers,
                   };
-
                   try {
                     await axios.post(
                       `${process.env.REACT_APP_API_ROOT}/table`,
                       tablePayload,
                       { withCredentials: true }
                     );
-
-                    // Close modal and return to order form
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
                   } catch (err) {
