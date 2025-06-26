@@ -920,9 +920,10 @@ const handleSaveNewCompany = async () => {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr 1fr",
-                gap: "1rem",
-                marginTop: "1rem",
+                gridTemplateColumns: "repeat(4, auto)",  // auto-sized instead of equal fractions
+                columnGap: "1rem",                        // horizontal gap
+                rowGap: "0.5rem",                         // vertical gap between rows
+                alignItems: "center",                     // center‐align labels & inputs
               }}
             >
               {/* Column 1: print time & magnets */}
@@ -943,7 +944,11 @@ const handleSaveNewCompany = async () => {
                     value={newProductData.printTime || ""}
                     onChange={handleNewProductChange}
                     required
-                    style={{ width: "100%" }}
+                    style={{
+                      width: "4ch",       // just wide enough for 1–2 digits
+                      padding: "0.25rem", // tighter padding
+                      fontSize: "0.85rem" // smaller font
+                    }}
                   />
                 </div>
                 <div>
@@ -954,7 +959,11 @@ const handleSaveNewCompany = async () => {
                     value={newProductData.magnetN || ""}
                     onChange={handleNewProductChange}
                     required
-                    style={{ width: "100%" }}
+                    style={{
+                      width: "4ch",       // just wide enough for 1–2 digits
+                      padding: "0.25rem", // tighter padding
+                      fontSize: "0.85rem" // smaller font
+                    }}
                   />
                 </div>
                 <div>
@@ -965,7 +974,11 @@ const handleSaveNewCompany = async () => {
                     value={newProductData.magnetS || ""}
                     onChange={handleNewProductChange}
                     required
-                    style={{ width: "100%" }}
+                    style={{
+                      width: "4ch",       // just wide enough for 1–2 digits
+                      padding: "0.25rem", // tighter padding
+                      fontSize: "0.85rem" // smaller font
+                    }}
                   />
                 </div>
               </div>
@@ -987,7 +1000,11 @@ const handleSaveNewCompany = async () => {
                       value={newProductData[key] || ""}
                       onChange={handleNewProductChange}
                       required
-                      style={{ width: "100%" }}
+                      style={{
+                        width: "4ch",       // just wide enough for 1–2 digits
+                        padding: "0.25rem", // tighter padding
+                        fontSize: "0.85rem" // smaller font
+                      }}
                     />
                   </div>
                 ))}
@@ -1008,7 +1025,11 @@ const handleSaveNewCompany = async () => {
                       value={newProductData[key] || ""}
                       onChange={handleNewProductChange}
                       required
-                      style={{ width: "100%" }}
+                      style={{
+                        width: "4ch",       // just wide enough for 1–2 digits
+                        padding: "0.25rem", // tighter padding
+                        fontSize: "0.85rem" // smaller font
+                      }}
                     />
                   </div>
                 ))}
@@ -1029,7 +1050,11 @@ const handleSaveNewCompany = async () => {
                       value={newProductData[key] || ""}
                       onChange={handleNewProductChange}
                       required
-                      style={{ width: "100%" }}
+                      style={{
+                        width: "4ch",       // just wide enough for 1–2 digits
+                        padding: "0.25rem", // tighter padding
+                        fontSize: "0.85rem" // smaller font
+                      }}
                     />
                   </div>
                 ))}
