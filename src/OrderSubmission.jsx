@@ -518,13 +518,14 @@ const handleSubmit = async (e) => {
     const submitUrl =
       process.env.REACT_APP_ORDER_SUBMIT_URL ||
       `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
-    await axios.post(submitUrl, fd, {
+    const config = {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: (e) => {
         const pct = Math.round((e.loaded * 100) / e.total);
         setUploadProgress(pct);
-      },
-    });
+      }
+    };
+    await axios.post(submitUrl, fd, config);
 
     alert("Order submitted!");
     // reset
