@@ -926,17 +926,11 @@ const handleSaveNewCompany = async () => {
                 alignItems: "center",                     // center‐align labels & inputs
               }}
             >
-              {/* Column 1: print time & magnets */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                <div>
-                  <label>
-                    Print Time (min){' '}
-                    <span
-                      style={{ cursor: "help" }}
-                      title={'6 divided by how many pieces can fit in 13"x30"'}
-                    >
-                      ℹ️
-                    </span>
+              {/* Column 1 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
+                  <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                    Print Time (min)
                   </label>
                   <input
                     name="printTime"
@@ -944,117 +938,112 @@ const handleSaveNewCompany = async () => {
                     value={newProductData.printTime || ""}
                     onChange={handleNewProductChange}
                     required
-                    style={{
-                      width: "4ch",       // just wide enough for 1–2 digits
-                      padding: "0.25rem", // tighter padding
-                      fontSize: "0.85rem" // smaller font
-                    }}
+                    style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
                   />
                 </div>
-                <div>
-                  <label>N Magnets</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
+                  <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                    N Magnets
+                  </label>
                   <input
                     name="magnetN"
                     type="number"
                     value={newProductData.magnetN || ""}
                     onChange={handleNewProductChange}
                     required
-                    style={{
-                      width: "4ch",       // just wide enough for 1–2 digits
-                      padding: "0.25rem", // tighter padding
-                      fontSize: "0.85rem" // smaller font
-                    }}
+                    style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
                   />
                 </div>
-                <div>
-                  <label>S Magnets</label>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
+                  <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                    S Magnets
+                  </label>
                   <input
                     name="magnetS"
                     type="number"
                     value={newProductData.magnetS || ""}
                     onChange={handleNewProductChange}
                     required
-                    style={{
-                      width: "4ch",       // just wide enough for 1–2 digits
-                      padding: "0.25rem", // tighter padding
-                      fontSize: "0.85rem" // smaller font
-                    }}
+                    style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
                   />
                 </div>
               </div>
 
-              {/* Column 2: foam & elastic */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Column 2 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {[
-                  ["foamHalf", '1/2" Foam'],
-                  ["foam38", '3/8" Foam'],
-                  ["foam14", '1/4" Foam'],
-                  ["foam18", '1/8" Foam'],
+                  ["foamHalf",    '1/2" Foam'],
+                  ["foam38",      '3/8" Foam'],
+                  ["foam14",      '1/4" Foam'],
+                  ["foam18",      '1/8" Foam'],
                   ["elasticHalf", '1/2" Elastic']
                 ].map(([key, label]) => (
-                  <div key={key}>
-                    <label>{label}</label>
+                  <div
+                    key={key}
+                    style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
+                  >
+                    <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                      {label}
+                    </label>
                     <input
                       name={key}
                       type="number"
                       value={newProductData[key] || ""}
                       onChange={handleNewProductChange}
                       required
-                      style={{
-                        width: "4ch",       // just wide enough for 1–2 digits
-                        padding: "0.25rem", // tighter padding
-                        fontSize: "0.85rem" // smaller font
-                      }}
+                      style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
                     />
                   </div>
                 ))}
               </div>
 
-              {/* Column 3: dimensions */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Column 3 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {[
                   ["length", "Length (in)"],
                   ["width",  "Width (in)"],
                   ["depth",  "Depth (in)"]
                 ].map(([key, label]) => (
-                  <div key={key}>
-                    <label>{label}</label>
+                  <div
+                    key={key}
+                    style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
+                  >
+                    <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                      {label}
+                    </label>
                     <input
                       name={key}
                       type="number"
                       value={newProductData[key] || ""}
                       onChange={handleNewProductChange}
                       required
-                      style={{
-                        width: "4ch",       // just wide enough for 1–2 digits
-                        padding: "0.25rem", // tighter padding
-                        fontSize: "0.85rem" // smaller font
-                      }}
+                      style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
                     />
                   </div>
                 ))}
               </div>
 
-              {/* Column 4: pouch-specific parts */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Column 4 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {[
                   ["blackGrommets", `1/4" Black Grommets`],
                   ["paracordFt",     "Paracord (ft)"],
                   ["cordStoppers",   "Cord Stoppers"]
                 ].map(([key, label]) => (
-                  <div key={key}>
-                    <label>{label}</label>
+                  <div
+                    key={key}
+                    style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
+                  >
+                    <label style={{ whiteSpace: "nowrap", width: "7ch", fontSize: "0.85rem" }}>
+                      {label}
+                    </label>
                     <input
                       name={key}
                       type="number"
                       value={newProductData[key] || ""}
                       onChange={handleNewProductChange}
                       required
-                      style={{
-                        width: "4ch",       // just wide enough for 1–2 digits
-                        padding: "0.25rem", // tighter padding
-                        fontSize: "0.85rem" // smaller font
-                      }}
+                      style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
                     />
                   </div>
                 ))}
