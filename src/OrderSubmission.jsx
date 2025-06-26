@@ -936,12 +936,10 @@ const handleSaveNewCompany = async () => {
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
                   <label style={{
-                    whiteSpace: "nowrap",
-                    width:       "7ch",
-                    marginRight: "0.5ch",
-                    fontSize:    "0.85rem",
-                    display:     "inline-block",
-                    lineHeight:  "1"
+                    whiteSpace: "nowrap",     // don’t wrap text
+                    flexShrink: 0,            // never compress this label
+                    marginRight: "0.5ch",     // space before the input
+                    fontSize:    "0.85rem",   // same sizing
                   }}>
                     Print Time (min)
                   </label>
@@ -956,12 +954,10 @@ const handleSaveNewCompany = async () => {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
                   <label style={{
-                    whiteSpace: "nowrap",
-                    width:       "7ch",
-                    marginRight: "0.5ch",
-                    fontSize:    "0.85rem",
-                    display:     "inline-block",
-                    lineHeight:  "1"
+                    whiteSpace: "nowrap",     // don’t wrap text
+                    flexShrink: 0,            // never compress this label
+                    marginRight: "0.5ch",     // space before the input
+                    fontSize:    "0.85rem",   // same sizing
                   }}>
                     N Magnets
                   </label>
@@ -976,12 +972,10 @@ const handleSaveNewCompany = async () => {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
                   <label style={{
-                    whiteSpace: "nowrap",
-                    width:       "7ch",
-                    marginRight: "0.5ch",
-                    fontSize:    "0.85rem",
-                    display:     "inline-block",
-                    lineHeight:  "1"
+                    whiteSpace: "nowrap",     // don’t wrap text
+                    flexShrink: 0,            // never compress this label
+                    marginRight: "0.5ch",     // space before the input
+                    fontSize:    "0.85rem",   // same sizing
                   }}>
                     S Magnets
                   </label>
@@ -1015,12 +1009,10 @@ const handleSaveNewCompany = async () => {
                     style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
                   >
                     <label style={{
-                      whiteSpace: "nowrap",
-                      width:       "7ch",
-                      marginRight: "0.5ch",
-                      fontSize:    "0.85rem",
-                      display:     "inline-block",
-                      lineHeight:  "1"
+                      whiteSpace: "nowrap",     // don’t wrap text
+                      flexShrink: 0,            // never compress this label
+                      marginRight: "0.5ch",     // space before the input
+                      fontSize:    "0.85rem",   // same sizing
                     }}>
                       {label}
                     </label>
@@ -1053,12 +1045,10 @@ const handleSaveNewCompany = async () => {
                     style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
                   >
                     <label style={{
-                      whiteSpace: "nowrap",
-                      width:       "7ch",
-                      marginRight: "0.5ch",
-                      fontSize:    "0.85rem",
-                      display:     "inline-block",
-                      lineHeight:  "1"
+                      whiteSpace: "nowrap",     // don’t wrap text
+                      flexShrink: 0,            // never compress this label
+                      marginRight: "0.5ch",     // space before the input
+                      fontSize:    "0.85rem",   // same sizing
                     }}>
                       {label}
                     </label>
@@ -1091,12 +1081,10 @@ const handleSaveNewCompany = async () => {
                     style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
                   >
                     <label style={{
-                      whiteSpace: "nowrap",
-                      width:       "7ch",
-                      marginRight: "0.5ch",
-                      fontSize:    "0.85rem",
-                      display:     "inline-block",
-                      lineHeight:  "1"
+                      whiteSpace: "nowrap",     // don’t wrap text
+                      flexShrink: 0,            // never compress this label
+                      marginRight: "0.5ch",     // space before the input
+                      fontSize:    "0.85rem",   // same sizing
                     }}>
                       {label}
                     </label>
