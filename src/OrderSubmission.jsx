@@ -107,13 +107,20 @@ export default function OrderSubmission() {
   const productInvalid   = form.product.trim() && !products
     .map(p => p.toLowerCase())
     .includes(form.product.trim().toLowerCase());
-  const materialsInvalid = form.materials
-    .filter(m => m.trim())
-    .some(m => !materialsInv
-      .map(v => v.toLowerCase())
-      .includes(m.trim().toLowerCase())
+  const materialsInvalid =
+    form.materials.filter(m => m.trim()).some(m =>
+      !materialsInv.map(v => v.toLowerCase()).includes(m.trim().toLowerCase())
+    )
+    || (
+      form.backMaterial.trim() &&
+      !materialsInv.map(v => v.toLowerCase())
+               .includes(form.backMaterial.trim().toLowerCase())
+    )
+    || (
+      form.furColor.trim() &&
+      !materialsInv.map(v => v.toLowerCase())
+               .includes(form.furColor.trim().toLowerCase())
     );
-
   const formRef = useRef(null); // for automatic resubmit
 
   const handleNewProductChange = (e) => {
@@ -1210,6 +1217,9 @@ const handleSaveNewCompany = async () => {
                       { withCredentials: true }
                     );
                     alert("Product successfully added");
+                    setProducts(prev => [...prev, newProductData.product]);
+
+                    setForm(prev => ({ ...prev, product: newProductData.product }));
                     setIsNewProductModalOpen(false);
                     setNewProductName("");
                   } catch (err) {
