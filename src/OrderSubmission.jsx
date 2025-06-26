@@ -100,6 +100,20 @@ export default function OrderSubmission() {
 
   const [modalSubmitting, setModalSubmitting] = useState(false);
 
+  // Step 1: flags for unrecognized entries
+  const companyInvalid   = form.company.trim() && !companies
+    .map(c => c.value.toLowerCase())
+    .includes(form.company.trim().toLowerCase());
+  const productInvalid   = form.product.trim() && !products
+    .map(p => p.toLowerCase())
+    .includes(form.product.trim().toLowerCase());
+  const materialsInvalid = form.materials
+    .filter(m => m.trim())
+    .some(m => !materialsInv
+      .map(v => v.toLowerCase())
+      .includes(m.trim().toLowerCase())
+    );
+
   const formRef = useRef(null); // for automatic resubmit
 
   const handleNewProductChange = (e) => {
@@ -1246,10 +1260,15 @@ const handleSaveNewCompany = async () => {
                 gridTemplateColumns: "repeat(3, 1fr)",
                 gap: "0.5rem",
               }}
-            >            {/* COMPANY INLINE TYPE-AHEAD */}
+            >            
+            {/* COMPANY INLINE TYPE-AHEAD */}
             <div style={{ marginBottom: "0.5rem", position: "relative" }}>
               <label style={{ display: "block" }}>
-                Company Name*<br />
+                Company Name*
+                {companyInvalid && (
+                  <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>
+                )}
+                <br />
                 <input
                   ref={companyInputRef}
                   name="company"
@@ -1266,14 +1285,12 @@ const handleSaveNewCompany = async () => {
                   list="company-list"
                 />
               </label>
-              {/* fallback dropdown list for clicking */}
               <datalist id="company-list">
                 {companyNames.map((c) => (
                   <option key={c} value={c} />
                 ))}
               </datalist>
             </div>
-
 
             <div>
               <label>
@@ -1303,7 +1320,11 @@ const handleSaveNewCompany = async () => {
             {/* PRODUCT INLINE TYPE-AHEAD */}
             <div style={{ marginBottom: "0.5rem", position: "relative" }}>
               <label style={{ display: "block" }}>
-                Product*<br />
+                Product*
+                {productInvalid && (
+                  <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>
+                )}
+                <br />
                 <input
                   ref={productInputRef}
                   name="product"
@@ -1394,7 +1415,12 @@ const handleSaveNewCompany = async () => {
 
         {/* Materials */}
         <fieldset style={{ padding: "0.5rem" }}>
-          <legend>Materials</legend>
+          <legend>
+            Materials
+            {materialsInvalid && (
+              <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>
+            )}
+          </legend>
           <div
             style={{
               display: "grid",
