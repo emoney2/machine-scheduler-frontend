@@ -1258,7 +1258,6 @@ const handleSaveNewCompany = async () => {
             height:        "8px",
             appearance:    "none",
             WebkitAppearance: "none",
-            accentColor:   "blue",      // ← this makes the fill blue
           }}
         />
       )}
