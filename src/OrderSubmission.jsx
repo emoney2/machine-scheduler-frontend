@@ -927,177 +927,208 @@ const handleSaveNewCompany = async () => {
                 justifyItems:   "start",    // ← ensures each column starts flush left
               }}
             >
-              {/* Column 1 */}
+              {/* Column 1: Print Time & Magnets */}
               <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                alignSelf: "start"
+                display:        "grid",
+                gridTemplateColumns: "max-content 4ch",
+                columnGap:      "0.5ch",
+                rowGap:         "0.5rem",
+                alignSelf:      "start"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
-                  <label style={{
-                    whiteSpace: "nowrap",     // don’t wrap text
-                    flexShrink: 0,            // never compress this label
-                    marginRight: "0.5ch",     // space before the input
-                    fontSize:    "0.85rem",   // same sizing
-                  }}>
-                    Print Time (min)
-                  </label>
-                  <input
-                    name="printTime"
-                    type="number"
-                    value={newProductData.printTime || ""}
-                    onChange={handleNewProductChange}
-                    required
-                    style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
-                  />
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
-                  <label style={{
-                    whiteSpace: "nowrap",     // don’t wrap text
-                    flexShrink: 0,            // never compress this label
-                    marginRight: "0.5ch",     // space before the input
-                    fontSize:    "0.85rem",   // same sizing
-                  }}>
-                    N Magnets
-                  </label>
-                  <input
-                    name="magnetN"
-                    type="number"
-                    value={newProductData.magnetN || ""}
-                    onChange={handleNewProductChange}
-                    required
-                    style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
-                  />
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}>
-                  <label style={{
-                    whiteSpace: "nowrap",     // don’t wrap text
-                    flexShrink: 0,            // never compress this label
-                    marginRight: "0.5ch",     // space before the input
-                    fontSize:    "0.85rem",   // same sizing
-                  }}>
-                    S Magnets
-                  </label>
-                  <input
-                    name="magnetS"
-                    type="number"
-                    value={newProductData.magnetS || ""}
-                    onChange={handleNewProductChange}
-                    required
-                    style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
-                  />
-                </div>
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  Print Time (min)
+                </label>
+                <input
+                  name="printTime"
+                  type="number"
+                  value={newProductData.printTime || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  N Magnets
+                </label>
+                <input
+                  name="magnetN"
+                  type="number"
+                  value={newProductData.magnetN || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  S Magnets
+                </label>
+                <input
+                  name="magnetS"
+                  type="number"
+                  value={newProductData.magnetS || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
               </div>
 
-              {/* Column 2 */}
+              {/* Column 2: Foam & Elastic */}
               <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                alignSelf: "start"
+                display:        "grid",
+                gridTemplateColumns: "max-content 4ch",
+                columnGap:      "0.5ch",
+                rowGap:         "0.5rem",
+                alignSelf:      "start"
               }}>
-                {[
-                  ["foamHalf",    '1/2" Foam'],
-                  ["foam38",      '3/8" Foam'],
-                  ["foam14",      '1/4" Foam'],
-                  ["foam18",      '1/8" Foam'],
-                  ["elasticHalf", '1/2" Elastic']
-                ].map(([key, label]) => (
-                  <div
-                    key={key}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
-                  >
-                    <label style={{
-                      whiteSpace: "nowrap",     // don’t wrap text
-                      flexShrink: 0,            // never compress this label
-                      marginRight: "0.5ch",     // space before the input
-                      fontSize:    "0.85rem",   // same sizing
-                    }}>
-                      {label}
-                    </label>
-                    <input
-                      name={key}
-                      type="number"
-                      value={newProductData[key] || ""}
-                      onChange={handleNewProductChange}
-                      required
-                      style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
-                    />
-                  </div>
-                ))}
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  ½" Foam
+                </label>
+                <input
+                  name="foamHalf"
+                  type="number"
+                  value={newProductData.foamHalf || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  ⅜" Foam
+                </label>
+                <input
+                  name="foam38"
+                  type="number"
+                  value={newProductData.foam38 || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  ¼" Foam
+                </label>
+                <input
+                  name="foam14"
+                  type="number"
+                  value={newProductData.foam14 || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  ⅛" Foam
+                </label>
+                <input
+                  name="foam18"
+                  type="number"
+                  value={newProductData.foam18 || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  ½" Elastic (in)
+                </label>
+                <input
+                  name="elasticHalf"
+                  type="number"
+                  value={newProductData.elasticHalf || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
               </div>
 
-              {/* Column 3 */}
+              {/* Column 3: Dimensions */}
               <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                alignSelf: "start"
+                display:        "grid",
+                gridTemplateColumns: "max-content 4ch",
+                columnGap:      "0.5ch",
+                rowGap:         "0.5rem",
+                alignSelf:      "start"
               }}>
-                {[
-                  ["length", "Length (in)"],
-                  ["width",  "Width (in)"],
-                  ["depth",  "Depth (in)"]
-                ].map(([key, label]) => (
-                  <div
-                    key={key}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
-                  >
-                    <label style={{
-                      whiteSpace: "nowrap",     // don’t wrap text
-                      flexShrink: 0,            // never compress this label
-                      marginRight: "0.5ch",     // space before the input
-                      fontSize:    "0.85rem",   // same sizing
-                    }}>
-                      {label}
-                    </label>
-                    <input
-                      name={key}
-                      type="number"
-                      value={newProductData[key] || ""}
-                      onChange={handleNewProductChange}
-                      required
-                      style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
-                    />
-                  </div>
-                ))}
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  Length (in)
+                </label>
+                <input
+                  name="length"
+                  type="number"
+                  value={newProductData.length || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  Width (in)
+                </label>
+                <input
+                  name="width"
+                  type="number"
+                  value={newProductData.width || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  Depth (in)
+                </label>
+                <input
+                  name="depth"
+                  type="number"
+                  value={newProductData.depth || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
               </div>
 
-              {/* Column 4 */}
+              {/* Column 4: Pouch-Specific */}
               <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5rem",
-                alignSelf: "start"
+                display:        "grid",
+                gridTemplateColumns: "max-content 4ch",
+                columnGap:      "0.5ch",
+                rowGap:         "0.5rem",
+                alignSelf:      "start"
               }}>
-                {[
-                  ["blackGrommets", `1/4" Black Grommets`],
-                  ["paracordFt",     "Paracord (ft)"],
-                  ["cordStoppers",   "Cord Stoppers"]
-                ].map(([key, label]) => (
-                  <div
-                    key={key}
-                    style={{ display: "flex", alignItems: "center", gap: "0.5ch" }}
-                  >
-                    <label style={{
-                      whiteSpace: "nowrap",     // don’t wrap text
-                      flexShrink: 0,            // never compress this label
-                      marginRight: "0.5ch",     // space before the input
-                      fontSize:    "0.85rem",   // same sizing
-                    }}>
-                      {label}
-                    </label>
-                    <input
-                      name={key}
-                      type="number"
-                      value={newProductData[key] || ""}
-                      onChange={handleNewProductChange}
-                      required
-                      style={{ width: "4ch", padding: "0.25rem", fontSize: "0.85rem" }}
-                    />
-                  </div>
-                ))}
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  1/4" Black Grommets
+                </label>
+                <input
+                  name="blackGrommets"
+                  type="number"
+                  value={newProductData.blackGrommets || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  Paracord (ft)
+                </label>
+                <input
+                  name="paracordFt"
+                  type="number"
+                  value={newProductData.paracordFt || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
+
+                <label style={{ fontSize:"0.85rem", whiteSpace:"nowrap" }}>
+                  Cord Stoppers
+                </label>
+                <input
+                  name="cordStoppers"
+                  type="number"
+                  value={newProductData.cordStoppers || ""}
+                  onChange={handleNewProductChange}
+                  required
+                  style={{ width:"4ch", padding:"0.25rem", fontSize:"0.85rem" }}
+                />
               </div>
             </div>
             {/* end grid */}
