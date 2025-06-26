@@ -1247,8 +1247,7 @@ const handleSaveNewCompany = async () => {
 
       {/* Loading bar */}
       {isSubmitting && (
-        <progress
-          className="upload-progress"
+        <progress className="upload-progress"
           max="100"
           value={uploadProgress}
           style={{
