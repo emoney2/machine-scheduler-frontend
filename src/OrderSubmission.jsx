@@ -1251,6 +1251,15 @@ const handleSaveNewCompany = async () => {
           className="upload-progress"
           max="100"
           value={uploadProgress}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "8px",
+            appearance: "none",
+            WebkitAppearance: "none"
+          }}
         />
       )}
 
