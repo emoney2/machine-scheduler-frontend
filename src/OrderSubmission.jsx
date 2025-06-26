@@ -101,6 +101,46 @@ export default function OrderSubmission() {
 
   const [modalSubmitting, setModalSubmitting] = useState(false);
 
+  const [modalSubmitting, setModalSubmitting] = useState(false);
+
+  // ─── Reorder modal state & handlers ─────────────────────────────
+  const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+  const [reorderData, setReorderData] = useState({
+    previousOrder: "",
+    newDueDate:    "",
+    newDateType:   "Hard Date",
+    notes:         ""
+  });
+ 
+  const openReorderModal = () => setIsReorderModalOpen(true);
+  const handleReorderSubmit = async () => {
+    // 1) fetch old order
+    const { data: old } = await axios.get(
+      `${API_ROOT}/api/orders/${reorderData.previousOrder}`
+    );
+    // 2) build payload
+    const payload = {
+      ...old,
+      dueDate:  reorderData.newDueDate,
+      dateType: reorderData.newDateType,
+      notes:    reorderData.notes,
+      // only carry production, print & .emb files
+      prodFiles: old.prodFiles,
+      printFiles: old.printFiles,
+      embFile:    old.embFile
+    };
+    // 3) submit reorder
+    await axios.post(`${API_ROOT}/api/reorder`, {
+      previousOrder: reorderData.previousOrder,
+      newDueDate:    reorderData.newDueDate,
+      newDateType:   reorderData.newDateType,
+      notes:         reorderData.notes
+    });
+    setIsReorderModalOpen(false);
+    alert("Reorder created!");
+  };
+
+
   // Step 1: flags for unrecognized entries
   const companyInvalid   = form.company.trim() && !companies
     .map(c => c.value.toLowerCase())
@@ -1245,6 +1285,62 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
 
+     {/* ─── Reorder Modal ─────────────────────────────── */}
+     {isReorderModalOpen && (
+       <div
+         style={{
+           position: "fixed",
+           top: 0, left: 0,
+           width: "100%", height: "100%",
+           background: "rgba(0,0,0,0.5)",
+           display: "flex",
+           alignItems: "center",
+           justifyContent: "center",
+           zIndex: 1000
+         }}
+       >
+         <div style={{ background:"#fff", padding:"1rem", borderRadius:"0.5rem", width: "400px" }}>
+           <h2>Reorder Previous Job</h2>
+           <label>
+             Previous Order #
+             <input
+               value={reorderData.previousOrder}
+               onChange={e => setReorderData(d => ({ ...d, previousOrder: e.target.value }))}
+             />
+           </label>
+           <label>
+             New Due Date
+             <input
+               type="date"
+               value={reorderData.newDueDate}
+               onChange={e => setReorderData(d => ({ ...d, newDueDate: e.target.value }))}
+             />
+           </label>
+           <label>
+             Due Type
+             <select
+               value={reorderData.newDateType}
+               onChange={e => setReorderData(d => ({ ...d, newDateType: e.target.value }))}
+             >
+               <option>Hard Date</option><option>Soft Date</option>
+             </select>
+           </label>
+           <label>
+             Notes
+             <textarea
+               rows={3}
+               value={reorderData.notes}
+               onChange={e => setReorderData(d => ({ ...d, notes: e.target.value }))}
+             />
+           </label>
+           <div style={{ marginTop:"0.5rem", textAlign:"right" }}>
+             <button onClick={() => setIsReorderModalOpen(false)}>Cancel</button>
+             <button onClick={handleReorderSubmit}>Submit</button>
+           </div>
+         </div>
+       </div>
+     )}
+
       {/* Loading bar */}
       {isSubmitting && (
         <progress className="upload-progress"
@@ -1261,6 +1357,16 @@ const handleSaveNewCompany = async () => {
           }}
         />
       )}
+
+      {/* ─── Reorder button ─────────────────────────────── */}
+      <div style={{ marginBottom: "1rem", textAlign: "right" }}>
+        <button type="button" onClick={openReorderModal}>
+          Reorder Previous Job
+        </button>
+      </div>
+ 
+      <form
+        ref={formRef}
 
       <form
         ref={formRef}
