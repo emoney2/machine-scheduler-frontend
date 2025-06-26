@@ -77,6 +77,7 @@ export default function OrderSubmission() {
   });
   const [newCompanyErrors, setNewCompanyErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress]  = useState(0);
   // ─── NEW: track “unknown product” pop-up ───────────────────────
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [newProductName, setNewProductName]         = useState("");
@@ -519,6 +520,10 @@ const handleSubmit = async (e) => {
       `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
     await axios.post(submitUrl, fd, {
       headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (e) => {
+        const pct = Math.round((e.loaded * 100) / e.total);
+        setUploadProgress(pct);
+      },
     });
 
     alert("Order submitted!");
@@ -547,6 +552,7 @@ const handleSubmit = async (e) => {
     alert(err.response?.data?.error || "Submission failed");
   } finally {
     setIsSubmitting(false);
+    setUploadProgress(0);
   }
 };
 
@@ -1241,11 +1247,16 @@ const handleSaveNewCompany = async () => {
       {/* Loading bar */}
       {isSubmitting && (
         <progress
+          max="100"
+          value={uploadProgress}
           style={{
             position: "fixed",
             top: 0, left: 0,
-            width: "100%", height: "4px",
+            width: "100%",
+            height: "8px",    // ← twice as tall
             zIndex: 1001,
+            appearance: "none",
+            WebkitAppearance: "none"
           }}
         />
       )}
