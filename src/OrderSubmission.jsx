@@ -82,9 +82,20 @@ export default function OrderSubmission() {
   const [newProductName, setNewProductName]         = useState("");
   const [newProductData, setNewProductData] = useState({
     product: "",
+    printTime: "",
+    foamHalf: "",
+    foam38: "",
+    foam14: "",
+    foam18: "",
+    magnetN: "",
+    magnetS: "",
+    elasticHalf: "",
     length: "",
     width: "",
     depth: "",
+    blackGrommets: "",    // <— new
+    paracordFt: "",       // <— new
+    cordStoppers: ""      // <— new
   });
 
   const [modalSubmitting, setModalSubmitting] = useState(false);
@@ -908,7 +919,7 @@ const handleSaveNewCompany = async () => {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
+                gridTemplateColumns: "1fr 1fr 1fr 1fr",
                 gap: "1rem",
                 marginTop: "1rem",
               }}
@@ -1002,6 +1013,27 @@ const handleSaveNewCompany = async () => {
                 ))}
               </div>
             </div>
+            {/* Column 4: pouch-specific parts */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {[
+                ["blackGrommets", `1/4\" Black Grommets`],
+                ["paracordFt",      "Paracord (ft)"],
+                ["cordStoppers",    "Cord Stoppers"]
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <label>{label}</label>
+                  <input
+                    name={key}
+                    type="number"
+                    value={newProductData[key] || ""}
+                    onChange={handleNewProductChange}
+                    required
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
 
             <div style={{ textAlign: "right", marginTop: "1rem" }}>
               <button
@@ -1036,6 +1068,9 @@ const handleSaveNewCompany = async () => {
                     length,
                     width,
                     depth,
+                    blackGrommets,   
+                    paracordFt,     
+                    cordStoppers,  
                   } = newProductData;
                   const volume = length * width * depth;
                   const perYard = Math.floor((36 / length) * (55 / width));
@@ -1051,6 +1086,9 @@ const handleSaveNewCompany = async () => {
                     magnetS,
                     elasticHalf,
                     volume,
+                    blackGrommets,   
+                    paracordFt,     
+                    cordStoppers,
                   };
 
                   try {
