@@ -920,7 +920,7 @@ const handleSaveNewCompany = async () => {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4, auto)",  // auto-sized instead of equal fractions
+                gridTemplateColumns: "repeat(4, 1fr)",    // ← equal-width columns
                 columnGap: "1rem",                        // horizontal gap
                 rowGap: "0.5rem",                         // vertical gap between rows
                 alignItems: "center",                     // center‐align labels & inputs
