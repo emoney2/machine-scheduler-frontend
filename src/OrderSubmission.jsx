@@ -1251,13 +1251,14 @@ const handleSaveNewCompany = async () => {
           max="100"
           value={uploadProgress}
           style={{
-            position: "fixed",
-            top: 0, left: 0,
-            width: "100%",
-            height: "8px",    // ← twice as tall
-            zIndex: 1001,
-            appearance: "none",
-            WebkitAppearance: "none"
+            position:      "fixed",
+            top:           0,
+            left:          0,
+            width:         "100%",
+            height:        "8px",
+            appearance:    "none",
+            WebkitAppearance: "none",
+            accentColor:   "blue",      // ← this makes the fill blue
           }}
         />
       )}
