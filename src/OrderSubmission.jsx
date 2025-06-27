@@ -151,27 +151,32 @@ export default function OrderSubmission() {
   };
 
   const handleReorderSubmit = async () => {
-    // 1) fetch old order
-    const { data: old } = await axios.get(
-      `${API_ROOT}/orders/${reorderData.previousOrder}`
-    );
-    // 2) build payload
-    const payload = {
-      ...old,
-      dueDate:  reorderData.newDueDate,
-      dateType: reorderData.newDateType,
-      notes:    reorderData.notes,
-      // only carry production, print & .emb files
-      prodFiles: old.prodFiles,
-      printFiles: old.printFiles,
-      embFile:    old.embFile
-    };
-    // 3) submit reorder
-    await axios.post(`${API_ROOT}/reorder`, payload);
-    setIsReorderModalOpen(false);
-    alert("Reorder created!");
-  };
+    try {
+      const { data: old } = await axios.get(
+        `${API_ROOT}/orders/${reorderData.previousOrder}`
+      );
 
+      const payload = {
+        ...old,
+        dueDate: reorderData.newDueDate,
+        dateType: reorderData.newDateType,
+        notes: reorderData.notes,
+        prodFiles: old.prodFiles,
+        printFiles: old.printFiles,
+        embFile: old.embFile
+      };
+
+      console.log("📦 Submitting reorder payload:", payload);  // 👈 ADD THIS LINE
+
+      await axios.post(`${API_ROOT}/reorder`, payload);
+
+      setIsReorderModalOpen(false);
+      alert("Reorder created!");
+    } catch (err) {
+      console.error("❌ Error submitting reorder:", err);
+      alert("Failed to reorder. See console.");
+    }
+  };
 
   // Step 1: flags for unrecognized entries
   const companyInvalid   = form.company.trim() && !companies
