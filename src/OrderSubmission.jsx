@@ -1332,6 +1332,12 @@ const handleSaveNewCompany = async () => {
         }}
       >
 
+        // ▶️ Add this useEffect right below:
+        useEffect(() => {
+          // re-fetch whenever order# changes
+          loadExistingOrder();
+        }, [reorderData.previousOrder]);
+
         {/* ─── Reorder Modal ──────────────────────────── */}
         {isReorderModalOpen && (
           <div style={{
@@ -1355,7 +1361,6 @@ const handleSaveNewCompany = async () => {
                   name="previousOrder"
                   value={reorderData.previousOrder}
                   onChange={handleReorderChange}
-                  onBlur={loadExistingOrder}
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
