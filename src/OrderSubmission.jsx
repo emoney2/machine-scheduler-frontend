@@ -162,7 +162,10 @@ export default function OrderSubmission() {
 
       console.log("📦 Submitting reorder payload:", JSON.stringify(payload, null, 2));
 
-      const response = await axios.post(`${API_ROOT}/reorder`, payload);
+      const response = await axios.post(`${API_ROOT}/reorder`, payload, {
+        headers: { "Content-Type": "application/json" },
+      });
+
       console.log("✅ Reorder response:", response.data);
 
       setIsReorderModalOpen(false);
@@ -172,8 +175,6 @@ export default function OrderSubmission() {
       alert("Failed to submit reorder.");
     }
   };
-
-
 
   // Step 1: flags for unrecognized entries
   const companyInvalid   = form.company.trim() && !companies
