@@ -1387,40 +1387,6 @@ const handleSaveNewCompany = async () => {
                 />
               </label>
 
-              {reorderData.previewUrl && (
-                <div style={{ marginBottom: "1rem" }}>
-                  <label>Preview:</label><br />
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "160px",
-                      border: "1px solid #ccc",
-                      borderRadius: "4px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginTop: "0.5rem",
-                      background: "#f9f9f9"
-                    }}
-                  >
-                    {reorderData.previewUrl ? (
-                      <img
-                        src={reorderData.previewUrl}
-                        alt="Preview"
-                        style={{
-                          maxHeight: "100%",
-                          maxWidth: "100%",
-                          objectFit: "contain",
-                          borderRadius: "4px"
-                        }}
-                      />
-                    ) : (
-                      <span style={{ color: "#888", fontStyle: "italic" }}>No preview yet</span>
-                    )}
-                  </div>
-                </div>
-              )}
-
               <label style={{ display: "block", marginBottom: "0.5rem" }}>
                 New Due Date<br />
                 <input
@@ -1430,25 +1396,23 @@ const handleSaveNewCompany = async () => {
                   onChange={handleReorderChange}
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
+                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                  {[6, 7, 8].map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + w * 7);
+                        const iso = d.toISOString().split("T")[0];
+                        setReorderData((prev) => ({ ...prev, newDueDate: iso }));
+                      }}
+                    >
+                      {w} weeks
+                    </button>
+                  ))}
+                </div>
               </label>
-
-              {/* Week Quick Picks */}
-              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-                {[6, 7, 8].map((w) => (
-                  <button
-                    key={w}
-                    type="button"
-                    onClick={() => {
-                      const d = new Date();
-                      d.setDate(d.getDate() + w * 7);
-                      const iso = d.toISOString().split("T")[0];
-                      setReorderData((prev) => ({ ...prev, newDueDate: iso }));
-                    }}
-                  >
-                    {w} weeks
-                  </button>
-                ))}
-              </div>
 
               <label style={{ display: "block", marginBottom: "0.5rem" }}>
                 Due Type<br />
@@ -1474,6 +1438,39 @@ const handleSaveNewCompany = async () => {
                 />
               </label>
 
+              {/* ✅ Always-visible Preview Section */}
+              <div style={{ marginBottom: "1rem" }}>
+                <label>Preview:</label><br />
+                <div
+                  style={{
+                    width: "100%",
+                    height: "160px",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginTop: "0.5rem",
+                    background: "#f9f9f9"
+                  }}
+                >
+                  {reorderData.previewUrl ? (
+                    <img
+                      src={reorderData.previewUrl}
+                      alt="Preview"
+                      style={{
+                        maxHeight: "100%",
+                        maxWidth: "100%",
+                        objectFit: "contain",
+                        borderRadius: "4px"
+                      }}
+                    />
+                  ) : (
+                    <span style={{ color: "#888", fontStyle: "italic" }}>No preview yet</span>
+                  )}
+                </div>
+              </div>
+
               <div style={{ textAlign: "right" }}>
                 <button
                   type="button"
@@ -1487,12 +1484,13 @@ const handleSaveNewCompany = async () => {
                   onClick={handleReorderSubmit}
                   style={{ padding: "0.25rem 0.5rem" }}
                 >
-                  Create
+                  Submit
                 </button>
               </div>
             </div>
           </div>
         )}
+
 
         {/* ─── Reorder Trigger ──────────────────────────── */}
         <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem" }}>
