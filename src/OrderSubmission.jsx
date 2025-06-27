@@ -129,8 +129,8 @@ export default function OrderSubmission() {
       console.log("✅ Loaded order:", old); // ← add this
       setReorderData(d => ({
         ...d,
-        notes:       old.notes || "",
-        newDateType: old.dateType || "Hard Date"
+        notes: old["Notes"] || "",               // ← Capital “N”
+        newDateType: old["Hard/Soft Date"] || "Hard Date"  // ← Use exact key from Sheet
       }));
     } catch (err) {
       console.error("❌ Could not load existing order:", err);
