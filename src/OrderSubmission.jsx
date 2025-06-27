@@ -167,7 +167,7 @@ export default function OrderSubmission() {
       embFile:    old.embFile
     };
     // 3) submit reorder
-    await axios.post(`${API_ROOT}/api/reorder`, payload);
+    await axios.post(`${API_ROOT}/reorder`, payload);
     setIsReorderModalOpen(false);
     alert("Reorder created!");
   };
