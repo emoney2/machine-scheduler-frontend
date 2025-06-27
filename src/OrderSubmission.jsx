@@ -1477,9 +1477,12 @@ const handleSaveNewCompany = async () => {
                   Cancel
                 </button>
                 <button
-                  type="button"
                   onClick={handleReorderSubmit}
-                  style={{ padding: "0.25rem 0.5rem" }}
+                  disabled={
+                    !reorderData.previousOrder ||
+                    !reorderData.newDueDate ||
+                    !reorderData.newDateType
+                  }
                 >
                   Submit
                 </button>
