@@ -118,7 +118,17 @@ export default function OrderSubmission() {
     setReorderData(d => ({ ...d, [name]: value }));
   };
 
-  // ─── Fetch existing order when the user finishes typing the order # ─────────────────────
+
+  const extractDriveThumbnail = (link) => {
+    let fileId = "";
+    if (link.includes("id=")) {
+      fileId = link.split("id=")[1].split("&")[0];
+    } else if (link.includes("/file/d/")) {
+      fileId = link.split("/file/d/")[1].split("/")[0];
+    }
+    return fileId ? `https://drive.google.com/thumbnail?id=${fileId}` : "";
+  };
+
   const loadExistingOrder = async () => {
     console.log("🔍 loadExistingOrder called with:", reorderData.previousOrder);
     if (!reorderData.previousOrder) return;
@@ -1368,6 +1378,24 @@ const handleSaveNewCompany = async () => {
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
+
+              {reorderData.previewUrl && (
+                <div style={{ marginBottom: "1rem" }}>
+                  <label>Preview:</label><br />
+                  <img
+                    src={reorderData.previewUrl}
+                    alt="Preview"
+                    style={{
+                      width: "100%",
+                      maxHeight: "160px",
+                      objectFit: "contain",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      marginTop: "0.5rem"
+                    }}
+                  />
+                </div>
+              )}
 
               <label style={{ display: "block", marginBottom: "0.5rem" }}>
                 New Due Date<br />
