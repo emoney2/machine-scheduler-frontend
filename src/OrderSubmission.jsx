@@ -147,7 +147,7 @@ export default function OrderSubmission() {
         ...d,
         notes: old["Notes"] || "",
         newDateType: old["Hard/Soft Date"] || "Hard Date",
-        previewUrl: preview
+        previewUrl: preview,
       }));
     } catch (err) {
       console.error("❌ Could not load existing order:", err);
