@@ -159,9 +159,10 @@ export default function OrderSubmission() {
         notes: reorderData.notes,
       };
 
-      console.log("📦 Submitting reorder payload:", payload);
+      console.log("📦 Submitting reorder payload:", JSON.stringify(payload, null, 2));
 
-      await axios.post(`${API_ROOT}/reorder`, payload);
+      const response = await axios.post(`${API_ROOT}/reorder`, payload);
+      console.log("✅ Reorder response:", response.data);
 
       setIsReorderModalOpen(false);
       alert("Reorder created!");
@@ -170,6 +171,7 @@ export default function OrderSubmission() {
       alert("Failed to submit reorder.");
     }
   };
+
 
 
   // Step 1: flags for unrecognized entries
