@@ -152,33 +152,11 @@ export default function OrderSubmission() {
 
   const handleReorderSubmit = async () => {
     try {
-      const { data: old } = await axios.get(
-        `${API_ROOT}/orders/${reorderData.previousOrder}`
-      );
-
       const payload = {
-        company: old["Company Name"] || "",
-        designName: old["Design"] || "",
-        quantity: old["Quantity"] || "",
-        product: old["Product"] || "",
-        price: old["Price"] || "",
-        dueDate: reorderData.newDueDate,
-        dateType: reorderData.newDateType,
+        previousOrder: reorderData.previousOrder,
+        newDueDate: reorderData.newDueDate,
+        newDateType: reorderData.newDateType,
         notes: reorderData.notes,
-        referral: old["Referral"] || "",
-        materials: [
-          old["Material 1"] || "",
-          old["Material 2"] || "",
-          old["Material 3"] || "",
-          old["Material 4"] || "",
-          old["Material 5"] || ""
-        ],
-        backMaterial: old["Back Material"] || "",
-        embBacking: old["Embroidery Backing"] || "",
-        furColor: old["Fur Color"] || "",
-        prodFiles: old.prodFiles || [],
-        printFiles: old.printFiles || [],
-        embFile: old.embFile || ""
       };
 
       console.log("📦 Submitting reorder payload:", payload);
