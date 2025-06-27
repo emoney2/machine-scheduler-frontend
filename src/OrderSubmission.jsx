@@ -153,7 +153,7 @@ export default function OrderSubmission() {
   const handleReorderSubmit = async () => {
     // 1) fetch old order
     const { data: old } = await axios.get(
-      `${API_ROOT}/api/orders/${reorderData.previousOrder}`
+      `${API_ROOT}/orders/${reorderData.previousOrder}`
     );
     // 2) build payload
     const payload = {
