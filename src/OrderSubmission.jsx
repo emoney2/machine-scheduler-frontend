@@ -515,6 +515,11 @@ const furColorNames = furColors;
 const handleSubmit = async (e) => {
   e.preventDefault();
 
+  // ⛔ Skip all validation if this is a reorder
+  if (form.isReorder) {
+    return submitForm();  // moved core logic to a new helper
+  }
+
   // 1) Company check
   const companyLower = form.company.trim().toLowerCase();
   const knownCompanies = companies.map(c => c.value.toLowerCase());
@@ -572,11 +577,15 @@ const handleSubmit = async (e) => {
     return setIsNewMaterialModalOpen(true);
   }
 
-  // 4) All good → submit
+  // ✅ If everything checks out, submit
+  return submitForm();
+};
+
+// 🔧 Shared submission logic for normal orders and reorders
+const submitForm = async () => {
   setIsSubmitting(true);
   try {
     const fd = new FormData();
-    // append form fields
     Object.entries(form).forEach(([key, value]) => {
       if (key === "materials") {
         value.forEach(m => fd.append("materials", m));
@@ -584,7 +593,6 @@ const handleSubmit = async (e) => {
         fd.append(key, value);
       }
     });
-    // append files
     prodFiles.forEach(f => fd.append("prodFiles", f));
     printFiles.forEach(f => fd.append("printFiles", f));
 
