@@ -157,14 +157,30 @@ export default function OrderSubmission() {
       );
 
       const payload = {
-        ...old,
+        company: old["Company Name"] || "",
+        designName: old["Design"] || "",
+        quantity: old["Quantity"] || "",
+        product: old["Product"] || "",
+        price: old["Price"] || "",
         dueDate: reorderData.newDueDate,
         dateType: reorderData.newDateType,
         notes: reorderData.notes,
-        prodFiles: old.prodFiles,
-        printFiles: old.printFiles,
-        embFile: old.embFile
+        referral: old["Referral"] || "",
+        materials: [
+          old["Material 1"] || "",
+          old["Material 2"] || "",
+          old["Material 3"] || "",
+          old["Material 4"] || "",
+          old["Material 5"] || ""
+        ],
+        backMaterial: old["Back Material"] || "",
+        embBacking: old["Embroidery Backing"] || "",
+        furColor: old["Fur Color"] || "",
+        prodFiles: old.prodFiles || [],
+        printFiles: old.printFiles || [],
+        embFile: old.embFile || ""
       };
+
 
       console.log("📦 Submitting reorder payload:", payload);  // 👈 ADD THIS LINE
 
