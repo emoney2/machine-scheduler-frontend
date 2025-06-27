@@ -124,7 +124,7 @@ export default function OrderSubmission() {
     if (!reorderData.previousOrder) return;
     try {
       const { data: old } = await axios.get(
-        `${API_ROOT}/api/orders/${reorderData.previousOrder}`
+        `${API_ROOT}/orders/${reorderData.previousOrder}`
       );
       console.log("✅ Loaded order:", old); // ← add this
       setReorderData(d => ({
