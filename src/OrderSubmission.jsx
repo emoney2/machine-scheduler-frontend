@@ -1390,37 +1390,34 @@ const handleSaveNewCompany = async () => {
               {reorderData.previewUrl && (
                 <div style={{ marginBottom: "1rem" }}>
                   <label>Preview:</label><br />
-                  {reorderData.previewUrl ? (
-                    <img
-                      src={reorderData.previewUrl}
-                      alt="Preview"
-                      style={{
-                        width: "100%",
-                        maxHeight: "160px",
-                        objectFit: "contain",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        marginTop: "0.5rem"
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "160px",
-                        border: "1px dashed #aaa",
-                        borderRadius: "4px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#999",
-                        fontStyle: "italic",
-                        marginTop: "0.5rem"
-                      }}
-                    >
-                      No preview yet
-                    </div>
-                  )}
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "160px",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginTop: "0.5rem",
+                      background: "#f9f9f9"
+                    }}
+                  >
+                    {reorderData.previewUrl ? (
+                      <img
+                        src={reorderData.previewUrl}
+                        alt="Preview"
+                        style={{
+                          maxHeight: "100%",
+                          maxWidth: "100%",
+                          objectFit: "contain",
+                          borderRadius: "4px"
+                        }}
+                      />
+                    ) : (
+                      <span style={{ color: "#888", fontStyle: "italic" }}>No preview yet</span>
+                    )}
+                  </div>
                 </div>
               )}
 
