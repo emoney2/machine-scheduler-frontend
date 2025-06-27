@@ -1362,6 +1362,7 @@ const handleSaveNewCompany = async () => {
                   name="previousOrder"
                   value={reorderData.previousOrder}
                   onChange={handleReorderChange}
+                  onBlur={loadExistingOrder}
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
@@ -1393,6 +1394,7 @@ const handleSaveNewCompany = async () => {
                   rows={3}
                   value={reorderData.notes}
                   onChange={handleReorderChange}
+                  onBlur={loadExistingOrder}
                 />
               </label>
               <div style={{ textAlign: "right" }}>
