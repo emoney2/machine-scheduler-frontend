@@ -706,6 +706,12 @@ const handleSaveNewCompany = async () => {
     }
   };
 
+  // whenever the order# changes, immediately load it
+  useEffect(() => {
+    if (reorderData.previousOrder) {
+      loadExistingOrder();
+    }
+  }, [reorderData.previousOrder]);
 
   return (
     <>
@@ -1331,12 +1337,6 @@ const handleSaveNewCompany = async () => {
           fontSize: "0.85rem",
         }}
       >
-
-        // ▶️ Add this useEffect right below:
-        useEffect(() => {
-          // re-fetch whenever order# changes
-          loadExistingOrder();
-        }, [reorderData.previousOrder]);
 
         {/* ─── Reorder Modal ──────────────────────────── */}
         {isReorderModalOpen && (
