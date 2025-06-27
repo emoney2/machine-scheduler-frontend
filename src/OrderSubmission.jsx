@@ -1301,6 +1301,13 @@ const handleSaveNewCompany = async () => {
         />
       )}
 
+      {/* ─── Reorder trigger button ─────────────────────────────── */}
+      <div style={{ textAlign: "right", marginBottom: "1rem" }}>
+        <button type="button" onClick={openReorderModal}>
+          Reorder Previous Job
+        </button>
+      </div>
+
       <form
         ref={formRef}
         onSubmit={handleSubmit}
