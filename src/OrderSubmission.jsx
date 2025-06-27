@@ -692,6 +692,25 @@ const handleSaveNewCompany = async () => {
 
   return (
     <>
+
+      {/* ─── YOUR NEW REORDER TRIGGER ─────────────────────── */}
+      <div style={{ textAlign: "right", padding: "0.5rem" }}>
+        <button
+          type="button"
+          onClick={openReorderModal}
+          style={{
+            padding: "0.5rem 1rem",
+            background: "#007bff",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          Reorder Previous Job
+        </button>
+      </div>
+
       {/* ─── Company Modal ───────────────────────────────────── */}
       {isNewCompanyModalOpen && (
         <div
@@ -1597,13 +1616,6 @@ const handleSaveNewCompany = async () => {
                 justifyContent: "center",
               }}
             >
-              <button
-                type="button"
-                onClick={openReorderModal}
-                style={{ marginTop: "0.5rem", padding: "0.5rem 1rem" }}
-              >
-                Reorder
-              </button>
               <button
                 type="submit"
                 style={{ marginTop: "0.5rem", padding: "0.5rem 1rem" }}
