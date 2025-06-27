@@ -152,35 +152,36 @@ export default function OrderSubmission() {
 
   const handleReorderSubmit = async () => {
     try {
-      // 1) Confirm previous order number is set
-      if (!reorderData.previousOrder) {
-        alert("Please enter a previous order number.");
-        return;
-      }
+      const { data: old } = await axios.get(
+        `${API_ROOT}/orders/${reorderData.previousOrder}`
+      );
 
-      // 2) Build payload with only required fields
       const payload = {
-        previousOrder: reorderData.previousOrder,
-        newDueDate: reorderData.newDueDate,
-        newDateType: reorderData.newDateType,
+        company: old["Company Name"] || "",
+        designName: old["Design"] || "",
+        quantity: old["Quantity"] || "",
+        product: old["Product"] || "",
+        price: old["Price"] || "",
+        dueDate: reorderData.newDueDate,
+        dateType: reorderData.newDateType,
         notes: reorderData.notes,
+        referral: old["Referral"] || "",
+        materials: [
+          old["Material 1"] || "",
+          old["Material 2"] || "",
+          old["Material 3"] || "",
+          old["Material 4"] || "",
+          old["Material 5"] || ""
+        ],
+        backMaterial: old["Back Material"] || "",
+        embBacking: old["Embroidery Backing"] || "",
+        furColor: old["Fur Color"] || "",
+        prodFiles: old.prodFiles || [],
+        printFiles: old.printFiles || [],
+        embFile: old.embFile || ""
       };
 
       console.log("📦 Submitting reorder payload:", payload);
-
-      // 3) Submit to backend
-      await axios.post(`${API_ROOT}/api/reorder`, payload);
- 
-      setIsReorderModalOpen(false);
-      alert("Reorder submitted successfully!");
-    } catch (err) {
-      console.error("❌ Error submitting reorder:", err);
-      alert("Failed to submit reorder.");
-    }
-  };
-
-
-      console.log("📦 Submitting reorder payload:", payload);  // 👈 ADD THIS LINE
 
       await axios.post(`${API_ROOT}/reorder`, payload);
 
@@ -188,9 +189,10 @@ export default function OrderSubmission() {
       alert("Reorder created!");
     } catch (err) {
       console.error("❌ Error submitting reorder:", err);
-      alert("Failed to reorder. See console.");
+      alert("Failed to submit reorder.");
     }
   };
+
 
   // Step 1: flags for unrecognized entries
   const companyInvalid   = form.company.trim() && !companies
