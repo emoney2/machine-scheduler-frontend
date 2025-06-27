@@ -1321,11 +1321,12 @@ const handleSaveNewCompany = async () => {
             type="button"
             onClick={openReorderModal}
             style={{
-              padding: "0.5rem 1rem",
+              padding: "0.25rem 0.5rem",    // ↓ half the padding
+              fontSize: "0.8rem",          // ↓ smaller text
               background: "#007bff",
               color: "#fff",
               border: "none",
-              borderRadius: "4px",
+              borderRadius: "3px",         // ↓ slightly smaller corner radius
               cursor: "pointer",
             }}
           >
