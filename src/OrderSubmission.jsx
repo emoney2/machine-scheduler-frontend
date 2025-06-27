@@ -1390,18 +1390,37 @@ const handleSaveNewCompany = async () => {
               {reorderData.previewUrl && (
                 <div style={{ marginBottom: "1rem" }}>
                   <label>Preview:</label><br />
-                  <img
-                    src={reorderData.previewUrl}
-                    alt="Preview"
-                    style={{
-                      width: "100%",
-                      maxHeight: "160px",
-                      objectFit: "contain",
-                      border: "1px solid #ccc",
-                      borderRadius: "4px",
-                      marginTop: "0.5rem"
-                    }}
-                  />
+                  {reorderData.previewUrl ? (
+                    <img
+                      src={reorderData.previewUrl}
+                      alt="Preview"
+                      style={{
+                        width: "100%",
+                        maxHeight: "160px",
+                        objectFit: "contain",
+                        border: "1px solid #ccc",
+                        borderRadius: "4px",
+                        marginTop: "0.5rem"
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "160px",
+                        border: "1px dashed #aaa",
+                        borderRadius: "4px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#999",
+                        fontStyle: "italic",
+                        marginTop: "0.5rem"
+                      }}
+                    >
+                      No preview yet
+                    </div>
+                  )}
                 </div>
               )}
 
