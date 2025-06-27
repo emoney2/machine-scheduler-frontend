@@ -1589,7 +1589,21 @@ const handleSaveNewCompany = async () => {
                 />
               </label>
             </div>
-            <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                textAlign: "center",
+                display: "flex",
+                gap: "1rem",
+                justifyContent: "center",
+              }}
+            >
+              <button
+                type="button"
+                onClick={openReorderModal}
+                style={{ marginTop: "0.5rem", padding: "0.5rem 1rem" }}
+              >
+                Reorder
+              </button>
               <button
                 type="submit"
                 style={{ marginTop: "0.5rem", padding: "0.5rem 1rem" }}
