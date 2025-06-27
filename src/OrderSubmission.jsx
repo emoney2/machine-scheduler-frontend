@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./FileInput.css";
 
-
+const API_ROOT = process.env.REACT_APP_API_ROOT;
 
 export default function OrderSubmission() {
   const [form, setForm] = useState({
@@ -20,6 +20,7 @@ export default function OrderSubmission() {
     furColor: "",
     notes: "",
   });
+
   const [prodFiles, setProdFiles] = useState([]);
   const [printFiles, setPrintFiles] = useState([]);
   const [prodPreviews, setProdPreviews] = useState([]);
