@@ -116,7 +116,6 @@ export default function OrderSubmission() {
   const handleReorderChange = (e) => {
     const { name, value } = e.target;
     setReorderData(d => ({ ...d, [name]: value }));
-    console.log("🖼️ Preview URL:", extractDriveThumbnail(old["Image"] || ""));
   };
 
 
