@@ -117,6 +117,23 @@ export default function OrderSubmission() {
     setReorderData(d => ({ ...d, [name]: value }));
   };
 
+  // ─── Fetch existing order when the user finishes typing the order # ─────────────────────
+  const loadExistingOrder = async () => {
+    if (!reorderData.previousOrder) return;
+    try {
+      const { data: old } = await axios.get(
+        `${API_ROOT}/api/orders/${reorderData.previousOrder}`
+      );
+      setReorderData(d => ({
+        ...d,
+        notes:       old.notes || "",
+        newDateType: old.dateType || "Hard Date"
+      }));
+    } catch (err) {
+      console.error("Could not load existing order:", err);
+    }
+  };
+
   const handleReorderSubmit = async () => {
     // 1) fetch old order
     const { data: old } = await axios.get(
@@ -1338,6 +1355,17 @@ const handleSaveNewCompany = async () => {
                   name="previousOrder"
                   value={reorderData.previousOrder}
                   onChange={handleReorderChange}
+                  onBlur={loadExistingOrder}
+                  style={{ width: "100%", padding: "0.25rem" }}
+                />
+              </label>
+              <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                New Due Date<br/>
+                <input
+                  type="date"
+                  name="newDueDate"
+                  value={reorderData.newDueDate}
+                  onChange={handleReorderChange}
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
@@ -1359,16 +1387,6 @@ const handleSaveNewCompany = async () => {
                   rows={3}
                   value={reorderData.notes}
                   onChange={handleReorderChange}
-                />
-              </label>
-              <label style={{ display: "block", marginBottom: "0.5rem" }}>
-                New Due Date<br/>
-                <input
-                  type="date"
-                  name="newDueDate"
-                  value={reorderData.newDueDate}
-                  onChange={handleReorderChange}
-                  style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
               <div style={{ textAlign: "right" }}>
