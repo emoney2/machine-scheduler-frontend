@@ -1341,6 +1341,26 @@ const handleSaveNewCompany = async () => {
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
+              <label>
+                Due Type<br/>
+                <select
+                  name="newDateType"
+                  value={reorderData.newDateType}
+                  onChange={handleReorderChange}
+                >
+                  <option>Hard Date</option>
+                  <option>Soft Date</option>
+                </select>
+              </label>
+              <label>
+                Notes<br/>
+                <textarea
+                  name="notes"
+                  rows={3}
+                  value={reorderData.notes}
+                  onChange={handleReorderChange}
+                />
+              </label>
               <label style={{ display: "block", marginBottom: "0.5rem" }}>
                 New Due Date<br/>
                 <input
