@@ -1315,6 +1315,62 @@ const handleSaveNewCompany = async () => {
         }}
       >
 
+        {/* ─── Reorder Modal ──────────────────────────── */}
+        {isReorderModalOpen && (
+          <div style={{
+            position: "fixed", top: 0, left: 0,
+            width: "100%", height: "100%",
+            background: "rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: "#fff",
+              padding: "1rem",
+              borderRadius: "0.5rem",
+              width: "320px",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.2)"
+            }}>
+              <h3 style={{ margin: 0, marginBottom: "0.5rem" }}>Reorder Previous Job</h3>
+              <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                Previous Order #<br/>
+                <input
+                  name="previousOrder"
+                  value={reorderData.previousOrder}
+                  onChange={handleReorderChange}
+                  style={{ width: "100%", padding: "0.25rem" }}
+                />
+              </label>
+              <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                New Due Date<br/>
+                <input
+                  type="date"
+                  name="newDueDate"
+                  value={reorderData.newDueDate}
+                  onChange={handleReorderChange}
+                  style={{ width: "100%", padding: "0.25rem" }}
+                />
+              </label>
+              <div style={{ textAlign: "right" }}>
+                <button
+                  type="button"
+                  onClick={() => setIsReorderModalOpen(false)}
+                  style={{ marginRight: "0.5rem", padding: "0.25rem 0.5rem" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleReorderSubmit}
+                  style={{ padding: "0.25rem 0.5rem" }}
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ─── Reorder Trigger ──────────────────────────── */}
         <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem" }}>
           <button
