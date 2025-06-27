@@ -1484,7 +1484,7 @@ const handleSaveNewCompany = async () => {
                 </button>
                 <button
                   className="btn"
-                  onClick={handleReorderSubmit}
+                  onClick={(e) => handleReorderSubmit(e)}
                   disabled={
                     !reorderData.previousOrder ||
                     !reorderData.newDueDate ||
