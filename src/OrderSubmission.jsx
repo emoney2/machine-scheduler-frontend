@@ -120,21 +120,22 @@ export default function OrderSubmission() {
 
   // ─── Fetch existing order when the user finishes typing the order # ─────────────────────
   const loadExistingOrder = async () => {
+    console.log("🔍 loadExistingOrder called with:", reorderData.previousOrder);
     if (!reorderData.previousOrder) return;
     try {
       const { data: old } = await axios.get(
         `${API_ROOT}/api/orders/${reorderData.previousOrder}`
       );
+      console.log("✅ Loaded order:", old); // ← add this
       setReorderData(d => ({
         ...d,
         notes:       old.notes || "",
         newDateType: old.dateType || "Hard Date"
       }));
     } catch (err) {
-      console.error("Could not load existing order:", err);
+      console.error("❌ Could not load existing order:", err);
     }
   };
-
   const handleReorderSubmit = async () => {
     // 1) fetch old order
     const { data: old } = await axios.get(
