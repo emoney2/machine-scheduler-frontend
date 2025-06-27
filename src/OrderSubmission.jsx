@@ -131,17 +131,14 @@ export default function OrderSubmission() {
   };
 
   const loadExistingOrder = async () => {
-    console.log("🔍 loadExistingOrder called with:", reorderData.previousOrder);
     if (!reorderData.previousOrder) return;
 
     try {
       const { data: old } = await axios.get(
         `${API_ROOT}/orders/${reorderData.previousOrder}`
       );
-      console.log("✅ Loaded order:", old);
 
       const preview = extractDriveThumbnail(old["Image"] || "");
-      console.log("🖼️ Preview URL:", preview);
 
       setReorderData((d) => ({
         ...d,
