@@ -1474,6 +1474,7 @@ const handleSaveNewCompany = async () => {
                   Cancel
                 </button>
                 <button
+                  className="btn"
                   onClick={handleReorderSubmit}
                   disabled={
                     !reorderData.previousOrder ||
