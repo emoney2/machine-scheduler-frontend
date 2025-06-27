@@ -106,9 +106,10 @@ export default function OrderSubmission() {
   const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
   const [reorderData, setReorderData] = useState({
     previousOrder: "",
-    newDueDate:    "",
-    newDateType:   "Hard Date",
-    notes:         ""
+    newDueDate: "",
+    newDateType: "Hard Date",
+    notes: "",
+    previewUrl: ""
   });
  
   const openReorderModal = () => setIsReorderModalOpen(true);
