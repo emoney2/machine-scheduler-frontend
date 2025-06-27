@@ -1314,6 +1314,24 @@ const handleSaveNewCompany = async () => {
           fontSize: "0.85rem",
         }}
       >
+
+        {/* ─── Reorder Trigger ──────────────────────────── */}
+        <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem" }}>
+          <button
+            type="button"
+            onClick={openReorderModal}
+            style={{
+              padding: "0.5rem 1rem",
+              background: "#007bff",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Reorder Previous Job
+          </button>
+        </div>
         {/* LEFT COLUMN */}
         <div style={{ display: "grid", gap: "0.5rem" }}>
           {/* Order Details */}
@@ -1600,24 +1618,6 @@ const handleSaveNewCompany = async () => {
             </div>
           </div>
         </fieldset>
-      </div>
-
-      {/* ─── YOUR NEW REORDER TRIGGER ─────────────────────── */}
-      <div style={{ textAlign: "right", padding: "0.5rem" }}>
-        <button
-          type="button"
-          onClick={openReorderModal}
-          style={{
-            padding: "0.5rem 1rem",
-            background: "#007bff",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          Reorder Previous Job
-        </button>
       </div>
 
       {/* RIGHT COLUMN: Uploads + Previews */}
