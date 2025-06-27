@@ -1373,67 +1373,64 @@ const handleSaveNewCompany = async () => {
             }}>
               <h3 style={{ margin: 0, marginBottom: "0.5rem" }}>Reorder Previous Job</h3>
 
-              <label style={{ display: "block", marginBottom: "0.5rem" }}>
-                Previous Order #<br />
-                <input
-                  name="previousOrder"
-                  value={reorderData.previousOrder}
-                  onChange={handleReorderChange}
-                  onBlur={loadExistingOrder}
-                  style={{ width: "100%", padding: "0.25rem" }}
-                />
-              </label>
+              <label>Previous Order #</label>
+              <input
+                type="text"
+                value={reorderData.previousOrder}
+                onChange={(e) =>
+                  setReorderData((d) => ({ ...d, previousOrder: e.target.value }))
+                }
+              />
 
-              <label style={{ display: "block", marginBottom: "0.5rem" }}>
-                New Due Date<br />
-                <input
-                  type="date"
-                  name="newDueDate"
-                  value={reorderData.newDueDate}
-                  onChange={handleReorderChange}
-                  style={{ width: "100%", padding: "0.25rem" }}
-                />
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-                  {[6, 7, 8].map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      onClick={() => {
-                        const d = new Date();
-                        d.setDate(d.getDate() + w * 7);
-                        const iso = d.toISOString().split("T")[0];
-                        setReorderData((prev) => ({ ...prev, newDueDate: iso }));
-                      }}
-                    >
-                      {w} weeks
-                    </button>
-                  ))}
-                </div>
-              </label>
+              <label>New Due Date</label>
+              <input
+                type="date"
+                value={reorderData.newDueDate}
+                onChange={(e) =>
+                  setReorderData((d) => ({ ...d, newDueDate: e.target.value }))
+                }
+              />
 
-              <label style={{ display: "block", marginBottom: "0.5rem" }}>
-                Due Type<br />
-                <select
-                  name="newDateType"
-                  value={reorderData.newDateType}
-                  onChange={handleReorderChange}
-                  style={{ width: "100%", padding: "0.25rem" }}
-                >
-                  <option>Hard Date</option>
-                  <option>Soft Date</option>
-                </select>
-              </label>
+              {/* Quick-select buttons */}
+              <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
+                {[6, 7, 8].map((weeks) => (
+                  <button
+                    type="button"
+                    key={weeks}
+                    onClick={() =>
+                      setReorderData((d) => ({
+                        ...d,
+                        newDueDate: new Date(
+                          Date.now() + weeks * 7 * 24 * 60 * 60 * 1000
+                        )
+                          .toISOString()
+                          .split("T")[0],
+                      }))
+                    }
+                  >
+                    {weeks} weeks
+                  </button>
+                ))}
+              </div>
 
-              <label style={{ display: "block", marginBottom: "0.5rem" }}>
-                Notes<br />
-                <textarea
-                  name="notes"
-                  rows={3}
-                  value={reorderData.notes}
-                  onChange={handleReorderChange}
-                  style={{ width: "100%", padding: "0.25rem" }}
-                />
-              </label>
+              <label>Due Type</label>
+              <select
+                value={reorderData.newDateType}
+                onChange={(e) =>
+                  setReorderData((d) => ({ ...d, newDateType: e.target.value }))
+                }
+              >
+                <option>Hard Date</option>
+                <option>Soft Date</option>
+              </select>
+
+              <label>Notes</label>
+              <textarea
+                value={reorderData.notes}
+                onChange={(e) =>
+                  setReorderData((d) => ({ ...d, notes: e.target.value }))
+                }
+              />
 
               {/* ✅ Always-visible Preview Section */}
               <div style={{ marginBottom: "1rem" }}>
