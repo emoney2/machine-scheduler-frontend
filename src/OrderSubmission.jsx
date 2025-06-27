@@ -1357,8 +1357,9 @@ const handleSaveNewCompany = async () => {
               boxShadow: "0 2px 10px rgba(0,0,0,0.2)"
             }}>
               <h3 style={{ margin: 0, marginBottom: "0.5rem" }}>Reorder Previous Job</h3>
+
               <label style={{ display: "block", marginBottom: "0.5rem" }}>
-                Previous Order #<br/>
+                Previous Order #<br />
                 <input
                   name="previousOrder"
                   value={reorderData.previousOrder}
@@ -1367,8 +1368,9 @@ const handleSaveNewCompany = async () => {
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
+
               <label style={{ display: "block", marginBottom: "0.5rem" }}>
-                New Due Date<br/>
+                New Due Date<br />
                 <input
                   type="date"
                   name="newDueDate"
@@ -1377,27 +1379,49 @@ const handleSaveNewCompany = async () => {
                   style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
-              <label>
-                Due Type<br/>
+
+              {/* Week Quick Picks */}
+              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+                {[6, 7, 8].map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + w * 7);
+                      const iso = d.toISOString().split("T")[0];
+                      setReorderData((prev) => ({ ...prev, newDueDate: iso }));
+                    }}
+                  >
+                    {w} weeks
+                  </button>
+                ))}
+              </div>
+
+              <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                Due Type<br />
                 <select
                   name="newDateType"
                   value={reorderData.newDateType}
                   onChange={handleReorderChange}
+                  style={{ width: "100%", padding: "0.25rem" }}
                 >
                   <option>Hard Date</option>
                   <option>Soft Date</option>
                 </select>
               </label>
-              <label>
-                Notes<br/>
+
+              <label style={{ display: "block", marginBottom: "0.5rem" }}>
+                Notes<br />
                 <textarea
                   name="notes"
                   rows={3}
                   value={reorderData.notes}
                   onChange={handleReorderChange}
-                  onBlur={loadExistingOrder}
+                  style={{ width: "100%", padding: "0.25rem" }}
                 />
               </label>
+
               <div style={{ textAlign: "right" }}>
                 <button
                   type="button"
