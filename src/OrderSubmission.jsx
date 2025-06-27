@@ -133,20 +133,27 @@ export default function OrderSubmission() {
   const loadExistingOrder = async () => {
     console.log("🔍 loadExistingOrder called with:", reorderData.previousOrder);
     if (!reorderData.previousOrder) return;
+
     try {
       const { data: old } = await axios.get(
         `${API_ROOT}/orders/${reorderData.previousOrder}`
       );
-      console.log("✅ Loaded order:", old); // ← add this
-      setReorderData(d => ({
+      console.log("✅ Loaded order:", old);
+
+      const preview = extractDriveThumbnail(old["Image"] || "");
+      console.log("🖼️ Preview URL:", preview);
+
+      setReorderData((d) => ({
         ...d,
-        notes: old["Notes"] || "",               // ← Capital “N”
-        newDateType: old["Hard/Soft Date"] || "Hard Date"  // ← Use exact key from Sheet
+        notes: old["Notes"] || "",
+        newDateType: old["Hard/Soft Date"] || "Hard Date",
+        previewUrl: preview
       }));
     } catch (err) {
       console.error("❌ Could not load existing order:", err);
     }
   };
+
   const handleReorderSubmit = async () => {
     // 1) fetch old order
     const { data: old } = await axios.get(
