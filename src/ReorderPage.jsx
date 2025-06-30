@@ -79,25 +79,45 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
-      <div style={{ marginBottom: "1rem" }}>
+      <div style={{ position: "relative", marginBottom: "1rem" }}>
         <input
-          list="company-options"
-          placeholder="Start typing a company..."
           value={company}
           onChange={(e) => {
             const value = e.target.value;
             setCompany(value);
-            if (companyList.includes(value)) {
-              handleFetchJobs();
-            }
+            setShowDropdown(true);
+            const lower = value.toLowerCase();
+            setFilteredNames(companyList.filter((name) => name.toLowerCase().includes(lower)));
           }}
-          style={{ fontSize: "1rem", padding: "0.5rem", width: "300px", marginBottom: "1rem" }}
+          placeholder="Enter company name"
+          style={{ width: "300px", padding: "0.5rem" }}
         />
-        <datalist id="company-options">
-          {companyList.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
+        {showDropdown && filteredNames.length > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              background: "white",
+              border: "1px solid #ccc",
+              width: "300px",
+              maxHeight: "150px",
+              overflowY: "auto",
+              zIndex: 10,
+            }}
+          >
+            {filteredNames.map((name) => (
+              <div
+                key={name}
+                onClick={() => {
+                  setCompany(name);
+                  setShowDropdown(false);
+                }}
+                style={{ padding: "0.5rem", cursor: "pointer" }}
+              >
+                {name}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <button onClick={handleFetchJobs}>Find Jobs</button>
 
