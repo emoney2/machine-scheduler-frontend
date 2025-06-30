@@ -12,7 +12,6 @@ export default function ReorderPage() {
   const [confirmJob, setConfirmJob] = useState(null);
   const navigate = useNavigate();
 
-  // Fetch company names on load
   useEffect(() => {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
@@ -79,30 +78,13 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
+
       <div style={{ position: "relative", marginBottom: "1rem" }}>
         <input
           value={company}
-          onChange={(e) => {
-            const value = e.target.value;
-            setCompany(value);
-            setShowDropdown(true);
-            const lower = value.toLowerCase();
-            setFilteredNames(companyList.filter((name) => name.toLowerCase().includes(lower)));
-          }}
-          placeholder="Enter company name"
-          style={{ width: "300px", padding: "0.5rem" }}
-        />
-        <input
-          value={company}
-          onChange={(e) => {
-            const value = e.target.value;
-            setCompany(value);
-            setShowDropdown(true);
-            const lower = value.toLowerCase();
-            setFilteredNames(companyList.filter((name) => name.toLowerCase().includes(lower)));
-          }}
+          onChange={(e) => handleCompanyChange(e.target.value)}
           onFocus={() => setShowDropdown(true)}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 100)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
           placeholder="Enter company name"
           style={{ width: "300px", padding: "0.5rem" }}
         />
@@ -121,10 +103,7 @@ export default function ReorderPage() {
             {filteredNames.map((name) => (
               <div
                 key={name}
-                onMouseDown={() => {
-                  setCompany(name);
-                  setShowDropdown(false);
-                }}
+                onMouseDown={() => handleSelectCompany(name)}
                 style={{ padding: "0.5rem", cursor: "pointer" }}
               >
                 {name}
@@ -133,6 +112,7 @@ export default function ReorderPage() {
           </div>
         )}
       </div>
+
       <button onClick={handleFetchJobs}>Find Jobs</button>
 
       {loading && <p>Loading…</p>}
@@ -181,7 +161,12 @@ export default function ReorderPage() {
           }}
         >
           <div
-            style={{ background: "#fff", padding: "2rem", borderRadius: "8px", textAlign: "center" }}
+            style={{
+              background: "#fff",
+              padding: "2rem",
+              borderRadius: "8px",
+              textAlign: "center",
+            }}
           >
             <p style={{ fontSize: "1.1rem" }}>Do you want to change any details?</p>
             <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginTop: "1rem" }}>
