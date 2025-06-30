@@ -3,116 +3,85 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 export default function ReorderPage() {
-  const [company, setCompany] = useState("");
   const [companyList, setCompanyList] = useState([]);
+  const [companyInput, setCompanyInput] = useState("");
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [confirmJob, setConfirmJob] = useState(null);
-  const companyInputRef = useRef(null);
+  const inputRef = useRef(null);
   const navigate = useNavigate();
 
+  // Load list of company names on mount
   useEffect(() => {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
         const names = (res.data || [])
-          .map((entry) => entry.value)  // ← FIXED HERE
+          .map((entry) => entry.value)
           .filter((name) => typeof name === "string" && name.trim());
         setCompanyList(names);
       })
-      .catch((err) => {
-        console.error("Failed to load company names", err);
-      });
+      .catch((err) => console.error("Failed to load company names", err));
   }, []);
 
-
-  const handleCompanyInput = (e) => {
-    const raw = e.target.value;
-    const inputType = e.nativeEvent?.inputType;
-
-    // allow deletes/backspace
-    if (inputType?.startsWith("delete")) {
-      setCompany(raw);
-      return;
-    }
-
-    const match = companyList.find((name) =>
-      name.toLowerCase().startsWith(raw.toLowerCase())
-    );
-
-    if (match && raw !== match) {
-      setCompany(match);
-      setTimeout(() => {
-        const input = companyInputRef.current;
-        input.setSelectionRange(raw.length, match.length);
-      }, 0);
-    } else {
-      setCompany(raw);
-    }
-  };
-
-  const handleFetchJobs = async () => {
-    if (!company.trim()) return;
+  // Fetch jobs when a full company name is selected
+  const handleCompanySelect = async (value) => {
+    setCompanyInput(value);
+    if (!companyList.includes(value)) return;
     setLoading(true);
     try {
       const res = await axios.get(
-        `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${encodeURIComponent(company)}`
+        `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`
       );
       setJobs(res.data.jobs || []);
-    } catch (err) {
+    } catch {
       alert("Failed to load jobs.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfirmChoice = (yes) => {
-    if (!confirmJob) return;
-    if (yes) {
-      navigate("/order", { state: { reorderJob: confirmJob } });
-    } else {
-      axios
-        .post(`${process.env.REACT_APP_API_ROOT}/reorder`, {
-          previousOrder: confirmJob["Order #"],
-          newDueDate: confirmJob["Due Date"],
-          newDateType: "Hard Date",
-          notes: "",
-        })
-        .then(() => alert("Reorder submitted!"))
-        .catch(() => alert("Reorder failed."));
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    setCompanyInput(val);
+    if (companyList.includes(val)) {
+      handleCompanySelect(val);
     }
-    setConfirmJob(null);
+  };
+
+  const handleReorder = (job) => {
+    navigate("/order", { state: { reorderJob: job } });
   };
 
   return (
-    <div style={{ padding: "1.5rem" }}>
-      <h2>Reorder a Previous Job</h2>
+    <div style={{ padding: "2rem" }}>
+      <h2>🔁 Reorder a Previous Job</h2>
+      <input
+        list="company-options"
+        value={companyInput}
+        onChange={handleInputChange}
+        placeholder="Start typing a company..."
+        ref={inputRef}
+        style={{ width: "300px", padding: "0.5rem", fontSize: "1rem" }}
+      />
+      <datalist id="company-options">
+        {companyList.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
 
-      <div style={{ marginBottom: "1rem" }}>
-        <input
-          type="text"
-          placeholder="Start typing a company..."
-          value={company}
-          onChange={handleCompanyInput}
-          ref={companyInputRef}
-          style={{ width: "300px", padding: "0.5rem" }}
-        />
-      </div>
-
-      <button onClick={handleFetchJobs}>Find Jobs</button>
-
-      {loading && <p>Loading…</p>}
+      {loading && <p>Loading jobs…</p>}
 
       <div style={{ marginTop: "2rem" }}>
         {jobs.map((job, idx) => (
           <div
             key={idx}
             style={{
-              border: "1px solid #ccc",
-              padding: "0.5rem",
-              marginBottom: "0.75rem",
               display: "flex",
               alignItems: "center",
+              border: "1px solid #ccc",
+              padding: "0.75rem",
+              borderRadius: "8px",
+              marginBottom: "1rem",
               gap: "1rem",
             }}
           >
@@ -126,61 +95,10 @@ export default function ReorderPage() {
               <br />
               Order #{job["Order #"] || "?"} | Due: {job["Due Date"] || "?"}
             </div>
-            <button onClick={() => setConfirmJob(job)}>Reorder</button>
+            <button onClick={() => handleReorder(job)}>Reorder</button>
           </div>
         ))}
       </div>
-
-      {confirmJob && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "2rem",
-              borderRadius: "8px",
-              textAlign: "center",
-            }}
-          >
-            <p style={{ fontSize: "1.1rem" }}>
-              Do you want to change any details?
-            </p>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                gap: "1rem",
-                marginTop: "1rem",
-              }}
-            >
-              <button
-                onClick={() => handleConfirmChoice(true)}
-                style={{ padding: "0.5rem 1rem" }}
-              >
-                Yes
-              </button>
-              <button
-                onClick={() => handleConfirmChoice(false)}
-                style={{ padding: "0.5rem 1rem" }}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
