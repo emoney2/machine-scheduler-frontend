@@ -11,12 +11,12 @@ export default function ReorderPage() {
   const [confirmJob, setConfirmJob] = useState(null);
   const navigate = useNavigate();
 
+  // Load companies from /directory
   useEffect(() => {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
-        const companies = res.data || [];
-        const names = companies
+        const names = (res.data || [])
           .map((entry) => entry.name)
           .filter((name) => typeof name === "string" && name.trim());
         setCompanyList(names);
@@ -58,6 +58,7 @@ export default function ReorderPage() {
   const handleConfirmChoice = (yes) => {
     if (!confirmJob) return;
     if (yes) {
+      // Route to form and pass full row of data for prefill
       navigate("/order", { state: { reorderJob: confirmJob } });
     } else {
       axios
@@ -76,6 +77,7 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
+
       <div style={{ position: "relative", marginBottom: "1rem" }}>
         <input
           value={company}
@@ -107,6 +109,7 @@ export default function ReorderPage() {
           </div>
         )}
       </div>
+
       <button onClick={handleFetchJobs}>Find Jobs</button>
 
       {loading && <p>Loading…</p>}
@@ -130,7 +133,8 @@ export default function ReorderPage() {
               style={{ width: 60, height: 60, objectFit: "cover" }}
             />
             <div style={{ flex: 1 }}>
-              <strong>{job.Design || "(No Design)"}</strong> — {job.Product || "?"} ({job.Quantity || "?"})
+              <strong>{job.Design || "(No Design)"}</strong> —{" "}
+              {job.Product || "?"} ({job.Quantity || "?"})
               <br />
               Order #{job["Order #"] || "?"} | Due: {job["Due Date"] || "?"}
             </div>
@@ -155,14 +159,34 @@ export default function ReorderPage() {
           }}
         >
           <div
-            style={{ background: "#fff", padding: "2rem", borderRadius: "8px", textAlign: "center" }}
+            style={{
+              background: "#fff",
+              padding: "2rem",
+              borderRadius: "8px",
+              textAlign: "center",
+            }}
           >
-            <p style={{ fontSize: "1.1rem" }}>Do you want to change any details?</p>
-            <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginTop: "1rem" }}>
-              <button onClick={() => handleConfirmChoice(true)} style={{ padding: "0.5rem 1rem" }}>
+            <p style={{ fontSize: "1.1rem" }}>
+              Do you want to change any details?
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "1rem",
+                marginTop: "1rem",
+              }}
+            >
+              <button
+                onClick={() => handleConfirmChoice(true)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
                 Yes
               </button>
-              <button onClick={() => handleConfirmChoice(false)} style={{ padding: "0.5rem 1rem" }}>
+              <button
+                onClick={() => handleConfirmChoice(false)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
                 No
               </button>
             </div>
