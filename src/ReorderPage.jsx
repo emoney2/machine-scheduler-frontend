@@ -16,7 +16,7 @@ export default function ReorderPage() {
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
         const names = (res.data || [])
-          .map((entry) => entry.value)
+          .map((name) => name)
           .filter((name) => typeof name === "string" && name.trim());
         console.log("✅ Company list loaded:", names);
         setCompanyList(names);
