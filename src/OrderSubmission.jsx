@@ -107,36 +107,6 @@ export default function OrderSubmission() {
 
   const [modalSubmitting, setModalSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (location.state?.reorderJob) {
-      const job = location.state.reorderJob;
-      console.log("📋 Prefilling form from reorder job:", job);
-
-      setForm((prev) => ({
-        ...prev,
-        company: job["Company Name"] || "",
-        designName: job["Design"] || "",
-        quantity: job["Quantity"] || "",
-        product: job["Product"] || "",
-        price: job["Price"] || "",
-        dueDate: job["Due Date"] || "",
-        dateType: job["Hard Date/Soft Date"] || "Hard Date",
-        referral: job["Referral"] || "",
-        notes: job["Notes"] || "",
-        materials: [
-          job["Material1"] || "",
-          job["Material2"] || "",
-          job["Material3"] || "",
-          job["Material4"] || "",
-          job["Material5"] || "",
-        ],
-        backMaterial: job["Back Material"] || "",
-        embBacking: job["EMB Backing"] || "",
-        furColor: job["Fur Color"] || "",
-      }));
-    }
-  }, [location.state]);
-
   // ─── Reorder modal state & handlers ─────────────────────────────
   const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
   const [reorderData, setReorderData] = useState({
@@ -416,8 +386,6 @@ const handleBackMaterialInput = (e) => {
       setForm((prev) => ({ ...prev, furColor: raw }));
     }
   };
-
-
 
   useEffect(() => {
     axios
@@ -776,7 +744,7 @@ const handleSaveNewCompany = async () => {
   useEffect(() => {
     if (reorderJob) {
       console.log("📋 Prefilling form from reorder job:", reorderJob);
-      console.log("🔍 Reorder Job Keys:", Object.keys(reorderJob));
+      console.log("🔍 Keys:", Object.keys(reorderJob));
 
       setForm(prev => ({
         ...prev,
@@ -785,7 +753,7 @@ const handleSaveNewCompany = async () => {
         quantity: reorderJob["Quantity"] || "",
         product: reorderJob["Product"] || "",
         price: reorderJob["Price"] || "",
-        // dueDate: skip on purpose
+        dueDate: "",  // ⛔ force cleared
         dateType: reorderJob["Hard Date/Soft Date"] || "Hard Date",
         referral: reorderJob["Referral"] || "",
         notes: reorderJob["Notes"] || "",
@@ -797,28 +765,31 @@ const handleSaveNewCompany = async () => {
           reorderJob["Material5"] || "",
         ],
         backMaterial: reorderJob["Back Material"] || "",
-        embBacking: reorderJob["EMB Backing"] || "",  // Check key spelling here
+        embBacking: reorderJob["EMB Backing"] || "",
         furColor: reorderJob["Fur Color"] || "",
         isReorder: true,
       }));
 
-      if (reorderJob.image) {
+      if (reorderJob["image"]) {
         setProdPreviews([{
-          url: reorderJob.image,
+          url: reorderJob["image"],
           type: "image/jpeg",
-          name: "Previous Job Preview"
+          name: "Previous Production File"
         }]);
       }
 
-      if (reorderJob.printImage) {
+      if (reorderJob["Print"]) {
         setPrintPreviews([{
-          url: reorderJob.printImage,
+          url: reorderJob["Print"],
           type: "image/jpeg",
-          name: "Previous Print Preview"
+          name: reorderJob["Print Files"] || "Previous Print File"
         }]);
 
-        // Dummy file to make printFiles non-empty
-        setPrintFiles([new File([""], "PreviousPrintFile.pdf")]);
+        setPrintFiles([
+          new File(["dummy content"], reorderJob["Print Files"] || "PreviousPrintFile.pdf", {
+            type: "application/pdf",
+          })
+        ]);
       }
     }
   }, [reorderJob]);
