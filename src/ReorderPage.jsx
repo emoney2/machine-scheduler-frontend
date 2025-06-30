@@ -7,9 +7,11 @@ export default function ReorderPage() {
   const [companyNames, setCompanyNames] = useState([]);
   const [filteredNames, setFilteredNames] = useState([]);
   const [jobs, setJobs] = useState([]);
+  const [companyList, setCompanyList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [confirmJob, setConfirmJob] = useState(null);
   const navigate = useNavigate();
+  
 
   // Fetch typeahead company names from Ship endpoint
   useEffect(() => {
@@ -72,10 +74,11 @@ export default function ReorderPage() {
         onChange={(e) => setCompany(e.target.value)}
         list="company-options"
         placeholder="Enter company name"
+        list="company-names"
         style={{ marginRight: "1rem", padding: "0.5rem" }}
       />
-      <datalist id="company-options">
-        {filteredNames.map((name) => (
+      <datalist id="company-names">
+        {companyList.map((name) => (
           <option key={name} value={name} />
         ))}
       </datalist>
