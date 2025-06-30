@@ -10,30 +10,39 @@ export default function ReorderPage() {
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
-  // Load list of company names on mount
   useEffect(() => {
+    console.log("🔄 Fetching company list...");
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
         const names = (res.data || [])
           .map((entry) => entry.value)
           .filter((name) => typeof name === "string" && name.trim());
+        console.log("✅ Company list loaded:", names);
         setCompanyList(names);
       })
-      .catch((err) => console.error("Failed to load company names", err));
+      .catch((err) => {
+        console.error("❌ Failed to load company names", err);
+      });
   }, []);
 
-  // Fetch jobs when a full company name is selected
   const handleCompanySelect = async (value) => {
+    console.log("🏢 Company selected:", value);
     setCompanyInput(value);
-    if (!companyList.includes(value)) return;
+    if (!companyList.includes(value)) {
+      console.log("⚠️ Company not in list:", value);
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await axios.get(
         `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`
       );
+      console.log("📦 Jobs loaded:", res.data.jobs);
       setJobs(res.data.jobs || []);
-    } catch {
+    } catch (err) {
+      console.error("❌ Failed to load jobs for company:", value, err);
       alert("Failed to load jobs.");
     } finally {
       setLoading(false);
@@ -42,19 +51,25 @@ export default function ReorderPage() {
 
   const handleInputChange = (e) => {
     const val = e.target.value;
+    console.log("⌨️ Typing:", val);
     setCompanyInput(val);
     if (companyList.includes(val)) {
+      console.log("✅ Match found in companyList, fetching jobs...");
       handleCompanySelect(val);
+    } else {
+      console.log("🔍 No exact match yet.");
     }
   };
 
   const handleReorder = (job) => {
+    console.log("🔁 Reordering job:", job);
     navigate("/order", { state: { reorderJob: job } });
   };
 
   return (
     <div style={{ padding: "2rem" }}>
       <h2>🔁 Reorder a Previous Job</h2>
+
       <input
         list="company-options"
         value={companyInput}
