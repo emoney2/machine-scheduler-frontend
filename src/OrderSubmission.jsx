@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./FileInput.css";
+import { useLocation } from "react-router-dom";
 
 const API_ROOT = process.env.REACT_APP_API_ROOT;
+
+const location = useLocation();
+const reorderJob = location.state?.reorderJob;
 
 export default function OrderSubmission() {
   const [form, setForm] = useState({
@@ -25,6 +29,8 @@ export default function OrderSubmission() {
   const [printFiles, setPrintFiles] = useState([]);
   const [prodPreviews, setProdPreviews] = useState([]);
   const [printPreviews, setPrintPreviews] = useState([]);
+
+
 
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
@@ -739,6 +745,47 @@ const handleSaveNewCompany = async () => {
       loadExistingOrder();
     }
   }, [reorderData.previousOrder]);
+
+  useEffect(() => {
+    if (reorderJob) {
+      console.log("📋 Prefilling form from reorder job:", reorderJob);
+
+      setForm(prev => ({
+        ...prev,
+        company: reorderJob.company || "",
+        designName: reorderJob.design || "",
+        quantity: reorderJob.quantity || "",
+        product: reorderJob.product || "",
+        price: reorderJob.price || "",
+        dueDate: reorderJob.due || "",
+        dateType: reorderJob.dateType || "Hard Date",
+        referral: reorderJob.referral || "",
+        materials: reorderJob.materials?.length ? reorderJob.materials : ["", "", "", "", ""],
+        backMaterial: reorderJob.backMaterial || "",
+        embBacking: reorderJob.embBacking || "",
+        furColor: reorderJob.furColor || "",
+        notes: reorderJob.notes || "",
+        isReorder: true
+      }));
+
+      if (reorderJob.image) {
+        setProdPreviews([{
+          url: reorderJob.image,
+          type: "image/jpeg",
+          name: "Previous Job Preview"
+        }]);
+      }
+
+      if (reorderJob.printImage) {
+        setPrintPreviews([{
+          url: reorderJob.printImage,
+          type: "image/jpeg",
+          name: "Previous Print Preview"
+        }]);
+      }
+    }
+  }, [reorderJob]);
+
 
   return (
     <>

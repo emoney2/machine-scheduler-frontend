@@ -13,6 +13,7 @@ import Section9 from './Section9';
 import OrderSubmission from './OrderSubmission';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 import { Routes, Route, NavLink } from 'react-router-dom';
+import ReorderPage from "./ReorderPage";
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
@@ -1085,6 +1086,7 @@ const onDragEnd = async (result) => {
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
         <Route path="/ship" element={<Ship />} />
+        <Route path="/reorder" element={<ReorderPage />} />  {/* ← this is new */}
       </Routes>
     </>
   );
