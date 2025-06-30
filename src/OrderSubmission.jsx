@@ -113,25 +113,54 @@ export default function OrderSubmission() {
 
       setForm((prev) => ({
         ...prev,
-        company: job.company || "",
-        designName: job.design || "",
-        quantity: job.quantity || "",
-        product: job.product || "",
-        price: job.price || "",
-        dueDate: job.due || "",
-        dateType: job.dateType || "Hard Date",
-        referral: job.referral || "",
-        notes: job.notes || "",
-        materials: Array.isArray(job.materials) && job.materials.length > 0
-          ? job.materials.concat(Array(5).fill("")).slice(0, 5)
-          : ["", "", "", "", ""],
-        backMaterial: job.backMaterial || "",
-        embBacking: job.embBacking || "",
-        furColor: job.furColor || "",
+        company: job["Company Name"] || "",
+        designName: job["Design"] || "",
+        quantity: job["Quantity"] || "",
+        product: job["Product"] || "",
+        price: job["Price"] || "",
+        dueDate: job["Due Date"] || "",
+        dateType: job["Hard Date/Soft Date"] || "Hard Date",
+        referral: "", // Not stored in sheet
+        notes: job["Notes"] || "",
+        materials: [
+          job["Material1"] || "",
+          job["Material2"] || "",
+          job["Material3"] || "",
+          job["Material4"] || "",
+          job["Material5"] || "",
+        ],
+        backMaterial: job["Back Material"] || "",
+        embBacking: job["EMB Backing"] || "",
+        furColor: job["Fur Color"] || "",
       }));
-    }
-  }, [location.state]);
 
+      // Production preview (from Image column)
+      if (job["Image"]) {
+        setProdPreviews([
+          {
+            name: job["Image"],
+            url: job["Image"],
+            type: job["Image"].endsWith(".pdf") ? "application/pdf" : "image/*",
+          },
+        ]);
+      }
+
+      // Print previews (from Print Files column)
+      if (job["Print Files"]) {
+        setPrintPreviews(
+          job["Print Files"]
+            .split(",")
+            .map((url) => url.trim())
+            .filter(Boolean)
+            .map((url) => ({
+              name: url,
+              url: url,
+              type: url.endsWith(".pdf") ? "application/pdf" : "image/*",
+            }))
+        );
+      }
+    } 
+  }, [location.state]);
 
   // ─── Reorder modal state & handlers ─────────────────────────────
   const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
