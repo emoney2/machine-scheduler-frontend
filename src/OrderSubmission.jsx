@@ -778,15 +778,17 @@ const handleSaveNewCompany = async () => {
         }]);
       }
 
-      if (reorderJob["Print"]) {
-        // Step 1: Show preview using original link
+      if (reorderJob["Print"] && reorderJob["Print"].startsWith("http")) {
+        console.log("🧪 reorderJob.Print =", reorderJob["Print"]);
+
+        // Step 1: Set print preview
         setPrintPreviews([{
           url: reorderJob["Print"],
           type: "image/jpeg",
           name: reorderJob["Print Files"] || "Previous Print File"
         }]);
 
-        // Step 2: Convert Google Drive link to a direct download URL
+        // Step 2: Convert Google Drive share link to direct download
         const driveUrl = reorderJob["Print"];
         const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)\//);
         const fileId = match ? match[1] : null;
@@ -812,8 +814,11 @@ const handleSaveNewCompany = async () => {
               console.error("❌ Failed to fetch real print file from Drive:", err);
             });
         } else {
-          console.warn("❗ Unable to extract file ID from print link:", driveUrl);
+          console.warn("❗ Invalid Google Drive link — no file ID found:", driveUrl);
         }
+
+      } else {
+        console.warn("❗ Skipping print file fetch — value is not a valid URL:", reorderJob["Print"]);
       }
     }
   }, [reorderJob]);
