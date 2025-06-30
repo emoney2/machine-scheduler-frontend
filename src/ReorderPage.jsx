@@ -16,7 +16,7 @@ export default function ReorderPage() {
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
         const names = (res.data || [])
-          .map((entry) => entry.name)
+          .map((entry) => entry.value)  // ← FIXED HERE
           .filter((name) => typeof name === "string" && name.trim());
         setCompanyList(names);
       })
@@ -24,6 +24,7 @@ export default function ReorderPage() {
         console.error("Failed to load company names", err);
       });
   }, []);
+
 
   const handleCompanyInput = (e) => {
     const raw = e.target.value;
