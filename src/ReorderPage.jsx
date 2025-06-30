@@ -12,7 +12,7 @@ export default function ReorderPage() {
   useEffect(() => {
     async function fetchCompanies() {
       try {
-        const res = await axios.get("/api/company-names");
+        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/company-names`);
         console.log("Fetched company names:", res.data);
         setCompanyNames(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
