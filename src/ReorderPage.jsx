@@ -82,10 +82,16 @@ export default function ReorderPage() {
       <div style={{ marginBottom: "1rem" }}>
         <input
           list="company-options"
+          placeholder="Start typing a company..."
           value={company}
-          onChange={(e) => setCompany(e.target.value)}
-          placeholder="Enter company name"
-          style={{ width: "300px", padding: "0.5rem" }}
+          onChange={(e) => {
+            const value = e.target.value;
+            setCompany(value);
+            if (companyList.includes(value)) {
+              handleFetchJobs();
+            }
+          }}
+          style={{ fontSize: "1rem", padding: "0.5rem", width: "300px", marginBottom: "1rem" }}
         />
         <datalist id="company-options">
           {companyList.map((name) => (
