@@ -5,8 +5,6 @@ import { useNavigate } from "react-router-dom";
 export default function ReorderPage() {
   const [company, setCompany] = useState("");
   const [companyList, setCompanyList] = useState([]);
-  const [filteredNames, setFilteredNames] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [confirmJob, setConfirmJob] = useState(null);
@@ -25,20 +23,6 @@ export default function ReorderPage() {
         console.error("Failed to load company names", err);
       });
   }, []);
-
-  const handleCompanyChange = (val) => {
-    setCompany(val);
-    const lower = val.toLowerCase();
-    setFilteredNames(
-      companyList.filter((name) => name.toLowerCase().includes(lower))
-    );
-    setShowDropdown(true);
-  };
-
-  const handleSelectCompany = (name) => {
-    setCompany(name);
-    setShowDropdown(false);
-  };
 
   const handleFetchJobs = async () => {
     if (!company.trim()) return;
@@ -77,39 +61,19 @@ export default function ReorderPage() {
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
 
-      <div style={{ position: "relative", marginBottom: "1rem" }}>
+      <div style={{ marginBottom: "1rem" }}>
         <input
-          type="text"
+          list="company-options"
+          placeholder="Start typing a company..."
           value={company}
-          onChange={(e) => handleCompanyChange(e.target.value)}
-          onFocus={() => setShowDropdown(true)}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-          placeholder="Enter company name"
+          onChange={(e) => setCompany(e.target.value)}
           style={{ width: "300px", padding: "0.5rem" }}
         />
-        {showDropdown && filteredNames.length > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              background: "white",
-              border: "1px solid #ccc",
-              width: "300px",
-              maxHeight: "150px",
-              overflowY: "auto",
-              zIndex: 10,
-            }}
-          >
-            {filteredNames.map((name) => (
-              <div
-                key={name}
-                onMouseDown={() => handleSelectCompany(name)}
-                style={{ padding: "0.5rem", cursor: "pointer" }}
-              >
-                {name}
-              </div>
-            ))}
-          </div>
-        )}
+        <datalist id="company-options">
+          {companyList.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
       </div>
 
       <button onClick={handleFetchJobs}>Find Jobs</button>
