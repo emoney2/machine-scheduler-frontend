@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -8,6 +8,7 @@ export default function ReorderPage() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [confirmJob, setConfirmJob] = useState(null);
+  const companyInputRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +24,31 @@ export default function ReorderPage() {
         console.error("Failed to load company names", err);
       });
   }, []);
+
+  const handleCompanyInput = (e) => {
+    const raw = e.target.value;
+    const inputType = e.nativeEvent?.inputType;
+
+    // allow deletes/backspace
+    if (inputType?.startsWith("delete")) {
+      setCompany(raw);
+      return;
+    }
+
+    const match = companyList.find((name) =>
+      name.toLowerCase().startsWith(raw.toLowerCase())
+    );
+
+    if (match && raw !== match) {
+      setCompany(match);
+      setTimeout(() => {
+        const input = companyInputRef.current;
+        input.setSelectionRange(raw.length, match.length);
+      }, 0);
+    } else {
+      setCompany(raw);
+    }
+  };
 
   const handleFetchJobs = async () => {
     if (!company.trim()) return;
@@ -63,17 +89,13 @@ export default function ReorderPage() {
 
       <div style={{ marginBottom: "1rem" }}>
         <input
-          list="company-options"
+          type="text"
           placeholder="Start typing a company..."
           value={company}
-          onChange={(e) => setCompany(e.target.value)}
+          onChange={handleCompanyInput}
+          ref={companyInputRef}
           style={{ width: "300px", padding: "0.5rem" }}
         />
-        <datalist id="company-options">
-          {companyList.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
       </div>
 
       <button onClick={handleFetchJobs}>Find Jobs</button>
