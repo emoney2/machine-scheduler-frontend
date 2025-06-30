@@ -107,6 +107,32 @@ export default function OrderSubmission() {
 
   const [modalSubmitting, setModalSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (location.state?.reorderJob) {
+      const job = location.state.reorderJob;
+
+      setForm((prev) => ({
+        ...prev,
+        company: job.company || "",
+        designName: job.design || "",
+        quantity: job.quantity || "",
+        product: job.product || "",
+        price: job.price || "",
+        dueDate: job.due || "",
+        dateType: job.dateType || "Hard Date",
+        referral: job.referral || "",
+        notes: job.notes || "",
+        materials: Array.isArray(job.materials) && job.materials.length > 0
+          ? job.materials.concat(Array(5).fill("")).slice(0, 5)
+          : ["", "", "", "", ""],
+        backMaterial: job.backMaterial || "",
+        embBacking: job.embBacking || "",
+        furColor: job.furColor || "",
+      }));
+    }
+  }, [location.state]);
+
+
   // ─── Reorder modal state & handlers ─────────────────────────────
   const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
   const [reorderData, setReorderData] = useState({
