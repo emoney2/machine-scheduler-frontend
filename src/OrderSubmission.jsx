@@ -776,6 +776,7 @@ const handleSaveNewCompany = async () => {
   useEffect(() => {
     if (reorderJob) {
       console.log("📋 Prefilling form from reorder job:", reorderJob);
+      console.log("🔍 Reorder Job Keys:", Object.keys(reorderJob));
 
       setForm(prev => ({
         ...prev,
@@ -784,7 +785,7 @@ const handleSaveNewCompany = async () => {
         quantity: reorderJob["Quantity"] || "",
         product: reorderJob["Product"] || "",
         price: reorderJob["Price"] || "",
-        dueDate: reorderJob["Due Date"] || "",
+        // dueDate: skip on purpose
         dateType: reorderJob["Hard Date/Soft Date"] || "Hard Date",
         referral: reorderJob["Referral"] || "",
         notes: reorderJob["Notes"] || "",
@@ -796,12 +797,11 @@ const handleSaveNewCompany = async () => {
           reorderJob["Material5"] || "",
         ],
         backMaterial: reorderJob["Back Material"] || "",
-        embBacking: reorderJob["EMB Backing"] || "",
+        embBacking: reorderJob["EMB Backing"] || "",  // Check key spelling here
         furColor: reorderJob["Fur Color"] || "",
         isReorder: true,
       }));
 
-      // Show preview images
       if (reorderJob.image) {
         setProdPreviews([{
           url: reorderJob.image,
@@ -816,6 +816,9 @@ const handleSaveNewCompany = async () => {
           type: "image/jpeg",
           name: "Previous Print Preview"
         }]);
+
+        // Dummy file to make printFiles non-empty
+        setPrintFiles([new File([""], "PreviousPrintFile.pdf")]);
       }
     }
   }, [reorderJob]);
