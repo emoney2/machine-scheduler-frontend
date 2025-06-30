@@ -82,20 +82,14 @@ export default function ReorderPage() {
       <div style={{ marginBottom: "1rem" }}>
         <input
           list="company-options"
-          placeholder="Start typing a company..."
           value={company}
-          onChange={(e) => {
-            const value = e.target.value;
-            setCompany(value);
-            if (companyList.includes(value)) {
-              setShowDropdown(false);
-            }
-          }}
+          onChange={(e) => setCompany(e.target.value)}
+          placeholder="Enter company name"
           style={{ width: "300px", padding: "0.5rem" }}
         />
         <datalist id="company-options">
-          {companyList.map((c) => (
-            <option key={c} value={c} />
+          {companyList.map((name) => (
+            <option key={name} value={name} />
           ))}
         </datalist>
       </div>
