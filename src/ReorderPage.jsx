@@ -16,8 +16,7 @@ export default function ReorderPage() {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
-        const companies = res.data || [];
-        const names = companies
+        const names = (res.data || [])
           .map((entry) => entry.name)
           .filter((name) => typeof name === "string" && name.trim());
         setCompanyList(names);
@@ -29,12 +28,11 @@ export default function ReorderPage() {
 
   const handleCompanyChange = (val) => {
     setCompany(val);
-    setShowDropdown(true);
     const lower = val.toLowerCase();
-    const filtered = companyList.filter((name) =>
-      name.toLowerCase().includes(lower)
+    setFilteredNames(
+      companyList.filter((name) => name.toLowerCase().includes(lower))
     );
-    setFilteredNames(filtered);
+    setShowDropdown(true);
   };
 
   const handleSelectCompany = (name) => {
@@ -81,6 +79,7 @@ export default function ReorderPage() {
 
       <div style={{ position: "relative", marginBottom: "1rem" }}>
         <input
+          type="text"
           value={company}
           onChange={(e) => handleCompanyChange(e.target.value)}
           onFocus={() => setShowDropdown(true)}
@@ -168,12 +167,27 @@ export default function ReorderPage() {
               textAlign: "center",
             }}
           >
-            <p style={{ fontSize: "1.1rem" }}>Do you want to change any details?</p>
-            <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginTop: "1rem" }}>
-              <button onClick={() => handleConfirmChoice(true)} style={{ padding: "0.5rem 1rem" }}>
+            <p style={{ fontSize: "1.1rem" }}>
+              Do you want to change any details?
+            </p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: "1rem",
+                marginTop: "1rem",
+              }}
+            >
+              <button
+                onClick={() => handleConfirmChoice(true)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
                 Yes
               </button>
-              <button onClick={() => handleConfirmChoice(false)} style={{ padding: "0.5rem 1rem" }}>
+              <button
+                onClick={() => handleConfirmChoice(false)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
                 No
               </button>
             </div>
