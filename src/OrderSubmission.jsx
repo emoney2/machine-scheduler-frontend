@@ -779,22 +779,29 @@ const handleSaveNewCompany = async () => {
 
       setForm(prev => ({
         ...prev,
-        company: reorderJob.company || "",
-        designName: reorderJob.design || "",
-        quantity: reorderJob.quantity || "",
-        product: reorderJob.product || "",
-        price: reorderJob.price || "",
-        dueDate: reorderJob.due || "",
-        dateType: reorderJob.dateType || "Hard Date",
-        referral: reorderJob.referral || "",
-        materials: reorderJob.materials?.length ? reorderJob.materials : ["", "", "", "", ""],
-        backMaterial: reorderJob.backMaterial || "",
-        embBacking: reorderJob.embBacking || "",
-        furColor: reorderJob.furColor || "",
-        notes: reorderJob.notes || "",
-        isReorder: true
+        company: reorderJob["Company Name"] || "",
+        designName: reorderJob["Design"] || "",
+        quantity: reorderJob["Quantity"] || "",
+        product: reorderJob["Product"] || "",
+        price: reorderJob["Price"] || "",
+        dueDate: reorderJob["Due Date"] || "",
+        dateType: reorderJob["Hard Date/Soft Date"] || "Hard Date",
+        referral: reorderJob["Referral"] || "",
+        notes: reorderJob["Notes"] || "",
+        materials: [
+          reorderJob["Material1"] || "",
+          reorderJob["Material2"] || "",
+          reorderJob["Material3"] || "",
+          reorderJob["Material4"] || "",
+          reorderJob["Material5"] || "",
+        ],
+        backMaterial: reorderJob["Back Material"] || "",
+        embBacking: reorderJob["EMB Backing"] || "",
+        furColor: reorderJob["Fur Color"] || "",
+        isReorder: true,
       }));
 
+      // Show preview images
       if (reorderJob.image) {
         setProdPreviews([{
           url: reorderJob.image,
@@ -812,7 +819,6 @@ const handleSaveNewCompany = async () => {
       }
     }
   }, [reorderJob]);
-
 
   return (
     <>
