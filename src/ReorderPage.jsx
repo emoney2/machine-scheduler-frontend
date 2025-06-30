@@ -13,13 +13,16 @@ export default function ReorderPage() {
     async function fetchCompanies() {
       try {
         const res = await axios.get("/api/company-names");
-        setCompanyNames(res.data);
+        console.log("Fetched company names:", res.data);
+        setCompanyNames(Array.isArray(res.data) ? res.data : []);
       } catch (err) {
         console.error("Failed to load company names");
+        setCompanyNames([]);
       }
     }
     fetchCompanies();
   }, []);
+
 
   const handleFetchJobs = async () => {
     if (!company.trim()) return;

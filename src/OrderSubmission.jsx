@@ -116,8 +116,6 @@ export default function OrderSubmission() {
     notes: "",
     previewUrl: ""
   });
- 
-  const openReorderModal = () => setIsReorderModalOpen(true);
 
   const handleReorderChange = (e) => {
     const { name, value } = e.target;
