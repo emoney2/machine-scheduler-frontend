@@ -4,14 +4,11 @@ import { useNavigate } from "react-router-dom";
 
 export default function ReorderPage() {
   const [company, setCompany] = useState("");
-  const [companyNames, setCompanyNames] = useState([]);
-  const [filteredNames, setFilteredNames] = useState([]);
-  const [jobs, setJobs] = useState([]);
   const [companyList, setCompanyList] = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [confirmJob, setConfirmJob] = useState(null);
   const navigate = useNavigate();
-  
 
   // Fetch typeahead company names from Ship endpoint
   useEffect(() => {
@@ -25,13 +22,6 @@ export default function ReorderPage() {
         console.error("Failed to load company names", err);
       });
   }, []);
-
-
-  // Filter list as user types
-  useEffect(() => {
-    const val = company.toLowerCase();
-    setFilteredNames(companyNames.filter((c) => c.toLowerCase().includes(val)));
-  }, [company]);
 
   const handleFetchJobs = async () => {
     if (!company.trim()) return;
@@ -72,7 +62,6 @@ export default function ReorderPage() {
       <input
         value={company}
         onChange={(e) => setCompany(e.target.value)}
-        list="company-options"
         placeholder="Enter company name"
         list="company-names"
         style={{ marginRight: "1rem", padding: "0.5rem" }}
