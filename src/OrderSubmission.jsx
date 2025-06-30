@@ -778,47 +778,57 @@ const handleSaveNewCompany = async () => {
         }]);
       }
 
-      if (reorderJob["Print"] && reorderJob["Print"].startsWith("http")) {
-        console.log("🧪 reorderJob.Print =", reorderJob["Print"]);
+      if (reorderJob["Print Files"] && reorderJob["Print Files"].includes("/folders/")) {
+        const folderUrl = reorderJob["Print Files"];
+        const match = folderUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+        const folderId = match ? match[1] : null;
 
-        // Step 1: Set print preview
-        setPrintPreviews([{
-          url: reorderJob["Print"],
-          type: "image/jpeg",
-          name: reorderJob["Print Files"] || "Previous Print File"
-        }]);
-
-        // Step 2: Convert Google Drive share link to direct download
-        const driveUrl = reorderJob["Print"];
-        const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)\//);
-        const fileId = match ? match[1] : null;
-
-        if (fileId) {
-          const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-
-          fetch(directUrl)
-            .then(res => {
-              if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-              return res.blob();
-            })
-            .then(blob => {
-              const file = new File(
-                [blob],
-                reorderJob["Print Files"] || "PreviousPrintFile.pdf",
-                { type: blob.type || "application/octet-stream" }
-              );
-              console.log("📦 Real print file fetched:", file);
-              setPrintFiles([file]);
-            })
-            .catch(err => {
-              console.error("❌ Failed to fetch real print file from Drive:", err);
-            });
-        } else {
-          console.warn("❗ Invalid Google Drive link — no file ID found:", driveUrl);
+        if (!folderId) {
+          console.warn("❗ Invalid folder link:", folderUrl);
+          return;
         }
 
+        // Call backend to list files in folder
+        fetch(`${process.env.REACT_APP_API_ROOT}/api/list-folder-files?folderId=${folderId}`)
+          .then(res => res.json())
+          .then(async (data) => {
+            if (!Array.isArray(data.files)) {
+              console.warn("❗ Invalid response from backend for folder contents", data);
+              return;
+            }
+
+            const previews = [];
+            const files = [];
+
+            for (let fileMeta of data.files) {
+              const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileMeta.id}`;
+
+              try {
+                const blob = await fetch(downloadUrl).then(r => r.blob());
+
+                const file = new File([blob], fileMeta.name, {
+                  type: blob.type || "application/octet-stream",
+                });
+
+                files.push(file);
+                previews.push({
+                  url: URL.createObjectURL(blob),
+                  type: blob.type,
+                  name: fileMeta.name,
+                });
+              } catch (err) {
+                console.error("❌ Failed to download print file:", fileMeta.name, err);
+              }
+            }
+
+            setPrintFiles(files);
+            setPrintPreviews(previews);
+          })
+          .catch(err => {
+            console.error("❌ Failed to list folder contents:", err);
+          });
       } else {
-        console.warn("❗ Skipping print file fetch — value is not a valid URL:", reorderJob["Print"]);
+        console.warn("❗ Skipping print file fetch — no folder link:", reorderJob["Print Files"]);
       }
     }
   }, [reorderJob]);
