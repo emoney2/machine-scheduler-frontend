@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import "./FileInput.css";
 import { useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const API_ROOT = process.env.REACT_APP_API_ROOT;
 
@@ -28,8 +29,7 @@ export default function OrderSubmission() {
   const [printPreviews, setPrintPreviews] = useState([]);
   const location = useLocation();
   const reorderJob = location.state?.reorderJob;
-
-
+  const navigate = useNavigate();
 
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
@@ -1546,18 +1546,17 @@ const handleSaveNewCompany = async () => {
         )}
 
 
-        {/* ─── Reorder Trigger ──────────────────────────── */}
         <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem" }}>
           <button
             type="button"
-            onClick={openReorderModal}
+            onClick={() => navigate("/reorder")}
             style={{
-              padding: "0.25rem 0.5rem",    // ↓ half the padding
-              fontSize: "0.8rem",          // ↓ smaller text
+              padding: "0.25rem 0.5rem",
+              fontSize: "0.8rem",
               background: "#007bff",
               color: "#fff",
               border: "none",
-              borderRadius: "3px",         // ↓ slightly smaller corner radius
+              borderRadius: "3px",
               cursor: "pointer",
             }}
           >
