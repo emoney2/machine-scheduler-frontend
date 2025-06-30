@@ -5,9 +5,6 @@ import { useLocation } from "react-router-dom";
 
 const API_ROOT = process.env.REACT_APP_API_ROOT;
 
-const location = useLocation();
-const reorderJob = location.state?.reorderJob;
-
 export default function OrderSubmission() {
   const [form, setForm] = useState({
     company: "",
@@ -29,6 +26,8 @@ export default function OrderSubmission() {
   const [printFiles, setPrintFiles] = useState([]);
   const [prodPreviews, setProdPreviews] = useState([]);
   const [printPreviews, setPrintPreviews] = useState([]);
+  const location = useLocation();
+  const reorderJob = location.state?.reorderJob;
 
 
 
