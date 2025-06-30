@@ -4,9 +4,22 @@ import { useNavigate } from "react-router-dom";
 
 export default function ReorderPage() {
   const [company, setCompany] = useState("");
+  const [companyNames, setCompanyNames] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function fetchCompanies() {
+      try {
+        const res = await axios.get("/api/company-names");
+        setCompanyNames(res.data);
+      } catch (err) {
+        console.error("Failed to load company names");
+      }
+    }
+    fetchCompanies();
+  }, []);
 
   const handleFetchJobs = async () => {
     if (!company.trim()) return;
@@ -26,10 +39,8 @@ export default function ReorderPage() {
   const handleReorder = (job) => {
     const confirm = window.confirm("Do you want to change any details?");
     if (confirm) {
-      // go to order form with job info pre-filled
       navigate("/order", { state: { reorderJob: job } });
     } else {
-      // trigger auto reorder
       axios
         .post(`${process.env.REACT_APP_API_ROOT}/reorder`, {
           previousOrder: job.orderId,
@@ -45,13 +56,30 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
-      <input
-        value={company}
-        onChange={(e) => setCompany(e.target.value)}
-        placeholder="Enter company name"
-        style={{ marginRight: "1rem", padding: "0.5rem" }}
-      />
-      <button onClick={handleFetchJobs}>Find Jobs</button>
+
+      <div style={{ marginBottom: "1rem", position: "relative" }}>
+        <input
+          type="text"
+          placeholder="Search company name…"
+          value={company}
+          onChange={(e) => setCompany(e.target.value)}
+          list="company-list"
+          style={{
+            width: "300px",
+            padding: "0.5rem",
+            fontSize: "1rem",
+            borderRadius: "4px",
+            border: "1px solid #ccc",
+            marginRight: "0.75rem",
+          }}
+        />
+        <datalist id="company-list">
+          {companyNames.map((name) => (
+            <option key={name} value={name} />
+          ))}
+        </datalist>
+        <button onClick={handleFetchJobs}>Find Jobs</button>
+      </div>
 
       {loading && <p>Loading...</p>}
 
