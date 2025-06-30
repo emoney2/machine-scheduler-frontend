@@ -14,16 +14,16 @@ export default function ReorderPage() {
   // Fetch typeahead company names from Ship endpoint
   useEffect(() => {
     axios
-      .get(`${process.env.REACT_APP_API_ROOT}/company-names`)
+      .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
-        const list = Array.isArray(res.data) ? res.data : [];
-        setCompanyNames(list);
-        setFilteredNames(list);
+        const companies = res.data || [];
+        setCompanyList(companies.map((entry) => entry.name));
       })
-      .catch(() => {
-        console.error("Failed to load company names");
+      .catch((err) => {
+        console.error("Failed to load company names", err);
       });
   }, []);
+
 
   // Filter list as user types
   useEffect(() => {
