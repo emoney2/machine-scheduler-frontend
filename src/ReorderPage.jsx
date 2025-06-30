@@ -5,25 +5,38 @@ import { useNavigate } from "react-router-dom";
 export default function ReorderPage() {
   const [company, setCompany] = useState("");
   const [companyList, setCompanyList] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [confirmJob, setConfirmJob] = useState(null);
   const navigate = useNavigate();
 
-  // Fetch type-ahead company list from /directory (like Ship tab)
   useEffect(() => {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
-        const valid = (res.data || []).map((entry) => entry.name).filter(name => typeof name === "string" && name.trim() !== "");
-        setCompanyList(valid);
+        const companies = res.data || [];
+        const names = companies
+          .map((entry) => entry.name)
+          .filter((name) => typeof name === "string" && name.trim());
+        setCompanyList(names);
       })
       .catch((err) => {
         console.error("Failed to load company names", err);
       });
   }, []);
 
-  const filteredSuggestions = companyList.filter((name) =>
+  const handleCompanyChange = (val) => {
+    setCompany(val);
+    setShowDropdown(true);
+  };
+
+  const handleSelectCompany = (name) => {
+    setCompany(name);
+    setShowDropdown(false);
+  };
+
+  const filteredNames = companyList.filter((name) =>
     name.toLowerCase().includes(company.toLowerCase())
   );
 
@@ -63,34 +76,30 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
-      <div style={{ position: "relative", width: "300px" }}>
+      <div style={{ position: "relative", marginBottom: "1rem" }}>
         <input
           value={company}
-          onChange={(e) => setCompany(e.target.value)}
+          onChange={(e) => handleCompanyChange(e.target.value)}
           placeholder="Enter company name"
-          style={{ width: "100%", padding: "0.5rem" }}
+          style={{ width: "300px", padding: "0.5rem" }}
         />
-        {company && filteredSuggestions.length > 0 && (
+        {showDropdown && company && filteredNames.length > 0 && (
           <div
             style={{
               position: "absolute",
-              top: "100%",
-              left: 0,
-              right: 0,
-              background: "#fff",
+              background: "white",
               border: "1px solid #ccc",
+              width: "300px",
+              maxHeight: "150px",
+              overflowY: "auto",
               zIndex: 10,
             }}
           >
-            {filteredSuggestions.map((name) => (
+            {filteredNames.map((name) => (
               <div
                 key={name}
-                onClick={() => setCompany(name)}
-                style={{
-                  padding: "0.5rem",
-                  cursor: "pointer",
-                  borderBottom: "1px solid #eee",
-                }}
+                onClick={() => handleSelectCompany(name)}
+                style={{ padding: "0.5rem", cursor: "pointer" }}
               >
                 {name}
               </div>
@@ -98,10 +107,7 @@ export default function ReorderPage() {
           </div>
         )}
       </div>
-
-      <button onClick={handleFetchJobs} style={{ marginTop: "1rem" }}>
-        Find Jobs
-      </button>
+      <button onClick={handleFetchJobs}>Find Jobs</button>
 
       {loading && <p>Loading…</p>}
 
@@ -119,7 +125,7 @@ export default function ReorderPage() {
             }}
           >
             <img
-              src={job.Image || ""}
+              src={job.image || ""}
               alt=""
               style={{ width: 60, height: 60, objectFit: "cover" }}
             />
@@ -148,7 +154,9 @@ export default function ReorderPage() {
             zIndex: 1000,
           }}
         >
-          <div style={{ background: "#fff", padding: "2rem", borderRadius: "8px", textAlign: "center" }}>
+          <div
+            style={{ background: "#fff", padding: "2rem", borderRadius: "8px", textAlign: "center" }}
+          >
             <p style={{ fontSize: "1.1rem" }}>Do you want to change any details?</p>
             <div style={{ display: "flex", justifyContent: "center", gap: "1rem", marginTop: "1rem" }}>
               <button onClick={() => handleConfirmChoice(true)} style={{ padding: "0.5rem 1rem" }}>

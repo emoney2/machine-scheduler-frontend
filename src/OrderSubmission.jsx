@@ -110,6 +110,7 @@ export default function OrderSubmission() {
   useEffect(() => {
     if (location.state?.reorderJob) {
       const job = location.state.reorderJob;
+      console.log("📋 Prefilling form from reorder job:", job);
 
       setForm((prev) => ({
         ...prev,
@@ -120,7 +121,7 @@ export default function OrderSubmission() {
         price: job["Price"] || "",
         dueDate: job["Due Date"] || "",
         dateType: job["Hard Date/Soft Date"] || "Hard Date",
-        referral: "", // Not stored in sheet
+        referral: job["Referral"] || "",
         notes: job["Notes"] || "",
         materials: [
           job["Material1"] || "",
@@ -133,33 +134,7 @@ export default function OrderSubmission() {
         embBacking: job["EMB Backing"] || "",
         furColor: job["Fur Color"] || "",
       }));
-
-      // Production preview (from Image column)
-      if (job["Image"]) {
-        setProdPreviews([
-          {
-            name: job["Image"],
-            url: job["Image"],
-            type: job["Image"].endsWith(".pdf") ? "application/pdf" : "image/*",
-          },
-        ]);
-      }
-
-      // Print previews (from Print Files column)
-      if (job["Print Files"]) {
-        setPrintPreviews(
-          job["Print Files"]
-            .split(",")
-            .map((url) => url.trim())
-            .filter(Boolean)
-            .map((url) => ({
-              name: url,
-              url: url,
-              type: url.endsWith(".pdf") ? "application/pdf" : "image/*",
-            }))
-        );
-      }
-    } 
+    }
   }, [location.state]);
 
   // ─── Reorder modal state & handlers ─────────────────────────────
