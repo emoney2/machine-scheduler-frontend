@@ -745,7 +745,7 @@ const handleSaveNewCompany = async () => {
     if (reorderJob) {
       console.log("📋 Prefilling form from reorder job:", reorderJob);
       console.log("🔍 Keys:", Object.keys(reorderJob));
-
+ 
       setForm(prev => ({
         ...prev,
         company: reorderJob["Company Name"] || "",
@@ -753,7 +753,7 @@ const handleSaveNewCompany = async () => {
         quantity: reorderJob["Quantity"] || "",
         product: reorderJob["Product"] || "",
         price: reorderJob["Price"] || "",
-        dueDate: "",  // ⛔ force cleared
+        dueDate: "", // force user to select a new one
         dateType: reorderJob["Hard Date/Soft Date"] || "Hard Date",
         referral: reorderJob["Referral"] || "",
         notes: reorderJob["Notes"] || "",
@@ -765,7 +765,7 @@ const handleSaveNewCompany = async () => {
           reorderJob["Material5"] || "",
         ],
         backMaterial: reorderJob["Back Material"] || "",
-        embBacking: reorderJob["EMB Backing"] || "",
+        embBacking: reorderJob["EMB Backing"] || "",  // ✅ this now works with your <select>
         furColor: reorderJob["Fur Color"] || "",
         isReorder: true,
       }));
@@ -785,11 +785,18 @@ const handleSaveNewCompany = async () => {
           name: reorderJob["Print Files"] || "Previous Print File"
         }]);
 
-        setPrintFiles([
-          new File(["dummy content"], reorderJob["Print Files"] || "PreviousPrintFile.pdf", {
-            type: "application/pdf",
+        // 🧠 actually fetch and reconstruct the file
+        fetch(reorderJob["Print"])
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], reorderJob["Print Files"] || "PreviousPrintFile.jpg", {
+              type: blob.type || "application/octet-stream"
+            });
+            setPrintFiles([file]);
           })
-        ]);
+          .catch(err => {
+            console.error("❌ Failed to fetch print file:", err);
+          });
       }
     }
   }, [reorderJob]);
