@@ -1087,6 +1087,7 @@ const onDragEnd = async (result) => {
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
         <Route path="/ship" element={<Ship />} />
         <Route path="/reorder" element={<ReorderPage />} />  {/* ← this is new */}
+        <Route path="/order" element={<OrderSubmission />} />
       </Routes>
     </>
   );
