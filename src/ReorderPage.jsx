@@ -92,6 +92,20 @@ export default function ReorderPage() {
           placeholder="Enter company name"
           style={{ width: "300px", padding: "0.5rem" }}
         />
+        <input
+          value={company}
+          onChange={(e) => {
+            const value = e.target.value;
+            setCompany(value);
+            setShowDropdown(true);
+            const lower = value.toLowerCase();
+            setFilteredNames(companyList.filter((name) => name.toLowerCase().includes(lower)));
+          }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 100)}
+          placeholder="Enter company name"
+          style={{ width: "300px", padding: "0.5rem" }}
+        />
         {showDropdown && filteredNames.length > 0 && (
           <div
             style={{
@@ -107,7 +121,7 @@ export default function ReorderPage() {
             {filteredNames.map((name) => (
               <div
                 key={name}
-                onClick={() => {
+                onMouseDown={() => {
                   setCompany(name);
                   setShowDropdown(false);
                 }}
