@@ -779,31 +779,41 @@ const handleSaveNewCompany = async () => {
       }
 
       if (reorderJob["Print"]) {
-        // Step 1: Preview image
+        // Step 1: Show preview using original link
         setPrintPreviews([{
           url: reorderJob["Print"],
           type: "image/jpeg",
           name: reorderJob["Print Files"] || "Previous Print File"
         }]);
 
-        // Step 2: Actually fetch and convert the print file into a real File object
-        fetch(reorderJob["Print"])
-          .then(res => {
-            if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-            return res.blob();
-          })
-          .then(blob => {
-            const file = new File(
-              [blob],
-              reorderJob["Print Files"] || "PreviousPrintFile.jpg",
-              { type: blob.type || "application/octet-stream" }
-            );
-            console.log("📦 Loaded actual print file:", file);
-            setPrintFiles([file]);
-          })
-          .catch(err => {
-            console.error("❌ Failed to fetch and convert print file:", err);
-          });
+        // Step 2: Convert Google Drive link to a direct download URL
+        const driveUrl = reorderJob["Print"];
+        const match = driveUrl.match(/\/d\/([a-zA-Z0-9_-]+)\//);
+        const fileId = match ? match[1] : null;
+
+        if (fileId) {
+          const directUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+          fetch(directUrl)
+            .then(res => {
+              if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+              return res.blob();
+            })
+            .then(blob => {
+              const file = new File(
+                [blob],
+                reorderJob["Print Files"] || "PreviousPrintFile.pdf",
+                { type: blob.type || "application/octet-stream" }
+              );
+              console.log("📦 Real print file fetched:", file);
+              setPrintFiles([file]);
+            })
+            .catch(err => {
+              console.error("❌ Failed to fetch real print file from Drive:", err);
+            });
+        } else {
+          console.warn("❗ Unable to extract file ID from print link:", driveUrl);
+        }
       }
     }
   }, [reorderJob]);
