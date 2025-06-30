@@ -79,36 +79,25 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
-      <div style={{ position: "relative", marginBottom: "1rem" }}>
+      <div style={{ marginBottom: "1rem" }}>
         <input
+          list="company-options"
+          placeholder="Start typing a company..."
           value={company}
-          onChange={(e) => handleCompanyChange(e.target.value)}
-          placeholder="Enter company name"
+          onChange={(e) => {
+            const value = e.target.value;
+            setCompany(value);
+            if (companyList.includes(value)) {
+              setShowDropdown(false);
+            }
+          }}
           style={{ width: "300px", padding: "0.5rem" }}
         />
-        {showDropdown && filteredNames.length > 0 && (
-          <div
-            style={{
-              position: "absolute",
-              background: "white",
-              border: "1px solid #ccc",
-              width: "300px",
-              maxHeight: "150px",
-              overflowY: "auto",
-              zIndex: 10,
-            }}
-          >
-            {filteredNames.map((name) => (
-              <div
-                key={name}
-                onClick={() => handleSelectCompany(name)}
-                style={{ padding: "0.5rem", cursor: "pointer" }}
-              >
-                {name}
-              </div>
-            ))}
-          </div>
-        )}
+        <datalist id="company-options">
+          {companyList.map((c) => (
+            <option key={c} value={c} />
+          ))}
+        </datalist>
       </div>
       <button onClick={handleFetchJobs}>Find Jobs</button>
 
