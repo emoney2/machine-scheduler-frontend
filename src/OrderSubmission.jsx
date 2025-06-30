@@ -779,23 +779,30 @@ const handleSaveNewCompany = async () => {
       }
 
       if (reorderJob["Print"]) {
+        // Step 1: Preview image
         setPrintPreviews([{
           url: reorderJob["Print"],
           type: "image/jpeg",
           name: reorderJob["Print Files"] || "Previous Print File"
         }]);
 
-        // 🧠 actually fetch and reconstruct the file
+        // Step 2: Actually fetch and convert the print file into a real File object
         fetch(reorderJob["Print"])
-          .then(res => res.blob())
+          .then(res => {
+            if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+            return res.blob();
+          })
           .then(blob => {
-            const file = new File([blob], reorderJob["Print Files"] || "PreviousPrintFile.jpg", {
-              type: blob.type || "application/octet-stream"
-            });
+            const file = new File(
+              [blob],
+              reorderJob["Print Files"] || "PreviousPrintFile.jpg",
+              { type: blob.type || "application/octet-stream" }
+            );
+            console.log("📦 Loaded actual print file:", file);
             setPrintFiles([file]);
           })
           .catch(err => {
-            console.error("❌ Failed to fetch print file:", err);
+            console.error("❌ Failed to fetch and convert print file:", err);
           });
       }
     }
