@@ -5,26 +5,25 @@ import { useNavigate } from "react-router-dom";
 export default function ReorderPage() {
   const [company, setCompany] = useState("");
   const [companyList, setCompanyList] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [confirmJob, setConfirmJob] = useState(null);
   const navigate = useNavigate();
 
-  // Fetch company names for dropdown
+  // Fetch type-ahead company list from /directory (like Ship tab)
   useEffect(() => {
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
-        const companies = res.data || [];
-        setCompanyList(companies.map((entry) => entry.name).filter(name => typeof name === "string" && name.trim() !== ""));
+        const valid = (res.data || []).map((entry) => entry.name).filter(name => typeof name === "string" && name.trim() !== "");
+        setCompanyList(valid);
       })
       .catch((err) => {
         console.error("Failed to load company names", err);
       });
   }, []);
 
-  const filteredCompanies = companyList.filter((name) =>
+  const filteredSuggestions = companyList.filter((name) =>
     name.toLowerCase().includes(company.toLowerCase())
   );
 
@@ -64,38 +63,29 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
-
-      <div style={{ position: "relative", marginBottom: "1rem" }}>
+      <div style={{ position: "relative", width: "300px" }}>
         <input
           value={company}
-          onChange={(e) => {
-            setCompany(e.target.value);
-            setShowDropdown(true);
-          }}
-          onFocus={() => setShowDropdown(true)}
-          onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+          onChange={(e) => setCompany(e.target.value)}
           placeholder="Enter company name"
-          style={{ marginRight: "1rem", padding: "0.5rem", width: "300px" }}
+          style={{ width: "100%", padding: "0.5rem" }}
         />
-        {showDropdown && filteredCompanies.length > 0 && (
+        {company && filteredSuggestions.length > 0 && (
           <div
             style={{
               position: "absolute",
+              top: "100%",
+              left: 0,
+              right: 0,
               background: "#fff",
               border: "1px solid #ccc",
-              width: "300px",
               zIndex: 10,
-              maxHeight: "150px",
-              overflowY: "auto",
             }}
           >
-            {filteredCompanies.map((name) => (
+            {filteredSuggestions.map((name) => (
               <div
                 key={name}
-                onMouseDown={() => {
-                  setCompany(name);
-                  setShowDropdown(false);
-                }}
+                onClick={() => setCompany(name)}
                 style={{
                   padding: "0.5rem",
                   cursor: "pointer",
@@ -109,7 +99,9 @@ export default function ReorderPage() {
         )}
       </div>
 
-      <button onClick={handleFetchJobs}>Find Jobs</button>
+      <button onClick={handleFetchJobs} style={{ marginTop: "1rem" }}>
+        Find Jobs
+      </button>
 
       {loading && <p>Loading…</p>}
 
@@ -127,7 +119,7 @@ export default function ReorderPage() {
             }}
           >
             <img
-              src={job.image || ""}
+              src={job.Image || ""}
               alt=""
               style={{ width: 60, height: 60, objectFit: "cover" }}
             />
