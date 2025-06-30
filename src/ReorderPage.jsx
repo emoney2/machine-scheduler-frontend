@@ -4,35 +4,41 @@ import { useNavigate } from "react-router-dom";
 
 export default function ReorderPage() {
   const [company, setCompany] = useState("");
-  const [companyNames, setCompanyNames] = useState([]);
+  const [allCompanies, setAllCompanies] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  // Fetch all company names for the datalist
   useEffect(() => {
     async function fetchCompanies() {
       try {
-        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/company-names`);
-        console.log("Fetched company names:", res.data);
-        setCompanyNames(Array.isArray(res.data) ? res.data : []);
+        const res = await fetch("https://machine-scheduler-backend.onrender.com/api/company-list", {
+          credentials: "include"
+        });
+        const data = await res.json();
+        setAllCompanies(data.companies || []);
       } catch (err) {
-        console.error("Failed to load company names");
-        setCompanyNames([]);
+        console.error("Company fetch failed", err);
+        alert("Failed to load company names");
       }
     }
     fetchCompanies();
   }, []);
 
+  const handleSelectCompany = async (e) => {
+    const value = e.target.value;
+    setCompany(value);
+    if (!allCompanies.includes(value)) return;
 
-  const handleFetchJobs = async () => {
-    if (!company.trim()) return;
     setLoading(true);
     try {
       const res = await axios.get(
-        `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${company}`
+        `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`
       );
       setJobs(res.data.jobs || []);
     } catch (err) {
+      console.error("Fetch failed", err);
       alert("Failed to load jobs.");
     } finally {
       setLoading(false);
@@ -59,30 +65,18 @@ export default function ReorderPage() {
   return (
     <div style={{ padding: "1.5rem" }}>
       <h2>Reorder a Previous Job</h2>
-
-      <div style={{ marginBottom: "1rem", position: "relative" }}>
-        <input
-          type="text"
-          placeholder="Search company name…"
-          value={company}
-          onChange={(e) => setCompany(e.target.value)}
-          list="company-list"
-          style={{
-            width: "300px",
-            padding: "0.5rem",
-            fontSize: "1rem",
-            borderRadius: "4px",
-            border: "1px solid #ccc",
-            marginRight: "0.75rem",
-          }}
-        />
-        <datalist id="company-list">
-          {companyNames.map((name) => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
-        <button onClick={handleFetchJobs}>Find Jobs</button>
-      </div>
+      <input
+        list="company-options"
+        value={company}
+        onChange={handleSelectCompany}
+        placeholder="Start typing a company..."
+        style={{ marginRight: "1rem", padding: "0.5rem", width: "300px" }}
+      />
+      <datalist id="company-options">
+        {allCompanies.map((c) => (
+          <option key={c} value={c} />
+        ))}
+      </datalist>
 
       {loading && <p>Loading...</p>}
 
