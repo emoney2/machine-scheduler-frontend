@@ -588,13 +588,12 @@ const handleSubmit = async (e) => {
 
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
-
-  // Wait a tick to ensure prodFiles has updated (especially after reorders)
   await new Promise(resolve => setTimeout(resolve, 0));
-
   console.log("🛎️ submitForm called");
 
   const fd = new FormData();
+
+  // Append form fields
   Object.entries(form).forEach(([key, value]) => {
     if (key === "materials") {
       value.forEach(m => fd.append("materials", m));
@@ -603,12 +602,12 @@ const submitForm = async () => {
     }
   });
 
-  // 🧪 Append prodFiles and printFiles manually
+  // 🧪 Append prodFiles
   if (prodFiles.length > 0) {
     prodFiles.forEach((f, i) => {
-      const file = new File([f], f.name, { type: f.type || "application/octet-stream" });
-      fd.append("prodFiles", file);
-      console.log(`📦 Added prodFile[${i}]:`, file.name, file.size, file.type);
+      const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      fd.append("prodFiles", safeFile);
+      console.log(`📦 Added prodFile[${i}]:`, safeFile.name, safeFile.size, safeFile.type);
     });
   } else if (!form.isReorder) {
     alert("Please select one or more production files.");
@@ -617,44 +616,35 @@ const submitForm = async () => {
     console.warn("⚠️ No prodFiles but this is reorder, continuing...");
   }
 
+  // 🖨️ Append printFiles
   if (printFiles.length > 0) {
     printFiles.forEach((f, i) => {
-      const file = new File([f], f.name, { type: f.type || "application/octet-stream" });
-      fd.append("printFiles", file);
-      console.log(`🖨️ Added printFile[${i}]:`, file.name, file.size, file.type);
+      const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      fd.append("printFiles", safeFile);
+      console.log(`🖨️ Added printFile[${i}]:`, safeFile.name, safeFile.size, safeFile.type);
     });
   }
 
+  // Log all form data before submitting
+  for (let [key, value] of fd.entries()) {
+    if (value instanceof File) {
+      console.log(`📁 ${key}: File - ${value.name} (${value.size} bytes, ${value.type})`);
+    } else {
+      console.log(`📄 ${key}: ${value}`);
+    }
+  }
+
+  if (!fd.has("prodFiles")) {
+    console.error("❌ No prodFiles in FormData");
+  }
+
   setIsSubmitting(true);
+
   try {
-    console.log("🚚 Submitting with prodFiles:", prodFiles);
-    const fd = new FormData();
-    Object.entries(form).forEach(([key, value]) => {
-      if (key === "materials") {
-        value.forEach(m => fd.append("materials", m));
-      } else {
-        fd.append(key, value);
-      }
-    });
-
-    // 🛠️ Ensure all prodFiles are wrapped as real File instances
-    console.log("📦 Appending to FormData:");
-
-    for (const f of prodFiles) {
-      const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
-      console.log("📄 Added prodFile:", safeFile.name, safeFile.size, safeFile.type);
-      fd.append("prodFiles", safeFile);
-    }
-
-    for (const f of printFiles) {
-      const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
-      console.log("📄 Added printFile:", safeFile.name, safeFile.size, safeFile.type);
-      fd.append("printFiles", safeFile);
-    }
-
     const submitUrl =
       process.env.REACT_APP_ORDER_SUBMIT_URL ||
       `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
+
     const config = {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: (e) => {
@@ -663,23 +653,10 @@ const submitForm = async () => {
       }
     };
 
-    // DEBUG: log all FormData entries before sending
-    for (let [key, value] of fd.entries()) {
-      if (value instanceof File) {
-        console.log(`📁 ${key}: File - ${value.name} (${value.size} bytes, ${value.type})`);
-      } else {
-        console.log(`📄 ${key}: ${value}`);
-      }
-    }
-
-    if (!fd.has("prodFiles")) {
-      console.error("❌ No prodFiles in FormData");
-    }
-
-    // Now submit as usual
     await axios.post(submitUrl, fd, config);
 
     alert("Order submitted!");
+
     // reset
     setForm({
       company: "",
