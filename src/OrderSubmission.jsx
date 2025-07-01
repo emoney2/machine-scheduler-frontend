@@ -31,6 +31,9 @@ export default function OrderSubmission() {
   const reorderJob = location.state?.reorderJob;
   const navigate = useNavigate();
   const [isPrefilling, setIsPrefilling] = useState(false);
+  const [isSubmittingOverlay, setIsSubmittingOverlay] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+
 
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
@@ -648,6 +651,7 @@ const submitForm = async () => {
   }
 
   setIsSubmitting(true);
+  setIsSubmittingOverlay(true);
 
   try {
     const submitUrl =
@@ -664,7 +668,11 @@ const submitForm = async () => {
 
     await axios.post(submitUrl, fd, config);
 
-    alert("Order submitted!");
+    setIsSubmittingOverlay(false);
+    setShowSuccessOverlay(true);
+    setTimeout(() => {
+      setShowSuccessOverlay(false);
+    }, 3000);
 
     // reset
     setForm({
@@ -978,7 +986,45 @@ const handleSaveNewCompany = async () => {
 
   return (
     <>
+      {isSubmittingOverlay && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(255, 255, 0, 0.2)",
+          zIndex: 9999,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "2rem",
+          fontWeight: "bold",
+          color: "#555",
+        }}>
+          🛠️ Submitting order...
+        </div>
+      )}
 
+      {showSuccessOverlay && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(0, 255, 0, 0.2)",
+          zIndex: 9999,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "2rem",
+          fontWeight: "bold",
+          color: "#1a3e1a",
+        }}>
+          ✅ Order submitted!
+        </div>
+      )}
       {/* ─── Company Modal ───────────────────────────────────── */}
       {isNewCompanyModalOpen && (
         <div
