@@ -586,18 +586,14 @@ const handleSubmit = async (e) => {
 
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
-  setIsSubmitting(true);
-
-  // ✅ Block normal orders if no production files were uploaded
   if (!form.isReorder && prodFiles.length === 0) {
     alert("Please select one or more production files.");
-    setIsSubmitting(false);
     return;
   }
 
+  setIsSubmitting(true);
   try {
     console.log("🚚 Submitting with prodFiles:", prodFiles);
-
     const fd = new FormData();
     Object.entries(form).forEach(([key, value]) => {
       if (key === "materials") {
@@ -609,12 +605,9 @@ const submitForm = async () => {
     prodFiles.forEach(f => fd.append("prodFiles", f));
     printFiles.forEach(f => fd.append("printFiles", f));
 
-    console.log("🚚 Submitting with prodFiles:", prodFiles);
-
     const submitUrl =
       process.env.REACT_APP_ORDER_SUBMIT_URL ||
       `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
-
     const config = {
       headers: { "Content-Type": "multipart/form-data" },
       onUploadProgress: (e) => {
@@ -622,12 +615,10 @@ const submitForm = async () => {
         setUploadProgress(pct);
       }
     };
-
     await axios.post(submitUrl, fd, config);
 
     alert("Order submitted!");
-
-    // ✅ Reset everything after submission
+    // reset
     setForm({
       company: "",
       designName: "",
