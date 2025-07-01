@@ -693,11 +693,6 @@ const fetchManualStateCore = async (previousCols) => {
     return () => clearInterval(handle);
   }, []);
 // ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
-
-const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
-  updateTopStartTime(prevRef, jobs, machineKey);
-}, 500); // wait 500ms between calls
-
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
     const newTop = jobs[0]?.id || null;
@@ -755,6 +750,10 @@ useEffect(() => {
       }
     }
   };
+
+  const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
+    updateTopStartTime(prevRef, jobs, machineKey);
+  }, 500); // wait 500ms between calls
 
   throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
   throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');;
