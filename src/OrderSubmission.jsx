@@ -588,6 +588,7 @@ const handleSubmit = async (e) => {
 
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
+  console.log("⏳ Waiting for prodFiles to finalize...");
   await new Promise(resolve => setTimeout(resolve, 0));
   console.log("🛎️ submitForm called");
 
@@ -602,7 +603,8 @@ const submitForm = async () => {
     }
   });
 
-  // 🧪 Append prodFiles
+  console.log("🧪 prodFiles right before check:", prodFiles);
+
   if (prodFiles.length > 0) {
     prodFiles.forEach((f, i) => {
       const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
@@ -854,6 +856,10 @@ const handleSaveNewCompany = async () => {
               }
               setProdPreviews(previews);
               setProdFiles(files);
+              setTimeout(() => {
+                console.log("✅ Prod files set after reorder:", files);
+              }, 0);
+
             })
             .catch(err => {
               console.error("❌ Failed to list production folder contents:", err);
