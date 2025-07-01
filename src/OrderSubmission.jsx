@@ -991,26 +991,24 @@ const handleSaveNewCompany = async () => {
       } else {
         console.warn("❗ Skipping print file fetch — no folder link:", reorderJob["Print Files"]);
         setPrintFilesLoading(false);
+        console.log("🟢 Print file loading finished");
       }
     }
   }, [reorderJob]);
 
   useEffect(() => {
-    if (isPrefilling && !overlayVisibleOnce) {
-      // wait until yellow screen is actually visible
-      setTimeout(() => {
-        setOverlayVisibleOnce(true);
-      }, 50);
-    }
-
-    if (!prodFilesLoading && !printFilesLoading && overlayVisibleOnce) {
+    if (!prodFilesLoading && !printFilesLoading) {
+      console.log("✅ All files done loading, hiding yellow overlay");
       setTimeout(() => {
         setIsPrefilling(false);
-        setOverlayVisibleOnce(false); // reset for future reorders
-      }, 300);
+      }, 300); // small delay for smoother transition
+    } else {
+      console.log("⏳ Still loading files...", {
+        prodFilesLoading,
+        printFilesLoading
+      });
     }
-  }, [prodFilesLoading, printFilesLoading, isPrefilling, overlayVisibleOnce]);
-
+  }, [prodFilesLoading, printFilesLoading]);
 
   useEffect(() => {
     if (!prodFilesLoading && !printFilesLoading) {
