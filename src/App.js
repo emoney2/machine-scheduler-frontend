@@ -14,6 +14,7 @@ import OrderSubmission from './OrderSubmission';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import ReorderPage from "./ReorderPage";
+import throttle from 'lodash.throttle';
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
@@ -692,6 +693,11 @@ const fetchManualStateCore = async (previousCols) => {
     return () => clearInterval(handle);
   }, []);
 // ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
+
+const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
+  updateTopStartTime(prevRef, jobs, machineKey);
+}, 500); // wait 500ms between calls
+
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
     const newTop = jobs[0]?.id || null;
@@ -750,8 +756,8 @@ useEffect(() => {
     }
   };
 
-  updateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
-  updateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+  throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+  throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');;
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 
 // === Section 6: Placeholder Management ===
