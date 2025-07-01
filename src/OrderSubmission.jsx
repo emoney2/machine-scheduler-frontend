@@ -589,6 +589,9 @@ const handleSubmit = async (e) => {
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
 
+  // Wait a tick to ensure prodFiles has updated (especially after reorders)
+  await new Promise(resolve => setTimeout(resolve, 0));
+
   console.log("🚦 Checking file state...");
   console.log("🚦 isReorder?", form.isReorder, "| prodFiles length:", prodFiles.length, prodFiles);
   if (prodFiles.length === 0) {
