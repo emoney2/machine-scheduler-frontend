@@ -789,7 +789,7 @@ const handleSaveNewCompany = async () => {
         }
 
         // Call backend to list files in folder
-        fetch(`${process.env.REACT_APP_API_ROOT}/api/list-folder-files?folderId=${folderId}`)
+        fetch(`${process.env.REACT_APP_API_ROOT}/list-folder-files?folderId=${folderId}`)
           .then(res => res.json())
           .then(async (data) => {
             if (!Array.isArray(data.files)) {
