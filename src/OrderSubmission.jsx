@@ -589,8 +589,15 @@ const handleSubmit = async (e) => {
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
   console.log("⏳ Waiting for prodFiles to finalize...");
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await new Promise(resolve => setTimeout(resolve, 100));
   console.log("🛎️ submitForm called");
+
+  console.log("🧪 prodFiles right before check:", prodFiles);
+
+  if (prodFiles.length === 0 && !form.isReorder) {
+    alert("Please select one or more production files.");
+    return;
+  }
 
   const fd = new FormData();
 
@@ -887,12 +894,21 @@ const handleSaveNewCompany = async () => {
                     type: realBlob.type || "application/octet-stream",
                   });
 
-                  setProdFiles([file]);
+                  const wrappedFile = new File([blob], filename, {
+                    type: blob.type || "application/octet-stream",
+                  });
+
+                  setProdFiles([wrappedFile]);
                   setProdPreviews([{
                     url: URL.createObjectURL(blob),
                     type: blob.type,
                     name: filename,
                   }]);
+
+                  setTimeout(() => {
+                    console.log("✅ Prod files set (single):", wrappedFile);
+                  }, 0);
+
                 });
             })
             .catch(err => {
