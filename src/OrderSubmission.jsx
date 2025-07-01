@@ -598,7 +598,6 @@ const submitForm = async () => {
     alert("Please select one or more production files.");
     return;
   }
-
   const fd = new FormData();
 
   // Append form fields
