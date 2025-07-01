@@ -324,8 +324,10 @@ function sortQueue(arr) {
 }
 
 // === Section 3: Scheduling & Late (using embroidery_start) ===
-function scheduleMachineJobs(jobs, headCount = 6) {
+function scheduleMachineJobs(jobs, machineKey) {
   const BUFFER_MS = 30 * 60 * 1000; // 30-minute buffer
+  const isOneHead = machineKey.toLowerCase().includes('(1)');
+  const headCount = isOneHead ? 1 : 6;
   let prevEnd = null;
 
   return jobs.map((job, idx) => {
@@ -546,11 +548,11 @@ function getChain(jobs, id) {
       // 11) Re-run scheduleMachineJobs for each machine using its headCount
       newCols.machine1.jobs = scheduleMachineJobs(
         newCols.machine1.jobs,
-        newCols.machine1.headCount
+        'Machine 1 (1)'
       );
       newCols.machine2.jobs = scheduleMachineJobs(
         newCols.machine2.jobs,
-        newCols.machine2.headCount
+        'Machine 2'
       );
 
       // 12) Return the updated columns
