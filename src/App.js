@@ -70,8 +70,8 @@ export default function App() {
 
   // ─── Section 1.5: Auto‐bump setup ────────────────────────────────────────────
   // Track last‐seen top job on each machine
-  const prevMachine1Top = useRef(null);
-  const prevMachine2Top = useRef(null);
+  const prevMachine1Top = useRef({ id: null, ts: 0 });
+  const prevMachine2Top = useRef({ id: null, ts: 0 });
   const bumpedJobs = useRef(new Set());
 
 
@@ -694,40 +694,44 @@ const fetchManualStateCore = async (previousCols) => {
 // ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
-    const oldTop = prevRef.current;
     const newTop = jobs[0]?.id || null;
+    const now    = Date.now();
 
-    // Only act when the 1st‐job actually changes
-    if (newTop && newTop !== oldTop) {
+    // Skip if no job
+    if (!newTop) return;
+
+    // Always overwrite if:
+    // 1) It's a new job at the top
+    // 2) It's the same job but enough time has passed (e.g., 10 seconds)
+    const prev = prevRef.current;
+    const timeSinceLastSet = now - prev.ts;
+
+    if (newTop !== prev.id || timeSinceLastSet > 10_000) {
       const nowClamped = clampToWorkHours(new Date());
-      const isoStamp    = nowClamped.toISOString();
+      const isoStamp   = nowClamped.toISOString();
 
       console.log(`✏️ Overwriting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
 
       try {
-        // send overwrite request
         await axios.post(API_ROOT + '/updateStartTime', {
-          id:        newTop,
+          id: newTop,
           startTime: isoStamp
         });
-        // reflect right away in UI
+
         setColumns(cols => ({
           ...cols,
           [machineKey]: {
             ...cols[machineKey],
             jobs: cols[machineKey].jobs.map(j =>
-              j.id === newTop
-                ? { ...j, embroidery_start: isoStamp }
-                : j
+              j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
             )
           }
         }));
+
+        prevRef.current = { id: newTop, ts: now };
       } catch (err) {
         console.error(`❌ Failed to set start time for ${newTop}`, err);
       }
-
-      // remember new top
-      prevRef.current = newTop;
     }
   };
 
