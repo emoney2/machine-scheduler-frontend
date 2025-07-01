@@ -1014,6 +1014,10 @@ const onDragEnd = async (result) => {
     machine2: 'Machine 2 (6)'
   };
 
+  // ─── reset the “previous top” refs so handleTopChange sees no change ───
+  prevMachine1Top.current = nextCols.machine1.jobs[0]?.id || null;
+  prevMachine2Top.current = nextCols.machine2.jobs[0]?.id || null;
+
   ['machine1', 'machine2'].forEach(machine => {
     nextCols[machine].jobs = scheduleMachineJobs(
       nextCols[machine].jobs,
@@ -1026,10 +1030,6 @@ const onDragEnd = async (result) => {
   // update state
   setColumns(nextCols);
   console.log('⏹ onDragEnd end (cross-col), new columns:', nextCols);
-
-  // ─── reset the “previous top” refs so handleTopChange sees no change ───
-  prevMachine1Top.current = nextCols.machine1.jobs[0]?.id || null;
-  prevMachine2Top.current = nextCols.machine2.jobs[0]?.id || null;
 
   // 6) Persist the shared manualState to backend **including placeholders**
   const manualState = {
