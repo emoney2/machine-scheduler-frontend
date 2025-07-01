@@ -516,6 +516,8 @@ const furColorNames = furColors;
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
+  console.log("🛎️ handleSubmit called");
+  console.log("🛎️ isReorder:", form.isReorder);
   e.preventDefault();
 
   // ⛔ Skip all validation if this is a reorder
