@@ -30,6 +30,7 @@ export default function OrderSubmission() {
   const location = useLocation();
   const reorderJob = location.state?.reorderJob;
   const navigate = useNavigate();
+  const [isPrefilling, setIsPrefilling] = useState(false);
 
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
@@ -797,6 +798,7 @@ const handleSaveNewCompany = async () => {
   useEffect(() => {
     if (reorderJob) {
       console.log("📋 Prefilling form from reorder job:", reorderJob);
+      setIsPrefilling(true);
       console.log("🔍 Keys:", Object.keys(reorderJob));
  
       setForm(prev => ({
@@ -961,12 +963,15 @@ const handleSaveNewCompany = async () => {
 
             setPrintFiles(files);
             setPrintPreviews(previews);
+
+            setIsPrefilling(false);
           })
           .catch(err => {
             console.error("❌ Failed to list folder contents:", err);
           });
       } else {
         console.warn("❗ Skipping print file fetch — no folder link:", reorderJob["Print Files"]);
+        setIsPrefilling(false);
       }
     }
   }, [reorderJob]);
@@ -1582,7 +1587,11 @@ const handleSaveNewCompany = async () => {
           }}
         />
       )}
-
+      {isPrefilling && (
+        <div style={{ marginBottom: "1rem", fontWeight: "bold", color: "#555" }}>
+          🔄 Loading previous order files...
+        </div>
+      )}
       <form
         ref={formRef}
         onSubmit={handleSubmit}
