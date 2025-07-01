@@ -809,6 +809,7 @@ const handleSaveNewCompany = async () => {
     if (reorderJob) {
       console.log("📋 Prefilling form from reorder job:", reorderJob);
       setIsPrefilling(true);
+      console.log("🟡 isPrefilling manually set to TRUE");
       console.log("🔍 Keys:", Object.keys(reorderJob));
  
       setForm(prev => ({
@@ -848,6 +849,7 @@ const handleSaveNewCompany = async () => {
             .then(async (data) => {
               if (!Array.isArray(data.files)) {
                 console.warn("❗ Invalid response from backend for production files:", data);
+                setProdFilesLoading(false);
                 return;
               }
 
@@ -858,7 +860,7 @@ const handleSaveNewCompany = async () => {
                 const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
                 try {
                   const blob = await fetch(downloadUrl).then(r => r.blob());
-                  const realBlob = blob.slice(0, blob.size, blob.type); // 👈 reset blob
+                  const realBlob = blob.slice(0, blob.size, blob.type);
                   const file = new File([realBlob], fileMeta.name, {
                     type: realBlob.type || "application/octet-stream",
                   });
@@ -875,24 +877,23 @@ const handleSaveNewCompany = async () => {
               }
               setProdPreviews(previews);
               setProdFiles(files);
-              setProdFilesLoading(false); // ✅ Add this line
+              setProdFilesLoading(false);
               setTimeout(() => {
                 console.log("✅ Prod files set after reorder:", files);
               }, 0);
             })
             .catch(err => {
               console.error("❌ Failed to list production folder contents:", err);
+              setProdFilesLoading(false);
             });
         }
       } else if (reorderJob["Image"] && reorderJob["Image"].includes("drive.google.com/file")) {
-        // handle single production file
         const fileIdMatch = reorderJob["Image"].match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
         const fileId = fileIdMatch ? fileIdMatch[1] : null;
 
         if (!fileId) {
           console.warn("❗ Invalid production file link:", reorderJob["Image"]);
         } else {
-          // fetch metadata to get file name
           setProdFilesLoading(true);
           fetch(`${process.env.REACT_APP_API_ROOT}/drive-file-metadata?fileId=${fileId}`)
             .then(res => res.json())
@@ -902,7 +903,7 @@ const handleSaveNewCompany = async () => {
               return fetch(downloadUrl)
                 .then(r => r.blob())
                 .then(blob => {
-                  const realBlob = blob.slice(0, blob.size, blob.type); // 👈 reset blob
+                  const realBlob = blob.slice(0, blob.size, blob.type);
                   const file = new File([realBlob], filename, {
                     type: realBlob.type || "application/octet-stream",
                   });
@@ -917,7 +918,7 @@ const handleSaveNewCompany = async () => {
                     type: blob.type,
                     name: filename,
                   }]);
-                  setProdFilesLoading(false); // ✅ Add this line
+                  setProdFilesLoading(false);
 
                   setTimeout(() => {
                     console.log("✅ Prod files set (single):", wrappedFile);
@@ -926,8 +927,11 @@ const handleSaveNewCompany = async () => {
             })
             .catch(err => {
               console.error("❌ Failed to fetch or download single production file:", err);
+              setProdFilesLoading(false);
             });
         }
+      } else {
+        setProdFilesLoading(false);
       }
 
       if (reorderJob["Print Files"] && reorderJob["Print Files"].includes("/folders/")) {
@@ -937,16 +941,17 @@ const handleSaveNewCompany = async () => {
 
         if (!folderId) {
           console.warn("❗ Invalid folder link:", folderUrl);
+          setPrintFilesLoading(false);
           return;
         }
 
-        // Call backend to list files in folder
         setPrintFilesLoading(true);
         fetch(`${process.env.REACT_APP_API_ROOT}/list-folder-files?folderId=${folderId}`)
           .then(res => res.json())
           .then(async (data) => {
             if (!Array.isArray(data.files)) {
               console.warn("❗ Invalid response from backend for folder contents", data);
+              setPrintFilesLoading(false);
               return;
             }
 
@@ -980,6 +985,7 @@ const handleSaveNewCompany = async () => {
           })
           .catch(err => {
             console.error("❌ Failed to list folder contents:", err);
+            setPrintFilesLoading(false);
           });
       } else {
         console.warn("❗ Skipping print file fetch — no folder link:", reorderJob["Print Files"]);
@@ -987,6 +993,14 @@ const handleSaveNewCompany = async () => {
       }
     }
   }, [reorderJob]);
+
+  useEffect(() => {
+    if (!prodFilesLoading && !printFilesLoading) {
+      setTimeout(() => {
+        setIsPrefilling(false);
+      }, 300);
+    }
+  }, [prodFilesLoading, printFilesLoading]);
 
   useEffect(() => {
     if (!prodFilesLoading && !printFilesLoading) {
