@@ -609,13 +609,17 @@ const submitForm = async () => {
     });
 
     // 🛠️ Ensure all prodFiles are wrapped as real File instances
+    console.log("📦 Appending to FormData:");
+
     for (const f of prodFiles) {
       const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      console.log("📄 Added prodFile:", safeFile.name, safeFile.size, safeFile.type);
       fd.append("prodFiles", safeFile);
     }
 
     for (const f of printFiles) {
       const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      console.log("📄 Added printFile:", safeFile.name, safeFile.size, safeFile.type);
       fd.append("printFiles", safeFile);
     }
 
