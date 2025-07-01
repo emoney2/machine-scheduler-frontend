@@ -33,6 +33,8 @@ export default function OrderSubmission() {
   const [isPrefilling, setIsPrefilling] = useState(false);
   const [isSubmittingOverlay, setIsSubmittingOverlay] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [prodFilesLoading, setProdFilesLoading] = useState(false);
+  const [printFilesLoading, setPrintFilesLoading] = useState(false);
 
 
   // list of company‐name options from Directory sheet
@@ -840,6 +842,7 @@ const handleSaveNewCompany = async () => {
         if (!prodFolderId) {
           console.warn("❗ Invalid production folder link:", reorderJob["Image"]);
         } else {
+          setProdFilesLoading(true);
           fetch(`${process.env.REACT_APP_API_ROOT}/list-folder-files?folderId=${prodFolderId}`)
             .then(res => res.json())
             .then(async (data) => {
@@ -872,10 +875,10 @@ const handleSaveNewCompany = async () => {
               }
               setProdPreviews(previews);
               setProdFiles(files);
+              setProdFilesLoading(false); // ✅ Add this line
               setTimeout(() => {
                 console.log("✅ Prod files set after reorder:", files);
               }, 0);
-
             })
             .catch(err => {
               console.error("❌ Failed to list production folder contents:", err);
@@ -890,6 +893,7 @@ const handleSaveNewCompany = async () => {
           console.warn("❗ Invalid production file link:", reorderJob["Image"]);
         } else {
           // fetch metadata to get file name
+          setProdFilesLoading(true);
           fetch(`${process.env.REACT_APP_API_ROOT}/drive-file-metadata?fileId=${fileId}`)
             .then(res => res.json())
             .then(meta => {
@@ -913,11 +917,11 @@ const handleSaveNewCompany = async () => {
                     type: blob.type,
                     name: filename,
                   }]);
+                  setProdFilesLoading(false); // ✅ Add this line
 
                   setTimeout(() => {
                     console.log("✅ Prod files set (single):", wrappedFile);
                   }, 0);
-
                 });
             })
             .catch(err => {
@@ -937,6 +941,7 @@ const handleSaveNewCompany = async () => {
         }
 
         // Call backend to list files in folder
+        setPrintFilesLoading(true);
         fetch(`${process.env.REACT_APP_API_ROOT}/list-folder-files?folderId=${folderId}`)
           .then(res => res.json())
           .then(async (data) => {
@@ -971,18 +976,25 @@ const handleSaveNewCompany = async () => {
 
             setPrintFiles(files);
             setPrintPreviews(previews);
-
-            setIsPrefilling(false);
+            setPrintFilesLoading(false);
           })
           .catch(err => {
             console.error("❌ Failed to list folder contents:", err);
           });
       } else {
         console.warn("❗ Skipping print file fetch — no folder link:", reorderJob["Print Files"]);
-        setIsPrefilling(false);
+        setPrintFilesLoading(false);
       }
     }
   }, [reorderJob]);
+
+  useEffect(() => {
+    if (!prodFilesLoading && !printFilesLoading) {
+      setTimeout(() => {
+        setIsPrefilling(false);
+      }, 300); // short delay to smooth things out
+    }
+  }, [prodFilesLoading, printFilesLoading]);
 
   return (
     <>
