@@ -592,15 +592,37 @@ const submitForm = async () => {
   // Wait a tick to ensure prodFiles has updated (especially after reorders)
   await new Promise(resolve => setTimeout(resolve, 0));
 
-  console.log("🚦 Checking file state...");
-  console.log("🚦 isReorder?", form.isReorder, "| prodFiles length:", prodFiles.length, prodFiles);
-  if (prodFiles.length === 0) {
-    if (!form.isReorder) {
-      alert("Please select one or more production files.");
-      return;
+  console.log("🛎️ submitForm called");
+
+  const fd = new FormData();
+  Object.entries(form).forEach(([key, value]) => {
+    if (key === "materials") {
+      value.forEach(m => fd.append("materials", m));
     } else {
-      console.warn("⚠️ No prodFiles, but this is a reorder. Proceeding anyway...");
+      fd.append(key, value);
     }
+  });
+
+  // 🧪 Append prodFiles and printFiles manually
+  if (prodFiles.length > 0) {
+    prodFiles.forEach((f, i) => {
+      const file = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      fd.append("prodFiles", file);
+      console.log(`📦 Added prodFile[${i}]:`, file.name, file.size, file.type);
+    });
+  } else if (!form.isReorder) {
+    alert("Please select one or more production files.");
+    return;
+  } else {
+    console.warn("⚠️ No prodFiles but this is reorder, continuing...");
+  }
+
+  if (printFiles.length > 0) {
+    printFiles.forEach((f, i) => {
+      const file = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      fd.append("printFiles", file);
+      console.log(`🖨️ Added printFile[${i}]:`, file.name, file.size, file.type);
+    });
   }
 
   setIsSubmitting(true);
