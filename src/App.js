@@ -555,7 +555,7 @@ function getChain(jobs, id) {
       );
       newCols.machine2.jobs = scheduleMachineJobs(
         newCols.machine2.jobs,
-        'Machine 2'
+        'Machine 2 (6)'
       );
 
       // 12) Return the updated columns
@@ -643,7 +643,7 @@ const fetchManualStateCore = async (previousCols) => {
     );
     mergedCols.machine2.jobs = scheduleMachineJobs(
       mergedCols.machine2.jobs,
-      'Machine 2'
+      'Machine 2 (6)'
     );
 
     console.log('fetchManualStateCore ▶ done');
