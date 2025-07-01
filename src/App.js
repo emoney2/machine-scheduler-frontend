@@ -338,7 +338,7 @@ function scheduleMachineJobs(jobs, headCount = 6) {
     if (idx === 0) {
       // First job: use saved embroidery_start if available
       start = job.embroidery_start
-        ? clampToWorkHours(new Date(job.embroidery_start))
+        ? new Date(job.embroidery_start)
         : clampToWorkHours(new Date());
     } else {
       const buffered = new Date(prevEnd.getTime() + BUFFER_MS);
@@ -695,20 +695,35 @@ const fetchManualStateCore = async (previousCols) => {
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
     const newTop = jobs[0]?.id || null;
-    const now    = Date.now();
-
-    // Skip if no job
-    if (!newTop) return;
-
-    // Always overwrite if:
-    // 1) It's a new job at the top
-    // 2) It's the same job but enough time has passed (e.g., 10 seconds)
+    const now = Date.now();
     const prev = prevRef.current;
-    const timeSinceLastSet = now - prev.ts;
 
-    if (newTop !== prev.id || timeSinceLastSet > 10_000) {
+    // 1. If a previous top job was replaced, clear its start time
+    if (prev.id && prev.id !== newTop) {
+      console.log(`🧼 Clearing start time for previous top job: ${prev.id}`);
+      try {
+        await axios.post(API_ROOT + '/updateStartTime', {
+          id: prev.id,
+          startTime: '' // clear from sheet
+        });
+        setColumns(cols => ({
+          ...cols,
+          [machineKey]: {
+            ...cols[machineKey],
+            jobs: cols[machineKey].jobs.map(j =>
+              j.id === prev.id ? { ...j, embroidery_start: '' } : j
+            )
+          }
+        }));
+      } catch (err) {
+        console.error(`❌ Failed to clear start time for ${prev.id}`, err);
+      }
+    }
+
+    // 2. If a new job moved to the top, assign a new start time
+    if (newTop && newTop !== prev.id) {
       const nowClamped = clampToWorkHours(new Date());
-      const isoStamp   = nowClamped.toISOString();
+      const isoStamp = nowClamped.toISOString();
 
       console.log(`✏️ Overwriting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
 
