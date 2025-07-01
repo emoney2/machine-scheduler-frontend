@@ -927,7 +927,7 @@ const onDragEnd = async (result) => {
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
     const updatedJobs = srcCol === 'queue'
       ? sortQueue(newSrcJobs)
-      : scheduleMachineJobs(newSrcJobs);
+      : scheduleMachineJobs(newSrcJobs, columns[srcCol].headCount, columns[srcCol].name);
 
     // 2a) Update local state
     setColumns(cols => ({
@@ -988,8 +988,13 @@ const onDragEnd = async (result) => {
     [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
   ['machine1', 'machine2'].forEach(machine => {
-    nextCols[machine].jobs = scheduleMachineJobs(nextCols[machine].jobs);
+    nextCols[machine].jobs = scheduleMachineJobs(
+      nextCols[machine].jobs,
+      columns[machine].headCount,
+      columns[machine].name
+    );
   });
+
   nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
 
   // update state
