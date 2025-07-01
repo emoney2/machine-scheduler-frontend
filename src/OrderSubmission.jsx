@@ -586,6 +586,9 @@ const handleSubmit = async (e) => {
 
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
+
+  console.log("🚦 Checking file state...");
+  console.log("🚦 isReorder?", form.isReorder, "| prodFiles length:", prodFiles.length, prodFiles);
   if (!form.isReorder && prodFiles.length === 0) {
     alert("Please select one or more production files.");
     return;
