@@ -334,12 +334,15 @@ function scheduleMachineJobs(jobs, headCount = 6) {
 
     // 2) StartTime
     let start;
+    const BUFFER_MS = 30 * 60 * 1000; // 30 minutes
+
     if (idx === 0) {
       start = job.embroidery_start
         ? clampToWorkHours(new Date(job.embroidery_start))
         : clampToWorkHours(prevEnd || new Date());
     } else {
-      start = clampToWorkHours(prevEnd);
+      const bufferedStart = new Date(prevEnd.getTime() + BUFFER_MS);
+      start = clampToWorkHours(bufferedStart);
     }
 
     // 3) Run → EndTime
