@@ -588,6 +588,7 @@ const handleSubmit = async (e) => {
 const submitForm = async () => {
   setIsSubmitting(true);
   try {
+    console.log("🚚 Submitting with prodFiles:", prodFiles);
     const fd = new FormData();
     Object.entries(form).forEach(([key, value]) => {
       if (key === "materials") {
@@ -794,7 +795,7 @@ const handleSaveNewCompany = async () => {
                 const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
                 try {
                   const blob = await fetch(downloadUrl).then(r => r.blob());
-                  const file = new File([blob], fileMeta.name, {
+                  const file = new File([blob], "Production File", {
                     type: blob.type || "application/octet-stream",
                   });
 
