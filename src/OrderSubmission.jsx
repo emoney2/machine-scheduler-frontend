@@ -2044,7 +2044,7 @@ const handleSaveNewCompany = async () => {
           <input
             type="file"
             multiple
-            required
+            required={!form.isReorder}
             onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
             style={{ marginBottom: "0.5rem" }}
           />
