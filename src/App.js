@@ -727,13 +727,12 @@ useEffect(() => {
       }
     }
 
-    // 2. If new job reached the top and has no embroidery_start, set it
-    const currentJob = jobs.find(j => j.id === newTop);
-    if (newTop && newTop !== prev.id && !currentJob?.embroidery_start) {
+    // 2. Always overwrite embroidery_start for new top job
+    if (newTop) {
       const nowClamped = clampToWorkHours(new Date());
       const isoStamp = nowClamped.toISOString();
 
-      console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
+      console.log(`✏️ Overwriting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
       try {
         await axios.post(API_ROOT + '/updateStartTime', {
           id: newTop,
@@ -750,7 +749,6 @@ useEffect(() => {
           }
         }));
 
-        // ✅ Save this top job as the new "previous top"
         prevRef.current = { id: newTop, ts: now };
       } catch (err) {
         console.error(`❌ Failed to set start time for ${newTop}`, err);
@@ -760,25 +758,11 @@ useEffect(() => {
 
   const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
     updateTopStartTime(prevRef, jobs, machineKey);
-  }, 500); // wait 500ms between calls
+  }, 500);
 
-  // Check if previous top job was removed — if so, clear its embroidery_start
-  const topChangeHandlers = [
-    { prev: prevMachine1Top, jobs: columns.machine1.jobs, machine: 'machine1' },
-    { prev: prevMachine2Top, jobs: columns.machine2.jobs, machine: 'machine2' }
-  ];
-
-  topChangeHandlers.forEach(async ({ jobs, machine }) => {
-    const currentTopId = jobs[0]?.id || null;
-    if (currentTopId) {
-      try {
-        console.log(`🕒 Setting embroidery_start for top job ${currentTopId}`);
-        await axios.post(`${API_ROOT}/resetStartTime`, { id: currentTopId });
-      } catch (err) {
-        console.error(`❌ Failed to reset start time for job ${currentTopId}`, err);
-      }
-    }
-  });
+  throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+  throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+}, [columns.machine1.jobs, columns.machine2.jobs]);
 
 // === Section 6: Placeholder Management ===
 
