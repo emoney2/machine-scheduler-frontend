@@ -36,7 +36,7 @@ export default function OrderSubmission() {
   const [prodFilesLoading, setProdFilesLoading] = useState(false);
   const [printFilesLoading, setPrintFilesLoading] = useState(false);
   const [overlayVisibleOnce, setOverlayVisibleOnce] = useState(false);
-
+  const [hasStartedLoadingFiles, setHasStartedLoadingFiles] = useState(false);
 
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
@@ -808,6 +808,7 @@ const handleSaveNewCompany = async () => {
 
   useEffect(() => {
     if (reorderJob) {
+      setHasStartedLoadingFiles(true);
       console.log("📋 Prefilling form from reorder job:", reorderJob);
       setIsPrefilling(true);
       console.log("🟡 isPrefilling manually set to TRUE");
@@ -997,26 +998,12 @@ const handleSaveNewCompany = async () => {
   }, [reorderJob]);
 
   useEffect(() => {
-    if (!prodFilesLoading && !printFilesLoading) {
-      console.log("✅ All files done loading, hiding yellow overlay");
+    if (hasStartedLoadingFiles && !prodFilesLoading && !printFilesLoading) {
       setTimeout(() => {
         setIsPrefilling(false);
-      }, 300); // small delay for smoother transition
-    } else {
-      console.log("⏳ Still loading files...", {
-        prodFilesLoading,
-        printFilesLoading
-      });
+      }, 300);
     }
-  }, [prodFilesLoading, printFilesLoading]);
-
-  useEffect(() => {
-    if (!prodFilesLoading && !printFilesLoading) {
-      setTimeout(() => {
-        setIsPrefilling(false);
-      }, 300); // short delay to smooth things out
-    }
-  }, [prodFilesLoading, printFilesLoading]);
+  }, [hasStartedLoadingFiles, prodFilesLoading, printFilesLoading]);
 
   return (
     <>
