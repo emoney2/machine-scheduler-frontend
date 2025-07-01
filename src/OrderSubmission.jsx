@@ -591,9 +591,13 @@ const submitForm = async () => {
 
   console.log("🚦 Checking file state...");
   console.log("🚦 isReorder?", form.isReorder, "| prodFiles length:", prodFiles.length, prodFiles);
-  if (!form.isReorder && prodFiles.length === 0) {
-    alert("Please select one or more production files.");
-    return;
+  if (prodFiles.length === 0) {
+    if (!form.isReorder) {
+      alert("Please select one or more production files.");
+      return;
+    } else {
+      console.warn("⚠️ No prodFiles, but this is a reorder. Proceeding anyway...");
+    }
   }
 
   setIsSubmitting(true);
