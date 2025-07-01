@@ -727,8 +727,8 @@ useEffect(() => {
       }
     }
 
-    // 2. Always overwrite embroidery_start for new top job
-    if (newTop) {
+    // 2. Only set start time if new job is different than previous top
+    if (newTop && newTop !== prev.id) {
       const nowClamped = clampToWorkHours(new Date());
       const isoStamp = nowClamped.toISOString();
 
