@@ -35,6 +35,7 @@ export default function OrderSubmission() {
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [prodFilesLoading, setProdFilesLoading] = useState(false);
   const [printFilesLoading, setPrintFilesLoading] = useState(false);
+  const [overlayVisibleOnce, setOverlayVisibleOnce] = useState(false);
 
 
   // list of company‐name options from Directory sheet
@@ -995,12 +996,21 @@ const handleSaveNewCompany = async () => {
   }, [reorderJob]);
 
   useEffect(() => {
-    if (!prodFilesLoading && !printFilesLoading) {
+    if (isPrefilling && !overlayVisibleOnce) {
+      // wait until yellow screen is actually visible
+      setTimeout(() => {
+        setOverlayVisibleOnce(true);
+      }, 50);
+    }
+
+    if (!prodFilesLoading && !printFilesLoading && overlayVisibleOnce) {
       setTimeout(() => {
         setIsPrefilling(false);
+        setOverlayVisibleOnce(false); // reset for future reorders
       }, 300);
     }
-  }, [prodFilesLoading, printFilesLoading]);
+  }, [prodFilesLoading, printFilesLoading, isPrefilling, overlayVisibleOnce]);
+
 
   useEffect(() => {
     if (!prodFilesLoading && !printFilesLoading) {
