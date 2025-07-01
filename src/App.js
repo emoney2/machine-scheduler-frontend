@@ -768,23 +768,17 @@ useEffect(() => {
     { prev: prevMachine2Top, jobs: columns.machine2.jobs, machine: 'machine2' }
   ];
 
-  topChangeHandlers.forEach(async ({ prev, jobs, machine }) => {
-    const prevId = prev.current;
+  topChangeHandlers.forEach(async ({ jobs, machine }) => {
     const currentTopId = jobs[0]?.id || null;
-
-    if (prevId && prevId !== currentTopId) {
+    if (currentTopId) {
       try {
-        console.log(`🧹 Clearing embroidery_start for removed top job ${prevId}`);
-        await axios.post(`${API_ROOT}/clearStartTime`, { id: prevId });
+        console.log(`🕒 Setting embroidery_start for top job ${currentTopId}`);
+        await axios.post(`${API_ROOT}/resetStartTime`, { id: currentTopId });
       } catch (err) {
-        console.error(`❌ Failed to clear start time for job ${prevId}`, err);
+        console.error(`❌ Failed to reset start time for job ${currentTopId}`, err);
       }
     }
   });
-
-  throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
-  throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');;
-}, [columns.machine1.jobs, columns.machine2.jobs]);
 
 // === Section 6: Placeholder Management ===
 
