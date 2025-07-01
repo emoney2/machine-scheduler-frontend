@@ -727,12 +727,13 @@ useEffect(() => {
       }
     }
 
-    // 2. If a job is now on top and it's different than before, always overwrite
-    if (newTop && newTop !== prev.id) {
+    // 2. If new job reached the top and has no embroidery_start, set it
+    const currentJob = jobs.find(j => j.id === newTop);
+    if (newTop && newTop !== prev.id && !currentJob?.embroidery_start) {
       const nowClamped = clampToWorkHours(new Date());
       const isoStamp = nowClamped.toISOString();
 
-      console.log(`✏️ Forcing overwrite of start time for ${machineKey} job ${newTop}: ${isoStamp}`);
+      console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
       try {
         await axios.post(API_ROOT + '/updateStartTime', {
           id: newTop,
@@ -749,9 +750,10 @@ useEffect(() => {
           }
         }));
 
+        // ✅ Save this top job as the new "previous top"
         prevRef.current = { id: newTop, ts: now };
       } catch (err) {
-        console.error(`❌ Failed to force overwrite start time for ${newTop}`, err);
+        console.error(`❌ Failed to set start time for ${newTop}`, err);
       }
     }
   };
