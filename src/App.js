@@ -636,15 +636,14 @@ const fetchManualStateCore = async (previousCols) => {
       return da - db;
     });
 
-    // 8) Re-run scheduling on machines
-    // re-schedule using each column’s headCount
+    // 8) Re-run scheduling on machines using machineKey
     mergedCols.machine1.jobs = scheduleMachineJobs(
       mergedCols.machine1.jobs,
-      mergedCols.machine1.headCount
+      'Machine 1 (1)'
     );
     mergedCols.machine2.jobs = scheduleMachineJobs(
       mergedCols.machine2.jobs,
-      mergedCols.machine2.headCount
+      'Machine 2'
     );
 
     console.log('fetchManualStateCore ▶ done');
