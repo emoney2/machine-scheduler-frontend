@@ -699,7 +699,7 @@ useEffect(() => {
     const now = Date.now();
     const prev = prevRef.current;
 
-    // 1. If previous top job is gone, clear its start time
+    // 1. If top job changed, clear previous top's start time
     if (prev.id && prev.id !== newTop) {
       console.log(`🧼 Clearing start time for previous top job: ${prev.id}`);
       try {
@@ -707,6 +707,7 @@ useEffect(() => {
           id: prev.id,
           startTime: ''
         });
+
         setColumns(cols => ({
           ...cols,
           [machineKey]: {
@@ -721,17 +722,19 @@ useEffect(() => {
       }
     }
 
-    // 2. If new job reaches top, set its start time once
-    if (newTop && newTop !== prev.id) {
+    // 2. If new job reached the top and has no embroidery_start, set it
+    const currentJob = jobs.find(j => j.id === newTop);
+    if (newTop && newTop !== prev.id && !currentJob?.embroidery_start) {
       const nowClamped = clampToWorkHours(new Date());
       const isoStamp = nowClamped.toISOString();
 
-      console.log(`✏️ Overwriting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
+      console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
       try {
         await axios.post(API_ROOT + '/updateStartTime', {
           id: newTop,
           startTime: isoStamp
         });
+
         setColumns(cols => ({
           ...cols,
           [machineKey]: {
@@ -741,11 +744,12 @@ useEffect(() => {
             )
           }
         }));
+
+        // ✅ Save this top job as the new "previous top"
+        prevRef.current = { id: newTop, ts: now };
       } catch (err) {
         console.error(`❌ Failed to set start time for ${newTop}`, err);
       }
-
-      prevRef.current = { id: newTop, ts: now };
     }
   };
 
