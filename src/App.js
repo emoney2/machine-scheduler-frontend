@@ -762,6 +762,28 @@ useEffect(() => {
     updateTopStartTime(prevRef, jobs, machineKey);
   }, 500); // wait 500ms between calls
 
+  // Check if previous top job was removed — if so, clear its embroidery_start
+  const topChangeHandlers = [
+    { prev: prevMachine1Top, jobs: columns.machine1.jobs, machine: 'machine1' },
+    { prev: prevMachine2Top, jobs: columns.machine2.jobs, machine: 'machine2' }
+  ];
+
+  topChangeHandlers.forEach(async ({ prev, jobs, machine }) => {
+    const prevId = prev.current;
+    const currentTopId = jobs[0]?.id || null;
+
+    if (prevId && prevId !== currentTopId) {
+      try {
+        console.log(`🧹 Clearing embroidery_start for removed top job ${prevId}`);
+        await axios.post(API_ROOT + '/clearStartTime', {
+          jobId: prevId
+        });
+      } catch (err) {
+        console.error(`❌ Failed to clear start time for job ${prevId}`, err);
+      }
+    }
+  });
+
   throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
   throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');;
 }, [columns.machine1.jobs, columns.machine2.jobs]);
