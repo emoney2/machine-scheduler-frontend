@@ -987,11 +987,15 @@ const onDragEnd = async (result) => {
     [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
     [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
+  const machineKeyLabels = {
+    machine1: 'Machine 1 (1)',
+    machine2: 'Machine 2 (6)'
+  };
+
   ['machine1', 'machine2'].forEach(machine => {
     nextCols[machine].jobs = scheduleMachineJobs(
       nextCols[machine].jobs,
-      columns[machine].headCount,
-      columns[machine].name
+      machineKeyLabels[machine]
     );
   });
 
