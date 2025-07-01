@@ -324,40 +324,38 @@ function sortQueue(arr) {
 
 // === Section 3: Scheduling & Late (using embroidery_start) ===
 function scheduleMachineJobs(jobs, headCount = 6) {
+  const BUFFER_MS = 30 * 60 * 1000; // 30-minute buffer
   let prevEnd = null;
 
   return jobs.map((job, idx) => {
-    // 1) Late cutoff
+    // 1) Compute late cutoff for this job
     const eedDay = subWorkDays(parseDueDate(job.due_date), 6);
     const cutoff = new Date(eedDay);
     cutoff.setHours(WORK_END_HR, WORK_END_MIN, 0, 0);
 
-    // 2) StartTime
+    // 2) Determine start time
     let start;
-    const BUFFER_MS = 30 * 60 * 1000; // 30 minutes
-
     if (idx === 0) {
+      // First job: use saved embroidery_start if available
       start = job.embroidery_start
         ? clampToWorkHours(new Date(job.embroidery_start))
-        : clampToWorkHours(prevEnd || new Date());
+        : clampToWorkHours(new Date());
     } else {
-      const bufferedStart = new Date(prevEnd.getTime() + BUFFER_MS);
-      start = clampToWorkHours(bufferedStart);
+      const buffered = new Date(prevEnd.getTime() + BUFFER_MS);
+      start = clampToWorkHours(buffered);
     }
 
-    // 3) Run → EndTime
-    //   a) bump quantity to a multiple of headCount
+    // 3) Calculate end time based on stitches and head count
     const qty = job.quantity % headCount === 0
       ? job.quantity
       : Math.ceil(job.quantity / headCount) * headCount;
-    //   b) default to 30000 stitches if none provided
+
     const stitches = job.stitch_count > 0 ? job.stitch_count : 30000;
     const runMs    = (stitches / 30000) * (qty / headCount) * 3600000;
 
-    //   c) calculate end time
     const end = addWorkTime(start, runMs);
 
-    // 4) Decorate
+    // 4) Assign computed times to job (overwrite existing values)
     job._rawStart = start;
     job._rawEnd   = end;
     job.start     = fmtDT(start);
@@ -365,7 +363,9 @@ function scheduleMachineJobs(jobs, headCount = 6) {
     job.delivery  = fmtMMDD(addWorkDays(end, 6));
     job.isLate    = end > cutoff;
 
+    // 5) Advance tracker
     prevEnd = end;
+
     return job;
   });
 }
