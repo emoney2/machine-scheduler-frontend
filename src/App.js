@@ -775,9 +775,7 @@ useEffect(() => {
     if (prevId && prevId !== currentTopId) {
       try {
         console.log(`🧹 Clearing embroidery_start for removed top job ${prevId}`);
-        await axios.post(API_ROOT + '/clearStartTime', {
-          jobId: prevId
-        });
+        await axios.post(`${API_ROOT}/clearStartTime`, { id: prevId });
       } catch (err) {
         console.error(`❌ Failed to clear start time for job ${prevId}`, err);
       }
