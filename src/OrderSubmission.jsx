@@ -814,9 +814,34 @@ const handleSaveNewCompany = async () => {
               console.error("❌ Failed to list production folder contents:", err);
             });
         }
+      } else if (reorderJob["Image"] && reorderJob["Image"].includes("drive.google.com/file")) {
+        // handle single production file
+        const fileIdMatch = reorderJob["Image"].match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        const fileId = fileIdMatch ? fileIdMatch[1] : null;
+
+        if (!fileId) {
+          console.warn("❗ Invalid production file link:", reorderJob["Image"]);
+        } else {
+          const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileId}`;
+          fetch(downloadUrl)
+            .then(r => r.blob())
+            .then(blob => {
+              const file = new File([blob], "Production File", {
+                type: blob.type || "application/octet-stream",
+              });
+
+              setProdFiles([file]);
+              setProdPreviews([{
+                url: URL.createObjectURL(blob),
+                type: blob.type,
+                name: "Production File",
+              }]);
+            })
+            .catch(err => {
+              console.error("❌ Failed to download single production file:", err);
+            });
+        }
       }
-
-
 
       if (reorderJob["Print Files"] && reorderJob["Print Files"].includes("/folders/")) {
         const folderUrl = reorderJob["Print Files"];
