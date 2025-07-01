@@ -602,8 +602,17 @@ const submitForm = async () => {
         fd.append(key, value);
       }
     });
-    prodFiles.forEach(f => fd.append("prodFiles", f));
-    printFiles.forEach(f => fd.append("printFiles", f));
+
+    // 🛠️ Ensure all prodFiles are wrapped as real File instances
+    for (const f of prodFiles) {
+      const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      fd.append("prodFiles", safeFile);
+    }
+
+    for (const f of printFiles) {
+      const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
+      fd.append("printFiles", safeFile);
+    }
 
     const submitUrl =
       process.env.REACT_APP_ORDER_SUBMIT_URL ||
