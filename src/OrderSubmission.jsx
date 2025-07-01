@@ -599,6 +599,8 @@ const submitForm = async () => {
     prodFiles.forEach(f => fd.append("prodFiles", f));
     printFiles.forEach(f => fd.append("printFiles", f));
 
+    console.log("🚚 Submitting with prodFiles:", prodFiles);
+
     const submitUrl =
       process.env.REACT_APP_ORDER_SUBMIT_URL ||
       `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
