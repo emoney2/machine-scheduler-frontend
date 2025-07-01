@@ -551,13 +551,14 @@ function getChain(jobs, id) {
       // 11) Re-run scheduleMachineJobs for each machine using its headCount
       newCols.machine1.jobs = scheduleMachineJobs(
         newCols.machine1.jobs,
+        newCols.machine1.headCount,
         'Machine 1 (1)'
       );
       newCols.machine2.jobs = scheduleMachineJobs(
         newCols.machine2.jobs,
+        newCols.machine2.headCount,
         'Machine 2 (6)'
       );
-
       // 12) Return the updated columns
       return newCols;
     } catch (err) {
