@@ -662,6 +662,21 @@ const submitForm = async () => {
         setUploadProgress(pct);
       }
     };
+
+    // DEBUG: log all FormData entries before sending
+    for (let [key, value] of fd.entries()) {
+      if (value instanceof File) {
+        console.log(`📁 ${key}: File - ${value.name} (${value.size} bytes, ${value.type})`);
+      } else {
+        console.log(`📄 ${key}: ${value}`);
+      }
+    }
+
+    if (!fd.has("prodFiles")) {
+      console.error("❌ No prodFiles in FormData");
+    }
+
+    // Now submit as usual
     await axios.post(submitUrl, fd, config);
 
     alert("Order submitted!");
