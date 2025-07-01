@@ -871,7 +871,7 @@ const handleSaveNewCompany = async () => {
             const files = [];
 
             for (let fileMeta of data.files) {
-              const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
+              const downloadUrl = `${process.env.REACT_APP_API_ROOT}/api/proxy-drive-file?fileId=${fileMeta.id}`;
 
               try {
                 const blob = await fetch(downloadUrl).then(r => r.blob());
