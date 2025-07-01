@@ -897,6 +897,13 @@ const toggleLink = async (colId, idx) => {
 
 
 // === Section 8: Drag & Drop Handler (with Chain-aware Moves & shared manualState + placeholders) ===
+function updatePrevTopRef(prevRef, oldTop, newTop) {
+  if (oldTop !== newTop) {
+    // Clear the old reference if the top job changed
+    prevRef.current = { id: null, ts: 0 };
+  }
+}
+
 const onDragEnd = async (result) => {
   // 🔍 DEBUGGING INSTRUMENTATION
   console.log("🔍 DRAG-END result:", result);
@@ -940,6 +947,21 @@ const onDragEnd = async (result) => {
       ...columns,
       [srcCol]: { ...columns[srcCol], jobs: updatedJobs }
     };
+
+    // compare old top jobs with new top jobs
+    const oldTop1 = columns.machine1.jobs[0]?.id || null;
+    const oldTop2 = columns.machine2.jobs[0]?.id || null;
+    const newTop1 = nextCols.machine1.jobs[0]?.id || null;
+    const newTop2 = nextCols.machine2.jobs[0]?.id || null;
+
+    // clear prevTopRef if top job changed
+    updatePrevTopRef(prevMachine1Top, oldTop1, newTop1);
+    updatePrevTopRef(prevMachine2Top, oldTop2, newTop2);
+
+    // update refs
+    prevMachine1Top.current = newTop1;
+    prevMachine2Top.current = newTop2;
+
     const manualState = {
       machine1:    nextCols.machine1.jobs.map(j => j.id),
       machine2:    nextCols.machine2.jobs.map(j => j.id),
