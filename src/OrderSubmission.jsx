@@ -795,7 +795,7 @@ const handleSaveNewCompany = async () => {
                 const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
                 try {
                   const blob = await fetch(downloadUrl).then(r => r.blob());
-                  const file = new File([blob], "Production File", {
+                  const file = new File([blob], fileMeta.name, {
                     type: blob.type || "application/octet-stream",
                   });
 
