@@ -806,9 +806,8 @@ const handleSaveNewCompany = async () => {
                   console.error("❌ Failed to download production file:", fileMeta.name, err);
                 }
               }
-
-              setProdFiles(files);
               setProdPreviews(previews);
+              setProdFiles(files);
             })
             .catch(err => {
               console.error("❌ Failed to list production folder contents:", err);
@@ -822,23 +821,29 @@ const handleSaveNewCompany = async () => {
         if (!fileId) {
           console.warn("❗ Invalid production file link:", reorderJob["Image"]);
         } else {
-          const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileId}`;
-          fetch(downloadUrl)
-            .then(r => r.blob())
-            .then(blob => {
-              const file = new File([blob], "Production File", {
-                type: blob.type || "application/octet-stream",
-              });
+          // fetch metadata to get file name
+          fetch(`${process.env.REACT_APP_API_ROOT}/drive-file-metadata?fileId=${fileId}`)
+            .then(res => res.json())
+            .then(meta => {
+              const filename = meta?.name || "Production File";
+              const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileId}`;
+              return fetch(downloadUrl)
+                .then(r => r.blob())
+                .then(blob => {
+                  const file = new File([blob], filename, {
+                    type: blob.type || "application/octet-stream",
+                  });
 
-              setProdFiles([file]);
-              setProdPreviews([{
-                url: URL.createObjectURL(blob),
-                type: blob.type,
-                name: "Production File",
-              }]);
+                  setProdFiles([file]);
+                  setProdPreviews([{
+                    url: URL.createObjectURL(blob),
+                    type: blob.type,
+                    name: filename,
+                  }]);
+                });
             })
             .catch(err => {
-              console.error("❌ Failed to download single production file:", err);
+              console.error("❌ Failed to fetch or download single production file:", err);
             });
         }
       }
