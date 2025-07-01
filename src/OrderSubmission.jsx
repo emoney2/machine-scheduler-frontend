@@ -1588,10 +1588,25 @@ const handleSaveNewCompany = async () => {
         />
       )}
       {isPrefilling && (
-        <div style={{ marginBottom: "1rem", fontWeight: "bold", color: "#555" }}>
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: "100vw",
+          height: "100vh",
+          backgroundColor: "rgba(255, 255, 150, 0.3)",
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "1.5rem",
+          fontWeight: "bold",
+          color: "#444"
+        }}>
           🔄 Loading previous order files...
         </div>
       )}
+
       <form
         ref={formRef}
         onSubmit={handleSubmit}
