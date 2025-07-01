@@ -727,12 +727,12 @@ useEffect(() => {
       }
     }
 
-    // 2. Only set start time if new job is different than previous top
+    // 2. If new job reached the top, always overwrite embroidery_start
     if (newTop && newTop !== prev.id) {
       const nowClamped = clampToWorkHours(new Date());
       const isoStamp = nowClamped.toISOString();
 
-      console.log(`✏️ Overwriting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
+      console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
       try {
         await axios.post(API_ROOT + '/updateStartTime', {
           id: newTop,
@@ -749,6 +749,7 @@ useEffect(() => {
           }
         }));
 
+        // ✅ Save new top job as previous
         prevRef.current = { id: newTop, ts: now };
       } catch (err) {
         console.error(`❌ Failed to set start time for ${newTop}`, err);
@@ -760,8 +761,20 @@ useEffect(() => {
     updateTopStartTime(prevRef, jobs, machineKey);
   }, 500);
 
-  throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
-  throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+  // Only update if top job actually changed
+  if (columns.machine1.jobs.length > 0) {
+    const newTop1 = columns.machine1.jobs[0].id;
+    if (newTop1 !== prevMachine1Top.current?.id) {
+      throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+    }
+  }
+
+  if (columns.machine2.jobs.length > 0) {
+    const newTop2 = columns.machine2.jobs[0].id;
+    if (newTop2 !== prevMachine2Top.current?.id) {
+      throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+    }
+  }
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 
 // === Section 6: Placeholder Management ===
