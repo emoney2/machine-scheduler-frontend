@@ -770,13 +770,49 @@ const handleSaveNewCompany = async () => {
         isReorder: true,
       }));
 
-      if (reorderJob["image"]) {
-        setProdPreviews([{
-          url: reorderJob["image"],
-          type: "image/jpeg",
-          name: "Previous Production File"
-        }]);
+      if (reorderJob["orderId"]) {
+        const folderId = reorderJob["orderId"];
+
+        fetch(`${process.env.REACT_APP_API_ROOT}/list-folder-files?folderId=${folderId}`)
+          .then(res => res.json())
+          .then(async (data) => {
+            if (!Array.isArray(data.files)) {
+              console.warn("❗ Invalid response from backend for production files:", data);
+              return;
+            }
+
+            const previews = [];
+            const files = [];
+
+            for (let fileMeta of data.files) {
+              if (fileMeta.name.toLowerCase().includes("print")) continue; // skip print files
+
+              const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
+              try {
+                const blob = await fetch(downloadUrl).then(r => r.blob());
+                const file = new File([blob], fileMeta.name, {
+                  type: blob.type || "application/octet-stream",
+                });
+
+                files.push(file);
+                previews.push({
+                  url: URL.createObjectURL(blob),
+                  type: blob.type,
+                  name: fileMeta.name,
+                });
+              } catch (err) {
+                console.error("❌ Failed to download production file:", fileMeta.name, err);
+              }
+            }
+
+            setProdFiles(files);
+            setProdPreviews(previews);
+          })
+          .catch(err => {
+            console.error("❌ Failed to list production folder contents:", err);
+          });
       }
+
 
       if (reorderJob["Print Files"] && reorderJob["Print Files"].includes("/folders/")) {
         const folderUrl = reorderJob["Print Files"];
