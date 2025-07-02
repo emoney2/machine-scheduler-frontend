@@ -737,12 +737,10 @@ useEffect(() => {
     const newTop = jobs[0]?.id || null;
     const prev = prevRef.current?.id || null;
 
-    // Skip if no change in top job
     if (!newTop || newTop === prev) return;
 
-    console.log(`✏️ New job reached top: ${newTop} on ${machineKey}`);
+    console.log(`✏️ Manually promoted job to top: ${newTop} on ${machineKey}`);
 
-    // Set new embroidery start time
     const nowClamped = clampToWorkHours(new Date());
     const isoStamp = nowClamped.toISOString();
 
@@ -762,13 +760,13 @@ useEffect(() => {
         }
       }));
 
-      // Update ref to remember this job is now top
       prevRef.current = { id: newTop, ts: Date.now() };
     } catch (err) {
       console.error(`❌ Failed to set start time for ${newTop}`, err);
     }
   };
 
+  // ✅ Only do this if manualReorder is true
   if (manualReorder) {
     if (columns.machine1.jobs.length > 0) {
       updateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
@@ -776,9 +774,9 @@ useEffect(() => {
     if (columns.machine2.jobs.length > 0) {
       updateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
     }
-    setManualReorder(false); // reset flag
+    setManualReorder(false); // turn off flag so polling doesn't trigger this
   }
-}, [columns.machine1.jobs, columns.machine2.jobs, manualReorder]);
+}, [manualReorder]); // 👈 only runs when manualReorder is true
 
 // === Section 6: Placeholder Management ===
 
