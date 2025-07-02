@@ -185,39 +185,20 @@ useEffect(() => {
   const top1 = columns.machine1.jobs?.[0];
   const top2 = columns.machine2.jobs?.[0];
 
-  // 🛑 Don't do anything if no jobs loaded yet
-  if (!top1 && !top2) return;
-
-  // 🧠 Machine 1
   if (top1?.id !== prevM1Top.current) {
-    if (
-      top1 &&
-      top1.embroidery_start === "" && // must be truly blank
-      !bumpedJobs.current.has(top1.id)
-    ) {
-      console.log("⏱️ Stamping Machine 1 top job:", top1.id, "at", new Date().toISOString());
-      bumpJobStartTime(top1.id);
-      bumpedJobs.current.add(top1.id);
+    if (top1?.id) {
+      console.log("⏱️ Overwriting start time for Machine 1 top job:", top1.id);
+      bumpJobStartTime(top1.id); // always stamp, even if it had a value
     }
     prevM1Top.current = top1?.id || null;
-  } else if (top1?.embroidery_start) {
-    bumpedJobs.current.add(top1.id); // mark already stamped
   }
 
-  // 🧠 Machine 2
   if (top2?.id !== prevM2Top.current) {
-    if (
-      top2 &&
-      top2.embroidery_start === "" &&
-      !bumpedJobs.current.has(top2.id)
-    ) {
-      console.log("⏱️ Stamping Machine 2 top job:", top2.id, "at", new Date().toISOString());
-      bumpJobStartTime(top2.id);
-      bumpedJobs.current.add(top2.id);
+    if (top2?.id) {
+      console.log("⏱️ Overwriting start time for Machine 2 top job:", top2.id);
+      bumpJobStartTime(top2.id); // always stamp
     }
     prevM2Top.current = top2?.id || null;
-  } else if (top2?.embroidery_start) {
-    bumpedJobs.current.add(top2.id);
   }
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 
