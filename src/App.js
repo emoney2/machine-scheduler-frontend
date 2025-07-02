@@ -36,6 +36,7 @@ axios.interceptors.response.use(
 
 
 // CONFIGURATION
+const [manualReorder, setManualReorder] = useState(false);
 const API_ROOT   = process.env.REACT_APP_API_ROOT;
 const SOCKET_URL = API_ROOT.replace(/\/api$/, '');
 const socket     = io(SOCKET_URL, {
