@@ -673,9 +673,10 @@ const fetchManualStateCore = async (previousCols) => {
       // 3) Finally, commit to React state
       setColumns(colsAfterManual);
 
+      // 🔥 DO NOT manually re-patch embroidery_start — we only update that on drag/drop
       console.log('fetchAllCombined ▶ done');
       setHasError(false);
-    } catch (err) {
+      } catch (err) {
       console.error('❌ fetchAllCombined error', err);
       setHasError(true);
     } finally {
@@ -690,42 +691,10 @@ const fetchManualStateCore = async (previousCols) => {
     // 1) Run immediately on mount
     fetchAllCombined();
 
-    // 2) Set up the 15-second polling with top job preservation
-    const handle = setInterval(async () => {
+    // 2) Set up the 15-second polling WITHOUT modifying start times
+    const handle = setInterval(() => {
       console.log("⏳ Poll: combined fetchAllCombined()");
-
-      const prevMachine1Top = columns.machine1.jobs[0];
-      const prevMachine2Top = columns.machine2.jobs[0];
-
-      const newData = await fetchAllCombined(true); // optionally allow param if needed
-
-      // After fetchAllCombined updates state, re-patch the top job start times
-      setColumns(current => ({
-        machine1: {
-          ...current.machine1,
-          jobs: current.machine1.jobs.map((job, i) =>
-            i === 0 && job.id === prevMachine1Top?.id
-              ? {
-                  ...job,
-                  embroidery_start: prevMachine1Top.embroidery_start,
-                  embroidery_stop: prevMachine1Top.embroidery_stop
-                }
-              : job
-          )
-        },
-        machine2: {
-          ...current.machine2,
-          jobs: current.machine2.jobs.map((job, i) =>
-            i === 0 && job.id === prevMachine2Top?.id
-              ? {
-                  ...job,
-                  embroidery_start: prevMachine2Top.embroidery_start,
-                  embroidery_stop: prevMachine2Top.embroidery_stop
-                }
-              : job
-          )
-        }
-      }));
+      fetchAllCombined();
     }, 15000);
 
     return () => clearInterval(handle);
