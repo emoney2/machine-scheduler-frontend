@@ -704,10 +704,9 @@ useEffect(() => {
     const now = Date.now();
     const prev = prevRef.current;
 
-    // If top job hasn’t changed, do nothing
-    if (newTop === prev?.id) return;
+    if (!newTop || newTop === prev?.id) return; // No change → do nothing
 
-    // 1. Clear previous top job’s start time
+    // 1. Clear old top job
     if (prev?.id && prev.id !== newTop) {
       console.log(`🧼 Clearing start time for previous top job: ${prev.id}`);
       try {
@@ -715,7 +714,6 @@ useEffect(() => {
           id: prev.id,
           startTime: ''
         });
-
         setColumns(cols => ({
           ...cols,
           [machineKey]: {
@@ -730,42 +728,44 @@ useEffect(() => {
       }
     }
 
-    // 2. Set new top job’s start time
-    if (newTop) {
-      const nowClamped = clampToWorkHours(new Date());
-      const isoStamp = nowClamped.toISOString();
+    // 2. Set new top job
+    const nowClamped = clampToWorkHours(new Date());
+    const isoStamp = nowClamped.toISOString();
 
-      console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
-      try {
-        await axios.post(API_ROOT + '/updateStartTime', {
-          id: newTop,
-          startTime: isoStamp
-        });
-
-        setColumns(cols => ({
-          ...cols,
-          [machineKey]: {
-            ...cols[machineKey],
-            jobs: cols[machineKey].jobs.map(j =>
-              j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
-            )
-          }
-        }));
-      } catch (err) {
-        console.error(`❌ Failed to set start time for ${newTop}`, err);
-      }
-
-      // ✅ Save current top as previous
-      prevRef.current = { id: newTop, ts: now };
+    console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
+    try {
+      await axios.post(API_ROOT + '/updateStartTime', {
+        id: newTop,
+        startTime: isoStamp
+      });
+      setColumns(cols => ({
+        ...cols,
+        [machineKey]: {
+          ...cols[machineKey],
+          jobs: cols[machineKey].jobs.map(j =>
+            j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
+          )
+        }
+      }));
+    } catch (err) {
+      console.error(`❌ Failed to set start time for ${newTop}`, err);
     }
+
+    // ✅ Save current as new top
+    prevRef.current = { id: newTop, ts: now };
   };
 
-  const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
-    updateTopStartTime(prevRef, jobs, machineKey);
-  }, 500);
+  // Check if machine 1's top job changed
+  const top1 = columns.machine1.jobs[0]?.id || null;
+  if (top1 !== prevMachine1Top.current?.id) {
+    updateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+  }
 
-  throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
-  throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+  // Check if machine 2's top job changed
+  const top2 = columns.machine2.jobs[0]?.id || null;
+  if (top2 !== prevMachine2Top.current?.id) {
+    updateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+  }
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 
 // === Section 6: Placeholder Management ===
