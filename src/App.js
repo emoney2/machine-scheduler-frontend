@@ -76,6 +76,9 @@ export default function App() {
   const prevMachine2Top = useRef({ id: null, ts: 0 });
   const bumpedJobs = useRef(new Set());
 
+  const prevM1Top = useRef(null);
+  const prevM2Top = useRef(null);
+
 
   // Send a new start time when needed
   const bumpJobStartTime = async (jobId) => {
@@ -182,19 +185,25 @@ useEffect(() => {
   const top1 = columns.machine1.jobs?.[0];
   const top2 = columns.machine2.jobs?.[0];
 
-  if (top1 && !top1.embroidery_start && !bumpedJobs.current.has(top1.id)) {
-    console.log("⏱️ Setting start time for Machine 1 top job:", top1.id);
-    bumpJobStartTime(top1.id);
-    bumpedJobs.current.add(top1.id);
+  if (top1?.id !== prevM1Top.current) {
+    if (top1 && !top1.embroidery_start && !bumpedJobs.current.has(top1.id)) {
+      console.log("⏱️ Setting start time for Machine 1 top job:", top1.id);
+      bumpJobStartTime(top1.id);
+      bumpedJobs.current.add(top1.id);
+    }
+    prevM1Top.current = top1?.id || null;
   }
 
-  if (top2 && !top2.embroidery_start && !bumpedJobs.current.has(top2.id)) {
-    console.log("⏱️ Setting start time for Machine 2 top job:", top2.id);
-    bumpJobStartTime(top2.id);
-    bumpedJobs.current.add(top2.id);
+  if (top2?.id !== prevM2Top.current) {
+    if (top2 && !top2.embroidery_start && !bumpedJobs.current.has(top2.id)) {
+      console.log("⏱️ Setting start time for Machine 2 top job:", top2.id);
+      bumpJobStartTime(top2.id);
+      bumpedJobs.current.add(top2.id);
+    }
+    prevM2Top.current = top2?.id || null;
   }
 }, [columns.machine1.jobs, columns.machine2.jobs]);
-;
+
 
 
 
