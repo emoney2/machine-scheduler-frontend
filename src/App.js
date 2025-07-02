@@ -794,17 +794,28 @@ useEffect(() => {
     updateTopStartTime(prevRef, jobs, machineKey);
   }, 500);
 
-  const top1 = columns.machine1.jobs[0]?.id || null;
-  const top2 = columns.machine2.jobs[0]?.id || null;
+  const m1Top = columns.machine1.jobs[0];
+  const m2Top = columns.machine2.jobs[0];
 
-  if (top1 && top1 !== prevMachine1Top.current?.id) {
+  const shouldUpdateM1 =
+    manualReorder ||
+    (prevMachine1Top.current?.id &&
+     !columns.machine1.jobs.some(j => j.id === prevMachine1Top.current.id));
+
+  const shouldUpdateM2 =
+    manualReorder ||
+    (prevMachine2Top.current?.id &&
+     !columns.machine2.jobs.some(j => j.id === prevMachine2Top.current.id));
+
+  if (shouldUpdateM1 && m1Top?.id !== prevMachine1Top.current?.id) {
     throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
   }
 
-  if (top2 && top2 !== prevMachine2Top.current?.id) {
+  if (shouldUpdateM2 && m2Top?.id !== prevMachine2Top.current?.id) {
     throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
   }
-}, [columns.machine1.jobs, columns.machine2.jobs]);
+
+  if (manualReorder) setManualReorder(false);
 
 
 // === Section 6: Placeholder Management ===
