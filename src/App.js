@@ -704,33 +704,37 @@ useEffect(() => {
     const now = Date.now();
     const prev = prevRef.current;
 
-    if (newTop && newTop !== prev?.id) {
-      // 1. Clear previous top
-      if (prev?.id) {
-        console.log(`🧼 Clearing start time for previous top job: ${prev.id}`);
-        try {
-          await axios.post(API_ROOT + '/updateStartTime', {
-            id: prev.id,
-            startTime: ''
-          });
+    // If top job hasn’t changed, do nothing
+    if (newTop === prev?.id) return;
 
-          setColumns(cols => ({
-            ...cols,
-            [machineKey]: {
-              ...cols[machineKey],
-              jobs: cols[machineKey].jobs.map(j =>
-                j.id === prev.id ? { ...j, embroidery_start: '' } : j
-              )
-            }
-          }));
-        } catch (err) {
-          console.error(`❌ Failed to clear start time for ${prev.id}`, err);
-        }
+    // 1. Clear previous top job’s start time
+    if (prev?.id && prev.id !== newTop) {
+      console.log(`🧼 Clearing start time for previous top job: ${prev.id}`);
+      try {
+        await axios.post(API_ROOT + '/updateStartTime', {
+          id: prev.id,
+          startTime: ''
+        });
+
+        setColumns(cols => ({
+          ...cols,
+          [machineKey]: {
+            ...cols[machineKey],
+            jobs: cols[machineKey].jobs.map(j =>
+              j.id === prev.id ? { ...j, embroidery_start: '' } : j
+            )
+          }
+        }));
+      } catch (err) {
+        console.error(`❌ Failed to clear start time for ${prev.id}`, err);
       }
+    }
 
-      // 2. Set new top
+    // 2. Set new top job’s start time
+    if (newTop) {
       const nowClamped = clampToWorkHours(new Date());
       const isoStamp = nowClamped.toISOString();
+
       console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
       try {
         await axios.post(API_ROOT + '/updateStartTime', {
@@ -751,9 +755,7 @@ useEffect(() => {
         console.error(`❌ Failed to set start time for ${newTop}`, err);
       }
 
-      prevRef.current = { id: newTop, ts: now };
-    } else if (newTop && !prev?.id) {
-      // Just store the first visible top job without changing its start time
+      // ✅ Save current top as previous
       prevRef.current = { id: newTop, ts: now };
     }
   };
