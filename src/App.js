@@ -187,7 +187,7 @@ useEffect(() => {
 
   if (top1?.id !== prevM1Top.current) {
     if (top1 && !top1.embroidery_start && !bumpedJobs.current.has(top1.id)) {
-      console.log("⏱️ Setting start time for Machine 1 top job:", top1.id);
+      console.log("⏱️ Stamping Machine 1 top job:", top1.id, "at", new Date().toISOString());
       bumpJobStartTime(top1.id);
       bumpedJobs.current.add(top1.id);
     }
@@ -196,7 +196,7 @@ useEffect(() => {
 
   if (top2?.id !== prevM2Top.current) {
     if (top2 && !top2.embroidery_start && !bumpedJobs.current.has(top2.id)) {
-      console.log("⏱️ Setting start time for Machine 2 top job:", top2.id);
+      console.log("⏱️ Stamping Machine 2 top job:", top2.id, "at", new Date().toISOString());
       bumpJobStartTime(top2.id);
       bumpedJobs.current.add(top2.id);
     }
@@ -435,8 +435,6 @@ function getChain(jobs, id) {
     console.log('fetchOrdersEmbroLinksCore ▶ start');
     setIsLoading(true);
     setHasError(false);
-    bumpedJobs.current.clear();
-
 
     try {
       // 1) Fetch orders, embroideryList, and links in parallel
