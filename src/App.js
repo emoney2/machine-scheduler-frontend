@@ -714,6 +714,13 @@ const fetchManualStateCore = async (previousCols) => {
     return () => clearInterval(handle);
   }, []);
 
+  const handleSync = async () => {
+    setSyncStatus('');
+    await fetchAllCombined();
+    setSyncStatus('updated');
+    setTimeout(() => setSyncStatus(''), 2000);
+  };
+
 // ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
