@@ -606,8 +606,6 @@ const submitForm = async () => {
     return;
   }
   const fd = new FormData();
-  if (reorderJob?.["Order #"]) fd.append("reorderFrom", reorderJob["Order #"]);
-  // Append form fields
   Object.entries(form).forEach(([key, value]) => {
     if (key === "materials") {
       value.forEach(m => fd.append("materials", m));
@@ -615,6 +613,11 @@ const submitForm = async () => {
       fd.append(key, value);
     }
   });
+
+  // 🧵 Add reorderFrom if this is a reorder
+  if (reorderJob && reorderJob["Order #"]) {
+    fd.append("reorderFrom", reorderJob["Order #"]);
+  }
 
   console.log("🧪 prodFiles right before check:", prodFiles);
 
