@@ -816,7 +816,7 @@ useEffect(() => {
   }
 
   if (manualReorder) setManualReorder(false);
-
+}, [columns.machine1.jobs, columns.machine2.jobs, manualReorder]);
 
 // === Section 6: Placeholder Management ===
 
