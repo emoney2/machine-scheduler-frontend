@@ -735,88 +735,49 @@ const fetchManualStateCore = async (previousCols) => {
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
     const newTop = jobs[0]?.id || null;
-    const now = Date.now();
-    const prev = prevRef.current;
+    const prev = prevRef.current?.id || null;
 
-    // 1. If top job changed, clear previous top's start time
-    if (prev && prev.id && prev.id !== newTop) {
-      console.log(`🧼 Clearing start time for previous top job: ${prev.id}`);
-      try {
-        await axios.post(API_ROOT + '/updateStartTime', {
-          id: prev.id,
-          startTime: ''
-        });
+    // Skip if no change in top job
+    if (!newTop || newTop === prev) return;
 
-        setColumns(cols => ({
-          ...cols,
-          [machineKey]: {
-            ...cols[machineKey],
-            jobs: cols[machineKey].jobs.map(j =>
-              j.id === prev.id ? { ...j, embroidery_start: '' } : j
-            )
-          }
-        }));
-      } catch (err) {
-        console.error(`❌ Failed to clear start time for ${prev.id}`, err);
-      }
-    }
+    console.log(`✏️ New job reached top: ${newTop} on ${machineKey}`);
 
-    // 2. Only stamp new top job if it changed
-    if (newTop && (!prev || newTop !== prev.id)) {
-      const nowClamped = clampToWorkHours(new Date());
-      const isoStamp = nowClamped.toISOString();
+    // Set new embroidery start time
+    const nowClamped = clampToWorkHours(new Date());
+    const isoStamp = nowClamped.toISOString();
 
-      console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
-      try {
-        await axios.post(API_ROOT + '/updateStartTime', {
-          id: newTop,
-          startTime: isoStamp
-        });
+    try {
+      await axios.post(API_ROOT + '/updateStartTime', {
+        id: newTop,
+        startTime: isoStamp
+      });
 
-        setColumns(cols => ({
-          ...cols,
-          [machineKey]: {
-            ...cols[machineKey],
-            jobs: cols[machineKey].jobs.map(j =>
-              j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
-            )
-          }
-        }));
+      setColumns(cols => ({
+        ...cols,
+        [machineKey]: {
+          ...cols[machineKey],
+          jobs: cols[machineKey].jobs.map(j =>
+            j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
+          )
+        }
+      }));
 
-        // ✅ Update ref
-        prevRef.current = { id: newTop, ts: now };
-      } catch (err) {
-        console.error(`❌ Failed to set start time for ${newTop}`, err);
-      }
+      // Update ref to remember this job is now top
+      prevRef.current = { id: newTop, ts: Date.now() };
+    } catch (err) {
+      console.error(`❌ Failed to set start time for ${newTop}`, err);
     }
   };
 
-  const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
-    updateTopStartTime(prevRef, jobs, machineKey);
-  }, 500);
-
-  const m1Top = columns.machine1.jobs[0];
-  const m2Top = columns.machine2.jobs[0];
-
-  const shouldUpdateM1 =
-    manualReorder &&
-    m1Top?.id &&
-    m1Top.id !== prevMachine1Top.current?.id;
-
-  const shouldUpdateM2 =
-    manualReorder &&
-    m2Top?.id &&
-    m2Top.id !== prevMachine2Top.current?.id;
-
-  if (shouldUpdateM1 && m1Top?.id !== prevMachine1Top.current?.id) {
-    throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+  if (manualReorder) {
+    if (columns.machine1.jobs.length > 0) {
+      updateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+    }
+    if (columns.machine2.jobs.length > 0) {
+      updateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+    }
+    setManualReorder(false); // reset flag
   }
-
-  if (shouldUpdateM2 && m2Top?.id !== prevMachine2Top.current?.id) {
-    throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
-  }
-
-  if (manualReorder) setManualReorder(false);
 }, [columns.machine1.jobs, columns.machine2.jobs, manualReorder]);
 
 // === Section 6: Placeholder Management ===
