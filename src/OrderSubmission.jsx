@@ -606,7 +606,7 @@ const submitForm = async () => {
     return;
   }
   const fd = new FormData();
-
+  if (reorderJob?.["Order #"]) fd.append("reorderFrom", reorderJob["Order #"]);
   // Append form fields
   Object.entries(form).forEach(([key, value]) => {
     if (key === "materials") {
