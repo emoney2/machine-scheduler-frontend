@@ -36,7 +36,6 @@ axios.interceptors.response.use(
 
 
 // CONFIGURATION
-const [manualReorder, setManualReorder] = useState(false);
 const API_ROOT   = process.env.REACT_APP_API_ROOT;
 const SOCKET_URL = API_ROOT.replace(/\/api$/, '');
 const socket     = io(SOCKET_URL, {
@@ -69,6 +68,7 @@ const BUBBLE_DELIV  = '#c8e6c9';
 
 export default function App() {
   console.log('🔔 App component mounted');
+  const [manualReorder, setManualReorder] = useState(false);
 
   // ─── Section 1.5: Auto‐bump setup ────────────────────────────────────────────
   // Track last‐seen top job on each machine
