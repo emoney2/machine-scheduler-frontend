@@ -799,14 +799,14 @@ useEffect(() => {
   const m2Top = columns.machine2.jobs[0];
 
   const shouldUpdateM1 =
-    manualReorder ||
-    (prevMachine1Top.current?.id &&
-     !columns.machine1.jobs.some(j => j.id === prevMachine1Top.current.id));
+    manualReorder &&
+    m1Top?.id &&
+    m1Top.id !== prevMachine1Top.current?.id;
 
   const shouldUpdateM2 =
-    manualReorder ||
-    (prevMachine2Top.current?.id &&
-     !columns.machine2.jobs.some(j => j.id === prevMachine2Top.current.id));
+    manualReorder &&
+    m2Top?.id &&
+    m2Top.id !== prevMachine2Top.current?.id;
 
   if (shouldUpdateM1 && m1Top?.id !== prevMachine1Top.current?.id) {
     throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
