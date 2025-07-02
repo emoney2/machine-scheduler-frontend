@@ -700,19 +700,31 @@ const fetchManualStateCore = async (previousCols) => {
 // ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
-    const newTop = jobs[0]?.id || null;
-    const now = Date.now();
-    const prev = prevRef.current;
+    const prevTopId = prevRef.current?.id || null;
+    const newTopJob = jobs[0];
+    const newTopId = newTopJob?.id || null;
 
-    // If top job actually changed, overwrite its embroidery_start
-    if (newTop && newTop !== prev?.id) {
+    if (!newTopId) return;
+
+    // Only act if top job changed
+    if (newTopId !== prevTopId) {
       const nowClamped = clampToWorkHours(new Date());
       const isoStamp = nowClamped.toISOString();
 
-      console.log(`✏️ Setting start time for ${machineKey} top job ${newTop}: ${isoStamp}`);
+      console.log(`🕒 Top job changed on ${machineKey}. New top: ${newTopId}`);
+
       try {
-        await axios.post(API_ROOT + '/updateStartTime', {
-          id: newTop,
+        // Clear old job's start time if it existed
+        if (prevTopId) {
+          await axios.post(`${API_ROOT}/updateStartTime`, {
+            id: prevTopId,
+            startTime: ''
+          });
+        }
+
+        // Set new top job start time
+        await axios.post(`${API_ROOT}/updateStartTime`, {
+          id: newTopId,
           startTime: isoStamp
         });
 
@@ -721,36 +733,23 @@ useEffect(() => {
           [machineKey]: {
             ...cols[machineKey],
             jobs: cols[machineKey].jobs.map(j =>
-              j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
+              j.id === prevTopId ? { ...j, embroidery_start: '' } :
+              j.id === newTopId ? { ...j, embroidery_start: isoStamp } :
+              j
             )
           }
         }));
 
-        // ✅ Update the stored top job reference
-        prevRef.current = { id: newTop, ts: now };
+        // Update tracker
+        prevRef.current = { id: newTopId, ts: Date.now() };
       } catch (err) {
-        console.error(`❌ Failed to set start time for ${newTop}`, err);
+        console.error(`❌ Failed to update start time for ${machineKey}`, err);
       }
     }
   };
 
-  const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
-    updateTopStartTime(prevRef, jobs, machineKey);
-  }, 500);
-
-  if (columns.machine1.jobs.length > 0) {
-    const newTop1 = columns.machine1.jobs[0].id;
-    if (newTop1 !== prevMachine1Top.current?.id) {
-      throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
-    }
-  }
-
-  if (columns.machine2.jobs.length > 0) {
-    const newTop2 = columns.machine2.jobs[0].id;
-    if (newTop2 !== prevMachine2Top.current?.id) {
-      throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
-    }
-  }
+  updateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+  updateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 
 
