@@ -698,62 +698,87 @@ const fetchManualStateCore = async (previousCols) => {
     return () => clearInterval(handle);
   }, []);
 // ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
-const prevTopJobIds = useRef({
-  machine1: null,
-  machine2: null,
-});
-
 useEffect(() => {
-  const updateTopStartTime = async (machineKey, jobs) => {
-    const prevId = prevTopJobIds.current[machineKey];
+  const updateTopStartTime = async (prevRef, jobs, machineKey) => {
     const newTop = jobs[0]?.id || null;
+    const now = Date.now();
+    const prev = prevRef.current;
 
-    if (!newTop || newTop === prevId) return;
-
-    // Clear previous top job's time
-    if (prevId) {
-      console.log(`🧼 Clearing start time for previous top job: ${prevId}`);
+    if (prev.id && prev.id !== newTop) {
+      console.log(`🧼 Clearing start time for previous top job: ${prev.id}`);
       try {
         await axios.post(API_ROOT + '/updateStartTime', {
-          id: prevId,
+          id: prev.id,
           startTime: ''
         });
+
+        setColumns(cols => ({
+          ...cols,
+          [machineKey]: {
+            ...cols[machineKey],
+            jobs: cols[machineKey].jobs.map(j =>
+              j.id === prev.id ? { ...j, embroidery_start: '' } : j
+            )
+          }
+        }));
       } catch (err) {
-        console.error(`❌ Failed to clear start time for ${prevId}`, err);
+        console.error(`❌ Failed to clear start time for ${prev.id}`, err);
       }
     }
 
-    // Set new top job's time
-    const nowClamped = clampToWorkHours(new Date());
-    const isoStamp = nowClamped.toISOString();
+    if (newTop) {
+      const nowClamped = clampToWorkHours(new Date());
+      const isoStamp = nowClamped.toISOString();
 
-    console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
-    try {
-      await axios.post(API_ROOT + '/updateStartTime', {
-        id: newTop,
-        startTime: isoStamp
-      });
+      console.log(`✏️ Setting start time for ${machineKey} job ${newTop}: ${isoStamp}`);
+      try {
+        await axios.post(API_ROOT + '/updateStartTime', {
+          id: newTop,
+          startTime: isoStamp
+        });
 
-      setColumns(cols => ({
-        ...cols,
-        [machineKey]: {
-          ...cols[machineKey],
-          jobs: cols[machineKey].jobs.map(j =>
-            j.id === newTop ? { ...j, embroidery_start: isoStamp } :
-            j.id === prevId ? { ...j, embroidery_start: '' } : j
-          )
-        }
-      }));
+        setColumns(cols => ({
+          ...cols,
+          [machineKey]: {
+            ...cols[machineKey],
+            jobs: cols[machineKey].jobs.map(j =>
+              j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
+            )
+          }
+        }));
 
-      prevTopJobIds.current[machineKey] = newTop;
-    } catch (err) {
-      console.error(`❌ Failed to set start time for ${newTop}`, err);
+        prevRef.current = { id: newTop, ts: now };
+      } catch (err) {
+        console.error(`❌ Failed to set start time for ${newTop}`, err);
+      }
     }
   };
 
-  updateTopStartTime('machine1', columns.machine1.jobs);
-  updateTopStartTime('machine2', columns.machine2.jobs);
+  const throttledUpdateTopStartTime = throttle((prevRef, jobs, machineKey) => {
+    updateTopStartTime(prevRef, jobs, machineKey);
+  }, 500);
+
+  // ✅ Initialize previous refs on first load
+  if (!prevMachine1Top.current?.id && columns.machine1.jobs.length > 0) {
+    prevMachine1Top.current = { id: columns.machine1.jobs[0].id, ts: Date.now() };
+  }
+  if (!prevMachine2Top.current?.id && columns.machine2.jobs.length > 0) {
+    prevMachine2Top.current = { id: columns.machine2.jobs[0].id, ts: Date.now() };
+  }
+
+  const top1 = columns.machine1.jobs[0]?.id || null;
+  const top2 = columns.machine2.jobs[0]?.id || null;
+
+  if (top1 !== prevMachine1Top.current?.id) {
+    throttledUpdateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+  }
+
+  if (top2 !== prevMachine2Top.current?.id) {
+    throttledUpdateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+  }
 }, [columns.machine1.jobs, columns.machine2.jobs]);
+
+
 
 
 // === Section 6: Placeholder Management ===
