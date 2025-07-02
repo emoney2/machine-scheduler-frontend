@@ -689,14 +689,47 @@ const fetchManualStateCore = async (previousCols) => {
     // 1) Run immediately on mount
     fetchAllCombined();
 
-    // 2) Then set up the 15 s interval
-    const handle = setInterval(() => {
+    // 2) Set up the 15-second polling with top job preservation
+    const handle = setInterval(async () => {
       console.log("⏳ Poll: combined fetchAllCombined()");
-      fetchAllCombined();
-    }, 15_000);
+
+      const prevMachine1Top = columns.machine1.jobs[0];
+      const prevMachine2Top = columns.machine2.jobs[0];
+
+      const newData = await fetchAllCombined(true); // optionally allow param if needed
+
+      // After fetchAllCombined updates state, re-patch the top job start times
+      setColumns(current => ({
+        machine1: {
+          ...current.machine1,
+          jobs: current.machine1.jobs.map((job, i) =>
+            i === 0 && job.id === prevMachine1Top?.id
+              ? {
+                  ...job,
+                  embroidery_start: prevMachine1Top.embroidery_start,
+                  embroidery_stop: prevMachine1Top.embroidery_stop
+                }
+              : job
+          )
+        },
+        machine2: {
+          ...current.machine2,
+          jobs: current.machine2.jobs.map((job, i) =>
+            i === 0 && job.id === prevMachine2Top?.id
+              ? {
+                  ...job,
+                  embroidery_start: prevMachine2Top.embroidery_start,
+                  embroidery_stop: prevMachine2Top.embroidery_stop
+                }
+              : job
+          )
+        }
+      }));
+    }, 15000);
 
     return () => clearInterval(handle);
   }, []);
+
 // ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
 useEffect(() => {
   const updateTopStartTime = async (prevRef, jobs, machineKey) => {
