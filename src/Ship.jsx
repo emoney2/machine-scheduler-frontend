@@ -510,11 +510,11 @@ const shippingOptions = [
           <div style={{ width: 60 }}>{job.image && <img src={job.image} alt="Preview" style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "4px", border: "1px solid #999" }} />}</div>
           <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
           <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job["Date"])}</div>
-          <div style={{ width: 200, textAlign: "center" }}>{job["Design Name"]}</div>
+          <div style={{ width: 200, textAlign: "center" }}>{job["Design"]}</div>
           <div style={{ width: 70, textAlign: "center" }}>
             <input
               type="number"
-              value={job.shipQty}
+              value={job.shipQty ?? job["Quantity"]}
               min="1"
               style={{ width: "50px" }}
               onClick={(e) => e.stopPropagation()}
