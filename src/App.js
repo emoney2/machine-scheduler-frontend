@@ -186,17 +186,17 @@ useEffect(() => {
   const top2 = columns.machine2.jobs?.[0];
 
   if (top1?.id !== prevM1Top.current) {
-    if (top1?.id) {
-      console.log("⏱️ Overwriting start time for Machine 1 top job:", top1.id);
-      bumpJobStartTime(top1.id); // always stamp, even if it had a value
+    if (top1?.id && !top1.embroidery_start) {
+      console.log("⏱️ Setting embroidery start time for Machine 1 top job:", top1.id);
+      bumpJobStartTime(top1.id);
     }
     prevM1Top.current = top1?.id || null;
   }
 
   if (top2?.id !== prevM2Top.current) {
-    if (top2?.id) {
-      console.log("⏱️ Overwriting start time for Machine 2 top job:", top2.id);
-      bumpJobStartTime(top2.id); // always stamp
+    if (top2?.id && !top2.embroidery_start) {
+      console.log("⏱️ Setting embroidery start time for Machine 2 top job:", top2.id);
+      bumpJobStartTime(top2.id);
     }
     prevM2Top.current = top2?.id || null;
   }
