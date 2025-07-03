@@ -509,8 +509,8 @@ const shippingOptions = [
         >
           <div style={{ width: 60 }}>{job.image && <img src={job.image} alt="Preview" style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "4px", border: "1px solid #999" }} />}</div>
           <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
-          <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job.date)}</div>
-          <div style={{ width: 200, textAlign: "center" }}>{job.design}</div>
+          <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job["Date"])}</div>
+          <div style={{ width: 200, textAlign: "center" }}>{job["Design Name"]}</div>
           <div style={{ width: 70, textAlign: "center" }}>
             <input
               type="number"
@@ -528,10 +528,10 @@ const shippingOptions = [
               }}
             />
           </div>
-          <div style={{ width: 120, textAlign: "center" }}>{job.product}</div>
-          <div style={{ width: 120, textAlign: "center" }}>{job.stage}</div>
-          <div style={{ width: 80, textAlign: "center" }}>${job.price}</div>
-          <div style={{ width: 90, textAlign: "center" }}>{formatDateMMDD(job.due)}</div>
+          <div style={{ width: 120, textAlign: "center" }}>{job["Product"]}</div>
+          <div style={{ width: 120, textAlign: "center" }}>{job["Stage"]}</div>
+          <div style={{ width: 80, textAlign: "center" }}>${job["Price"]}</div>
+          <div style={{ width: 90, textAlign: "center" }}>{formatDateMMDD(job["Due Date"])}</div>
         </div>
       ))}
 
