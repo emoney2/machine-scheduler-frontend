@@ -102,9 +102,11 @@ export default function Ship() {
   const [loading, setLoading] = useState(false);
   const [boxes, setBoxes] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
+  const [shippingMethod, setShippingMethod] = useState("");
 
   const query = new URLSearchParams(window.location.search);
   const defaultCompany = query.get("company");
+
 
 // === useEffect 1: Initial load ===
   useEffect(() => {
@@ -417,7 +419,12 @@ const handleShip = async () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ order_ids: selected, boxes: packedBoxes, shipped_quantities: shippedQuantities }),
+        body: JSON.stringify({
+          order_ids: selected,
+          boxes: packedBoxes,
+          shipped_quantities: shippedQuantities,
+          shipping_method: shippingMethod
+        }),
       }
     );
 
@@ -441,14 +448,15 @@ const handleShip = async () => {
 };
 
 // 🧠 New rate-based shipping handler (mockup version)
-const handleRateAndShip = (method, rate, deliveryDate) => {
+const handleRateAndShip = async (method, rate, deliveryDate) => {
   const confirmed = window.confirm(
     `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${deliveryDate}\nProceed?`
   );
   if (!confirmed) return;
 
-  alert(`Pretending to ship with ${method}...`);
-  handleShip();
+  setShippingMethod(method); // store selected method
+
+  await handleShip(); // wait for async logic to complete
 };
 
 // Mock shipping options (replace with live API later)
