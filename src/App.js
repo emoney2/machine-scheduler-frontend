@@ -18,8 +18,6 @@ import throttle from 'lodash.throttle';
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
-import { useEffect } from "react";
-
 function QuickBooksRedirect() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
