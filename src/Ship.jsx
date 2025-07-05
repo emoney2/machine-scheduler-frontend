@@ -194,6 +194,37 @@ useEffect(() => {
 // === End useEffect 2 ===
 
   useEffect(() => {
+    const retryPendingShipment = async () => {
+      const pending = sessionStorage.getItem("pendingShipment");
+      if (pending) {
+        console.log("🔁 Resuming pending shipment...");
+        sessionStorage.removeItem("pendingShipment");
+
+        const parsed = JSON.parse(pending);
+        const res = await fetch(
+          "https://machine-scheduler-backend.onrender.com/api/process-shipment",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(parsed),
+          }
+        );
+
+        const data = await res.json();
+        if (res.ok) {
+          data.labels.forEach((url) => window.open(url, "_blank"));
+          window.open(data.invoice, "_blank");
+          data.slips.forEach((url) => window.open(url, "_blank"));
+          window.location.reload();
+        } else {
+          alert(data.error || "Shipment failed.");
+        }
+      }
+    };
+
+    retryPendingShipment();
+
     if (targetOrder && jobs.length > 0) {
       const match = jobs.find(j => j.orderId.toString() === targetOrder);
       if (match) {
@@ -430,12 +461,32 @@ const handleShip = async () => {
 
     const shipData = await shipRes.json();
 
+    // 🔁 If backend tells us to redirect to QuickBooks login
+    if (shipData.redirect) {
+      // Save everything needed to retry later
+      sessionStorage.setItem("pendingShipment", JSON.stringify({
+        order_ids: selected,
+        boxes: packedBoxes,
+        shipped_quantities: shippedQuantities,
+        shipping_method: shippingMethod,
+      }));
+
+      // Redirect to QuickBooks login
+      window.location.href = shipData.redirect;
+      return;
+    }
+
     if (shipRes.ok) {
       shipData.labels.forEach((url) => window.open(url, "_blank"));
       window.open(shipData.invoice, "_blank");
       shipData.slips.forEach((url) => window.open(url, "_blank"));
+
+      // 🧹 Clear pending shipment on success
+      sessionStorage.removeItem("pendingShipment");
+
       setLoading(false);
       window.location.reload();
+
     } else {
       alert(shipData.error || "Shipment failed.");
       setLoading(false);
