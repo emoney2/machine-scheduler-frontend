@@ -18,6 +18,18 @@ import throttle from 'lodash.throttle';
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
+import { useEffect } from "react";
+
+function QuickBooksRedirect() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next") || "/";
+    window.location.href = `https://machine-scheduler-backend.onrender.com/quickbooks/login?next=${encodeURIComponent(next)}`;
+  }, []);
+
+  return <div>🔁 Redirecting to QuickBooks...</div>;
+}
+
 // send cookies on every API call so Flask session is preserved
 axios.defaults.withCredentials = true;
 
@@ -1136,6 +1148,7 @@ const onDragEnd = async (result) => {
         <Route path="/ship" element={<Ship />} />
         <Route path="/reorder" element={<ReorderPage />} />  {/* ← this is new */}
         <Route path="/order" element={<OrderSubmission />} />
+        <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
       </Routes>
     </>
   );
