@@ -407,6 +407,11 @@ const handleShip = async () => {
   const invoiceWindow = window.open("", "_blank");
   const slipWindows   = new Array(selected.length).fill().map(() => window.open("", "_blank"));
 
+  // DEBUG
+  console.log("🚀 labelWindows count:", labelWindows.length, labelWindows);
+  console.log("🚀 invoiceWindow:", invoiceWindow);
+  console.log("🚀 slipWindows count:", slipWindows.length, slipWindows);
+
   // Show “processing” overlay
   setIsShippingOverlay(true);
   setShippingStage("📦 Preparing shipment...");
