@@ -122,7 +122,7 @@ export default function Ship() {
         );
         const data = await res.json();
         if (res.ok) {
-          setJobs(() =>
+          setJobs(
             data.jobs.map(job => {
               const qty = Number(job.quantity ?? 0);
               return {
