@@ -517,20 +517,52 @@ const handleShip = async () => {
     }
 
     if (shipRes.ok) {
+
+      // 1) Mark the order complete
+      setShippingStage("🔖 Marking order complete...");
+
+      // 2) Submit info to UPS
+      setShippingStage("✉️ Submitting info to UPS...");
+
+      // 3) UPS customer setup
+      setShippingStage("👥 Setting up UPS customer...");
+
+      // 4) Print shipping labels
+      setShippingStage(
+        `🖨️ Printing ${shipData.labels.length} shipping label${shipData.labels.length > 1 ? "s" : ""}...`
+      );
       shipData.labels.forEach((url) => window.open(url, "_blank"));
+
+      // 5) Log into QuickBooks
+      setShippingStage("🔑 Logging into QuickBooks...");
       window.open(shipData.invoice, "_blank");
+
+      // 6) QuickBooks customer setup
+      setShippingStage("👤 Setting up QuickBooks customer...");
+
+      // 7) QuickBooks product setup
+      setShippingStage("📦 Setting up QuickBooks product info...");
+
+      // 8) Generate packing slip and open it
+      setShippingStage("📋 Generating packing slip...");
       shipData.slips.forEach((url) => window.open(url, "_blank"));
 
-      // 🧹 Clear pending shipment on success
-      sessionStorage.removeItem("pendingShipment");
-
+      // 9) Complete!
+      setShippingStage("✅ Complete!");
       setLoading(false);
-      window.location.reload();
+
+      // Hide the overlay and reload so the user sees “Complete!”
+      setTimeout(() => {
+        setIsShippingOverlay(false);
+        window.location.reload();
+      }, 1000);
 
     } else {
       alert(shipData.error || "Shipment failed.");
       setLoading(false);
+      setIsShippingOverlay(false); // hide overlay on failure
     }
+
   } catch (err) {
     console.error(err);
     alert("Failed to ship.");
