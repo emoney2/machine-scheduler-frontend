@@ -127,8 +127,8 @@ export default function Ship() {
               const existing = prev.find(j => j.orderId === newJob.orderId);
               return {
                 ...newJob,
-                shipQty: existing?.shipQty ?? newJob.quantity,
-                ShippedQty: existing?.shipQty ?? newJob.quantity,
+                shipQty: Number(existing?.shipQty ?? newJob.quantity ?? 0),
+                ShippedQty: Number(existing?.shipQty ?? newJob.quantity ?? 0),
               };
             });
 
