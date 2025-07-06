@@ -401,24 +401,22 @@ const handleShip = async () => {
     return;
   }
 
-  // ── PRE-OPEN POPUPS ───────────────────────────────────────
-  // Must happen synchronously in the click handler
-  const labelWindows  = new Array(selected.length).fill().map(() => window.open("", "_blank"));
+  // ── 1) PRE-OPEN POPUPS (must be inside click handler) ──
+  const labelWindows  = new Array(selected.length)
+    .fill()
+    .map(() => window.open("", "_blank"));
   const invoiceWindow = window.open("", "_blank");
-  const slipWindows   = new Array(selected.length).fill().map(() => window.open("", "_blank"));
+  // We don’t know slip count yet—open as many as orders
+  const slipWindows   = new Array(selected.length)
+    .fill()
+    .map(() => window.open("", "_blank"));
 
-  // DEBUG
-  console.log("🚀 labelWindows count:", labelWindows.length, labelWindows);
-  console.log("🚀 invoiceWindow:", invoiceWindow);
-  console.log("🚀 slipWindows count:", slipWindows.length, slipWindows);
-
-  // Show “processing” overlay
   setIsShippingOverlay(true);
   setShippingStage("📦 Preparing shipment...");
   setLoading(true);
 
   try {
-    // ── STEP 1: prepare‐shipment ─────────────────────────────
+    // ── 2) PREPARE SHIPMENT ────────────────────────────────
     let response = await fetch(
       "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
       {
@@ -437,7 +435,7 @@ const handleShip = async () => {
     );
     let result = await response.json();
 
-    // If volumes missing, prompt for dimensions and retry once
+    // Retry if missing volume info
     if (!response.ok && result.missing_products) {
       for (const product of result.missing_products) {
         const success = await promptDimensionsForProduct(product);
@@ -447,7 +445,7 @@ const handleShip = async () => {
           return;
         }
       }
-      // retry
+      // retry once
       response = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
         {
@@ -467,12 +465,12 @@ const handleShip = async () => {
       result = await response.json();
     }
 
-    // Pack the boxes
+    // Pack boxes
     const packedBoxes = result.boxes || [];
     setShippingStage("📦 Packing boxes...");
     setBoxes(packedBoxes);
 
-    // ── STEP 2: process‐shipment ─────────────────────────────
+    // ── 3) PROCESS SHIPMENT ────────────────────────────────
     setShippingStage("🚚 Processing shipment...");
     const shipRes = await fetch(
       "https://machine-scheduler-backend.onrender.com/api/process-shipment",
@@ -494,12 +492,12 @@ const handleShip = async () => {
     );
     const shipData = await shipRes.json();
 
-    // Hide yellow overlay & show success
+    // Hide the “processing” overlay, show a quick success banner
     setIsShippingOverlay(false);
     setShowSuccessOverlay(true);
     setTimeout(() => setShowSuccessOverlay(false), 3000);
 
-    // Handle QuickBooks OAuth redirect if needed
+    // QuickBooks redirect handling
     if (shipData.redirect) {
       sessionStorage.setItem(
         "pendingShipment",
@@ -518,8 +516,9 @@ const handleShip = async () => {
       return;
     }
 
+    // ── 4) HANDLE SUCCESS ──────────────────────────────────
     if (shipRes.ok) {
-      // ── 3: Shipping labels ─────────────────────────────────
+      // 4a) Shipping labels
       setShippingStage(
         `🖨️ Printing ${shipData.labels.length} shipping label${
           shipData.labels.length > 1 ? "s" : ""
@@ -529,12 +528,12 @@ const handleShip = async () => {
         const win = labelWindows[i];
         if (win) {
           win.location = url;
-          win.blur();      // send that tab to the background
-          window.focus();  // bring our app tab back into focus
+          win.blur();
+          window.focus();
         }
       });
 
-      // ── 4: QuickBooks invoice ──────────────────────────────
+      // 4b) QuickBooks invoice
       setShippingStage("🔑 Logging into QuickBooks...");
       if (invoiceWindow) {
         invoiceWindow.location = shipData.invoice;
@@ -542,11 +541,11 @@ const handleShip = async () => {
         window.focus();
       }
 
-      // ── 5–7: UI stages ─────────────────────────────────────
+      // 4c) UI stages for customer/product setup
       setShippingStage("👤 Setting up QuickBooks customer...");
       setShippingStage("📦 Setting up QuickBooks product info...");
 
-      // ── 8: Packing slip ────────────────────────────────────
+      // 4d) Packing slip
       setShippingStage("📋 Generating packing slip...");
       shipData.slips.forEach((url, i) => {
         const win = slipWindows[i];
@@ -557,21 +556,30 @@ const handleShip = async () => {
         }
       });
 
-      // ── 9: Done ─────────────────────────────────────────────
+      // 4e) Finalize
       setShippingStage("✅ Complete!");
       setLoading(false);
-
-      // Briefly show “Complete!” then reload
       setTimeout(() => {
         setIsShippingOverlay(false);
         window.location.reload();
       }, 1000);
+
     } else {
+      // Shipment error from server
       alert(shipData.error || "Shipment failed.");
       setLoading(false);
       setIsShippingOverlay(false);
     }
-    };
+
+  } catch (err) {
+    // Any JavaScript error in the above logic
+    console.error(err);
+    alert("Failed to ship.");
+    setLoading(false);
+    setIsShippingOverlay(false);
+  }
+}; // end handleShip
+
 
 // 🧠 New rate-based shipping handler (mockup version)
 const handleRateAndShip = async (method, rate, deliveryDate) => {
