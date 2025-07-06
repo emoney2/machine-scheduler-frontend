@@ -411,7 +411,12 @@ const handleShip = async () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ order_ids: selected }),
+        body: JSON.stringify({
+          order_ids: selected,
+          shipped_quantities: Object.fromEntries(
+            jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
+          )
+        }),
       }
     );
 
@@ -433,7 +438,12 @@ const handleShip = async () => {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ order_ids: selected }),
+          body: JSON.stringify({
+            order_ids: selected,
+            shipped_quantities: Object.fromEntries(
+              jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
+            )
+          }),
         }
       );
 
