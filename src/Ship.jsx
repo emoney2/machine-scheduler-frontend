@@ -535,8 +535,14 @@ const handleShip = async () => {
 
       // 4b) QuickBooks invoice
       setShippingStage("🔑 Logging into QuickBooks...");
+
+      // If the server gave us just an ID (no "http"), build the full QBO URL:
+      const invoiceUrl = shipData.invoice.startsWith("http")
+        ? shipData.invoice
+        : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`;
+
       if (invoiceWindow) {
-        invoiceWindow.location = shipData.invoice;
+        invoiceWindow.location = invoiceUrl;
         invoiceWindow.blur();
         window.focus();
       }
