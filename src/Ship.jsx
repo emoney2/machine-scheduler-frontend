@@ -274,23 +274,21 @@ useEffect(() => {
       );
       const data = await res.json();
       if (res.ok) {
-        const newJobs = data.jobs.map(job => ({ ...job, shipQty: job.quantity }));
-        setJobs(prevJobs => {
-          // Create a map from existing jobs for fast lookup
-          const jobMap = Object.fromEntries(prevJobs.map(j => [j.orderId, j]));
-          // Update only changed jobs, retain shipQty edits
-          return newJobs.map(job => {
-            const existing = jobMap[job.orderId];
-            return existing
-              ? { ...job, shipQty: existing.shipQty ?? job.quantity }
-              : job;
-          });
+        // Initialize shipQty from the sheet's "Quantity" column
+        const jobsWithQty = data.jobs.map(job => {
+          const qty = Number(job.Quantity ?? 0);
+          return { ...job, shipQty: qty, ShippedQty: qty };
         });
+        setJobs(jobsWithQty);
+        // Also clean up your selected list in case jobs changed
+        setSelected(prev =>
+          prev.filter(id => jobsWithQty.some(j => j.orderId.toString() === id))
+        );
       } else {
         alert(data.error || "Failed to load jobs");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error loading jobs:", err);
       alert("Error loading jobs.");
     }
   }
