@@ -128,6 +128,7 @@ export default function Ship() {
               return {
                 ...newJob,
                 shipQty: existing?.shipQty ?? newJob.quantity,
+                ShippedQty: existing?.shipQty ?? newJob.quantity,
               };
             });
 
@@ -178,6 +179,7 @@ useEffect(() => {
               return {
                 ...newJob,
                 shipQty: existing?.shipQty ?? newJob.quantity,
+                ShippedQty: existing?.shipQty ?? newJob.quantity,
               };
             });
           });
