@@ -125,7 +125,8 @@ useEffect(() => {
       if (res.ok) {
         // 1) Build job array and initialize shipQty from the sheet quantity
         const updatedJobs = data.jobs.map((job) => {
-          const qty = Number(job.quantity ?? 0);
+          // Pull from the sheet’s "Quantity" column (capital Q)
+          const qty = Number(job.Quantity ?? job.quantity ?? 0);
           return {
             ...job,
             shipQty: qty,
@@ -416,7 +417,9 @@ const handleShip = async () => {
         body: JSON.stringify({
           order_ids: selected,
           shipped_quantities: Object.fromEntries(
-            jobs.filter(j => selected.includes(j.orderId.toString())).map(j => [j.orderId, j.shipQty])
+            jobs
+              .filter(j => selected.includes(j.orderId.toString()))
+              .map(j => [j.orderId, j.shipQty])
           )
         }),
       }
@@ -482,7 +485,11 @@ const handleShip = async () => {
         body: JSON.stringify({
           order_ids: selected,
           boxes: packedBoxes,
-          shipped_quantities: shippedQuantities,
+          shipped_quantities: Object.fromEntries(
+            jobs
+              .filter(j => selected.includes(j.orderId.toString()))
+              .map(j => [j.orderId, j.shipQty])
+          ),
           shipping_method: shippingMethod
         }),
       }
