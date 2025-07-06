@@ -526,12 +526,21 @@ const handleShip = async () => {
         }...`
       );
       shipData.labels.forEach((url, i) => {
-        if (labelWindows[i]) labelWindows[i].location = url;
+        const win = labelWindows[i];
+        if (win) {
+          win.location = url;
+          win.blur();      // send that tab to the background
+          window.focus();  // bring our app tab back into focus
+        }
       });
 
       // ── 4: QuickBooks invoice ──────────────────────────────
       setShippingStage("🔑 Logging into QuickBooks...");
-      if (invoiceWindow) invoiceWindow.location = shipData.invoice;
+      if (invoiceWindow) {
+        invoiceWindow.location = shipData.invoice;
+        invoiceWindow.blur();
+        window.focus();
+      }
 
       // ── 5–7: UI stages ─────────────────────────────────────
       setShippingStage("👤 Setting up QuickBooks customer...");
@@ -540,7 +549,12 @@ const handleShip = async () => {
       // ── 8: Packing slip ────────────────────────────────────
       setShippingStage("📋 Generating packing slip...");
       shipData.slips.forEach((url, i) => {
-        if (slipWindows[i]) slipWindows[i].location = url;
+        const win = slipWindows[i];
+        if (win) {
+          win.location = url;
+          win.blur();
+          window.focus();
+        }
       });
 
       // ── 9: Done ─────────────────────────────────────────────
@@ -557,13 +571,7 @@ const handleShip = async () => {
       setLoading(false);
       setIsShippingOverlay(false);
     }
-  } catch (err) {
-    console.error(err);
-    alert("Failed to ship.");
-    setLoading(false);
-    setIsShippingOverlay(false);
-  }
-};
+    };
 
 // 🧠 New rate-based shipping handler (mockup version)
 const handleRateAndShip = async (method, rate, deliveryDate) => {
