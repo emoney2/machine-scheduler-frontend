@@ -107,6 +107,10 @@ export default function Ship() {
   const query = new URLSearchParams(window.location.search);
   const defaultCompany = query.get("company");
 
+  const [isShippingOverlay, setIsShippingOverlay] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [shippingStage, setShippingStage] = useState(""); // dynamic overlay message
+
 
 // === useEffect 1: Initial load ===
   useEffect(() => {
@@ -394,6 +398,8 @@ const handleShip = async () => {
     return;
   }
 
+  setIsShippingOverlay(true);
+  setShippingStage("📦 Preparing shipment...");
   setLoading(true);
 
   try {
@@ -414,6 +420,7 @@ const handleShip = async () => {
         const success = await promptDimensionsForProduct(product);
         if (!success) {
           setLoading(false);
+          setIsShippingOverlay(false); // 🛑 turn off yellow overlay
           return;
         }
       }
@@ -432,6 +439,7 @@ const handleShip = async () => {
     }
 
     const packedBoxes = result.boxes || [];
+    setShippingStage("📦 Packing boxes...");
     setBoxes(packedBoxes);
 
     const shippedQuantities = Object.fromEntries(
@@ -444,6 +452,7 @@ const handleShip = async () => {
       shipped_quantities: shippedQuantities,
     });
 
+    setShippingStage("🚚 Processing shipment...");
     const shipRes = await fetch(
       "https://machine-scheduler-backend.onrender.com/api/process-shipment",
       {
@@ -461,9 +470,11 @@ const handleShip = async () => {
 
     const shipData = await shipRes.json();
 
-    // 🔁 If backend tells us to redirect to QuickBooks login
+    setIsShippingOverlay(false);
+    setShowSuccessOverlay(true);
+    setTimeout(() => setShowSuccessOverlay(false), 3000);
+    
     if (shipData.redirect) {
-      // Save everything needed to retry later
       sessionStorage.setItem("pendingShipment", JSON.stringify({
         order_ids: selected,
         boxes: packedBoxes,
@@ -495,6 +506,7 @@ const handleShip = async () => {
     console.error(err);
     alert("Failed to ship.");
     setLoading(false);
+    setIsShippingOverlay(false); // 🛑 Hide yellow overlay on error
   }
 };
 
@@ -521,6 +533,41 @@ const shippingOptions = [
 
   return (
     <div style={{ padding: "2rem" }}>
+      {/* 🚚 Shipping Overlay */}
+      {isShippingOverlay && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0,
+          width: "100vw", height: "100vh",
+          backgroundColor: "#fff7c2",
+          zIndex: 9999,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "1.5rem",
+          fontWeight: "bold"
+        }}>
+          {shippingStage || "Processing..."}
+        </div>
+      )}
+
+      {/* ✅ Success Overlay */}
+      {showSuccessOverlay && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0,
+          width: "100vw", height: "100vh",
+          backgroundColor: "#c2f0c2",
+          zIndex: 9999,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "1.5rem",
+          fontWeight: "bold"
+        }}>
+          ✅ Shipment Complete!
+        </div>
+      )}
       <h2>📦 Ship Jobs</h2>
       <input
         list="company-options"
