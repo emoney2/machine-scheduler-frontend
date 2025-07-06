@@ -122,15 +122,16 @@ export default function Ship() {
         );
         const data = await res.json();
         if (res.ok) {
-          setJobs(prev => {
-            const updatedJobs = data.jobs.map(newJob => {
-              const existing = prev.find(j => j.orderId === newJob.orderId);
+          setJobs(() =>
+            data.jobs.map(job => {
+              const qty = Number(job.quantity ?? 0);
               return {
-                ...newJob,
-                shipQty: Number(existing?.shipQty ?? newJob.quantity ?? 0),
-                ShippedQty: Number(existing?.shipQty ?? newJob.quantity ?? 0),
+                ...job,
+                shipQty: qty,
+                ShippedQty: qty,
               };
-            });
+            })
+          );
 
             // 🧹 Clean up selected list based on new jobs
             const updatedOrderIds = updatedJobs.map(j => j.orderId.toString());
