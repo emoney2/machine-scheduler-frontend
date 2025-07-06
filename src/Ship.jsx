@@ -123,26 +123,25 @@ useEffect(() => {
       const data = await res.json();
 
       if (res.ok) {
-        // 1) Build the array and initialize shipQty
-        const updatedJobs = data.jobs.map(job => {
+        // 1) Build job array and initialize shipQty from the sheet quantity
+        const updatedJobs = data.jobs.map((job) => {
           const qty = Number(job.quantity ?? 0);
-          return { 
+          return {
             ...job,
             shipQty: qty,
             ShippedQty: qty,
           };
         });
 
-        // 2) Commit it to state
+        // 2) Push into state
         setJobs(updatedJobs);
 
-        // 3) Clean up your "selected" list
-        const updatedOrderIds = updatedJobs.map(j => j.orderId.toString());
-        setSelected(prevSelected =>
-          prevSelected.filter(id => updatedOrderIds.includes(id))
+        // 3) Drop any selected IDs that no longer exist
+        setSelected((prevSelected) =>
+          prevSelected.filter((id) =>
+            updatedJobs.some((j) => j.orderId.toString() === id)
+          )
         );
-
-        // (no return needed here)
       } else {
         console.error("Fetch error:", data.error);
       }
