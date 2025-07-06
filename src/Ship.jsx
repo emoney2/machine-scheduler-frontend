@@ -632,7 +632,7 @@ const shippingOptions = [
           <div style={{ width: 70, textAlign: "center" }}>
             <input
               type="number"
-              value={job.shipQty ?? job["Quantity"]}
+              value={job.shipQty ?? job["Quantity"] ?? 0}
               min="1"
               style={{ width: "50px" }}
               onClick={(e) => e.stopPropagation()}
