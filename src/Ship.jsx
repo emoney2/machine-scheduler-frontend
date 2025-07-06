@@ -401,11 +401,19 @@ const handleShip = async () => {
     return;
   }
 
+  // ── PRE-OPEN POPUPS ───────────────────────────────────────
+  // Must happen synchronously in the click handler
+  const labelWindows  = new Array(selected.length).fill().map(() => window.open("", "_blank"));
+  const invoiceWindow = window.open("", "_blank");
+  const slipWindows   = new Array(selected.length).fill().map(() => window.open("", "_blank"));
+
+  // Show “processing” overlay
   setIsShippingOverlay(true);
   setShippingStage("📦 Preparing shipment...");
   setLoading(true);
 
   try {
+    // ── STEP 1: prepare‐shipment ─────────────────────────────
     let response = await fetch(
       "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
       {
@@ -416,25 +424,25 @@ const handleShip = async () => {
           order_ids: selected,
           shipped_quantities: Object.fromEntries(
             jobs
-              .filter(j => selected.includes(j.orderId.toString()))
-              .map(j => [j.orderId, j.shipQty])
-          )
+              .filter((j) => selected.includes(j.orderId.toString()))
+              .map((j) => [j.orderId, j.shipQty])
+          ),
         }),
       }
     );
-
     let result = await response.json();
 
+    // If volumes missing, prompt for dimensions and retry once
     if (!response.ok && result.missing_products) {
-      for (let product of result.missing_products) {
+      for (const product of result.missing_products) {
         const success = await promptDimensionsForProduct(product);
         if (!success) {
           setLoading(false);
-          setIsShippingOverlay(false); // 🛑 turn off yellow overlay
+          setIsShippingOverlay(false);
           return;
         }
       }
-
+      // retry
       response = await fetch(
         "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
         {
@@ -444,39 +452,23 @@ const handleShip = async () => {
           body: JSON.stringify({
             order_ids: selected,
             shipped_quantities: Object.fromEntries(
-              jobs.filter(j => selected.includes(j.orderId.toString())).map(j => [j.orderId, j.shipQty])
-            )
+              jobs
+                .filter((j) => selected.includes(j.orderId.toString()))
+                .map((j) => [j.orderId, j.shipQty])
+            ),
           }),
         }
       );
-
       result = await response.json();
     }
 
+    // Pack the boxes
     const packedBoxes = result.boxes || [];
     setShippingStage("📦 Packing boxes...");
     setBoxes(packedBoxes);
 
-    const shippedQuantities = Object.fromEntries(
-      jobs.filter(j => selected.includes(j.orderId.toString())).map(j => [j.orderId, j.shipQty])
-    );
-
-    console.log("📦 Sending to /api/process-shipment:", {
-      order_ids: selected,
-      boxes: packedBoxes,
-      shipped_quantities: shippedQuantities,
-    });
-
+    // ── STEP 2: process‐shipment ─────────────────────────────
     setShippingStage("🚚 Processing shipment...");
-    // 🐞 DEBUG: what we send to the backend
-    console.log(
-      "📦 PAYLOAD for process-shipment: " +
-      JSON.stringify({
-        order_ids: selected,
-        shipped_quantities: shippedQuantities,
-        shipping_method: shippingMethod
-      })
-    );
     const shipRes = await fetch(
       "https://machine-scheduler-backend.onrender.com/api/process-shipment",
       {
@@ -488,86 +480,83 @@ const handleShip = async () => {
           boxes: packedBoxes,
           shipped_quantities: Object.fromEntries(
             jobs
-              .filter(j => selected.includes(j.orderId.toString()))
-              .map(j => [j.orderId, j.shipQty])
+              .filter((j) => selected.includes(j.orderId.toString()))
+              .map((j) => [j.orderId, j.shipQty])
           ),
-          shipping_method: shippingMethod
+          shipping_method: shippingMethod,
         }),
       }
     );
-
     const shipData = await shipRes.json();
 
+    // Hide yellow overlay & show success
     setIsShippingOverlay(false);
     setShowSuccessOverlay(true);
     setTimeout(() => setShowSuccessOverlay(false), 3000);
-    
-    if (shipData.redirect) {
-      sessionStorage.setItem("pendingShipment", JSON.stringify({
-        order_ids: selected,
-        boxes: packedBoxes,
-        shipped_quantities: shippedQuantities,
-        shipping_method: shippingMethod,
-      }));
 
-      // Prepend the backend’s base URL so we go to the Flask endpoint
-      const backendBase = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-      window.location.href = backendBase + shipData.redirect;
+    // Handle QuickBooks OAuth redirect if needed
+    if (shipData.redirect) {
+      sessionStorage.setItem(
+        "pendingShipment",
+        JSON.stringify({
+          order_ids: selected,
+          boxes: packedBoxes,
+          shipped_quantities: Object.fromEntries(
+            jobs
+              .filter((j) => selected.includes(j.orderId.toString()))
+              .map((j) => [j.orderId, j.shipQty])
+          ),
+          shipping_method: shippingMethod,
+        })
+      );
+      window.location.href = shipData.redirect;
       return;
     }
 
     if (shipRes.ok) {
-
-      // 1) Mark the order complete
-      setShippingStage("🔖 Marking order complete...");
-
-      // 2) Submit info to UPS
-      setShippingStage("✉️ Submitting info to UPS...");
-
-      // 3) UPS customer setup
-      setShippingStage("👥 Setting up UPS customer...");
-
-      // 4) Print shipping labels
+      // ── 3: Shipping labels ─────────────────────────────────
       setShippingStage(
-        `🖨️ Printing ${shipData.labels.length} shipping label${shipData.labels.length > 1 ? "s" : ""}...`
+        `🖨️ Printing ${shipData.labels.length} shipping label${
+          shipData.labels.length > 1 ? "s" : ""
+        }...`
       );
-      shipData.labels.forEach((url) => window.open(url, "_blank"));
+      shipData.labels.forEach((url, i) => {
+        if (labelWindows[i]) labelWindows[i].location = url;
+      });
 
-      // 5) Log into QuickBooks
+      // ── 4: QuickBooks invoice ──────────────────────────────
       setShippingStage("🔑 Logging into QuickBooks...");
-      window.open(shipData.invoice, "_blank");
+      if (invoiceWindow) invoiceWindow.location = shipData.invoice;
 
-      // 6) QuickBooks customer setup
+      // ── 5–7: UI stages ─────────────────────────────────────
       setShippingStage("👤 Setting up QuickBooks customer...");
-
-      // 7) QuickBooks product setup
       setShippingStage("📦 Setting up QuickBooks product info...");
 
-      // 8) Generate packing slip and open it
+      // ── 8: Packing slip ────────────────────────────────────
       setShippingStage("📋 Generating packing slip...");
-      shipData.slips.forEach((url) => window.open(url, "_blank"));
+      shipData.slips.forEach((url, i) => {
+        if (slipWindows[i]) slipWindows[i].location = url;
+      });
 
-      // 9) Complete!
+      // ── 9: Done ─────────────────────────────────────────────
       setShippingStage("✅ Complete!");
       setLoading(false);
 
-      // Hide the overlay and reload so the user sees “Complete!”
+      // Briefly show “Complete!” then reload
       setTimeout(() => {
         setIsShippingOverlay(false);
         window.location.reload();
       }, 1000);
-
     } else {
       alert(shipData.error || "Shipment failed.");
       setLoading(false);
-      setIsShippingOverlay(false); // hide overlay on failure
+      setIsShippingOverlay(false);
     }
-
   } catch (err) {
     console.error(err);
     alert("Failed to ship.");
     setLoading(false);
-    setIsShippingOverlay(false); // 🛑 Hide yellow overlay on error
+    setIsShippingOverlay(false);
   }
 };
 
