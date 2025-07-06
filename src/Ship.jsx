@@ -113,52 +113,54 @@ export default function Ship() {
 
 
 // === useEffect 1: Initial load ===
-  useEffect(() => {
-    async function loadJobsForCompany(company) {
-      try {
-        const res = await fetch(
-          `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
-          { credentials: "include" }
+useEffect(() => {
+  async function loadJobsForCompany(company) {
+    try {
+      const res = await fetch(
+        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
+        { credentials: "include" }
+      );
+      const data = await res.json();
+
+      if (res.ok) {
+        // 1) Build the array and initialize shipQty
+        const updatedJobs = data.jobs.map(job => {
+          const qty = Number(job.quantity ?? 0);
+          return { 
+            ...job,
+            shipQty: qty,
+            ShippedQty: qty,
+          };
+        });
+
+        // 2) Commit it to state
+        setJobs(updatedJobs);
+
+        // 3) Clean up your "selected" list
+        const updatedOrderIds = updatedJobs.map(j => j.orderId.toString());
+        setSelected(prevSelected =>
+          prevSelected.filter(id => updatedOrderIds.includes(id))
         );
-        const data = await res.json();
-        if (res.ok) {
-          setJobs(
-            data.jobs.map(job => {
-              const qty = Number(job.quantity ?? 0);
-              return {
-                ...job,
-                shipQty: qty,
-                ShippedQty: qty,
-              };
-            })
-          );
 
-            // 🧹 Clean up selected list based on new jobs
-            const updatedOrderIds = updatedJobs.map(j => j.orderId.toString());
-            setSelected(prevSelected => prevSelected.filter(id => updatedOrderIds.includes(id)));
-
-            return updatedJobs;
-          });
-
-        } else {
-          console.error("Fetch error:", data.error);
-        }
-      } catch (err) {
-        console.error("Error loading jobs:", err);
+        // (no return needed here)
+      } else {
+        console.error("Fetch error:", data.error);
       }
+    } catch (err) {
+      console.error("Error loading jobs:", err);
     }
+  }
 
-    async function setup() {
-      await fetchCompanyNames();
-
-      if (defaultCompany) {
-        setCompanyInput(defaultCompany);
-        await loadJobsForCompany(defaultCompany);
-      }
+  async function setup() {
+    await fetchCompanyNames();
+    if (defaultCompany) {
+      setCompanyInput(defaultCompany);
+      await loadJobsForCompany(defaultCompany);
     }
+  }
 
-    setup();
-  }, []);
+  setup();
+}, []);
 // === End useEffect 1 ===
 
 // === useEffect 2: Live update polling ===
