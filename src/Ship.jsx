@@ -414,7 +414,7 @@ const handleShip = async () => {
         body: JSON.stringify({
           order_ids: selected,
           shipped_quantities: Object.fromEntries(
-            jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
+            jobs.filter(j => selected.includes(j.orderId.toString())).map(j => [j.orderId, j.shipQty])
           )
         }),
       }
@@ -441,7 +441,7 @@ const handleShip = async () => {
           body: JSON.stringify({
             order_ids: selected,
             shipped_quantities: Object.fromEntries(
-              jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
+              jobs.filter(j => selected.includes(j.orderId.toString())).map(j => [j.orderId, j.shipQty])
             )
           }),
         }
@@ -455,7 +455,7 @@ const handleShip = async () => {
     setBoxes(packedBoxes);
 
     const shippedQuantities = Object.fromEntries(
-      jobs.filter(j => selected.includes(j.orderId)).map(j => [j.orderId, j.shipQty])
+      jobs.filter(j => selected.includes(j.orderId.toString())).map(j => [j.orderId, j.shipQty])
     );
 
     console.log("📦 Sending to /api/process-shipment:", {
