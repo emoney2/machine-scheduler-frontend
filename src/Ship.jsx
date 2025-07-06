@@ -471,11 +471,14 @@ const handleShip = async () => {
 
     setShippingStage("🚚 Processing shipment...");
     // 🐞 DEBUG: what we send to the backend
-    console.log("📦 PAYLOAD for process-shipment:", {
-      order_ids: selected,
-      shipped_quantities: shippedQuantities,
-      shipping_method: shippingMethod
-    });
+    console.log(
+      "📦 PAYLOAD for process-shipment: " +
+      JSON.stringify({
+        order_ids: selected,
+        shipped_quantities: shippedQuantities,
+        shipping_method: shippingMethod
+      })
+    );
     const shipRes = await fetch(
       "https://machine-scheduler-backend.onrender.com/api/process-shipment",
       {
