@@ -510,8 +510,9 @@ const handleShip = async () => {
         shipping_method: shippingMethod,
       }));
 
-      // Redirect to QuickBooks login
-      window.location.href = shipData.redirect;
+      // Prepend the backend’s base URL so we go to the Flask endpoint
+      const backendBase = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      window.location.href = backendBase + shipData.redirect;
       return;
     }
 
