@@ -15,6 +15,7 @@ import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import ReorderPage from "./ReorderPage";
 import throttle from 'lodash.throttle';
+import ShipmentComplete from "./ShipmentComplete";
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
@@ -1147,6 +1148,7 @@ const onDragEnd = async (result) => {
         <Route path="/reorder" element={<ReorderPage />} />  {/* ← this is new */}
         <Route path="/order" element={<OrderSubmission />} />
         <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
+        <Route path="/shipment-complete" element={<ShipmentComplete />} />
       </Routes>
     </>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 function parseDateFromString(dateStr) {
   if (!dateStr) return null;
@@ -395,6 +396,8 @@ useEffect(() => {
     });
   };
 
+const navigate = useNavigate();
+
 const handleShip = async () => {
   if (selected.length === 0) {
     alert("Select at least one job to ship.");
@@ -492,6 +495,11 @@ const handleShip = async () => {
     );
     const shipData = await shipRes.json();
 
+    // Build the full invoice URL (either use what server gave, or construct it)
+    const invoiceUrl = shipData.invoice.startsWith("http")
+      ? shipData.invoice
+      : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`;
+
     // Hide the “processing” overlay, show a quick success banner
     setIsShippingOverlay(false);
     setShowSuccessOverlay(true);
@@ -567,7 +575,10 @@ const handleShip = async () => {
       setLoading(false);
       setTimeout(() => {
         setIsShippingOverlay(false);
-        window.location.reload();
+        // go to our new confirmation screen, passing invoice URL
+        navigate("/shipment-complete", {
+          state: { invoiceUrl: invoiceUrl }
+        });
       }, 1000);
 
     } else {
