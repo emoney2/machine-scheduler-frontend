@@ -109,7 +109,6 @@ export default function Ship() {
   const defaultCompany = query.get("company");
 
   const [isShippingOverlay, setIsShippingOverlay] = useState(false);
-  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [shippingStage, setShippingStage] = useState(""); // dynamic overlay message
 
 
