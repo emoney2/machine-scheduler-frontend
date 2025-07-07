@@ -523,8 +523,6 @@ const handleShip = async () => {
 
     // Hide the “processing” overlay, show a quick success banner
     setIsShippingOverlay(false);
-    setShowSuccessOverlay(true);
-    setTimeout(() => setShowSuccessOverlay(false), 3000);
 
     // QuickBooks redirect handling
     if (shipData.redirect) {
@@ -662,22 +660,6 @@ const shippingOptions = [
       )}
 
       {/* ✅ Success Overlay */}
-      {showSuccessOverlay && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0,
-          width: "100vw", height: "100vh",
-          backgroundColor: "rgba(255, 247, 194, 0.85)",
-          zIndex: 9999,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          fontSize: "1.5rem",
-          fontWeight: "bold"
-        }}>
-          ✅ Shipment Complete!
-        </div>
-      )}
       <h2>📦 Ship Jobs</h2>
       <input
         list="company-options"
