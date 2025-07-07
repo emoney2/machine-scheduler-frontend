@@ -204,13 +204,14 @@ useEffect(() => {
 // === End useEffect 2 ===
 
   useEffect(() => {
+    // 1) Retry any pending shipment
     const retryPendingShipment = async () => {
       const pending = sessionStorage.getItem("pendingShipment");
       if (pending) {
         console.log("🔁 Resuming pending shipment...");
         sessionStorage.removeItem("pendingShipment");
-
         const parsed = JSON.parse(pending);
+
         const res = await fetch(
           "https://machine-scheduler-backend.onrender.com/api/process-shipment",
           {
@@ -220,15 +221,12 @@ useEffect(() => {
             body: JSON.stringify(parsed),
           }
         );
-
         const data = await res.json();
         if (res.ok) {
-          // Open windows as before
           data.labels.forEach((url) => window.open(url, "_blank"));
           window.open(data.invoice, "_blank");
           data.slips.forEach((url) => window.open(url, "_blank"));
 
-          // ← instead of reloading, navigate to the confirmation page
           navigate("/shipment-complete", {
             state: {
               shippedOk:     true,
@@ -242,28 +240,20 @@ useEffect(() => {
         }
       }
     };
-
     retryPendingShipment();
-  }, [navigate]); 
 
+    // 2) If we deep-linked with ?order=..., scroll into view + select
     if (targetOrder && jobs.length > 0) {
       const match = jobs.find(j => j.orderId.toString() === targetOrder);
       if (match) {
         const el = jobRefs.current[targetOrder];
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-
-        // Select it using string ID
-        setSelected(prev => {
-          if (!prev.includes(targetOrder)) {
-            return [...prev, targetOrder];
-          }
-          return prev;
-        });
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setSelected(prev =>
+          prev.includes(targetOrder) ? prev : [...prev, targetOrder]
+        );
       }
     }
-  }, [jobs, targetOrder]);
+  }, [jobs, targetOrder, navigate]);
 
   async function fetchCompanyNames() {
     try {
