@@ -591,8 +591,16 @@ const handleShip = async () => {
       setLoading(false);
       setTimeout(() => {
         setIsShippingOverlay(false);
-        // go to our new confirmation screen, passing invoice URL
-        navigate("/shipment-complete", { state: { invoiceUrl: shipData.invoice } });
+ 
+        // Prepare flags for ShipmentComplete page
+        const shippedOk     = true;
+        const slipsPrinted  = shipData.slips?.length > 0;
+        const labelsPrinted = shipData.labels?.length > 0;
+ 
+        // Navigate into your React route instead of reload
+        navigate("/shipment-complete", {
+          state: { shippedOk, slipsPrinted, labelsPrinted }
+        });
       }, 1000);
 
     } else {
