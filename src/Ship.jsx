@@ -495,6 +495,27 @@ const handleShip = async () => {
     );
     const shipData = await shipRes.json();
 
+    // ── Handle missing QBO token by redirecting into OAuth flow ──
+    if (shipData.redirect) {
+      // Save the current shipment state so we can resume after login
+      sessionStorage.setItem(
+        "pendingShipment",
+        JSON.stringify({
+          order_ids: selected,
+          boxes: boxes,
+          shipped_quantities: Object.fromEntries(
+            jobs
+              .filter((j) => selected.includes(j.orderId.toString()))
+              .map((j) => [j.orderId, j.shipQty])
+          ),
+          shipping_method: shippingMethod,
+        })
+      );
+      // Redirect the browser into your OAuth start endpoint:
+      window.location.href = shipData.redirect;
+      return;  // stop further execution
+    }
+
     // Build the full invoice URL (either use what server gave, or construct it)
     const invoiceUrl = shipData.invoice.startsWith("http")
       ? shipData.invoice
