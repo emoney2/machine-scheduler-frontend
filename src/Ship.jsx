@@ -512,8 +512,8 @@ const handleShip = async () => {
         })
       );
       // Redirect the browser into your OAuth start endpoint:
-      window.location.href = shipData.redirect;
-      return;  // stop further execution
+      window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/,"")}${shipData.redirect}`;
+      return;
     }
 
     // Build the full invoice URL (either use what server gave, or construct it)
