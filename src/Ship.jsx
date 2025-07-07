@@ -110,6 +110,7 @@ export default function Ship() {
 
   const [isShippingOverlay, setIsShippingOverlay] = useState(false);
   const [shippingStage, setShippingStage] = useState(""); // dynamic overlay message
+  const navigate = useNavigate();
 
 
 // === useEffect 1: Initial load ===
@@ -222,10 +223,20 @@ useEffect(() => {
 
         const data = await res.json();
         if (res.ok) {
+          // Open windows as before
           data.labels.forEach((url) => window.open(url, "_blank"));
           window.open(data.invoice, "_blank");
           data.slips.forEach((url) => window.open(url, "_blank"));
-          window.location.reload();
+
+          // ← instead of reloading, navigate to the confirmation page
+          navigate("/shipment-complete", {
+            state: {
+              shippedOk:     true,
+              labelsPrinted: data.labels.length > 0,
+              slipsPrinted:  data.slips.length > 0,
+              invoiceUrl:    data.invoice
+            }
+          });
         } else {
           alert(data.error || "Shipment failed.");
         }
@@ -233,6 +244,7 @@ useEffect(() => {
     };
 
     retryPendingShipment();
+  }, [navigate]); 
 
     if (targetOrder && jobs.length > 0) {
       const match = jobs.find(j => j.orderId.toString() === targetOrder);
@@ -394,8 +406,6 @@ useEffect(() => {
       document.body.appendChild(dialog);
     });
   };
-
-const navigate = useNavigate();
 
 const handleShip = async () => {
   if (selected.length === 0) {
