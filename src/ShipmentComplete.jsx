@@ -5,12 +5,19 @@ import { useLocation, useNavigate } from "react-router-dom";
 export default function ShipmentComplete() {
   const navigate = useNavigate();
   const { state } = useLocation();
-  // The full URL we passed via navigate()
-  const invoiceUrl = state?.invoiceUrl || "";
+  const invoiceUrl    = state?.invoiceUrl    || "";
+  const shippedOk     = state?.shippedOk     ?? false;
+  const slipsPrinted  = state?.slipsPrinted  ?? false;
+  const labelsPrinted = state?.labelsPrinted ?? false;
+
+  const renderStatus = (ok, label) => (
+    <li style={{ marginBottom: "0.75rem", fontSize: "1.1rem" }}>
+      {ok ? "✅" : "❌"} {label}
+    </li>
+  );
 
   const handleViewEdit = () => {
-    // Opens the QuickBooks invoice page
-    window.open(invoiceUrl, "_blank");
+    if (invoiceUrl) window.open(invoiceUrl, "_blank");
   };
 
   const handleSend = async () => {
@@ -35,33 +42,41 @@ export default function ShipmentComplete() {
   };
 
   return (
-    <div style={{ padding: "2rem", textAlign: "center" }}>
-      <h2>✅ Shipment Complete!</h2>
-      <button
-        onClick={handleViewEdit}
-        style={{ margin: "1rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
-      >
-        View / Edit Invoice
-      </button>
-      <button
-        onClick={handleSend}
-        style={{ margin: "1rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
-      >
-        Send Invoice
-      </button>
-      <br />
-      <button
-        onClick={() => navigate("/")}
-        style={{
-          marginTop: "2rem",
-          color: "#666",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-        }}
-      >
-        ← Back to Shipping
-      </button>
+    <div style={{ padding: "2rem", maxWidth: "500px", margin: "0 auto", fontFamily: "sans-serif" }}>
+      <h2 style={{ textAlign: "center", marginBottom: "1.5rem" }}>Shipment Summary</h2>
+      <ul style={{ listStyle: "none", padding: 0, lineHeight: 1.6 }}>
+        {renderStatus(shippedOk,     "Order Marked Shipped")}
+        {renderStatus(slipsPrinted,  "Printed Packing Slips")}
+        {renderStatus(labelsPrinted, "Printed Shipping Labels")}
+      </ul>
+      <div style={{ marginTop: "2rem", textAlign: "center" }}>
+        <button
+          onClick={handleViewEdit}
+          style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
+        >
+          View / Edit Invoice
+        </button>
+        <button
+          onClick={handleSend}
+          style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
+        >
+          Send Invoice
+        </button>
+      </div>
+      <div style={{ textAlign: "center", marginTop: "2rem" }}>
+        <button
+          onClick={() => navigate("/")}
+          style={{
+            color: "#666",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "0.9rem"
+          }}
+        >
+          ← Back to Shipping
+        </button>
+      </div>
     </div>
   );
 }
