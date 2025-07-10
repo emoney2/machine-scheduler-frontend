@@ -57,7 +57,7 @@ export default function ShipmentComplete() {
       </h2>
       <ul style={{ listStyle: "none", padding: 0, lineHeight: 1.6 }}>
         {renderStatus(shippedOk, "Order Marked Shipped")}
-        {renderStatus(slipsPrinted, "Printed Packing Slips")}
+        {renderStatus(slipsPrinted,  "Packing Slips Generated")}
         {renderStatus(labelsPrinted, "Printed Shipping Labels")}
       </ul>
 
