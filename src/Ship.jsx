@@ -93,6 +93,10 @@ function getEarliestDueDate(selected, jobs) {
 }
 
 export default function Ship() {
+// 📌 give this tab a name so we can re-focus it later
+useEffect(() => {
+  window.name = 'mainShipTab';
+}, []);
   const [searchParams] = useSearchParams();
   const targetCompany = searchParams.get("company");
   const targetOrder = searchParams.get("order");
@@ -252,7 +256,12 @@ useEffect(() => {
             mainWindow.focus();
           }, 500);
 
-          // finally navigate to the complete page
+          // 📌 bring the main Ship tab back into view a moment later
+          setTimeout(() => {
+            const mainTab = window.open("", "mainShipTab");
+            if (mainTab && mainTab.focus) mainTab.focus();
+          }, 500);
+
           navigate("/shipment-complete", {
             state: {
               shippedOk:     true,
@@ -587,7 +596,6 @@ const handleShip = async () => {
         if (win) {
           win.location = url;
           win.blur();
-          window.focus();
         }
       });
 
@@ -617,7 +625,6 @@ const handleShip = async () => {
         if (win) {
           win.location = url;
           win.blur();
-          window.focus();
         }
       });
 
