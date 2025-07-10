@@ -110,6 +110,7 @@ useEffect(() => {
   const [boxes, setBoxes] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
+  const [projectedBoxes, setProjectedBoxes] = useState([]);
 
   const query = new URLSearchParams(window.location.search);
   const defaultCompany = query.get("company");
@@ -745,9 +746,9 @@ const shippingOptions = [
         <div style={{ marginTop: "2rem" }}>
           <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "#f0f0f0", borderRadius: "4px" }}>
             <strong>Boxes needed:</strong>
-            {boxes.length > 0 ? (
+            {projectedBoxes.length > 0 ? (
               Object.entries(
-                boxes.reduce((acc, box) => {
+                projectedBoxes.reduce((acc, box) => {
                   acc[box.size] = (acc[box.size] || 0) + 1;
                   return acc;
                 }, {})
