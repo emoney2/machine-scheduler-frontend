@@ -456,7 +456,7 @@ const handleShip = async () => {
   try {
     // ── PREPARE ─────────────────────────────────────────
     let response = await fetch(
-      `${process.env.REACT_APP_API_ROOT}/api/prepare-shipment`,
+      `${process.env.REACT_APP_API_ROOT}/prepare-shipment`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -483,7 +483,7 @@ const handleShip = async () => {
     // ── PROCESS ─────────────────────────────────────────
     setShippingStage("🚚 Processing shipment...");
     const shipRes = await fetch(
-      `${process.env.REACT_APP_API_ROOT}/api/process-shipment`,
+      `${process.env.REACT_APP_API_ROOT}/process-shipment`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
