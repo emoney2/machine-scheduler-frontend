@@ -2,6 +2,13 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
+// Map our logical box names to their actual dimensions
+const BOX_DIMENSIONS = {
+  Small:  "10×10×10",
+  Medium: "15×15×15",
+  Large:  "20×20×20"
+};
+
 function parseDateFromString(dateStr) {
   if (!dateStr) return null;
 
@@ -751,7 +758,7 @@ const shippingOptions = [
                   return acc;
                 }, {})
               ).map(([size, count]) => (
-                <div key={size}>{count} × {size}</div>
+                <div key={size}>{count} × {BOX_DIMENSIONS[size] || size}</div>
               ))
             ) : (
               <div>No boxes required.</div>
