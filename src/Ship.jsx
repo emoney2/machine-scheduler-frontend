@@ -255,6 +255,23 @@ useEffect(() => {
     }
   }, [jobs, targetOrder, navigate]);
 
+  // AFTER OAuth login, auto–retry the shipment if flagged
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("resumeShipment") === "true") {
+      // strip the flag so it doesn’t loop
+      params.delete("resumeShipment");
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`
+      );
+      // re-run the shipment call
+      handleShip();
+    }
+  }, []);
+
+
   async function fetchCompanyNames() {
     try {
       const res = await fetch(
