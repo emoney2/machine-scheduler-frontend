@@ -445,9 +445,6 @@ const handleShip = async () => {
   const labelWindows = selected.map((_, i) =>
     window.open("", `labelWindow${i}`, "width=600,height=400")
   );
-  const slipWindows = selected.map((_, i) =>
-    window.open("", `slipWindow${i}`, "width=600,height=400")
-  );
 
   setIsShippingOverlay(true);
   setShippingStage("📦 Preparing shipment...");
@@ -553,15 +550,12 @@ const handleShip = async () => {
       setShippingStage("👤 Setting up QuickBooks customer…");
       setShippingStage("📦 Setting up QuickBooks product info…");
 
-      // 4c) Packing slips
-      setShippingStage("📋 Generating packing slip…");
-      shipData.slips.forEach((url, i) => {
-        const win = slipWindows[i];
-        if (win) {
-          win.location = url;
-          win.blur();    // ensure background
-        }
-      });
+      // 4c) Packing slip saved
+      setShippingStage(
+        `📋 Packing slip PDF saved for ${packedBoxes.length} box${
+          packedBoxes.length > 1 ? "es" : ""
+        } (watching folder for print)…`
+      );
 
       // 4d) refocus main tab immediately
       setTimeout(() => {
