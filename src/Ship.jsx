@@ -515,11 +515,6 @@ const handleShip = async () => {
       return;
     }
 
-    // Build the full invoice URL (either use what server gave, or construct it)
-    const invoiceUrl = shipData.invoice.startsWith("http")
-      ? shipData.invoice
-      : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`;
-
     // Hide the “processing” overlay, show a quick success banner
     setIsShippingOverlay(false);
 
@@ -542,8 +537,17 @@ const handleShip = async () => {
       return;
     }
 
+
     // ── 4) HANDLE SUCCESS ──────────────────────────────────
     if (shipRes.ok) {
+
+      // Build the full invoice URL, only if defined
+      const invoiceUrl = shipData.invoice
+        ? (shipData.invoice.startsWith("http")
+            ? shipData.invoice
+            : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`)
+        : "";
+
       // 4a) Shipping labels
       setShippingStage(
         `🖨️ Printing ${shipData.labels.length} shipping label${
@@ -564,6 +568,12 @@ const handleShip = async () => {
 
       if (invoiceWindow) {
         invoiceWindow.location = shipData.invoice;
+        invoiceWindow.blur();
+        window.focus();
+      }
+
+      if (invoiceWindow && invoiceUrl) {
+        invoiceWindow.location = invoiceUrl;
         invoiceWindow.blur();
         window.focus();
       }
