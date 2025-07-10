@@ -93,8 +93,6 @@ function getEarliestDueDate(selected, jobs) {
 }
 
 export default function Ship() {
-  // ▶︎ Preview box calculation
-  const [projectedBoxes, setProjectedBoxes] = useState([]);
 // 📌 give this tab a name so we can re-focus it later
 useEffect(() => {
   window.name = 'mainShipTab';
