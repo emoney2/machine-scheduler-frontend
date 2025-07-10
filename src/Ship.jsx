@@ -223,18 +223,42 @@ useEffect(() => {
         );
         const data = await res.json();
         if (res.ok) {
-          data.labels.forEach((url) => window.open(url, "_blank"));
-          window.open(data.invoice, "_blank");
-          data.slips.forEach((url) => window.open(url, "_blank"));
+          // open shipping labels
+          data.labels.forEach((url) => {
+            const win = window.open(url, "_blank");
+            win && win.blur();
+          });
 
+          // build and open the full invoice URL
+          const invoiceUrl = data.invoice
+            ? (data.invoice.startsWith("http")
+                ? data.invoice
+                : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
+            : null;
+          if (invoiceUrl) {
+            const invWin = window.open(invoiceUrl, "_blank");
+            invWin && invWin.blur();
+          }
+
+          // open packing slips
+          data.slips.forEach((url) => {
+            const win = window.open(url, "_blank");
+            win && win.blur();
+          });
+
+          // refocus this tab so you can watch the overlay
+          window.focus();
+
+          // finally navigate to the complete page
           navigate("/shipment-complete", {
             state: {
               shippedOk:     true,
               labelsPrinted: data.labels.length > 0,
               slipsPrinted:  data.slips.length > 0,
-              invoiceUrl:    data.invoice
+              invoiceUrl:    invoiceUrl
             }
           });
+
         } else {
           alert(data.error || "Shipment failed.");
         }
@@ -254,22 +278,6 @@ useEffect(() => {
       }
     }
   }, [jobs, targetOrder, navigate]);
-
-  // AFTER OAuth login, auto–retry the shipment if flagged
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("resumeShipment") === "true") {
-      // strip the flag so it doesn’t loop
-      params.delete("resumeShipment");
-      window.history.replaceState(
-        null,
-        "",
-        `${window.location.pathname}${params.toString() ? "?" + params.toString() : ""}`
-      );
-      // re-run the shipment call
-      handleShip();
-    }
-  }, []);
 
 
   async function fetchCompanyNames() {
