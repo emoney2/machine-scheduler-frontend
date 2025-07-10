@@ -93,6 +93,8 @@ function getEarliestDueDate(selected, jobs) {
 }
 
 export default function Ship() {
+  // ▶︎ Preview box calculation
+  const [projectedBoxes, setProjectedBoxes] = useState([]);
 // 📌 give this tab a name so we can re-focus it later
 useEffect(() => {
   window.name = 'mainShipTab';
@@ -292,6 +294,36 @@ useEffect(() => {
     }
   }, [jobs, targetOrder, navigate]);
 
+  // ▶︎ Whenever selection changes, re-fetch box requirements
+  useEffect(() => {
+    async function previewBoxes() {
+      if (selected.length === 0) {
+        setProjectedBoxes([]);
+        return;
+      }
+      const res = await fetch(
+        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/prepare-shipment`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            order_ids: selected,
+            shipped_quantities: Object.fromEntries(
+              jobs
+                .filter((j) => selected.includes(j.orderId.toString()))
+                .map((j) => [j.orderId, j.shipQty])
+            ),
+          }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setProjectedBoxes(data.boxes || []);
+      }
+    }
+    previewBoxes();
+  }, [selected]);
 
   async function fetchCompanyNames() {
     try {
@@ -711,6 +743,21 @@ const shippingOptions = [
 
       {selected.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
+          <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "#f0f0f0", borderRadius: "4px" }}>
+            <strong>Boxes needed:</strong>
+            {boxes.length > 0 ? (
+              Object.entries(
+                boxes.reduce((acc, box) => {
+                  acc[box.size] = (acc[box.size] || 0) + 1;
+                  return acc;
+                }, {})
+              ).map(([size, count]) => (
+                <div key={size}>{count} × {size}</div>
+              ))
+            ) : (
+              <div>No boxes required.</div>
+            )}
+          </div>
           <h4>Select UPS Shipping Option:</h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
             {shippingOptions.map((opt) => {
