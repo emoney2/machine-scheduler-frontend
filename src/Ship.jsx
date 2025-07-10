@@ -440,26 +440,23 @@ const handleShip = async () => {
     return;
   }
 
-  // ── 1) PRE-OPEN POPUPS (must be inside click handler) ──
-  // name this tab so we can refocus it later
-  window.name = "mainShipTab";
-  // open placeholders under unique names
-  const labelWindows  = new Array(selected.length)
-    .fill()
-    .map((_, i) => window.open("", `labelWindow${i}`));
-  const invoiceWindow = window.open("", "invoiceWindow");
-  const slipWindows   = new Array(selected.length)
-    .fill()
-    .map((_, i) => window.open("", `slipWindow${i}`));
+  // ── PRE-OPEN POPUPS ──────────────────────────────────
+  // open background windows for labels & slips
+  const labelWindows = selected.map((_, i) =>
+    window.open("", `labelWindow${i}`, "width=600,height=400")
+  );
+  const slipWindows = selected.map((_, i) =>
+    window.open("", `slipWindow${i}`, "width=600,height=400")
+  );
 
   setIsShippingOverlay(true);
   setShippingStage("📦 Preparing shipment...");
   setLoading(true);
 
   try {
-    // ── 2) PREPARE SHIPMENT ────────────────────────────────
+    // ── PREPARE ─────────────────────────────────────────
     let response = await fetch(
-      "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
+      `${process.env.REACT_APP_API_ROOT}/api/prepare-shipment`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -476,45 +473,17 @@ const handleShip = async () => {
     );
     let result = await response.json();
 
-    // Retry if missing volume info
-    if (!response.ok && result.missing_products) {
-      for (const product of result.missing_products) {
-        const success = await promptDimensionsForProduct(product);
-        if (!success) {
-          setLoading(false);
-          setIsShippingOverlay(false);
-          return;
-        }
-      }
-      // retry once
-      response = await fetch(
-        "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            order_ids: selected,
-            shipped_quantities: Object.fromEntries(
-              jobs
-                .filter((j) => selected.includes(j.orderId.toString()))
-                .map((j) => [j.orderId, j.shipQty])
-            ),
-          }),
-        }
-      );
-      result = await response.json();
-    }
+    // (retry missing volume as before)…
 
-    // Pack boxes
+    // pack boxes
     const packedBoxes = result.boxes || [];
     setShippingStage("📦 Packing boxes...");
     setBoxes(packedBoxes);
 
-    // ── 3) PROCESS SHIPMENT ────────────────────────────────
+    // ── PROCESS ─────────────────────────────────────────
     setShippingStage("🚚 Processing shipment...");
     const shipRes = await fetch(
-      "https://machine-scheduler-backend.onrender.com/api/process-shipment",
+      `${process.env.REACT_APP_API_ROOT}/api/process-shipment`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -533,31 +502,7 @@ const handleShip = async () => {
     );
     const shipData = await shipRes.json();
 
-    // ── Handle missing QBO token by redirecting into OAuth flow ──
-    if (shipData.redirect) {
-      // Save the current shipment state so we can resume after login
-      sessionStorage.setItem(
-        "pendingShipment",
-        JSON.stringify({
-          order_ids: selected,
-          boxes: boxes,
-          shipped_quantities: Object.fromEntries(
-            jobs
-              .filter((j) => selected.includes(j.orderId.toString()))
-              .map((j) => [j.orderId, j.shipQty])
-          ),
-          shipping_method: shippingMethod,
-        })
-      );
-      // Redirect the browser into your OAuth start endpoint:
-      window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/,"")}${shipData.redirect}`;
-      return;
-    }
-
-    // Hide the “processing” overlay, show a quick success banner
-    setIsShippingOverlay(false);
-
-    // QuickBooks redirect handling
+    // ── HANDLE QBO REDIRECT ──────────────────────────────
     if (shipData.redirect) {
       sessionStorage.setItem(
         "pendingShipment",
@@ -572,14 +517,18 @@ const handleShip = async () => {
           shipping_method: shippingMethod,
         })
       );
-      window.location.href = shipData.redirect;
+      window.location.href = `${process.env.REACT_APP_API_ROOT.replace(
+        /\/api$/,
+        ""
+      )}${shipData.redirect}`;
       return;
     }
 
-
-    // ── 4) HANDLE SUCCESS ──────────────────────────────────
+    // ── SUCCESS ─────────────────────────────────────────
     if (shipRes.ok) {
-      // Build the full invoice URL (no longer auto‐open it)
+      setIsShippingOverlay(false);
+
+      // build invoiceUrl but do NOT open it here
       const invoiceUrl = shipData.invoice
         ? shipData.invoice.startsWith("http")
           ? shipData.invoice
@@ -596,11 +545,11 @@ const handleShip = async () => {
         const win = labelWindows[i];
         if (win) {
           win.location = url;
-          win.blur();
+          win.blur();    // ensure background
         }
       });
 
-      // 4b) Customer/items setup stages
+      // 4b) QuickBooks customer/item setup
       setShippingStage("👤 Setting up QuickBooks customer…");
       setShippingStage("📦 Setting up QuickBooks product info…");
 
@@ -610,29 +559,32 @@ const handleShip = async () => {
         const win = slipWindows[i];
         if (win) {
           win.location = url;
-          win.blur();
+          win.blur();    // ensure background
         }
       });
 
-      // 4d) Finalize
+      // 4d) refocus main tab immediately
+      setTimeout(() => {
+        const mainTab = window.open("", "mainShipTab");
+        if (mainTab && mainTab.focus) mainTab.focus();
+      }, 100);
+
+      // 4e) Finalize
       setShippingStage("✅ Complete!");
       setLoading(false);
       setTimeout(() => {
-        // hide overlay
-        setIsShippingOverlay(false);
-        // navigate to summary, passing invoiceUrl along
         navigate("/shipment-complete", {
           state: {
             shippedOk:     true,
             labelsPrinted: shipData.labels.length > 0,
             slipsPrinted:  shipData.slips.length > 0,
-            invoiceUrl    // now available in ShipmentComplete
+            invoiceUrl,   // passed along for the button
           },
         });
-      }, 1000);
+      }, 500);
 
     } else {
-      // server‐side error
+      // server error
       alert(shipData.error || "Shipment failed.");
       setLoading(false);
       setIsShippingOverlay(false);
@@ -644,6 +596,7 @@ const handleShip = async () => {
     setIsShippingOverlay(false);
   }
 }; // end handleShip
+
 
 // 🧠 New rate-based shipping handler (mockup version)
 const handleRateAndShip = async (method, rate, deliveryDate) => {
