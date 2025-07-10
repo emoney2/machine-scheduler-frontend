@@ -314,10 +314,16 @@ useEffect(() => {
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            order_ids: selected,
+            order_ids: selected.filter(id => {
+              const name = jobs.find(j => j.orderId.toString()===id)?.Product||"";
+              return !/\s+Back$/i.test(name.trim());
+            }),
             shipped_quantities: Object.fromEntries(
               jobs
-                .filter((j) => selected.includes(j.orderId.toString()))
+                .filter((j) =>
+                  selected.includes(j.orderId.toString()) &&
+                  !/\s+Back$/i.test(j.Product.trim())
+                )
                 .map((j) => [j.orderId, j.shipQty])
             ),
           }),
