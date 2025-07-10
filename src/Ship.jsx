@@ -223,6 +223,7 @@ useEffect(() => {
         );
         const data = await res.json();
         if (res.ok) {
+          const mainWindow = window;
           // open shipping labels
           data.labels.forEach((url) => {
             const win = window.open(url, "_blank");
@@ -246,8 +247,10 @@ useEffect(() => {
             win && win.blur();
           });
 
-          // refocus this tab so you can watch the overlay
-          window.focus();
+          // refocus this tab after a brief pause
+          setTimeout(() => {
+            mainWindow.focus();
+          }, 500);
 
           // finally navigate to the complete page
           navigate("/shipment-complete", {
