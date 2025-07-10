@@ -594,25 +594,25 @@ const handleShip = async () => {
         }...`
       );
       shipData.labels.forEach((url, i) => {
-        const win = labelWindows[i];
-        if (win) {
-          win.location = url;
-          win.blur();
-        }
+        // leave labelWindows creation alone, but open the real URL in a true popup
+        const win = window.open(
+          url,
+          `labelWindow${i}`,
+          "width=600,height=400"
+        );
+        if (win) win.blur();
       });
 
       // 4b) QuickBooks invoice
       setShippingStage("🔑 Logging into QuickBooks...");
 
-      if (invoiceWindow && invoiceUrl) {
-        invoiceWindow.location = invoiceUrl;
-        invoiceWindow.blur();
-      }
-
-      if (invoiceWindow && invoiceUrl) {
-        invoiceWindow.location = invoiceUrl;
-        invoiceWindow.blur();
-        window.focus();
+      if (invoiceUrl) {
+        const invWin = window.open(
+          invoiceUrl,
+          "invoiceWindow",
+          "width=800,height=600"
+        );
+        if (invWin) invWin.blur();
       }
 
       // 4c) UI stages for customer/product setup
@@ -622,18 +622,19 @@ const handleShip = async () => {
       // 4d) Packing slip
       setShippingStage("📋 Generating packing slip...");
       shipData.slips.forEach((url, i) => {
-        const win = slipWindows[i];
-        if (win) {
-          win.location = url;
-          win.blur();
+        const win = window.open(
+          url,
+          `slipWindow${i}`,
+          "width=600,height=400"
+        );
+        if (win) win.blur();
         }
       });
 
       // 4d2) REFRESH MAIN SHIP TAB (after pop-ups)
       setTimeout(() => {
-        const mainTab = window.open("", "mainShipTab");
-        if (mainTab && mainTab.focus) mainTab.focus();
-      }, 500);
+        window.focus();
+      }, 300);
 
       // 4e) Finalize
       setShippingStage("✅ Complete!");
