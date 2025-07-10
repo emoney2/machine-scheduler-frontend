@@ -579,96 +579,71 @@ const handleShip = async () => {
 
     // ── 4) HANDLE SUCCESS ──────────────────────────────────
     if (shipRes.ok) {
-
-      // Build the full invoice URL, only if defined
+      // Build the full invoice URL (no longer auto‐open it)
       const invoiceUrl = shipData.invoice
-        ? (shipData.invoice.startsWith("http")
-            ? shipData.invoice
-            : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`)
+        ? shipData.invoice.startsWith("http")
+          ? shipData.invoice
+          : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
         : "";
 
       // 4a) Shipping labels
       setShippingStage(
         `🖨️ Printing ${shipData.labels.length} shipping label${
           shipData.labels.length > 1 ? "s" : ""
-        }...`
+        }…`
       );
       shipData.labels.forEach((url, i) => {
-        // leave labelWindows creation alone, but open the real URL in a true popup
-        const win = window.open(
-          url,
-          `labelWindow${i}`,
-          "width=600,height=400"
-        );
-        if (win) win.blur();
-      });
-
-      // 4b) QuickBooks invoice
-      setShippingStage("🔑 Logging into QuickBooks...");
-
-      if (invoiceUrl) {
-        const invWin = window.open(
-          invoiceUrl,
-          "invoiceWindow",
-          "width=800,height=600"
-        );
-        if (invWin) invWin.blur();
-      }
-
-      // 4c) UI stages for customer/product setup
-      setShippingStage("👤 Setting up QuickBooks customer...");
-      setShippingStage("📦 Setting up QuickBooks product info...");
-
-      // 4d) Packing slip
-      setShippingStage("📋 Generating packing slip...");
-      shipData.slips.forEach((url, i) => {
-        const win = window.open(
-          url,
-          `slipWindow${i}`,
-          "width=600,height=400"
-        );
-        if (win) win.blur();
+        const win = labelWindows[i];
+        if (win) {
+          win.location = url;
+          win.blur();
         }
       });
 
-      // 4d2) REFRESH MAIN SHIP TAB (after pop-ups)
-      setTimeout(() => {
-        window.focus();
-      }, 300);
+      // 4b) Customer/items setup stages
+      setShippingStage("👤 Setting up QuickBooks customer…");
+      setShippingStage("📦 Setting up QuickBooks product info…");
 
-      // 4e) Finalize
+      // 4c) Packing slips
+      setShippingStage("📋 Generating packing slip…");
+      shipData.slips.forEach((url, i) => {
+        const win = slipWindows[i];
+        if (win) {
+          win.location = url;
+          win.blur();
+        }
+      });
+
+      // 4d) Finalize
       setShippingStage("✅ Complete!");
       setLoading(false);
       setTimeout(() => {
+        // hide overlay
         setIsShippingOverlay(false);
- 
-        // Prepare flags for ShipmentComplete page
-        const shippedOk     = true;
-        const slipsPrinted  = shipData.slips?.length > 0;
-        const labelsPrinted = shipData.labels?.length > 0;
- 
-        // Navigate into your React route instead of reload
+        // navigate to summary, passing invoiceUrl along
         navigate("/shipment-complete", {
-          state: { shippedOk, slipsPrinted, labelsPrinted }
+          state: {
+            shippedOk:     true,
+            labelsPrinted: shipData.labels.length > 0,
+            slipsPrinted:  shipData.slips.length > 0,
+            invoiceUrl    // now available in ShipmentComplete
+          },
         });
       }, 1000);
 
     } else {
-      // Shipment error from server
+      // server‐side error
       alert(shipData.error || "Shipment failed.");
       setLoading(false);
       setIsShippingOverlay(false);
     }
-
   } catch (err) {
-    // Any JavaScript error in the above logic
     console.error(err);
     alert("Failed to ship.");
     setLoading(false);
     setIsShippingOverlay(false);
   }
 }; // end handleShip
-
 
 // 🧠 New rate-based shipping handler (mockup version)
 const handleRateAndShip = async (method, rate, deliveryDate) => {

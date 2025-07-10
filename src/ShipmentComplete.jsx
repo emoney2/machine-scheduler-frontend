@@ -17,7 +17,9 @@ export default function ShipmentComplete() {
   );
 
   const handleViewEdit = () => {
-    if (invoiceUrl) window.open(invoiceUrl, "_blank");
+    if (invoiceUrl) {
+      window.open(invoiceUrl, "_blank");
+    }
   };
 
   const handleSend = async () => {
@@ -42,20 +44,32 @@ export default function ShipmentComplete() {
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: "500px", margin: "0 auto", fontFamily: "sans-serif" }}>
-      <h2 style={{ textAlign: "center", marginBottom: "1.5rem" }}>Shipment Summary</h2>
+    <div
+      style={{
+        padding: "2rem",
+        maxWidth: "500px",
+        margin: "0 auto",
+        fontFamily: "sans-serif",
+      }}
+    >
+      <h2 style={{ textAlign: "center", marginBottom: "1.5rem" }}>
+        Shipment Summary
+      </h2>
       <ul style={{ listStyle: "none", padding: 0, lineHeight: 1.6 }}>
-        {renderStatus(shippedOk,     "Order Marked Shipped")}
-        {renderStatus(slipsPrinted,  "Printed Packing Slips")}
+        {renderStatus(shippedOk, "Order Marked Shipped")}
+        {renderStatus(slipsPrinted, "Printed Packing Slips")}
         {renderStatus(labelsPrinted, "Printed Shipping Labels")}
       </ul>
+
       <div style={{ marginTop: "2rem", textAlign: "center" }}>
-        <button
-          onClick={handleViewEdit}
-          style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
-        >
-          View / Edit Invoice
-        </button>
+        {invoiceUrl && (
+          <button
+            onClick={handleViewEdit}
+            style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
+          >
+            View / Edit Invoice
+          </button>
+        )}
         <button
           onClick={handleSend}
           style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
@@ -63,6 +77,7 @@ export default function ShipmentComplete() {
           Send Invoice
         </button>
       </div>
+
       <div style={{ textAlign: "center", marginTop: "2rem" }}>
         <button
           onClick={() => navigate("/")}
@@ -71,7 +86,7 @@ export default function ShipmentComplete() {
             background: "none",
             border: "none",
             cursor: "pointer",
-            fontSize: "0.9rem"
+            fontSize: "0.9rem",
           }}
         >
           ← Back to Shipping
