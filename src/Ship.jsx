@@ -441,14 +441,16 @@ const handleShip = async () => {
   }
 
   // ── 1) PRE-OPEN POPUPS (must be inside click handler) ──
+  // name this tab so we can refocus it later
+  window.name = "mainShipTab";
+  // open placeholders under unique names
   const labelWindows  = new Array(selected.length)
     .fill()
-    .map(() => window.open("", "_blank"));
-  const invoiceWindow = window.open("", "_blank");
-  // We don’t know slip count yet—open as many as orders
+    .map((_, i) => window.open("", `labelWindow${i}`));
+  const invoiceWindow = window.open("", "invoiceWindow");
   const slipWindows   = new Array(selected.length)
     .fill()
-    .map(() => window.open("", "_blank"));
+    .map((_, i) => window.open("", `slipWindow${i}`));
 
   setIsShippingOverlay(true);
   setShippingStage("📦 Preparing shipment...");
@@ -602,10 +604,9 @@ const handleShip = async () => {
       // 4b) QuickBooks invoice
       setShippingStage("🔑 Logging into QuickBooks...");
 
-      if (invoiceWindow) {
-        invoiceWindow.location = shipData.invoice;
+      if (invoiceWindow && invoiceUrl) {
+        invoiceWindow.location = invoiceUrl;
         invoiceWindow.blur();
-        window.focus();
       }
 
       if (invoiceWindow && invoiceUrl) {
@@ -627,6 +628,12 @@ const handleShip = async () => {
           win.blur();
         }
       });
+
+      // 4d2) REFRESH MAIN SHIP TAB (after pop-ups)
+      setTimeout(() => {
+        const mainTab = window.open("", "mainShipTab");
+        if (mainTab && mainTab.focus) mainTab.focus();
+      }, 500);
 
       // 4e) Finalize
       setShippingStage("✅ Complete!");
