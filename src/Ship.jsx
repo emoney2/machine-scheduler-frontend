@@ -264,11 +264,12 @@ useEffect(() => {
 
           navigate("/shipment-complete", {
             state: {
-              shippedOk:     true,
-              labelsPrinted: data.labels.length > 0,
-              slipsPrinted:  data.slips.length > 0,
-              invoiceUrl:    invoiceUrl
-            }
+              shippedOk:      true,
+              labelsPrinted:  shipData.labels.length > 0,
+              // use your React state 'boxes' which you set above
+              slipsSaved:     boxes.length > 0,
+              invoiceUrl
+            },
           });
 
         } else {
@@ -567,14 +568,15 @@ const handleShip = async () => {
       setShippingStage("✅ Complete!");
       setLoading(false);
       setTimeout(() => {
-        navigate("/shipment-complete", {
-          state: {
-            shippedOk:     true,
-            labelsPrinted: shipData.labels.length > 0,
-            slipsPrinted:  shipData.slips.length > 0,
-            invoiceUrl,   // passed along for the button
-          },
-        });
+         navigate("/shipment-complete", {
+           state: {
+             shippedOk:     true,
+             labelsPrinted: shipData.labels.length > 0,
+             // we saved one packing-slip PDF per box into the watch folder:
+             slipsPrinted:  packedBoxes.length > 0,
+             invoiceUrl
+           },
+         });
       }, 500);
 
     } else {
