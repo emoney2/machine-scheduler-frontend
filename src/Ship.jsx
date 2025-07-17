@@ -637,6 +637,8 @@ const handleShip = async () => {
   }
 }; // end handleShip
 
+// ─── 0) Feature flag at top ───
+const SKIP_UPS = true;
 
 // 1) State for live UPS rates
 const [shippingOptions, setShippingOptions] = useState([]);
@@ -694,7 +696,19 @@ const fetchRates = async () => {
     }
   };
 
-  // 5d) Call your new /api/rate endpoint
+  // 5d) Either bypass UPS or call /api/rate
+  if (SKIP_UPS) {
+    // bypass UPS: always provide one manual option
+    setShippingOptions([
+      {
+        method:       "Manual Shipping",
+        rate:         "N/A",
+        deliveryDate: "TBD"
+      }
+    ]);
+    return;
+  }
+
   try {
     const resp = await fetch(
       `${process.env.REACT_APP_API_ROOT}/rate`,
@@ -711,7 +725,6 @@ const fetchRates = async () => {
   } catch (err) {
     console.error("UPS rate error:", err);
     alert("Unable to fetch UPS rates; using manual fallback.");
-    // ─── FALLBACK ─── always provide at least one option
     setShippingOptions([
       {
         method:       "Manual Shipping",
@@ -729,8 +742,17 @@ useEffect(() => {
   }
 }, [selected]);
 
-// 🧠 Updated rate-based shipping handler
+// 🧠 Updated rate‑based shipping handler
 const handleRateAndShip = async (method, rate, deliveryDate) => {
+  if (SKIP_UPS) {
+    const ok = window.confirm(
+      "Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice."
+    );
+    if (!ok) return;
+    await handleShip();
+    return;
+  }
+
   const confirmed = window.confirm(
     `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${deliveryDate}\nProceed?`
   );
@@ -739,6 +761,16 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
   setShippingMethod(method);
   await handleShip();
 };
+
+// …in your render…
+{shippingOptions.map(opt => (
+  <button
+    key={opt.method}
+    onClick={() => handleRateAndShip(opt.method, opt.rate, opt.deliveryDate)}
+  >
+    {opt.method} – {opt.rate} – {opt.deliveryDate}
+  </button>
+))}
 
 
   return (
