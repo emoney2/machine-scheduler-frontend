@@ -700,12 +700,9 @@ const fetchRates = async () => {
       `${process.env.REACT_APP_API_ROOT}/rate`,
       {
         method: "POST",
+        credentials: "include",              // ← add this
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shipper,               // static shipper you already defined
-          recipient,
-          packages: packagesPayload
-        })
+        body: JSON.stringify({ shipper, recipient, packages: packagesPayload })
       }
     );
     if (!resp.ok) throw new Error("Rate fetch failed");
