@@ -225,7 +225,7 @@ useEffect(() => {
         const parsed = JSON.parse(pending);
 
         const res = await fetch(
-          "https://machine-scheduler-backend.onrender.com/api/process-shipment",
+          "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",  // updated URL
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -273,8 +273,7 @@ useEffect(() => {
           navigate("/shipment-complete", {
             state: {
               shippedOk:      true,
-              labelsPrinted:  shipData.labels.length > 0,
-              // use your React state 'boxes' which you set above
+              labelsPrinted:  data.labels.length > 0,
               slipsSaved:     boxes.length > 0,
               invoiceUrl
             },
@@ -299,6 +298,7 @@ useEffect(() => {
       }
     }
   }, [jobs, targetOrder, navigate]);
+
 
   // ▶︎ Whenever selection changes, re-fetch box requirements
   useEffect(() => {
