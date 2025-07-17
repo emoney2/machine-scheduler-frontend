@@ -643,12 +643,12 @@ const [shippingOptions, setShippingOptions] = useState([]);
 
 // 2) Your package payloads (Customer Supplied = 02)
 const packagesPayload = [
-  { PackagingType: "02", Weight: 7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
-  { PackagingType: "02", Weight: 24, Dimensions: { Length: 15, Width: 15, Height: 15 } },
-  { PackagingType: "02", Weight: 55, Dimensions: { Length: 20, Width: 20, Height: 20 } },
+  { PackagingType: "02", Weight:  7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
+  { PackagingType: "02", Weight: 24,  Dimensions: { Length: 15, Width: 15, Height: 15 } },
+  { PackagingType: "02", Weight: 55,  Dimensions: { Length: 20, Width: 20, Height: 20 } },
 ];
 
-// 3)
+// 3) Static shipper
 const shipper = {
   Name:           "JR & Co.",
   AttentionName:  "Justin Eckard",
@@ -663,7 +663,7 @@ const shipper = {
   }
 };
 
-// 5) Helper to fetch live UPS rates (with safety checks)
+// 5) Helper to fetch live UPS rates (with safety checks + fallback)
 const fetchRates = async () => {
   // 5a) If nothing selected, clear rates and stop
   if (selected.length === 0) {
@@ -699,18 +699,26 @@ const fetchRates = async () => {
     const resp = await fetch(
       `${process.env.REACT_APP_API_ROOT}/rate`,
       {
-        method: "POST",
-        credentials: "include",              // ← add this
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ shipper, recipient, packages: packagesPayload })
+        method:      "POST",
+        credentials: "include",
+        headers:     { "Content-Type": "application/json" },
+        body:        JSON.stringify({ shipper, recipient, packages: packagesPayload })
       }
     );
-    if (!resp.ok) throw new Error("Rate fetch failed");
+    if (!resp.ok) throw new Error(`Rate fetch failed: ${resp.status}`);
     const data = await resp.json();
     setShippingOptions(data);
   } catch (err) {
     console.error("UPS rate error:", err);
-    alert("Unable to fetch UPS rates. See console for details.");
+    alert("Unable to fetch UPS rates; using manual fallback.");
+    // ─── FALLBACK ─── always provide at least one option
+    setShippingOptions([
+      {
+        method:       "Manual Shipping",
+        rate:         "N/A",
+        deliveryDate: "TBD"
+      }
+    ]);
   }
 };
 
