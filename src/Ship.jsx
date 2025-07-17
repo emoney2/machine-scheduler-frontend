@@ -638,26 +638,76 @@ const handleShip = async () => {
 }; // end handleShip
 
 
-// 🧠 New rate-based shipping handler (mockup version)
+// 1) State for live UPS rates
+const [shippingOptions, setShippingOptions] = useState([]);
+
+// 2) Your package payloads (Customer Supplied = 02)
+const packagesPayload = [
+  { PackagingType: "02", Weight: 7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
+  { PackagingType: "02", Weight: 24, Dimensions: { Length: 15, Width: 15, Height: 15 } },
+  { PackagingType: "02", Weight: 55, Dimensions: { Length: 20, Width: 20, Height: 20 } },
+];
+
+// 3) Pick the first selected job to build our UPS “ship-to” payload
+const jobToShip = jobs.find(j => selected.includes(j.orderId.toString()));
+
+// 4) Build the UPS recipient object from your Directory columns:
+const recipient = {
+  Name:            jobToShip["Company Name"],
+  AttentionName:   `${jobToShip["Contact First Name"]} ${jobToShip["Contact Last Name"]}`,
+  Phone:           jobToShip["Phone Number"],
+  Address: {
+    AddressLine1:      jobToShip["Street Address 1"],
+    AddressLine2:      jobToShip["Street Address 2"] || "",
+    City:              jobToShip["City"],
+    StateProvinceCode: jobToShip["State"],
+    PostalCode:        jobToShip["Zip Code"],
+    CountryCode:       "US"
+  }
+};
+
+// 5) Helper to fetch live UPS rates
+const fetchRates = async () => {
+  try {
+    const resp = await fetch(
+      `${process.env.REACT_APP_API_ROOT}/rate`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shipper,       // your static shipper object
+          recipient,
+          packages: packagesPayload
+        })
+      }
+    );
+    if (!resp.ok) throw new Error("Rate fetch failed");
+    const data = await resp.json();
+    setShippingOptions(data);
+  } catch (err) {
+    console.error(err);
+    alert("Unable to fetch UPS rates. See console for details.");
+  }
+};
+
+// 6) Auto‑fetch rates whenever a job is selected
+useEffect(() => {
+  if (selected.length > 0) {
+    fetchRates();
+  }
+}, [selected]);
+
+// 🧠 Updated rate-based shipping handler
 const handleRateAndShip = async (method, rate, deliveryDate) => {
   const confirmed = window.confirm(
     `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${deliveryDate}\nProceed?`
   );
   if (!confirmed) return;
 
-  setShippingMethod(method); // store selected method
-
-  await handleShip(); // wait for async logic to complete
+  setShippingMethod(method);
+  await handleShip();
 };
 
-// Mock shipping options (replace with live API later)
-const shippingOptions = [
-  { method: "Ground", rate: "$12.34", delivery: "2025-06-24" },
-  { method: "2nd Day Air", rate: "$24.10", delivery: "2025-06-22" },
-  { method: "Next Day Air", rate: "$41.00", delivery: "2025-06-21" },
-  { method: "Next Day Air Early AM", rate: "$55.20", delivery: "2025-06-21" },
-  { method: "Saturday Delivery", rate: "$60.00", delivery: "2025-06-22" },
-];
 
   return (
     <div style={{ padding: "2rem" }}>
