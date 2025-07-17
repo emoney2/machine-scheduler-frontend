@@ -648,26 +648,38 @@ const packagesPayload = [
   { PackagingType: "02", Weight: 55, Dimensions: { Length: 20, Width: 20, Height: 20 } },
 ];
 
-// 3) Pick the first selected job to build our UPS “ship-to” payload
-const jobToShip = jobs.find(j => selected.includes(j.orderId.toString()));
-
-// 4) Build the UPS recipient object from your Directory columns:
-const recipient = {
-  Name:            jobToShip["Company Name"],
-  AttentionName:   `${jobToShip["Contact First Name"]} ${jobToShip["Contact Last Name"]}`,
-  Phone:           jobToShip["Phone Number"],
-  Address: {
-    AddressLine1:      jobToShip["Street Address 1"],
-    AddressLine2:      jobToShip["Street Address 2"] || "",
-    City:              jobToShip["City"],
-    StateProvinceCode: jobToShip["State"],
-    PostalCode:        jobToShip["Zip Code"],
-    CountryCode:       "US"
-  }
-};
-
-// 5) Helper to fetch live UPS rates
+// 5) Helper to fetch live UPS rates (with safety checks)
 const fetchRates = async () => {
+  // 5a) If nothing selected, clear rates and stop
+  if (selected.length === 0) {
+    setShippingOptions([]);
+    return;
+  }
+
+  // 5b) Find the one job we’re quoting
+  const jobToShip = jobs.find(j => selected.includes(j.orderId.toString()));
+  if (!jobToShip) {
+    console.warn("No matching job for selected IDs:", selected);
+    setShippingOptions([]);
+    return;
+  }
+
+  // 5c) Build the UPS “ship to” payload from that job
+  const recipient = {
+    Name:            jobToShip["Company Name"],
+    AttentionName:   `${jobToShip["Contact First Name"]} ${jobToShip["Contact Last Name"]}`,
+    Phone:           jobToShip["Phone Number"],
+    Address: {
+      AddressLine1:      jobToShip["Street Address 1"],
+      AddressLine2:      jobToShip["Street Address 2"] || "",
+      City:              jobToShip["City"],
+      StateProvinceCode: jobToShip["State"],
+      PostalCode:        jobToShip["Zip Code"],
+      CountryCode:       "US"
+    }
+  };
+
+  // 5d) Call your new /api/rate endpoint
   try {
     const resp = await fetch(
       `${process.env.REACT_APP_API_ROOT}/rate`,
@@ -675,7 +687,7 @@ const fetchRates = async () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          shipper,       // your static shipper object
+          shipper,               // static shipper you already defined
           recipient,
           packages: packagesPayload
         })
@@ -685,7 +697,7 @@ const fetchRates = async () => {
     const data = await resp.json();
     setShippingOptions(data);
   } catch (err) {
-    console.error(err);
+    console.error("UPS rate error:", err);
     alert("Unable to fetch UPS rates. See console for details.");
   }
 };
