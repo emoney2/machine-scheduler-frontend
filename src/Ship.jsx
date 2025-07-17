@@ -648,6 +648,21 @@ const packagesPayload = [
   { PackagingType: "02", Weight: 55, Dimensions: { Length: 20, Width: 20, Height: 20 } },
 ];
 
+// 3)
+const shipper = {
+  Name:           "JR & Co.",
+  AttentionName:  "Justin Eckard",
+  Phone:          "678-294-5350",
+  Address: {
+    AddressLine1:      "3653 Lost Oak Drive",
+    AddressLine2:      "",
+    City:              "Buford",
+    StateProvinceCode: "GA",
+    PostalCode:        "30519",
+    CountryCode:       "US"
+  }
+};
+
 // 5) Helper to fetch live UPS rates (with safety checks)
 const fetchRates = async () => {
   // 5a) If nothing selected, clear rates and stop
