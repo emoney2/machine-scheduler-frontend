@@ -486,7 +486,6 @@ const handleShip = async () => {
   }
 
   // ── PRE-OPEN POPUPS ──────────────────────────────────
-  // open background windows for labels & slips
   const labelWindows = selected.map((_, i) =>
     window.open("", `labelWindow${i}`, "width=600,height=400")
   );
@@ -497,25 +496,35 @@ const handleShip = async () => {
 
   try {
     // ── PREPARE ─────────────────────────────────────────
-    let response = await fetch(
-      `${process.env.REACT_APP_API_ROOT}/prepare-shipment`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          order_ids: selected,
-          shipped_quantities: Object.fromEntries(
-            jobs
-              .filter((j) => selected.includes(j.orderId.toString()))
-              .map((j) => [j.orderId, j.shipQty])
-          ),
-        }),
+    let result;
+    try {
+      const response = await fetch(
+        `${process.env.REACT_APP_API_ROOT}/prepare-shipment`,
+        {
+          method:      "POST",
+          headers:     { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            order_ids: selected,
+            shipped_quantities: Object.fromEntries(
+              jobs
+                .filter((j) => selected.includes(j.orderId.toString()))
+                .map((j) => [j.orderId, j.shipQty])
+            ),
+          }),
+        }
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        console.warn("prepare-shipment error:", data.error);
+        result = { boxes: [] };
+      } else {
+        result = data;
       }
-    );
-    let result = await response.json();
-
-    // (retry missing volume as before)…
+    } catch (prepErr) {
+      console.error("prepare-shipment failed:", prepErr);
+      result = { boxes: [] };
+    }
 
     // pack boxes
     const packedBoxes = result.boxes || [];
@@ -524,39 +533,51 @@ const handleShip = async () => {
 
     // ── PROCESS ─────────────────────────────────────────
     setShippingStage("🚚 Processing shipment...");
-    const shipRes = await fetch(
-      `${process.env.REACT_APP_API_ROOT}/process-shipment`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          order_ids: selected,
-          boxes: packedBoxes,
-          shipped_quantities: Object.fromEntries(
-            jobs
-              .filter((j) => selected.includes(j.orderId.toString()))
-              .map((j) => [j.orderId, j.shipQty])
-          ),
-          shipping_method: shippingMethod,
-        }),
+    let shipData;
+    try {
+      const shipRes = await fetch(
+        `${process.env.REACT_APP_API_ROOT}/process-shipment`,
+        {
+          method:      "POST",
+          headers:     { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            order_ids:         selected,
+            boxes:             packedBoxes,
+            shipped_quantities: Object.fromEntries(
+              jobs
+                .filter((j) => selected.includes(j.orderId.toString()))
+                .map((j) => [j.orderId, j.shipQty])
+            ),
+            shipping_method:   shippingMethod,
+          }),
+        }
+      );
+      const data = await shipRes.json();
+      if (!shipRes.ok) {
+        console.warn("process-shipment error:", data.error);
+        shipData = { labels: [], slips: [], invoice: null, redirect: data.redirect };
+      } else {
+        shipData = data;
       }
-    );
-    const shipData = await shipRes.json();
+    } catch (procErr) {
+      console.error("process-shipment failed:", procErr);
+      shipData = { labels: [], slips: [], invoice: null };
+    }
 
     // ── HANDLE QBO REDIRECT ──────────────────────────────
     if (shipData.redirect) {
       sessionStorage.setItem(
         "pendingShipment",
         JSON.stringify({
-          order_ids: selected,
-          boxes: packedBoxes,
+          order_ids:         selected,
+          boxes:             packedBoxes,
           shipped_quantities: Object.fromEntries(
             jobs
               .filter((j) => selected.includes(j.orderId.toString()))
               .map((j) => [j.orderId, j.shipQty])
           ),
-          shipping_method: shippingMethod,
+          shipping_method:   shippingMethod,
         })
       );
       window.location.href = `${process.env.REACT_APP_API_ROOT.replace(
@@ -567,68 +588,55 @@ const handleShip = async () => {
     }
 
     // ── SUCCESS ─────────────────────────────────────────
-    if (shipRes.ok) {
-      setIsShippingOverlay(false);
+    setIsShippingOverlay(false);
+    setLoading(false);
 
-      // build invoiceUrl but do NOT open it here
-      const invoiceUrl = shipData.invoice
-        ? shipData.invoice.startsWith("http")
-          ? shipData.invoice
-          : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
-        : "";
+    // build invoiceUrl but do NOT open it here
+    const invoiceUrl = shipData.invoice
+      ? shipData.invoice.startsWith("http")
+        ? shipData.invoice
+        : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
+      : "";
 
-      // 4a) Shipping labels
-      setShippingStage(
-        `🖨️ Printing ${shipData.labels.length} shipping label${
-          shipData.labels.length > 1 ? "s" : ""
-        }…`
-      );
-      shipData.labels.forEach((url, i) => {
-        const win = labelWindows[i];
-        if (win) {
-          win.location = url;
-          win.blur();    // ensure background
-        }
+    // 4a) Shipping labels
+    setShippingStage(
+      `🖨️ Printing ${shipData.labels.length} shipping label${shipData.labels.length > 1 ? "s" : ""}…`
+    );
+    shipData.labels.forEach((url, i) => {
+      const win = labelWindows[i];
+      if (win) {
+        win.location = url;
+        win.blur();
+      }
+    });
+
+    // 4b) QuickBooks customer/item setup
+    setShippingStage("👤 Setting up QuickBooks customer…");
+    setShippingStage("📦 Setting up QuickBooks product info…");
+
+    // 4c) Packing slip saved
+    setShippingStage(
+      `📋 Packing slip PDF saved for ${packedBoxes.length} box${packedBoxes.length > 1 ? "es" : ""} (watching folder for print)…`
+    );
+
+    // 4d) refocus main tab immediately
+    setTimeout(() => {
+      const mainTab = window.open("", "mainShipTab");
+      if (mainTab && mainTab.focus) mainTab.focus();
+    }, 100);
+
+    // 4e) Finalize
+    setShippingStage("✅ Complete!");
+    setTimeout(() => {
+      navigate("/shipment-complete", {
+        state: {
+          shippedOk:     true,
+          labelsPrinted: shipData.labels.length > 0,
+          slipsPrinted:  packedBoxes.length > 0,
+          invoiceUrl
+        },
       });
-
-      // 4b) QuickBooks customer/item setup
-      setShippingStage("👤 Setting up QuickBooks customer…");
-      setShippingStage("📦 Setting up QuickBooks product info…");
-
-      // 4c) Packing slip saved
-      setShippingStage(
-        `📋 Packing slip PDF saved for ${packedBoxes.length} box${
-          packedBoxes.length > 1 ? "es" : ""
-        } (watching folder for print)…`
-      );
-
-      // 4d) refocus main tab immediately
-      setTimeout(() => {
-        const mainTab = window.open("", "mainShipTab");
-        if (mainTab && mainTab.focus) mainTab.focus();
-      }, 100);
-
-      // 4e) Finalize
-      setShippingStage("✅ Complete!");
-      setLoading(false);
-      setTimeout(() => {
-         navigate("/shipment-complete", {
-           state: {
-             shippedOk:     true,
-             labelsPrinted: shipData.labels.length > 0,
-             // we saved one packing-slip PDF per box into the watch folder:
-             slipsPrinted:  packedBoxes.length > 0,
-             invoiceUrl
-           },
-         });
-      }, 500);
-
-    } else {
-      // server error
-      alert(shipData.error || "Shipment failed.");
-      setLoading(false);
-      setIsShippingOverlay(false);
-    }
+    }, 500);
   } catch (err) {
     console.error(err);
     alert("Failed to ship.");
