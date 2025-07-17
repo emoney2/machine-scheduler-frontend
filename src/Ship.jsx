@@ -226,7 +226,7 @@ useEffect(() => {
         const parsed = JSON.parse(pending);
 
         const res = await fetch(
-          "https://machine-scheduler-backend.onrender.com/api/prepare-shipment",  // updated URL
+          "https://machine-scheduler-backend.onrender.com/api/process-shipment",  // updated URL
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
