@@ -246,7 +246,7 @@ useEffect(() => {
           const invoiceUrl = data.invoice
             ? (data.invoice.startsWith("http")
                 ? data.invoice
-                : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
+                : `https://app.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`)
             : null;
           if (invoiceUrl) {
             const invWin = window.open(invoiceUrl, "_blank");
