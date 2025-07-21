@@ -307,13 +307,14 @@ const handleSaveBulkNewItems = async () => {
         // Build payload to add & log new materials
         const addAndLogPayload = newItemData
           ? newMaterialsBatch.map(item => ({
-              materialName: item.value.trim(),          // use .value for the typed name
+              materialName: item.value.trim(),
+              type:         "Material",
               unit:         newItemData.unit.trim(),
               minInv:       newItemData.minInv.trim(),
               reorder:      newItemData.reorder.trim(),
               cost:         newItemData.cost.trim(),
-              action:       item.action,            // from the batch item
-              quantity:     item.quantity,          // from the batch item
+              action:       item.action,
+              quantity:     item.quantity,
               notes:        newItemData.notes || ""
             }))
           : [];
