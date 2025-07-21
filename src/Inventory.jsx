@@ -319,7 +319,7 @@ const handleSaveBulkNewItems = async () => {
           : [];
 
         // 👉 Debug: log the target URL and payload
-        const url = `${process.env.REACT_APP_API_ROOT}/materials`;
+        const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
         console.log("Posting to:", url, addAndLogPayload);
 
         // POST to /materials → adds to Inventory AND logs to Material Log
