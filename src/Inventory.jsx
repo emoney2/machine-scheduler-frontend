@@ -367,10 +367,10 @@ const handleSaveBulkNewItems = async () => {
     // --- THREAD BATCH ---
     if (newItemData.type === "Thread" && bulkNewItems.length) {
       const payload = bulkNewItems.map(item => ({
-        threadColor: item.name,
-        minInv:      item.minInv,
-        reorder:     item.reorder,
-        cost:        item.cost
+        value:   item.name,
+        minInv:  item.minInv,
+        reorder: item.reorder,
+        cost:    item.cost      
       }));
 
       await axios.post(
