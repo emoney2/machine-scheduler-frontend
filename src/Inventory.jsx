@@ -367,12 +367,13 @@ const handleSaveBulkNewItems = async () => {
     // --- THREAD BATCH ---
     if (newItemData.type === "Thread" && bulkNewItems.length) {
       const payload = bulkNewItems.map(item => ({
-        value:   item.name,
-        minInv:  item.minInv,
-        reorder: item.reorder,
-        cost:    item.cost      
+        value:    item.name,
+        quantity: "1",               // ← default to 1 cone
+        action:   "Ordered",         // ← required by backend
+        minInv:   item.minInv,
+        reorder:  item.reorder,
+        cost:     item.cost
       }));
-
       await axios.post(
         `${process.env.REACT_APP_API_ROOT}/threadInventory`,
         payload
