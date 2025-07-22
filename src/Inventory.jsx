@@ -172,12 +172,13 @@ export default function Inventory() {
 
      // ② If there are any, prepare the bulk modal and bail out
      if (unknowns.length) {
+       setNewItemData({ name: "", type: "Thread" });  // ← add this line
        setBulkNewItems(
          unknowns.map(color => ({
-           name:    color,
-           minInv:  "",
+           name: color,
+           minInv: "",
            reorder: "",
-           cost:    ""
+           cost: ""
          }))
        );
        setNewItemErrors({});
