@@ -335,56 +335,53 @@ const handleSaveBulkNewItems = async () => {
   try {
     console.log("handleSaveBulkNewItems running", newItemData, newMaterialsBatch);
 
-    if (newMaterialsBatch.length) {
-      // --- MATERIAL BATCH ---
-      if (newItemData.type === "Material") {
-        // Build payload to add & log new materials
-        const addAndLogPayload = newItemData
-          ? newMaterialsBatch.map(item => ({
-              materialName: item.value.trim(),
-              type:         "Material",
-              unit:         newItemData.unit.trim(),
-              minInv:       newItemData.minInv.trim(),
-              reorder:      newItemData.reorder.trim(),
-              cost:         newItemData.cost.trim(),
-              action:       item.action,
-              quantity:     item.quantity,
-              notes:        newItemData.notes || ""
-            }))
-          : [];
+    // --- MATERIAL BATCH ---
+    if (newItemData.type === "Material" && newMaterialsBatch.length) {
+      // Build payload to add & log new materials
+      const addAndLogPayload = newMaterialsBatch.map(item => ({
+        materialName: item.value.trim(),
+        type:         "Material",
+        unit:         newItemData.unit.trim(),
+        minInv:       newItemData.minInv.trim(),
+        reorder:      newItemData.reorder.trim(),
+        cost:         newItemData.cost.trim(),
+        action:       item.action,
+        quantity:     item.quantity,
+        notes:        newItemData.notes || ""
+      }));
 
-        // 👉 Debug: log the target URL and payload
-        const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
-        console.log("Posting to:", url, addAndLogPayload);
+      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
+      console.log("Posting to:", url, addAndLogPayload);
 
-        // POST to /materials → adds to Inventory AND logs to Material Log
-        await axios.post(url, addAndLogPayload);
+      await axios.post(url, addAndLogPayload);
 
-        // Refresh local dropdown
-        setMaterials(m => [
-          ...m,
-          ...newMaterialsBatch.map(i => i.value.trim())
-        ]);
+      setMaterials(m => [
+        ...m,
+        ...newMaterialsBatch.map(i => i.value.trim())
+      ]);
 
-        // Clear out the material batch
-        setNewMaterialsBatch([]);
-      }
+      setNewMaterialsBatch([]);
+    }
 
-      // --- THREAD BATCH (unchanged) ---
-      if (newItemData.type === "Thread") {
-        const payload = bulkNewItems.map(item => ({
-          threadColor: item.name,
-          minInv:      item.minInv,
-          reorder:     item.reorder,
-          cost:        item.cost
-        }));
-        await axios.post(
-          `${process.env.REACT_APP_API_ROOT}/threadInventory`,
-          payload
-        );
-        setThreads(prev => [...prev, ...bulkNewItems.map(i => i.name)]);
-      }
-    // Close modal & reset state
+    // --- THREAD BATCH ---
+    if (newItemData.type === "Thread" && bulkNewItems.length) {
+      const payload = bulkNewItems.map(item => ({
+        threadColor: item.name,
+        minInv:      item.minInv,
+        reorder:     item.reorder,
+        cost:        item.cost
+      }));
+
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/threadInventory`,
+        payload
+      );
+
+      setThreads(prev => [...prev, ...bulkNewItems.map(i => i.name)]);
+      setBulkNewItems([]);
+    }
+
+    // Reset shared modal state
     setIsNewItemModalOpen(false);
     setNewItemErrors({});
     setNewItemData({
@@ -405,6 +402,7 @@ const handleSaveBulkNewItems = async () => {
     setNewItemErrors({ general: "Failed to save. Try again." });
   }
 };
+
   // --- Section 6: Render -----------------------------------------------
   return (
     <>
