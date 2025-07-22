@@ -334,6 +334,7 @@ const handleSaveNewItem = async () => {
 const handleSaveBulkNewItems = async () => {
   try {
     console.log("handleSaveBulkNewItems running", newItemData, newMaterialsBatch);
+    console.log("🧵 bulkNewItems content:", bulkNewItems);
 
     // --- MATERIAL BATCH ---
     if (newItemData.type === "Material" && newMaterialsBatch.length) {
