@@ -372,7 +372,7 @@ const handleSaveBulkNewItems = async () => {
 
       // --- THREAD BATCH (unchanged) ---
       if (newItemData.type === "Thread") {
-        const payload = newMaterialsBatch.map(item => ({
+        const payload = bulkNewItems.map(item => ({
           threadColor: item.name,
           minInv:      item.minInv,
           reorder:     item.reorder,
@@ -382,10 +382,8 @@ const handleSaveBulkNewItems = async () => {
           `${process.env.REACT_APP_API_ROOT}/threadInventory`,
           payload
         );
-        setThreads(prev => [...prev, ...newMaterialsBatch.map(i => i.name)]);
+        setThreads(prev => [...prev, ...bulkNewItems.map(i => i.name)]);
       }
-    }
-
     // Close modal & reset state
     setIsNewItemModalOpen(false);
     setNewItemErrors({});
