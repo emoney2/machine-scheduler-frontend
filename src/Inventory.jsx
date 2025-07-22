@@ -507,7 +507,7 @@ const handleSaveBulkNewItems = async () => {
             >
               Cancel
             </button>
-            <button onClick={handleSaveNewItem}>Save All</button>
+            <button onClick={handleSaveBulkNewItems}>Save All</button>
           </div>
         </>
       ) : (
