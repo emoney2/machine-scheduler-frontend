@@ -159,6 +159,8 @@ export default function Inventory() {
 // ⏺ Add this immediately below handleSubmit
    // ——— Custom submit for Threads — detect new colors first ———
    const submitThreads = () => {
+     console.log("🚨 submitThreads triggered");
+
      // ① Gather every distinct color in the grid that’s not yet in threads[]
      const unknowns = [
        ...new Set(
@@ -183,8 +185,31 @@ export default function Inventory() {
        return;
      }
 
-     // ③ Otherwise, no unknowns → submit the grid as usual
-     handleSubmit(threadRows, "/threadInventory", setThreadRows);
+     // ③ Otherwise, build payload with action default
+     const payload = threadRows
+       .filter(r => r.value && r.quantity)
+       .map(r => ({
+         value: r.value,
+         quantity: r.quantity,
+         action: r.action || "Ordered"
+       }));
+
+     console.log("🧵 Submitting thread payload:", payload);
+
+     if (!payload.length) {
+       alert("No threads to submit");
+       return;
+     }
+
+     axios.post(`${process.env.REACT_APP_API_ROOT}/threadInventory`, payload)
+       .then(() => {
+         alert("Submitted!");
+         setThreadRows(initRows());
+       })
+       .catch(err => {
+         console.error("❌ Submission failed", err);
+         alert("Submission failed");
+       });
    };
 
 // ─── Section 4b: Intercept Material-Submit & Branch Endpoints ────────────
