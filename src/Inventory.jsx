@@ -133,8 +133,16 @@ export default function Inventory() {
   };
 
   const handleSubmit = async (rows, url, resetRows) => {
-    const payload = rows.filter(r => r.value && r.quantity);
+    const payload = rows
+      .filter(r => r.value && r.quantity)
+      .map(r => ({
+        value: r.value,
+        quantity: r.quantity,
+        action: r.action || "Ordered"
+      }));
+
     if (!payload.length) return alert("No rows to submit");
+
     try {
       const res = await axios.post(
         `${process.env.REACT_APP_API_ROOT}${url}`,
