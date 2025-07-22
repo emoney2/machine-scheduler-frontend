@@ -665,7 +665,13 @@ const handleSaveBulkNewItems = async () => {
               ))}
             </tbody>
           </table>
-          <button onClick={submitThreads} style={{ marginTop:8 }}>
+          <button
+            onClick={() => {
+              console.log("🧪 BUTTON CLICKED");
+              submitThreads();
+            }}
+            style={{ marginTop: 8 }}
+          >
             Submit Threads
           </button>
         </fieldset>
