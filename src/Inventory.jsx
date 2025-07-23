@@ -384,6 +384,7 @@ const handleSaveBulkNewItems = async () => {
     }
 
     // Reset shared modal state
+    // Reset shared modal state
     setIsNewItemModalOpen(false);
     setNewItemErrors({});
     setNewItemData({
@@ -397,8 +398,15 @@ const handleSaveBulkNewItems = async () => {
       quantity: "",
       notes:    ""
     });
-    setMaterialRows(initRows());
+
+    if (newItemData.type === "Material") {
+      setMaterialRows(initRows());
+    } else if (newItemData.type === "Thread") {
+      setThreadRows(initRows());
+    }
+
     alert("Submitted!");
+
   } catch (err) {
     console.error(err);
     setNewItemErrors({ general: "Failed to save. Try again." });
