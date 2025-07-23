@@ -338,8 +338,7 @@ const handleSaveBulkNewItems = async () => {
 
     // --- MATERIAL BATCH ---
     if (newItemData.type === "Material" && newMaterialsBatch.length) {
-      // Build payload to add & log new materials
-      const addAndLogPayload = newMaterialsBatch.map(item => ({
+      const payload = newMaterialsBatch.map(item => ({
         materialName: item.value.trim(),
         type:         "Material",
         unit:         newItemData.unit.trim(),
@@ -352,15 +351,13 @@ const handleSaveBulkNewItems = async () => {
       }));
 
       const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
-      console.log("Posting to:", url, addAndLogPayload);
-
-      await axios.post(url, addAndLogPayload);
+      console.log("Posting to:", url, payload);
+      await axios.post(url, payload);
 
       setMaterials(m => [
         ...m,
         ...newMaterialsBatch.map(i => i.value.trim())
       ]);
-
       setNewMaterialsBatch([]);
     }
 
@@ -375,13 +372,15 @@ const handleSaveBulkNewItems = async () => {
         reorder:      item.reorder,
         cost:         item.cost
       }));
-      await axios.post(`${API_ROOT}/materialInventory`, payload);
+
+      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
+      console.log("Posting to:", url, payload);
+      await axios.post(url, payload);
 
       setThreads(prev => [...prev, ...bulkNewItems.map(i => i.name)]);
       setBulkNewItems([]);
     }
 
-    // Reset shared modal state
     // Reset shared modal state
     setIsNewItemModalOpen(false);
     setNewItemErrors({});
@@ -397,6 +396,7 @@ const handleSaveBulkNewItems = async () => {
       notes:    ""
     });
 
+    // Clear the correct grid
     if (newItemData.type === "Material") {
       setMaterialRows(initRows());
     } else if (newItemData.type === "Thread") {
@@ -404,12 +404,12 @@ const handleSaveBulkNewItems = async () => {
     }
 
     alert("Submitted!");
-
   } catch (err) {
     console.error(err);
     setNewItemErrors({ general: "Failed to save. Try again." });
   }
 };
+
 
   // --- Section 6: Render -----------------------------------------------
   return (
