@@ -538,7 +538,7 @@ const handleSubmit = async (e) => {
 
   // ⛔ Skip all validation if this is a reorder
   if (form.isReorder) {
-    return submitForm();  // moved core logic to a new helper
+    return submitForm();
   }
 
   // 1) Company check
@@ -582,7 +582,6 @@ const handleSubmit = async (e) => {
     !materialsInv.map(v => v.toLowerCase()).includes(m.trim().toLowerCase())
   );
   if (missingMat) {
-    // determine which field is missing
     const matIndex = form.materials.indexOf(missingMat);
     setModalMaterialField({
       type: matIndex >= 0 ? "materials" : "backMaterial",
@@ -598,9 +597,20 @@ const handleSubmit = async (e) => {
     return setIsNewMaterialModalOpen(true);
   }
 
+  // ── New: ensure any non‑empty Material[i] has form.materialPercents[i] filled ──
+  for (let i = 0; i < form.materials.length; i++) {
+    const mat = form.materials[i].trim();
+    const pct = (form.materialPercents[i] || "").toString().trim();
+    if (mat && !pct) {
+      alert(`Please enter a percentage for Material ${i+1}.`);
+      return;  // stop here and keep the form visible
+    }
+  }
+
   // ✅ If everything checks out, submit
   return submitForm();
 };
+
 
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
