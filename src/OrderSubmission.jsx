@@ -17,6 +17,7 @@ export default function OrderSubmission() {
     dateType: "Hard Date",
     referral: "",
     materials: ["", "", "", "", ""],
+    materialPercents: ["", "", "", "", ""],  // ← new
     backMaterial: "",
     embBacking: "",
     furColor: "",
@@ -501,6 +502,14 @@ const furColorNames = furColors;
     });
   };
 
+  const handleMaterialPercentChange = (i, val) => {
+    setForm((prev) => {
+      const newPercents = [...prev.materialPercents];
+      newPercents[i] = val;
+      return { ...prev, materialPercents: newPercents };
+    });
+  };
+
   const createPreviews = (files) =>
     files.map((f) => ({ url: URL.createObjectURL(f), type: f.type, name: f.name }));
 
@@ -609,6 +618,8 @@ const submitForm = async () => {
   Object.entries(form).forEach(([key, value]) => {
     if (key === "materials") {
       value.forEach(m => fd.append("materials", m));
+    } else if (key === "materialPercents") {
+      value.forEach(p => fd.append("materialPercents", p));
     } else {
       fd.append(key, value);
     }
@@ -2021,23 +2032,28 @@ const handleSaveNewCompany = async () => {
               gap: "0.5rem",
             }}
           >
-            {form.materials.map((m, i) => (
-              <div key={i}>
-                <label>
-                  Material {i + 1}{i === 0 && "*"}<br />
-                  <input
-                    ref={el => (materialInputRefs.current[i] = el)}
-                    name={`materials[${i}]`}
-                    value={form.materials[i]}
-                    onChange={handleMaterialInput(i)}
-                    list="material-list"
-                    autoComplete="off"
-                    required={i === 0}
-                    style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
-                  />
-                </label>
+            {form.materials.map((material, i) => (
+              <div key={i} className="material-row flex items-center gap-2 mb-2">
+                <input
+                  type="text"
+                  placeholder={`Material ${i + 1}`}
+                  value={form.materials[i]}
+                  onChange={(e) => handleMaterialChange(i, e.target.value)}
+                  ref={el => materialInputRefs.current[i] = el}
+                  className="border rounded py-2 px-4 flex-grow"
+                />
+                <input
+                  type="number"
+                  placeholder="%"
+                  value={form.materialPercents[i]}
+                  onChange={(e) => handleMaterialPercentChange(i, e.target.value)}
+                  className="border rounded py-2 px-2 w-20"
+                  min="0"
+                  max="100"
+                />
               </div>
             ))}
+
 
             {/* shared dropdown options for all Material inputs */}
             <datalist id="material-list">
