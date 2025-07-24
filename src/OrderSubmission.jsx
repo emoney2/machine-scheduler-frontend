@@ -712,6 +712,7 @@ const submitForm = async () => {
       dateType: "Hard Date",
       referral: "",
       materials: ["", "", "", "", ""],
+      materialPercents: ["", "", "", "", ""],  // ← add this
       backMaterial: "",
       embBacking: "",
       furColor: "",
@@ -2061,7 +2062,13 @@ const handleSaveNewCompany = async () => {
                     value={form.materialPercents[i]||""}
                     onChange={e => handleMaterialPercentChange(i, e.target.value)}
                     min="0" max="100"
-                    style={{ width:"3rem", padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px", textAlign:"right" }}
+                    style={{
+                      width: "3rem",
+                      padding: "0.5rem",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      textAlign: "right"
+                    }}
                   />
                 </div>
               ))}
@@ -2086,7 +2093,13 @@ const handleSaveNewCompany = async () => {
                     value={form.materialPercents[i]||""}
                     onChange={e => handleMaterialPercentChange(i, e.target.value)}
                     min="0" max="100"
-                    style={{ width:"3rem", padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px", textAlign:"right" }}
+                    style={{
+                      width: "3rem",
+                      padding: "0.5rem",
+                      border: "1px solid #ccc",
+                      borderRadius: "4px",
+                      textAlign: "right"
+                    }}
                   />
                 </div>
               ))}
