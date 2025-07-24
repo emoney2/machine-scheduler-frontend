@@ -2017,7 +2017,7 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
 
-        {/* Materials (updated) */}
+        {/* Materials */}
         <fieldset style={{ padding: "0.5rem" }}>
           <legend>
             Materials
@@ -2025,6 +2025,7 @@ const handleSaveNewCompany = async () => {
               <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>
             )}
           </legend>
+
           <div
             style={{
               display: "grid",
@@ -2033,8 +2034,11 @@ const handleSaveNewCompany = async () => {
             }}
           >
             {form.materials.map((mat, i) => (
-              <div key={i} className="material-row flex flex-col mb-4">
-                <label htmlFor={`material${i+1}`} className="font-medium">
+              <div key={i} className="flex flex-col mb-4">
+                <label
+                  htmlFor={`material${i+1}`}
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Material {i + 1}{i === 0 && "*"}
                 </label>
                 <input
@@ -2047,12 +2051,13 @@ const handleSaveNewCompany = async () => {
                   list="material-list"
                   autoComplete="off"
                   required={i === 0}
-                  className="border rounded py-2 px-4 w-full"
+                  className="border rounded py-2 px-3 w-full"
                   placeholder={`Material ${i + 1}`}
                 />
+
                 <label
                   htmlFor={`material${i+1}Percent`}
-                  className="mt-2 font-medium text-sm"
+                  className="block text-sm font-medium text-gray-700 mt-2 mb-1"
                 >
                   %
                 </label>
@@ -2066,8 +2071,8 @@ const handleSaveNewCompany = async () => {
                   value={form.materialPercents[i] || ""}
                   onChange={e => handleMaterialPercentChange(i, e.target.value)}
                   required={!!form.materials[i].trim()}
-                  className="border rounded py-2 px-2 w-full"
-                  placeholder="%"
+                  className="border rounded py-2 px-2 w-16 text-right"
+                  placeholder="0‑100"
                 />
               </div>
             ))}
@@ -2079,8 +2084,8 @@ const handleSaveNewCompany = async () => {
               ))}
             </datalist>
 
-            <div>
-              <label htmlFor="backMaterial" className="font-medium">
+            <div className="flex flex-col mb-4">
+              <label htmlFor="backMaterial" className="block text-sm font-medium text-gray-700 mb-1">
                 Back Material{form.product.toLowerCase().includes("full") && "*"}
               </label>
               <input
@@ -2092,13 +2097,13 @@ const handleSaveNewCompany = async () => {
                 list="material-list"
                 autoComplete="off"
                 required={form.product.toLowerCase().includes("full")}
-                className="border rounded py-2 px-4 w-full mt-1"
+                className="border rounded py-2 px-3 w-full"
                 placeholder="Back Material"
               />
             </div>
 
-            <div>
-              <label htmlFor="embBacking" className="font-medium">
+            <div className="flex flex-col mb-4">
+              <label htmlFor="embBacking" className="block text-sm font-medium text-gray-700 mb-1">
                 EMB Backing*
               </label>
               <select
@@ -2107,7 +2112,7 @@ const handleSaveNewCompany = async () => {
                 value={form.embBacking}
                 onChange={handleChange}
                 required
-                className="border rounded py-2 px-4 w-full mt-1"
+                className="border rounded py-2 px-3 w-full"
               >
                 <option value="">Select backing…</option>
                 <option value="Cut Away">Cut Away</option>
@@ -2115,8 +2120,8 @@ const handleSaveNewCompany = async () => {
               </select>
             </div>
 
-            <div>
-              <label htmlFor="furColor" className="font-medium">
+            <div className="flex flex-col mb-4">
+              <label htmlFor="furColor" className="block text-sm font-medium text-gray-700 mb-1">
                 Fur Color*
               </label>
               <input
@@ -2128,13 +2133,12 @@ const handleSaveNewCompany = async () => {
                 list="material-list"
                 autoComplete="off"
                 required
-                className="border rounded py-2 px-4 w-full mt-1"
+                className="border rounded py-2 px-3 w-full"
                 placeholder="Fur Color"
               />
             </div>
           </div>
         </fieldset>
-
 
         {/* Additional Info + Files */}
         <fieldset style={{ padding: "0.5rem" }}>
