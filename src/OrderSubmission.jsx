@@ -2101,66 +2101,67 @@ const handleSaveNewCompany = async () => {
 
           {/* shared dropdown options for all Material inputs */}
           <datalist id="material-list">
-            {materialNames.map(mat => (
-              <option key={mat} value={mat} />
-            ))}
+            {materialNames.map(mat => <option key={mat} value={mat} />)}
           </datalist>
 
-            <div className="flex flex-col mb-4">
-              <label htmlFor="backMaterial" className="block text-sm font-medium text-gray-700 mb-1">
-                Back Material{form.product.toLowerCase().includes("full") && "*"}
-              </label>
-              <input
-                id="backMaterial"
-                ref={backMaterialRef}
-                name="backMaterial"
-                value={form.backMaterial}
-                onChange={handleBackMaterialInput}
-                list="material-list"
-                autoComplete="off"
-                required={form.product.toLowerCase().includes("full")}
-                className="border rounded py-2 px-3 w-full"
-                placeholder="Back Material"
-              />
-            </div>
+          {/* Back Material */}
+          <div className="flex flex-col mb-4">
+            <label htmlFor="backMaterial" className="block text-sm font-medium text-gray-700 mb-1">
+              Back Material{form.product.toLowerCase().includes("full") && "*"}
+            </label>
+            <input
+              id="backMaterial"
+              ref={backMaterialRef}
+              name="backMaterial"
+              value={form.backMaterial}
+              onChange={handleBackMaterialInput}
+              list="material-list"
+              autoComplete="off"
+              required={form.product.toLowerCase().includes("full")}
+              className="border rounded py-2 px-3 w-full"
+              placeholder="Back Material"
+            />
+          </div>
 
-            <div className="flex flex-col mb-4">
-              <label htmlFor="embBacking" className="block text-sm font-medium text-gray-700 mb-1">
-                EMB Backing*
-              </label>
-              <select
-                id="embBacking"
-                name="embBacking"
-                value={form.embBacking}
-                onChange={handleChange}
-                required
-                className="border rounded py-2 px-3 w-full"
-              >
-                <option value="">Select backing…</option>
-                <option value="Cut Away">Cut Away</option>
-                <option value="Tear Away">Tear Away</option>
-              </select>
-            </div>
+          {/* EMB Backing */}
+          <div className="flex flex-col mb-4">
+            <label htmlFor="embBacking" className="block text-sm font-medium text-gray-700 mb-1">
+              EMB Backing*
+            </label>
+            <select
+              id="embBacking"
+              name="embBacking"
+              value={form.embBacking}
+              onChange={handleChange}
+              required
+              className="border rounded py-2 px-3 w-full"
+            >
+              <option value="">Select backing…</option>
+              <option value="Cut Away">Cut Away</option>
+              <option value="Tear Away">Tear Away</option>
+            </select>
+          </div>
 
-            <div className="flex flex-col mb-4">
-              <label htmlFor="furColor" className="block text-sm font-medium text-gray-700 mb-1">
-                Fur Color*
-              </label>
-              <input
-                id="furColor"
-                ref={furColorRef}
-                name="furColor"
-                value={form.furColor}
-                onChange={handleFurColorInput}
-                list="material-list"
-                autoComplete="off"
-                required
-                className="border rounded py-2 px-3 w-full"
-                placeholder="Fur Color"
-              />
-            </div>
+          {/* Fur Color */}
+          <div className="flex flex-col mb-4">
+            <label htmlFor="furColor" className="block text-sm font-medium text-gray-700 mb-1">
+              Fur Color*
+            </label>
+            <input
+              id="furColor"
+              ref={furColorRef}
+              name="furColor"
+              value={form.furColor}
+              onChange={handleFurColorInput}
+              list="material-list"
+              autoComplete="off"
+              required
+              className="border rounded py-2 px-3 w-full"
+              placeholder="Fur Color"
+            />
           </div>
         </fieldset>
+
 
         {/* Additional Info + Files */}
         <fieldset style={{ padding: "0.5rem" }}>
