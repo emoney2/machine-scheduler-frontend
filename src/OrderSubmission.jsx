@@ -2024,125 +2024,124 @@ const handleSaveNewCompany = async () => {
             {materialsInvalid && <span style={{ color: "red", marginLeft: "0.5rem" }}>🚩</span>}
           </legend>
 
-          {form.materials.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                marginBottom: "1rem",
-              }}
-            >
-              <input
-                id={`material${i+1}`}
-                name="materials"
-                type="text"
-                ref={el => (materialInputRefs.current[i] = el)}
-                value={form.materials[i]}
-                onChange={handleMaterialInput(i)}
-                list="material-list"
-                autoComplete="off"
-                required={i === 0}
-                placeholder={`Material ${i+1}`}
-                style={{
-                  flex: 1,
-                  maxWidth: "10rem",
-                  padding: "0.25rem 0.5rem",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                }}
-              />
-
-              <input
-                id={`material${i+1}Percent`}
-                name="materialPercents"
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={form.materialPercents[i] || ""}
-                onChange={e => handleMaterialPercentChange(i, e.target.value)}
-                required={!!form.materials[i].trim()}
-                placeholder="%"
-                style={{
-                  width: "3rem",
-                  padding: "0.25rem 0.5rem",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  textAlign: "right",
-                }}
-              />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: "1rem",
+            }}
+          >
+            {/* Left column: Material 1–3 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {[0,1,2].map(i => (
+                <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    type="text"
+                    placeholder={`Material ${i+1}${i===0?"*":""}`}
+                    value={form.materials[i]}
+                    onChange={e => handleMaterialInput(i)(e)}
+                    ref={el => (materialInputRefs.current[i] = el)}
+                    list="material-list"
+                    autoComplete="off"
+                    required={i===0}
+                    style={{ flex:1, padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                  />
+                  <input
+                    type="number"
+                    placeholder="%"
+                    value={form.materialPercents[i]||""}
+                    onChange={e => handleMaterialPercentChange(i, e.target.value)}
+                    min="0" max="100"
+                    required={!!form.materials[i].trim()}
+                    style={{ width:"3rem", padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px", textAlign:"right" }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
 
-          {/* shared dropdown options */}
-          <datalist id="material-list">
-            {materialNames.map(mat => (
-              <option key={mat} value={mat} />
-            ))}
-          </datalist>
+            {/* Middle column: Material 4–5 + Back Material */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {[3,4].map(i => (
+                <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
+                  <input
+                    type="text"
+                    placeholder={`Material ${i+1}`}
+                    value={form.materials[i]}
+                    onChange={e => handleMaterialInput(i)(e)}
+                    ref={el => (materialInputRefs.current[i] = el)}
+                    list="material-list"
+                    autoComplete="off"
+                    style={{ flex:1, padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                  />
+                  <input
+                    type="number"
+                    placeholder="%"
+                    value={form.materialPercents[i]||""}
+                    onChange={e => handleMaterialPercentChange(i, e.target.value)}
+                    min="0" max="100"
+                    style={{ width:"3rem", padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px", textAlign:"right" }}
+                  />
+                </div>
+              ))}
 
-          {/* Back Material */}
-          <div className="flex flex-col mb-4">
-            <label htmlFor="backMaterial" className="block text-sm font-medium text-gray-700 mb-1">
-              Back Material{form.product.toLowerCase().includes("full") && "*"}
-            </label>
-            <input
-              id="backMaterial"
-              ref={backMaterialRef}
-              name="backMaterial"
-              value={form.backMaterial}
-              onChange={handleBackMaterialInput}
-              list="material-list"
-              autoComplete="off"
-              required={form.product.toLowerCase().includes("full")}
-              className="border rounded py-1 px-2 w-full max-w-xs"
-              placeholder="Back Material"
-            />
-          </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <label htmlFor="backMaterial" style={{ marginBottom:"0.25rem", fontWeight:500 }}>
+                  Back Material{form.product.toLowerCase().includes("full") && "*"}
+                </label>
+                <input
+                  id="backMaterial"
+                  name="backMaterial"
+                  ref={backMaterialRef}
+                  value={form.backMaterial}
+                  onChange={handleBackMaterialInput}
+                  list="material-list"
+                  autoComplete="off"
+                  required={form.product.toLowerCase().includes("full")}
+                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                  placeholder="Back Material"
+                />
+              </div>
+            </div>
 
-          {/* EMB Backing */}
-          <div className="flex flex-col mb-4">
-            <label htmlFor="embBacking" className="block text-sm font-medium text-gray-700 mb-1">
-              EMB Backing*
-            </label>
-            <select
-              id="embBacking"
-              name="embBacking"
-              value={form.embBacking}
-              onChange={handleChange}
-              required
-              className="border rounded py-1 px-2 w-full max-w-xs"
-            >
-              <option value="">Select backing…</option>
-              <option value="Cut Away">Cut Away</option>
-              <option value="Tear Away">Tear Away</option>
-            </select>
-          </div>
-
-          {/* Fur Color */}
-          <div className="flex flex-col mb-4">
-            <label htmlFor="furColor" className="block text-sm font-medium text-gray-700 mb-1">
-              Fur Color*
-            </label>
-            <input
-              id="furColor"
-              ref={furColorRef}
-              name="furColor"
-              value={form.furColor}
-              onChange={handleFurColorInput}
-              list="material-list"
-              autoComplete="off"
-              required
-              className="border rounded py-1 px-2 w-full max-w-xs"
-              placeholder="Fur Color"
-            />
+            {/* Right column: EMB Backing & Fur Color */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <label htmlFor="embBacking" style={{ marginBottom:"0.25rem", fontWeight:500 }}>
+                  EMB Backing*
+                </label>
+                <select
+                  id="embBacking"
+                  name="embBacking"
+                  value={form.embBacking}
+                  onChange={handleChange}
+                  required
+                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                >
+                  <option value="">Select backing…</option>
+                  <option value="Cut Away">Cut Away</option>
+                  <option value="Tear Away">Tear Away</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <label htmlFor="furColor" style={{ marginBottom:"0.25rem", fontWeight:500 }}>
+                  Fur Color*
+                </label>
+                <input
+                  id="furColor"
+                  name="furColor"
+                  ref={furColorRef}
+                  value={form.furColor}
+                  onChange={handleFurColorInput}
+                  list="material-list"
+                  autoComplete="off"
+                  required
+                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                  placeholder="Fur Color"
+                />
+              </div>
+            </div>
           </div>
         </fieldset>
-
-
-
         {/* Additional Info + Files */}
         <fieldset style={{ padding: "0.5rem" }}>
           <legend>Additional Info</legend>
