@@ -2017,7 +2017,7 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
 
-        {/* Materials */}
+        {/* Materials (updated) */}
         <fieldset style={{ padding: "0.5rem" }}>
           <legend>
             Materials
@@ -2032,28 +2032,45 @@ const handleSaveNewCompany = async () => {
               gap: "0.5rem",
             }}
           >
-            {form.materials.map((material, i) => (
-              <div key={i} className="material-row flex items-center gap-2 mb-2">
+            {form.materials.map((mat, i) => (
+              <div key={i} className="material-row flex flex-col mb-4">
+                <label htmlFor={`material${i+1}`} className="font-medium">
+                  Material {i + 1}{i === 0 && "*"}
+                </label>
                 <input
+                  id={`material${i+1}`}
+                  name="materials"
                   type="text"
-                  placeholder={`Material ${i + 1}`}
-                  value={form.materials[i]}
-                  onChange={(e) => handleMaterialChange(i, e.target.value)}
                   ref={el => materialInputRefs.current[i] = el}
-                  className="border rounded py-2 px-4 flex-grow"
+                  value={form.materials[i]}
+                  onChange={handleMaterialInput(i)}
+                  list="material-list"
+                  autoComplete="off"
+                  required={i === 0}
+                  className="border rounded py-2 px-4 w-full"
+                  placeholder={`Material ${i + 1}`}
                 />
+                <label
+                  htmlFor={`material${i+1}Percent`}
+                  className="mt-2 font-medium text-sm"
+                >
+                  %
+                </label>
                 <input
+                  id={`material${i+1}Percent`}
+                  name="materialPercents"
                   type="number"
-                  placeholder="%"
-                  value={form.materialPercents[i]}
-                  onChange={(e) => handleMaterialPercentChange(i, e.target.value)}
-                  className="border rounded py-2 px-2 w-20"
+                  step="0.1"
                   min="0"
                   max="100"
+                  value={form.materialPercents[i] || ""}
+                  onChange={e => handleMaterialPercentChange(i, e.target.value)}
+                  required={!!form.materials[i].trim()}
+                  className="border rounded py-2 px-2 w-full"
+                  placeholder="%"
                 />
               </div>
             ))}
-
 
             {/* shared dropdown options for all Material inputs */}
             <datalist id="material-list">
@@ -2061,55 +2078,63 @@ const handleSaveNewCompany = async () => {
                 <option key={mat} value={mat} />
               ))}
             </datalist>
+
             <div>
-              <label>
-                Back Material<br />
-                <input
-                  ref={backMaterialRef}
-                  name="backMaterial"
-                  value={form.backMaterial}
-                  onChange={handleBackMaterialInput}
-                  list="material-list"
-                  autoComplete="off"
-                  required={form.product.toLowerCase().includes("full")}
-                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
-                />
+              <label htmlFor="backMaterial" className="font-medium">
+                Back Material{form.product.toLowerCase().includes("full") && "*"}
               </label>
+              <input
+                id="backMaterial"
+                ref={backMaterialRef}
+                name="backMaterial"
+                value={form.backMaterial}
+                onChange={handleBackMaterialInput}
+                list="material-list"
+                autoComplete="off"
+                required={form.product.toLowerCase().includes("full")}
+                className="border rounded py-2 px-4 w-full mt-1"
+                placeholder="Back Material"
+              />
             </div>
+
             <div>
-              <label>
-                EMB Backing*<br/>
-                <select
-                  name="embBacking"
-                  value={form.embBacking}
-                  onChange={handleChange}
-                  required
-                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
-                >
-                  <option value="">Select backing…</option>
-                  <option value="Cut Away">Cut Away</option>
-                  <option value="Tear Away">Tear Away</option>
-                </select>
+              <label htmlFor="embBacking" className="font-medium">
+                EMB Backing*
               </label>
+              <select
+                id="embBacking"
+                name="embBacking"
+                value={form.embBacking}
+                onChange={handleChange}
+                required
+                className="border rounded py-2 px-4 w-full mt-1"
+              >
+                <option value="">Select backing…</option>
+                <option value="Cut Away">Cut Away</option>
+                <option value="Tear Away">Tear Away</option>
+              </select>
             </div>
+
             <div>
-              <label>
-                Fur Color*<br />
-                <input
-                  ref={furColorRef}
-                  name="furColor"
-                  placeholder="Fur Color*"
-                  value={form.furColor}
-                  onChange={handleFurColorInput}
-                  list="material-list"
-                  autoComplete="off"
-                  required
-                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
-                />
+              <label htmlFor="furColor" className="font-medium">
+                Fur Color*
               </label>
+              <input
+                id="furColor"
+                ref={furColorRef}
+                name="furColor"
+                value={form.furColor}
+                onChange={handleFurColorInput}
+                list="material-list"
+                autoComplete="off"
+                required
+                className="border rounded py-2 px-4 w-full mt-1"
+                placeholder="Fur Color"
+              />
             </div>
           </div>
         </fieldset>
+
 
         {/* Additional Info + Files */}
         <fieldset style={{ padding: "0.5rem" }}>
