@@ -2017,61 +2017,69 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
 
-        {form.materials.map((_, i) => (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              marginBottom: "1rem",
-            }}
-          >
-            <input
-              id={`material${i+1}`}
-              name="materials"
-              type="text"
-              ref={el => (materialInputRefs.current[i] = el)}
-              value={form.materials[i]}
-              onChange={handleMaterialInput(i)}
-              list="material-list"
-              autoComplete="off"
-              required={i === 0}
-              placeholder={`Material ${i+1}`}
-              style={{
-                flex: 1,
-                maxWidth: "12rem",
-                padding: "0.25rem 0.5rem",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-              }}
-            />
-            <input
-              id={`material${i+1}Percent`}
-              name="materialPercents"
-              type="number"
-              step="0.1"
-              min="0"
-              max="100"
-              value={form.materialPercents[i] || ""}
-              onChange={e => handleMaterialPercentChange(i, e.target.value)}
-              required={!!form.materials[i].trim()}
-              placeholder="%"
-              style={{
-                width: "3rem",
-                padding: "0.25rem 0.5rem",
-                border: "1px solid #ccc",
-                borderRadius: "4px",
-                textAlign: "right",
-              }}
-            />
-          </div>
-        ))}
+        {/* Materials */}
+        <fieldset style={{ padding: "1rem", marginBottom: "2rem" }}>
+          <legend style={{ marginBottom: "1rem", fontSize: "1.1rem", fontWeight: 600 }}>
+            Materials
+            {materialsInvalid && <span style={{ color: "red", marginLeft: "0.5rem" }}>🚩</span>}
+          </legend>
 
+          {form.materials.map((_, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                marginBottom: "1rem",
+              }}
+            >
+              <input
+                id={`material${i+1}`}
+                name="materials"
+                type="text"
+                ref={el => (materialInputRefs.current[i] = el)}
+                value={form.materials[i]}
+                onChange={handleMaterialInput(i)}
+                list="material-list"
+                autoComplete="off"
+                required={i === 0}
+                placeholder={`Material ${i+1}`}
+                style={{
+                  flex: 1,
+                  maxWidth: "12rem",
+                  padding: "0.25rem 0.5rem",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                }}
+              />
+              <input
+                id={`material${i+1}Percent`}
+                name="materialPercents"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={form.materialPercents[i] || ""}
+                onChange={e => handleMaterialPercentChange(i, e.target.value)}
+                required={!!form.materials[i].trim()}
+                placeholder="%"
+                style={{
+                  width: "3rem",
+                  padding: "0.25rem 0.5rem",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  textAlign: "right",
+                }}
+              />
+            </div>
+          ))}
 
           {/* shared dropdown options for all Material inputs */}
           <datalist id="material-list">
-            {materialNames.map(mat => <option key={mat} value={mat} />)}
+            {materialNames.map(mat => (
+              <option key={mat} value={mat} />
+            ))}
           </datalist>
 
           {/* Back Material */}
@@ -2131,6 +2139,7 @@ const handleSaveNewCompany = async () => {
             />
           </div>
         </fieldset>
+
 
 
         {/* Additional Info + Files */}
