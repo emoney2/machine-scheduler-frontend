@@ -2047,12 +2047,13 @@ const handleSaveNewCompany = async () => {
                 placeholder={`Material ${i+1}`}
                 style={{
                   flex: 1,
-                  maxWidth: "12rem",
+                  maxWidth: "10rem",
                   padding: "0.25rem 0.5rem",
                   border: "1px solid #ccc",
                   borderRadius: "4px",
                 }}
               />
+
               <input
                 id={`material${i+1}Percent`}
                 name="materialPercents"
@@ -2075,7 +2076,7 @@ const handleSaveNewCompany = async () => {
             </div>
           ))}
 
-          {/* shared dropdown options for all Material inputs */}
+          {/* shared dropdown options */}
           <datalist id="material-list">
             {materialNames.map(mat => (
               <option key={mat} value={mat} />
@@ -2096,7 +2097,7 @@ const handleSaveNewCompany = async () => {
               list="material-list"
               autoComplete="off"
               required={form.product.toLowerCase().includes("full")}
-              className="border rounded py-2 px-3 w-full"
+              className="border rounded py-1 px-2 w-full max-w-xs"
               placeholder="Back Material"
             />
           </div>
@@ -2112,7 +2113,7 @@ const handleSaveNewCompany = async () => {
               value={form.embBacking}
               onChange={handleChange}
               required
-              className="border rounded py-2 px-3 w-full"
+              className="border rounded py-1 px-2 w-full max-w-xs"
             >
               <option value="">Select backing…</option>
               <option value="Cut Away">Cut Away</option>
@@ -2134,7 +2135,7 @@ const handleSaveNewCompany = async () => {
               list="material-list"
               autoComplete="off"
               required
-              className="border rounded py-2 px-3 w-full"
+              className="border rounded py-1 px-2 w-full max-w-xs"
               placeholder="Fur Color"
             />
           </div>
