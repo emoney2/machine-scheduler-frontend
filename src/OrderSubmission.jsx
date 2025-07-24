@@ -2017,87 +2017,57 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
 
-        {/* Materials */}
-        <fieldset style={{ padding: "1rem", marginBottom: "2rem" }}>
-          <legend style={{ marginBottom: "1rem", fontSize: "1.1rem", fontWeight: 600 }}>
-            Materials
-            {materialsInvalid && <span style={{ color: "red", marginLeft: "0.5rem" }}>🚩</span>}
-          </legend>
-
-          {form.materials.map((_, i) => (
-            <div
-              key={i}
+        {form.materials.map((_, i) => (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              marginBottom: "1rem",
+            }}
+          >
+            <input
+              id={`material${i+1}`}
+              name="materials"
+              type="text"
+              ref={el => (materialInputRefs.current[i] = el)}
+              value={form.materials[i]}
+              onChange={handleMaterialInput(i)}
+              list="material-list"
+              autoComplete="off"
+              required={i === 0}
+              placeholder={`Material ${i+1}`}
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 4rem",
-                gap: "1rem",
-                marginBottom: "1.5rem",
-                alignItems: "start",
+                flex: 1,
+                maxWidth: "12rem",
+                padding: "0.25rem 0.5rem",
+                border: "1px solid #ccc",
+                borderRadius: "4px",
               }}
-            >
-              <label
-                htmlFor={`material${i+1}`}
-                style={{
-                  gridColumn: "1 / -1",
-                  marginBottom: "0.5rem",
-                  fontWeight: 500,
-                }}
-              >
-                Material {i+1}{i === 0 && "*"}
-              </label>
+            />
+            <input
+              id={`material${i+1}Percent`}
+              name="materialPercents"
+              type="number"
+              step="0.1"
+              min="0"
+              max="100"
+              value={form.materialPercents[i] || ""}
+              onChange={e => handleMaterialPercentChange(i, e.target.value)}
+              required={!!form.materials[i].trim()}
+              placeholder="%"
+              style={{
+                width: "3rem",
+                padding: "0.25rem 0.5rem",
+                border: "1px solid #ccc",
+                borderRadius: "4px",
+                textAlign: "right",
+              }}
+            />
+          </div>
+        ))}
 
-              <input
-                id={`material${i+1}`}
-                name="materials"
-                type="text"
-                ref={el => (materialInputRefs.current[i] = el)}
-                value={form.materials[i]}
-                onChange={handleMaterialInput(i)}
-                list="material-list"
-                autoComplete="off"
-                required={i === 0}
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                }}
-                placeholder={`Material ${i+1}`}
-              />
-
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <label
-                  htmlFor={`material${i+1}Percent`}
-                  style={{
-                    marginBottom: "0.25rem",
-                    fontSize: "0.9rem",
-                    fontWeight: 500,
-                  }}
-                >
-                  %
-                </label>
-                <input
-                  id={`material${i+1}Percent`}
-                  name="materialPercents"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
-                  value={form.materialPercents[i] || ""}
-                  onChange={e => handleMaterialPercentChange(i, e.target.value)}
-                  required={!!form.materials[i].trim()}
-                  style={{
-                    width: "100%",
-                    padding: "0.5rem",
-                    border: "1px solid #ccc",
-                    borderRadius: "4px",
-                    textAlign: "right",
-                  }}
-                  placeholder="0–100"
-                />
-              </div>
-            </div>
-          ))}
 
           {/* shared dropdown options for all Material inputs */}
           <datalist id="material-list">
