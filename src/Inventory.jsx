@@ -633,8 +633,10 @@ const handleSaveBulkNewItems = async () => {
         {/* Thread Inventory */}
         <fieldset style={{ flex:1 }}>
           <legend>Thread Inventory ({ROWS} rows)</legend>
+
+          {/* ✅ Datalist goes here */}
           <datalist id="thread-list">
-            {threads.map(c => <option key={c} value={c}/>) }
+            {threads.map(c => <option key={c} value={c}/>)}
           </datalist>
           <table style={{ width:"100%", borderCollapse:"collapse" }}>
             <thead>
@@ -653,6 +655,7 @@ const handleSaveBulkNewItems = async () => {
                       list="thread-list"
                       value={r.value}
                       onChange={handleThreadInput(i)}
+                      onBlur={handleThreadBlur(i)}
                       placeholder="Thread color…"
                       style={{ width:"90%", boxSizing:"border-box" }}
                     />
