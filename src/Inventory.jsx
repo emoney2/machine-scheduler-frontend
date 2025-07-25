@@ -48,7 +48,7 @@ export default function Inventory() {
 
   // --- Section 2.4: Effects to Fetch Dropdown Lists ---------------------
   useEffect(() => {
-    axios.get(`${process.env.REACT_APP_API_ROOT}/fur-colors`)
+    axios.get(`${process.env.REACT_APP_API_ROOT}/thread-colors`)
       .then(res => setThreads(res.data))
       .catch(console.error);
     axios.get(`${process.env.REACT_APP_API_ROOT}/materials`)
