@@ -459,18 +459,17 @@ function getChain(jobs, id) {
           )
       );
 
-      // 4) Build embMap: orderId → embroideryStartTime
-      const embMap = {};
-      embList.forEach(r => {
-        const id = String(r['Order #'] || '').trim();
-        if (id) embMap[id] = r['Embroidery Start Time'] || '';
-      });
+      // 4) (Removed embMap) — we now read Embroidery Start Time directly from Production Orders
 
-      // 5) Build a map of all jobs (orders + placeholders)
+      // 5) Build a map of all jobs (orders + placeholders) using Production Orders as source of truth
       const jobById = {};
       orders.forEach(o => {
         const sid = String(o['Order #'] || '').trim();
         if (!sid) return;
+
+        // Pull persisted start time directly from Production Orders
+        const persistedStart = o['Embroidery Start Time'] || '';
+
         jobById[sid] = {
           id:               sid,
           company:          o['Company Name'] || '',
@@ -479,8 +478,8 @@ function getChain(jobs, id) {
           stitch_count:     +o['Stitch Count'] || 0,
           due_date:         o['Due Date'] || '',
           due_type:         o['Hard Date/Soft Date'] || '',
-          embroidery_start: embMap[sid] || '',
-          start_date:       embMap[sid] || '',
+          embroidery_start: persistedStart,     // ← use Production Orders
+          start_date:       persistedStart,     // ← keep same for display if you use it
           status:           o['Stage'] || '',
           threadColors:     o['Threads'] || '',
           machineId:        'queue',
