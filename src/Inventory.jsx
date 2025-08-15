@@ -202,7 +202,7 @@ export default function Inventory() {
        return;
      }
 
-     axios.post(`${process.env.REACT_APP_API_ROOT}/threadInventory`, payload)
+     await axios.post(`${process.env.REACT_APP_API_ROOT}/api/threadInventory`, payload)
        .then(() => {
          alert("Submitted!");
          setThreadRows(initRows());
@@ -256,9 +256,10 @@ const handleMaterialSubmit = async () => {
   // 3) POST to /materialInventory (only writes to your Material Log)
   try {
     await axios.post(
-      `${process.env.REACT_APP_API_ROOT}/materialInventory`,
+      `${process.env.REACT_APP_API_ROOT}/api/materialInventory`,
       payload
     );
+
     // reset the grid
     setMaterialRows(initRows());
     alert("Submitted!");
@@ -321,9 +322,9 @@ const handleSaveNewItem = async () => {
 
     // re-submit the grid now that dropdowns are up to date
     if (newItemData.type === "Thread") {
-      handleSubmit(threadRows,    "/threadInventory",   setThreadRows);
+      handleSubmit(threadRows,    "/api/threadInventory",   setThreadRows);
     } else {
-      handleSubmit(materialRows,  "/materialInventory", setMaterialRows);
+      handleSubmit(materialRows,  "/api/materialInventory", setMaterialRows);
     }
   } catch {
     setNewItemErrors({ general: "Failed to save. Try again." });
@@ -350,7 +351,7 @@ const handleSaveBulkNewItems = async () => {
         notes:        newItemData.notes || ""
       }));
 
-      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
+      const url = `${process.env.REACT_APP_API_ROOT}/api/materialInventory`;
       console.log("Posting to:", url, payload);
       await axios.post(url, payload);
 
@@ -373,7 +374,7 @@ const handleSaveBulkNewItems = async () => {
         cost:         item.cost
       }));
 
-      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
+      const url = `${process.env.REACT_APP_API_ROOT}/api/materialInventory`;
       console.log("Posting to:", url, payload);
       await axios.post(url, payload);
 
