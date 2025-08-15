@@ -321,6 +321,37 @@ function fmtMMDD(d) {
   return mo + '/' + da;
 }
 
+function fmtMMDD(d) {
+  const dt = new Date(d);
+  const mo = String(dt.getMonth() + 1).padStart(2, '0');
+  const da = String(dt.getDate()).padStart(2, '0');
+  return mo + '/' + da;
+}
+
+// === Artwork / Image Helpers ===
+function extractDriveId(url) {
+  if (!url) return '';
+  try {
+    const m1 = url.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+    if (m1) return m1[1];
+    const idParam = new URL(url).searchParams.get('id');
+    if (idParam) return idParam;
+  } catch (_) {}
+  return '';
+}
+
+function toPreviewUrl(originalUrl) {
+  if (!originalUrl) return '';
+  const id = extractDriveId(originalUrl);
+  if (!id) {
+    if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
+    return '';
+  }
+  // Works for images *and* PDFs
+  return `https://drive.google.com/thumbnail?id=${id}&sz=w256`;
+}
+
+
 function sortQueue(arr) {
   return [...arr].sort((a, b) => {
     const da = parseDueDate(a.due_date);
@@ -467,8 +498,12 @@ function getChain(jobs, id) {
         const sid = String(o['Order #'] || '').trim();
         if (!sid) return;
 
-        // Pull persisted start time directly from Production Orders
+        // Persisted start time (from Production Orders)
         const persistedStart = o['Embroidery Start Time'] || '';
+
+        // Artwork link (from Production Orders → Image) → thumbnailable URL
+        const rawImageLink = o['Image'] || '';
+        const artworkUrl   = toPreviewUrl(rawImageLink);
 
         jobById[sid] = {
           id:               sid,
@@ -478,14 +513,17 @@ function getChain(jobs, id) {
           stitch_count:     +o['Stitch Count'] || 0,
           due_date:         o['Due Date'] || '',
           due_type:         o['Hard Date/Soft Date'] || '',
-          embroidery_start: persistedStart,     // ← use Production Orders
-          start_date:       persistedStart,     // ← keep same for display if you use it
+          embroidery_start: persistedStart,
+          start_date:       persistedStart,
           status:           o['Stage'] || '',
           threadColors:     o['Threads'] || '',
+          imageLink:        rawImageLink,   // keep original for debugging
+          artworkUrl,                       // use this on the card
           machineId:        'queue',
           linkedTo:         linksData[sid] || null
         };
       });
+
 
       // 6) Inject placeholders so they persist
       placeholders.forEach(ph => {

@@ -289,21 +289,59 @@ export default function Section9(props) {
                                       gridTemplateRows: 'repeat(5, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
-                                      padding: `6px ${rightPadding}px 6px 6px`,
-                                      margin: `0 0 ${
-                                        jIdx < seg.len - 1 ? 6 : 0
-                                      }px 0`,
+                                      // give room for a 56px thumb + 8px gap on the left when artwork exists
+                                      paddingTop: 6,
+                                      paddingBottom: 6,
+                                      paddingRight: rightPadding,
+                                      paddingLeft: job.artworkUrl ? 6 + 56 + 8 : 6,
+                                      margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
                                       background: job.isLate
                                         ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
                                         : base,
-                                      border: `2px solid ${
-                                        job.isLate ? 'red' : bCol
-                                      }`,
+                                      border: `2px solid ${job.isLate ? 'red' : bCol}`,
                                       borderRadius: 4,
                                       zIndex: 2,
                                       ...prov.draggableProps.style
                                     }}
+
                                   >
+{/* Artwork thumbnail (absolute, top-left); hidden if no artwork */}
+{job.artworkUrl ? (
+  <a
+    href={job.imageLink || job.artworkUrl}
+    target="_blank"
+    rel="noreferrer noopener"
+    title="Open full artwork"
+    style={{
+      position: 'absolute',
+      top: 6,
+      left: 6,
+      display: 'block',
+      zIndex: 5
+    }}
+    onMouseDown={(e) => e.stopPropagation()} // prevent dragging conflicts
+    onClick={(e) => e.stopPropagation()}
+  >
+    <img
+      src={job.artworkUrl}
+      alt={(job.design || 'Artwork') + ' preview'}
+      style={{
+        display: 'block',
+        width: 56,
+        height: 56,
+        objectFit: 'cover',
+        borderRadius: 8,
+        border: '1px solid #eee',
+        background: '#fff',
+        cursor: 'pointer'
+      }}
+      loading="lazy"
+      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+    />
+  </a>
+) : null}
+
+
 {/* only show badge outside strip on real jobs */}
 {!isPh && (
   <span
