@@ -184,12 +184,21 @@ export default function Section9(props) {
           {['queue', 'machine1', 'machine2'].map(colId => {
             const col = columns[colId] || {};
             const rawJobs = Array.isArray(col.jobs) ? col.jobs : [];
-            const jobs = rawJobs.filter(j => {
-              if (!j || j.id === undefined) return false;
-              const st = String(j.status).trim().toLowerCase();
-              return st !== 'complete' && st !== 'sewing';
-             });
-            console.log('🤖 Column', colId, 'jobs after filter:', jobs.map(j => [j.id, `"${j.status}"`] ));
+            const jobs = rawJobs
+              // keep only active jobs
+              .filter(j => {
+                if (!j || j.id === undefined) return false;
+                const st = String(j.status).trim().toLowerCase();
+                return st !== 'complete' && st !== 'sewing';
+              })
+              // 🚫 drop towels (case-insensitive; supports job.product or job.Product)
+              .filter(j => {
+                const prod = String(j.product ?? j.Product ?? '').toLowerCase();
+                return !prod.includes('towel');
+              });
+
+            console.log('🤖 Column', colId, 'jobs after filter:', jobs.map(j => [j.id, `"${j.status}"`, (j.product ?? j.Product ?? '')] ));
+
 
             const segments = [];
             let idx = 0;
@@ -286,7 +295,7 @@ export default function Section9(props) {
                                       position: 'relative',
                                       display: 'grid',
                                       gridTemplateColumns: '1fr auto',
-                                      gridTemplateRows: 'repeat(5, auto)',
+                                      gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
                                       // give room for a 56px thumb + 8px gap on the left when artwork exists
@@ -468,8 +477,9 @@ export default function Section9(props) {
                                       >
                                         {isPh ? '*' : job.id}
                                       </span>
-                                      {job.company}
+                                      {job.company}{(job.product ?? job.Product ?? job.design) ? ' - ' : ''}{job.product ?? job.Product ?? job.design ?? ''}
                                     </span>
+
 
                                     {/* Quantity */}
                                     <span
@@ -488,23 +498,6 @@ export default function Section9(props) {
                                       }}
                                     >
                                       {job.quantity}
-                                    </span>
-
-                                    {/* Design */}
-                                    <span
-                                      style={{
-                                        gridRow: 2,
-                                        gridColumn: 1,
-                                        background: base,
-                                        padding: '0 4px',
-                                        borderRadius: 4,
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        fontSize: 13
-                                      }}
-                                    >
-                                      {job.design || ''}
                                     </span>
 
                                     {/* Embroidery Start */}
@@ -528,7 +521,7 @@ export default function Section9(props) {
                                     {/* EED */}
                                     <span
                                       style={{
-                                        gridRow: 3,
+                                        gridRow: 2,
                                         gridColumn: 1,
                                         background: BUBBLE_END,
                                         padding: '0 4px',
@@ -563,7 +556,7 @@ export default function Section9(props) {
                                     {/* Delivery */}
                                     <span
                                       style={{
-                                        gridRow: 4,
+                                        gridRow: 3,
                                         gridColumn: 1,
                                         background: BUBBLE_DELIV,
                                         padding: '0 4px',
@@ -596,8 +589,8 @@ export default function Section9(props) {
                                     {job.threadColors && (
                                       <div
                                         style={{
-                                          gridRow:           5,
-                                          gridColumn:        '1 / span 2',         // span both columns
+                                          gridRow:           4,
+                                          gridColumn:        1,
                                           display:           'grid',
                                           gridTemplateColumns: 'repeat(8, 1fr)',   // 8 equal columns
                                           gridTemplateRows:  'repeat(2, auto)',    // max 2 rows
