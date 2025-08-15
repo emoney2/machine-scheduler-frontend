@@ -457,7 +457,8 @@ export default function Section9(props) {
                                         overflow: 'hidden',
                                         textOverflow: 'ellipsis',
                                         fontSize: 13,
-                                        fontWeight: 'bold'
+                                        fontWeight: 'bold',
+                                        minWidth: 0               // ← key: allow ellipsis to happen only when it hits Quantity
                                       }}
                                     >
                                       <span
@@ -479,6 +480,7 @@ export default function Section9(props) {
                                       </span>
                                       {job.company}{(job.product ?? job.Product) ? ' - ' : ''}{job.product ?? job.Product ?? ''}
                                     </span>
+
 
 
                                     {/* Quantity */}
@@ -614,9 +616,10 @@ export default function Section9(props) {
                                                 padding:      '1px 2px',
                                                 fontSize:     10,
                                                 textAlign:    'center',
-                                                overflow:     'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace:   'nowrap',
+                                                // show full text; allow wrapping if needed
+                                                overflow:     'visible',
+                                                textOverflow: 'clip',
+                                                whiteSpace:   'normal',
                                                 width:        '100%'
                                               }}
                                             >
