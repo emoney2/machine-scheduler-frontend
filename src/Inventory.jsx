@@ -133,20 +133,41 @@ const handleChange = (setter, idx, field) => (e) => {
 };
 
 const handleSubmit = async (rows, url, resetRows) => {
-  const payload = rows
-    .filter(r => r.value && r.quantity)
-    .map(r => ({
-      value: r.value,
-      quantity: r.quantity,
-      action: r.action || "Ordered"
-    }));
+  // Option B: API root already ends with /api, so url must be like "/materialInventory" or "/threadInventory"
+  const isMaterial = url.includes("/materialInventory");
 
-  if (!payload.length) return alert("No rows to submit");
+  const payload = rows
+    .filter(r => String(r.value || "").trim() && String(r.quantity || "").trim())
+    .map(r => {
+      const value = String(r.value).trim();
+      const quantity = String(r.quantity).trim();
+      const action = (r.action || "Ordered").trim();
+
+      // Server accepts name under "materialName" or "value"
+      return isMaterial
+        ? {
+            materialName: value,
+            quantity,
+            action,
+            type: "Material"
+          }
+        : {
+            value,
+            quantity,
+            action
+          };
+    });
+
+  if (!payload.length) {
+    alert("No rows to submit");
+    return;
+  }
 
   try {
     await axios.post(
       `${process.env.REACT_APP_API_ROOT}${url}`,
-      payload
+      payload,
+      { withCredentials: true }
     );
     alert("Submitted!");
     resetRows(initRows());
@@ -164,7 +185,7 @@ const submitThreads = async () => {
   const unknowns = [
     ...new Set(
       threadRows
-        .map(r => (r.value || "").trim())
+        .map(r => String(r.value || "").trim())
         .filter(v => v && !threads.includes(v))
     )
   ];
@@ -187,11 +208,11 @@ const submitThreads = async () => {
 
   // ③ Otherwise, build payload with action default
   const payload = threadRows
-    .filter(r => r.value && r.quantity)
+    .filter(r => String(r.value || "").trim() && String(r.quantity || "").trim())
     .map(r => ({
-      value: r.value,
-      quantity: r.quantity,
-      action: r.action || "Ordered"
+      value: String(r.value).trim(),
+      quantity: String(r.quantity).trim(),
+      action: String(r.action || "Ordered").trim()
     }));
 
   console.log("🧵 Submitting thread payload:", payload);
@@ -204,7 +225,8 @@ const submitThreads = async () => {
   try {
     await axios.post(
       `${process.env.REACT_APP_API_ROOT}/threadInventory`,
-      payload
+      payload,
+      { withCredentials: true }
     );
     alert("Submitted!");
     setThreadRows(initRows());
