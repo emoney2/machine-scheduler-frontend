@@ -203,7 +203,7 @@ const submitThreads = async () => {
 
   try {
     await axios.post(
-      `${process.env.REACT_APP_API_ROOT}/api/threadInventory`,
+      `${process.env.REACT_APP_API_ROOT}/threadInventory`,
       payload
     );
     alert("Submitted!");
@@ -213,6 +213,7 @@ const submitThreads = async () => {
     alert("Submission failed");
   }
 };
+
 
 // ─── Section 4b: Intercept Material-Submit & Branch Endpoints ────────────
 const handleMaterialSubmit = async () => {
@@ -257,7 +258,7 @@ const handleMaterialSubmit = async () => {
   // 3) POST to /materialInventory (only writes to your Material Log)
   try {
     await axios.post(
-      `${process.env.REACT_APP_API_ROOT}/api/materialInventory`,
+      `${process.env.REACT_APP_API_ROOT}/materialInventory`,
       payload
     );
 
@@ -323,9 +324,9 @@ const handleSaveNewItem = async () => {
 
     // re-submit the grid now that dropdowns are up to date
     if (newItemData.type === "Thread") {
-      handleSubmit(threadRows,    "/api/threadInventory",   setThreadRows);
+      handleSubmit(threadRows,    "/threadInventory",   setThreadRows);
     } else {
-      handleSubmit(materialRows,  "/api/materialInventory", setMaterialRows);
+      handleSubmit(materialRows,  "/materialInventory", setMaterialRows);
     }
   } catch {
     setNewItemErrors({ general: "Failed to save. Try again." });
@@ -352,7 +353,7 @@ const handleSaveBulkNewItems = async () => {
         notes:        newItemData.notes || ""
       }));
 
-      const url = `${process.env.REACT_APP_API_ROOT}/api/materialInventory`;
+      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
       console.log("Posting to:", url, payload);
       await axios.post(url, payload);
 
@@ -375,7 +376,7 @@ const handleSaveBulkNewItems = async () => {
         cost:         item.cost
       }));
 
-      const url = `${process.env.REACT_APP_API_ROOT}/api/materialInventory`;
+      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
       console.log("Posting to:", url, payload);
       await axios.post(url, payload);
 
