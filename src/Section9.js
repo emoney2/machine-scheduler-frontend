@@ -446,20 +446,18 @@ export default function Section9(props) {
 </div>
 
                                     {/* Job ID + Company */}
-                                    <span
+                                    {/* Row 1: Company–Product (fills) + Quantity (right) */}
+                                    <div
                                       style={{
                                         gridRow: 1,
-                                        gridColumn: 1,
-                                        background: base,
-                                        padding: '0 4px',
-                                        borderRadius: 4,
-                                        fontSize: 13,
-                                        fontWeight: 'bold',
+                                        gridColumn: '1 / span 2',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        overflow: 'hidden'        // still hides if it really collides with Quantity
+                                        gap: 6,
+                                        minWidth: 0
                                       }}
                                     >
+                                      {/* ID dot */}
                                       <span
                                         style={{
                                           flexShrink: 0,
@@ -478,37 +476,40 @@ export default function Section9(props) {
                                       >
                                         {isPh ? '*' : job.id}
                                       </span>
+
+                                      {/* Company – Product bubble (expands fully until Quantity) */}
                                       <span
                                         style={{
-                                          flexGrow: 1,             // ← expands bubble all the way until Quantity
-                                          minWidth: 0,             // ← allows proper shrinking if really needed
+                                          flexGrow: 1,
+                                          minWidth: 0,
+                                          background: base,
+                                          padding: '0 4px',
+                                          borderRadius: 4,
                                           whiteSpace: 'nowrap',
                                           overflow: 'hidden',
-                                          textOverflow: 'ellipsis'
+                                          textOverflow: 'ellipsis',
+                                          fontSize: 13,
+                                          fontWeight: 'bold'
                                         }}
                                       >
                                         {job.company}{(job.product ?? job.Product) ? ' - ' : ''}{job.product ?? job.Product ?? ''}
                                       </span>
-                                    </span>
 
-                                    {/* Quantity */}
-                                    <span
-                                      style={{
-                                        gridRow: 1,
-                                        gridColumn: 2,
-                                        justifySelf: 'end',
-                                        background: base,
-                                        padding: '0 4px',
-                                        borderRadius: 4,
-                                        fontSize: 15,
-                                        fontWeight: 'bold',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
-                                      }}
-                                    >
-                                      {job.quantity}
-                                    </span>
+                                      {/* Quantity bubble pinned right */}
+                                      <span
+                                        style={{
+                                          marginLeft: 6,
+                                          background: base,
+                                          padding: '0 4px',
+                                          borderRadius: 4,
+                                          fontSize: 15,
+                                          fontWeight: 'bold',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        {job.quantity}
+                                      </span>
+                                    </div>
 
                                     {/* Embroidery Start */}
                                     {job.start && (
