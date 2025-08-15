@@ -333,7 +333,7 @@ export default function Section9(props) {
   >
     <img
       src={job.artworkUrl}
-      alt={(job.design || 'Artwork') + ' preview'}
+      alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
       style={{
         display: 'block',
         width: 56,
@@ -477,7 +477,7 @@ export default function Section9(props) {
                                       >
                                         {isPh ? '*' : job.id}
                                       </span>
-                                      {job.company}{(job.product ?? job.Product ?? job.design) ? ' - ' : ''}{job.product ?? job.Product ?? job.design ?? ''}
+                                      {job.company}{(job.product ?? job.Product) ? ' - ' : ''}{job.product ?? job.Product ?? ''}
                                     </span>
 
 
@@ -596,7 +596,6 @@ export default function Section9(props) {
                                           gridTemplateRows:  'repeat(2, auto)',    // max 2 rows
                                           gap:               2,
                                           marginTop:         4,
-                                          paddingRight:      '32px',               // reserve 32px for the right strip
                                           overflow:          'hidden'
                                         }}
                                       >

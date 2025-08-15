@@ -508,6 +508,7 @@ function getChain(jobs, id) {
         jobById[sid] = {
           id:               sid,
           company:          o['Company Name'] || '',
+          product:          o['Product'] || '',           // ← ADD THIS
           design:           o['Design'] || '',
           quantity:         +o['Quantity'] || 0,
           stitch_count:     +o['Stitch Count'] || 0,
@@ -517,8 +518,8 @@ function getChain(jobs, id) {
           start_date:       persistedStart,
           status:           o['Stage'] || '',
           threadColors:     o['Threads'] || '',
-          imageLink:        rawImageLink,   // keep original for debugging
-          artworkUrl,                       // use this on the card
+          imageLink:        rawImageLink,
+          artworkUrl,
           machineId:        'queue',
           linkedTo:         linksData[sid] || null
         };
