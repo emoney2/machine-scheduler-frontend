@@ -294,7 +294,7 @@ export default function Section9(props) {
                                     style={{
                                       position: 'relative',
                                       display: 'grid',
-                                      gridTemplateColumns: '1fr auto',
+                                      gridTemplateColumns: 'minmax(0, 1fr) auto',
                                       gridTemplateRows: 'repeat(4, auto)',
                                       columnGap: 6,
                                       rowGap: 4,
@@ -453,16 +453,16 @@ export default function Section9(props) {
                                         background: base,
                                         padding: '0 4px',
                                         borderRadius: 4,
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
                                         fontSize: 13,
                                         fontWeight: 'bold',
-                                        minWidth: 0               // ← key: allow ellipsis to happen only when it hits Quantity
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        overflow: 'hidden'        // still hides if it really collides with Quantity
                                       }}
                                     >
                                       <span
                                         style={{
+                                          flexShrink: 0,
                                           display: 'inline-block',
                                           width: 20,
                                           height: 20,
@@ -478,10 +478,18 @@ export default function Section9(props) {
                                       >
                                         {isPh ? '*' : job.id}
                                       </span>
-                                      {job.company}{(job.product ?? job.Product) ? ' - ' : ''}{job.product ?? job.Product ?? ''}
+                                      <span
+                                        style={{
+                                          flexGrow: 1,             // ← expands bubble all the way until Quantity
+                                          minWidth: 0,             // ← allows proper shrinking if really needed
+                                          whiteSpace: 'nowrap',
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis'
+                                        }}
+                                      >
+                                        {job.company}{(job.product ?? job.Product) ? ' - ' : ''}{job.product ?? job.Product ?? ''}
+                                      </span>
                                     </span>
-
-
 
                                     {/* Quantity */}
                                     <span
@@ -591,14 +599,15 @@ export default function Section9(props) {
                                     {job.threadColors && (
                                       <div
                                         style={{
-                                          gridRow:           4,
-                                          gridColumn:        1,
-                                          display:           'grid',
+                                          gridRow:             4,
+                                          gridColumn:          1,
+                                          display:             'grid',
                                           gridTemplateColumns: 'repeat(8, 1fr)',   // 8 equal columns
-                                          gridTemplateRows:  'repeat(2, auto)',    // max 2 rows
-                                          gap:               2,
-                                          marginTop:         4,
-                                          overflow:          'hidden'
+                                          gridTemplateRows:    'repeat(2, auto)',  // max 2 rows
+                                          gap:                 2,
+                                          marginTop:           4,
+                                          overflow:            'hidden',
+                                          minWidth:            0                   // ← lets it expand right up to Delivery
                                         }}
                                       >
                                         {job.threadColors
