@@ -210,7 +210,7 @@ export default function Section9(props) {
                       position: 'relative',
                       border: '1px solid #ccc',
                       borderRadius: 4,
-                      width: colId === 'queue' ? 340 : 420,
+                      width: colId === 'queue' ? 300 : 380,
                       minHeight: 400,
                       padding: 12,
                       background: '#fafafa'
