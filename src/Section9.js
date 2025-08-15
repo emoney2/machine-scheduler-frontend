@@ -180,7 +180,7 @@ export default function Section9(props) {
            }
          }}
        >
-        <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
+        <div style={{ display: 'flex', gap: 16, marginTop: 16, overflowX: 'auto' }}>
           {['queue', 'machine1', 'machine2'].map(colId => {
             const col = columns[colId] || {};
             const rawJobs = Array.isArray(col.jobs) ? col.jobs : [];
@@ -210,7 +210,7 @@ export default function Section9(props) {
                       position: 'relative',
                       border: '1px solid #ccc',
                       borderRadius: 4,
-                      width: colId === 'queue' ? 260 : 300,
+                      width: colId === 'queue' ? 340 : 420,
                       minHeight: 400,
                       padding: 12,
                       background: '#fafafa'
@@ -504,7 +504,7 @@ export default function Section9(props) {
                                         fontSize: 13
                                       }}
                                     >
-                                      {job.design?.slice(0, 22)}
+                                      {job.design || ''}
                                     </span>
 
                                     {/* Embroidery Start */}
