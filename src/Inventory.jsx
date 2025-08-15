@@ -122,96 +122,97 @@ export default function Inventory() {
     }
   };
 
-  // --- Section 4: Change & Submit Handlers -------------------------------
-  const handleChange = (setter, idx, field) => (e) => {
-    const val = e.target.value;
-    setter(rows => {
-      const copy = [...rows];
-      copy[idx] = { ...copy[idx], [field]: val };
-      return copy;
-    });
-  };
+// --- Section 4: Change & Submit Handlers -------------------------------
+const handleChange = (setter, idx, field) => (e) => {
+  const val = e.target.value;
+  setter(rows => {
+    const copy = [...rows];
+    copy[idx] = { ...copy[idx], [field]: val };
+    return copy;
+  });
+};
 
-  const handleSubmit = async (rows, url, resetRows) => {
-    const payload = rows
-      .filter(r => r.value && r.quantity)
-      .map(r => ({
-        value: r.value,
-        quantity: r.quantity,
-        action: r.action || "Ordered"
-      }));
+const handleSubmit = async (rows, url, resetRows) => {
+  const payload = rows
+    .filter(r => r.value && r.quantity)
+    .map(r => ({
+      value: r.value,
+      quantity: r.quantity,
+      action: r.action || "Ordered"
+    }));
 
-    if (!payload.length) return alert("No rows to submit");
+  if (!payload.length) return alert("No rows to submit");
 
-    try {
-      const res = await axios.post(
-        `${process.env.REACT_APP_API_ROOT}${url}`,
-        payload
-      );
-      alert("Submitted!");
-      resetRows(initRows());
-    } catch (err) {
-      console.error(err);
-      alert("Submission failed");
-    }
-  };
+  try {
+    await axios.post(
+      `${process.env.REACT_APP_API_ROOT}${url}`,
+      payload
+    );
+    alert("Submitted!");
+    resetRows(initRows());
+  } catch (err) {
+    console.error(err);
+    alert("Submission failed");
+  }
+};
 
-// ⏺ Add this immediately below handleSubmit
-   // ——— Custom submit for Threads — detect new colors first ———
-   const submitThreads = () => {
-     console.log("🚨 submitThreads triggered");
+// ——— Custom submit for Threads — detect new colors first ———
+const submitThreads = async () => {
+  console.log("🚨 submitThreads triggered");
 
-     // ① Gather every distinct color in the grid that’s not yet in threads[]
-     const unknowns = [
-       ...new Set(
-         threadRows
-           .map(r => r.value.trim())
-           .filter(v => v && !threads.includes(v))
-       )
-     ];
+  // ① Gather every distinct color in the grid that’s not yet in threads[]
+  const unknowns = [
+    ...new Set(
+      threadRows
+        .map(r => (r.value || "").trim())
+        .filter(v => v && !threads.includes(v))
+    )
+  ];
 
-     // ② If there are any, prepare the bulk modal and bail out
-     if (unknowns.length) {
-       setNewItemData({ name: "", type: "Thread" });  // ← add this line
-       setBulkNewItems(
-         unknowns.map(color => ({
-           name: color,
-           minInv: "",
-           reorder: "",
-           cost: ""
-         }))
-       );
-       setNewItemErrors({});
-       setIsNewItemModalOpen(true);
-       return;
-     }
+  // ② If there are any, prepare the bulk modal and bail out
+  if (unknowns.length) {
+    setNewItemData({ name: "", type: "Thread" });
+    setBulkNewItems(
+      unknowns.map(color => ({
+        name: color,
+        minInv: "",
+        reorder: "",
+        cost: ""
+      }))
+    );
+    setNewItemErrors({});
+    setIsNewItemModalOpen(true);
+    return;
+  }
 
-     // ③ Otherwise, build payload with action default
-     const payload = threadRows
-       .filter(r => r.value && r.quantity)
-       .map(r => ({
-         value: r.value,
-         quantity: r.quantity,
-         action: r.action || "Ordered"
-       }));
+  // ③ Otherwise, build payload with action default
+  const payload = threadRows
+    .filter(r => r.value && r.quantity)
+    .map(r => ({
+      value: r.value,
+      quantity: r.quantity,
+      action: r.action || "Ordered"
+    }));
 
-     console.log("🧵 Submitting thread payload:", payload);
+  console.log("🧵 Submitting thread payload:", payload);
 
-     if (!payload.length) {
-       alert("No threads to submit");
-       return;
-     }
+  if (!payload.length) {
+    alert("No threads to submit");
+    return;
+  }
 
-     await axios.post(`${process.env.REACT_APP_API_ROOT}/api/threadInventory`, payload)
-       .then(() => {
-         alert("Submitted!");
-         setThreadRows(initRows());
-       })
-       .catch(err => {
-         console.error("❌ Submission failed", err);
-         alert("Submission failed");
-       });
-   };
+  try {
+    await axios.post(
+      `${process.env.REACT_APP_API_ROOT}/api/threadInventory`,
+      payload
+    );
+    alert("Submitted!");
+    setThreadRows(initRows());
+  } catch (err) {
+    console.error("❌ Submission failed", err);
+    alert("Submission failed");
+  }
+};
 
 // ─── Section 4b: Intercept Material-Submit & Branch Endpoints ────────────
 const handleMaterialSubmit = async () => {
