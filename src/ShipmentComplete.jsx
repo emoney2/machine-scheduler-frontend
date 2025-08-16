@@ -58,7 +58,7 @@ export default function ShipmentComplete() {
       <ul style={{ listStyle: "none", padding: 0, lineHeight: 1.6 }}>
         {renderStatus(shippedOk, "Order Marked Shipped")}
         {renderStatus(slipsPrinted,  "Packing Slips Generated")}
-        {renderStatus(labelsPrinted, "Printed Shipping Labels")}
+        {renderStatus(!!invoiceUrl, "Invoice Created")}
       </ul>
 
       <div style={{ marginTop: "2rem", textAlign: "center" }}>
