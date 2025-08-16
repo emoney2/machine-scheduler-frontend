@@ -20,7 +20,7 @@ export default function OrderSubmission() {
     materialPercents: ["", "", "", "", ""],  // ← new
     backMaterial: "",
     embBacking: "",
-    furColor: "",
+    furColor: "Cut Away",
     notes: "",
   });
 
@@ -448,26 +448,11 @@ const furColorNames = furColors;
 
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
-    setProdFiles((prevFiles) => {
-      const newFiles = prevFiles.filter((_, idx) => idx !== i);
-
-      // Adjust designName:  
-      // • if we still have files, use the first one  
-      // • otherwise clear it
-      if (newFiles.length > 0) {
-        let name = newFiles[0].name.replace(/\.[^/.]+$/, "");
-        if (name.length > 12) name = name.slice(0, 12) + "..";
-        setForm((prev) => ({ ...prev, designName: name }));
-      } else {
-        setForm((prev) => ({ ...prev, designName: "" }));
-      }
-
-      return newFiles;
-    });
-
-    // remove its preview
+    // Only update file & preview arrays; leave form.designName alone
+    setProdFiles((prevFiles) => prevFiles.filter((_, idx) => idx !== i));
     setProdPreviews((prev) => prev.filter((_, idx) => idx !== i));
   };
+
 
   // remove the print file + its preview at index i
   const removePrintFile = (i) => {
@@ -515,20 +500,11 @@ const furColorNames = furColors;
 
   const handleFileChange = (e, setter, previewSetter) => {
     const files = Array.from(e.target.files);
-    setter(prev => [...prev, ...files]);
-    previewSetter(prev => [...prev, ...createPreviews(files)]);
-
-    // only set designName on very first production-file upload
-    if (
-      setter === setProdFiles &&
-      prodFiles.length === 0 &&      // no files were there before
-      files.length > 0
-    ) {
-      let name = files[0].name.replace(/\.[^/.]+$/, "");
-      if (name.length > 12) name = name.slice(0, 12) + "..";
-      setForm(prev => ({ ...prev, designName: name }));
-    }
+    setter((prev) => [...prev, ...files]);
+    previewSetter((prev) => [...prev, ...createPreviews(files)]);
+    // Do NOT touch form.designName — user will type it manually 
   };
+
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
@@ -1913,7 +1889,7 @@ const handleSaveNewCompany = async () => {
                 <input
                   name="designName"
                   value={form.designName}
-                  readOnly
+                  onChange={handleChange}
                   required
                   style={{ width: "80%" }}
                 />
@@ -2047,6 +2023,7 @@ const handleSaveNewCompany = async () => {
               {[0,1,2].map(i => (
                 <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
                   <input
+                    ref={(el) => (materialInputRefs.current[i] = el)}
                     type="text"
                     placeholder={`Material ${i+1}${i===0?"*":""}`}
                     value={form.materials[i]}
@@ -2079,6 +2056,7 @@ const handleSaveNewCompany = async () => {
               {[3,4].map(i => (
                 <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
                   <input
+                    ref={(el) => (materialInputRefs.current[i] = el)}
                     type="text"
                     placeholder={`Material ${i+1}`}
                     value={form.materials[i]}
@@ -2105,13 +2083,10 @@ const handleSaveNewCompany = async () => {
               ))}
 
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <label htmlFor="backMaterial" style={{ marginBottom:"0.25rem", fontWeight:500 }}>
-                  Back Material{form.product.toLowerCase().includes("full") && "*"}
-                </label>
                 <input
                   id="backMaterial"
                   type="text"
-                  placeholder="Back Material"
+                  placeholder={`Back Material${form.product.toLowerCase().includes("full") ? "*" : ""}`}
                   value={form.backMaterial}
                   onChange={handleBackMaterialInput}
                   list="material-list"
@@ -2120,14 +2095,10 @@ const handleSaveNewCompany = async () => {
                   style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
                 />
               </div>
-            </div>
 
             {/* Right: EMB Backing & Fur Color */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <label htmlFor="embBacking" style={{ marginBottom:"0.25rem", fontWeight:500 }}>
-                  EMB Backing*
-                </label>
                 <select
                   id="embBacking"
                   name="embBacking"
@@ -2136,19 +2107,17 @@ const handleSaveNewCompany = async () => {
                   required
                   style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
                 >
-                  <option value="">Select backing…</option>
+                  <option value="">EMB Backing*</option>
                   <option value="Cut Away">Cut Away</option>
                   <option value="Tear Away">Tear Away</option>
                 </select>
               </div>
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <label htmlFor="furColor" style={{ marginBottom:"0.25rem", fontWeight:500 }}>
-                  Fur Color*
-                </label>
                 <input
+                  ref={furColorRef}
                   id="furColor"
                   type="text"
-                  placeholder="Fur Color"
+                  placeholder="Fur Color*"
                   value={form.furColor}
                   onChange={handleFurColorInput}
                   list="material-list"
@@ -2158,7 +2127,7 @@ const handleSaveNewCompany = async () => {
                 />
               </div>
             </div>
-          </div>
+
 
           {/* shared dropdown for type‑ahead */}
           <datalist id="material-list">
