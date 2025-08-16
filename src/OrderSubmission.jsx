@@ -2020,31 +2020,31 @@ const handleSaveNewCompany = async () => {
           >
             {/* Left: Material 1–3 */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {[0,1,2].map(i => (
+              {[0, 1, 2].map((i) => (
                 <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
                   <input
-                    ref={(el) => (materialInputRefs.current[i] = el)}
                     type="text"
-                    placeholder={`Material ${i+1}${i===0?"*":""}`}
+                    placeholder={`Material ${i + 1}${i === 0 ? "*" : ""}`}
                     value={form.materials[i]}
-                    onChange={e => handleMaterialInput(i)(e)}
+                    onChange={(e) => handleMaterialInput(i)(e)}
                     list="material-list"
                     autoComplete="off"
-                    required={i===0}
-                    style={{ flex:1, padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                    required={i === 0}
+                    style={{ flex: 1, padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
                   />
                   <input
                     type="number"
                     placeholder="%"
-                    value={form.materialPercents[i]||""}
-                    onChange={e => handleMaterialPercentChange(i, e.target.value)}
-                    min="0" max="100"
+                    value={form.materialPercents[i] || ""}
+                    onChange={(e) => handleMaterialPercentChange(i, e.target.value)}
+                    min="0"
+                    max="100"
                     style={{
                       width: "3rem",
                       padding: "0.5rem",
                       border: "1px solid #ccc",
                       borderRadius: "4px",
-                      textAlign: "right"
+                      textAlign: "right",
                     }}
                   />
                 </div>
@@ -2053,35 +2053,36 @@ const handleSaveNewCompany = async () => {
 
             {/* Middle: Material 4–5 + Back Material */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-              {[3,4].map(i => (
+              {[3, 4].map((i) => (
                 <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
                   <input
-                    ref={(el) => (materialInputRefs.current[i] = el)}
                     type="text"
-                    placeholder={`Material ${i+1}`}
+                    placeholder={`Material ${i + 1}`}
                     value={form.materials[i]}
-                    onChange={e => handleMaterialInput(i)(e)}
+                    onChange={(e) => handleMaterialInput(i)(e)}
                     list="material-list"
                     autoComplete="off"
-                    style={{ flex:1, padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                    style={{ flex: 1, padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
                   />
                   <input
                     type="number"
                     placeholder="%"
-                    value={form.materialPercents[i]||""}
-                    onChange={e => handleMaterialPercentChange(i, e.target.value)}
-                    min="0" max="100"
+                    value={form.materialPercents[i] || ""}
+                    onChange={(e) => handleMaterialPercentChange(i, e.target.value)}
+                    min="0"
+                    max="100"
                     style={{
                       width: "3rem",
                       padding: "0.5rem",
                       border: "1px solid #ccc",
                       borderRadius: "4px",
-                      textAlign: "right"
+                      textAlign: "right",
                     }}
                   />
                 </div>
               ))}
 
+              {/* Back Material (placeholder-only label, required iff Product contains "full") */}
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <input
                   id="backMaterial"
@@ -2092,9 +2093,10 @@ const handleSaveNewCompany = async () => {
                   list="material-list"
                   autoComplete="off"
                   required={form.product.toLowerCase().includes("full")}
-                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                  style={{ padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
                 />
               </div>
+            </div>
 
             {/* Right: EMB Backing & Fur Color */}
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -2105,13 +2107,14 @@ const handleSaveNewCompany = async () => {
                   value={form.embBacking}
                   onChange={handleChange}
                   required
-                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                  style={{ padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
                 >
                   <option value="">EMB Backing*</option>
                   <option value="Cut Away">Cut Away</option>
                   <option value="Tear Away">Tear Away</option>
                 </select>
               </div>
+
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <input
                   ref={furColorRef}
@@ -2123,15 +2126,17 @@ const handleSaveNewCompany = async () => {
                   list="material-list"
                   autoComplete="off"
                   required
-                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
+                  style={{ padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
                 />
               </div>
             </div>
+          </div>
 
-
-          {/* shared dropdown for type‑ahead */}
+          {/* shared dropdown for type-ahead */}
           <datalist id="material-list">
-            {materialNames.map(mat => <option key={mat} value={mat} />)}
+            {materialNames.map((mat) => (
+              <option key={mat} value={mat} />
+            ))}
           </datalist>
         </fieldset>
         {/* Additional Info + Files */}
