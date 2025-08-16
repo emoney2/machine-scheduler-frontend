@@ -19,8 +19,8 @@ export default function OrderSubmission() {
     materials: ["", "", "", "", ""],
     materialPercents: ["", "", "", "", ""],  // ← new
     backMaterial: "",
-    embBacking: "",
-    furColor: "Cut Away",
+    embBacking: "Cut Away",
+    furColor: "",
     notes: "",
   });
 
@@ -309,89 +309,93 @@ export default function OrderSubmission() {
   };
 
 // ─── MATERIAL inline‐typeahead ─────────────────────────────────
-const handleMaterialInput = (idx) => (e) => {
+const handleMaterialInput = (i) => (e) => {
   const raw = e.target.value;
   const inputType = e.nativeEvent?.inputType;
 
-  // on delete/backspace, just store raw
-  if (inputType?.startsWith("delete")) {
-    const newM = [...form.materials];
-    newM[idx] = raw;
-    setForm(prev => ({ ...prev, materials: newM }));
+  if (!raw) {
+    handleMaterialChange(i, "");
     return;
   }
 
-  // otherwise try to complete
+  if (inputType?.startsWith("delete")) {
+    handleMaterialChange(i, raw);
+    return;
+  }
+
   const match = materialNames.find(m =>
     m.toLowerCase().startsWith(raw.toLowerCase())
   );
   if (match && raw !== match) {
-    const newM = [...form.materials];
-    newM[idx] = match;
-    setForm(prev => ({ ...prev, materials: newM }));
-    // highlight the appended text
+    handleMaterialChange(i, match);
     setTimeout(() => {
-      const input = materialInputRefs.current[idx];
-      input.setSelectionRange(raw.length, match.length);
+      const input = materialInputRefs.current[i];
+      if (input) input.setSelectionRange(raw.length, match.length);
     }, 0);
   } else {
-    const newM = [...form.materials];
-    newM[idx] = raw;
-    setForm(prev => ({ ...prev, materials: newM }));
+    handleMaterialChange(i, raw);
   }
 };
+
 
 // ─── BACK MATERIAL inline‐typeahead ─────────────────────────────
 const handleBackMaterialInput = (e) => {
   const raw = e.target.value;
   const inputType = e.nativeEvent?.inputType;
 
-  // allow backspace/delete
+  if (!raw) {
+    setForm(prev => ({ ...prev, backMaterial: "" }));
+    return;
+  }
+
   if (inputType?.startsWith("delete")) {
     setForm(prev => ({ ...prev, backMaterial: raw }));
     return;
   }
 
-  // otherwise try to complete
   const match = materialNames.find(m =>
     m.toLowerCase().startsWith(raw.toLowerCase())
   );
   if (match && raw !== match) {
     setForm(prev => ({ ...prev, backMaterial: match }));
-    // highlight the appended text
     setTimeout(() => {
       const input = backMaterialRef.current;
-      input.setSelectionRange(raw.length, match.length);
+      if (input) input.setSelectionRange(raw.length, match.length);
     }, 0);
   } else {
     setForm(prev => ({ ...prev, backMaterial: raw }));
   }
 };
 
+
   // ─── FUR COLOR inline‐typeahead ────────────────────────────────
   const handleFurColorInput = (e) => {
     const raw = e.target.value;
     const inputType = e.nativeEvent?.inputType;
 
-    // on delete/backspace, store raw
-    if (inputType?.startsWith("delete")) {
-      setForm((prev) => ({ ...prev, furColor: raw }));
+    // if empty, don't autocomplete
+    if (!raw) {
+      setForm(prev => ({ ...prev, furColor: "" }));
       return;
     }
 
-    // try to autocomplete from materialNames
-    const match = materialNames.find((m) =>
+    // allow deletes/backspace
+    if (inputType?.startsWith("delete")) {
+      setForm(prev => ({ ...prev, furColor: raw }));
+      return;
+    }
+ 
+    const match = materialNames.find(m =>
       m.toLowerCase().startsWith(raw.toLowerCase())
     );
     if (match && raw !== match) {
-      setForm((prev) => ({ ...prev, furColor: match }));
-      // highlight appended text
+      setForm(prev => ({ ...prev, furColor: match }));
       setTimeout(() => {
         const input = furColorRef.current;
-        input.setSelectionRange(raw.length, match.length);
+        if (input) input.setSelectionRange(raw.length, match.length);
       }, 0);
     } else {
-      setForm((prev) => ({ ...prev, furColor: raw }));
+      setForm(prev => ({ ...prev, furColor: raw }));
     }
   };
 
@@ -2023,10 +2027,11 @@ const handleSaveNewCompany = async () => {
               {[0, 1, 2].map((i) => (
                 <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
                   <input
+                    ref={(el) => (materialInputRefs.current[i] = el)}
                     type="text"
                     placeholder={`Material ${i + 1}${i === 0 ? "*" : ""}`}
                     value={form.materials[i]}
-                    onChange={(e) => handleMaterialInput(i)(e)}
+                    onChange={handleMaterialInput(i)}
                     list="material-list"
                     autoComplete="off"
                     required={i === 0}
@@ -2056,10 +2061,11 @@ const handleSaveNewCompany = async () => {
               {[3, 4].map((i) => (
                 <div key={i} style={{ display: "flex", gap: "0.5rem" }}>
                   <input
+                    ref={(el) => (materialInputRefs.current[i] = el)}
                     type="text"
                     placeholder={`Material ${i + 1}`}
                     value={form.materials[i]}
-                    onChange={(e) => handleMaterialInput(i)(e)}
+                    onChange={handleMaterialInput(i)}
                     list="material-list"
                     autoComplete="off"
                     style={{ flex: 1, padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
@@ -2085,6 +2091,7 @@ const handleSaveNewCompany = async () => {
               {/* Back Material (placeholder-only label, required iff Product contains "full") */}
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <input
+                  ref={backMaterialRef}
                   id="backMaterial"
                   type="text"
                   placeholder={`Back Material${form.product.toLowerCase().includes("full") ? "*" : ""}`}
@@ -2093,7 +2100,7 @@ const handleSaveNewCompany = async () => {
                   list="material-list"
                   autoComplete="off"
                   required={form.product.toLowerCase().includes("full")}
-                  style={{ padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
+                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
                 />
               </div>
             </div>
@@ -2126,7 +2133,7 @@ const handleSaveNewCompany = async () => {
                   list="material-list"
                   autoComplete="off"
                   required
-                  style={{ padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
+                  style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
                 />
               </div>
             </div>
