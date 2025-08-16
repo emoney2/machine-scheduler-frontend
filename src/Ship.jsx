@@ -865,68 +865,16 @@ export default function Ship() {
 
       {selected.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
-          <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "#f0f0f0", borderRadius: "4px" }}>
-            <strong>Boxes needed:</strong>
-            {projectedBoxes.length > 0 ? (
-              Object.entries(
-                projectedBoxes.reduce((acc, box) => {
-                  acc[box.size] = (acc[box.size] || 0) + 1;
-                  return acc;
-                }, {})
-              ).map(([size, count]) => (
-                <div key={size}>{count} × {BOX_DIMENSIONS[size] || size}</div>
-              ))
-            ) : (
-              <div>No boxes required.</div>
-            )}
-          </div>
           <h4>Select UPS Shipping Option:</h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
             {shippingOptions.map((opt) => {
               const { method, rate, delivery } = opt;
-              const deliveryDate = parseDateFromString(delivery);
-
-              const dueDates = jobs
-                .filter(j => selected.includes(j.orderId.toString()))
-                .map(j => {
-                  const d = parseDateFromString(j.due);
-                  return d instanceof Date && !isNaN(d) ? d : null;
-                })
-                .filter(Boolean);
-
-              const earliestDueDate = dueDates.length > 0
-                ? new Date(Math.min(...dueDates.map(d => d.getTime())))
-                : null;
-
-              let backgroundColor = "#ccc"; // default grey
-
-              if (earliestDueDate && deliveryDate) {
-                // strip times so we’re only comparing dates
-                const due = new Date(
-                  earliestDueDate.getFullYear(),
-                  earliestDueDate.getMonth(),
-                  earliestDueDate.getDate()
-                ).getTime();
-                const del = new Date(
-                  deliveryDate.getFullYear(),
-                  deliveryDate.getMonth(),
-                  deliveryDate.getDate()
-                ).getTime();
-
-                if (del < due) {
-                  backgroundColor = "#b2fab4"; // green: early
-                } else if (del === due) {
-                  backgroundColor = "#fff9c4"; // yellow: same day
-                } else {
-                  backgroundColor = "#ffcdd2"; // red: late
-                }
-              }
               return (
                 <button
                   key={method}
                   onClick={() => handleRateAndShip(method, rate, delivery)}
                   style={{
-                    backgroundColor,
+                    backgroundColor: "#eee",
                     color: "#000",
                     padding: "1rem",
                     marginRight: "1rem",
@@ -941,37 +889,15 @@ export default function Ship() {
                   <div style={{ fontWeight: "bold" }}>{method}</div>
                   <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
                   <div style={{ fontSize: "0.85rem", color: "#333" }}>
-                    Est. delivery: {formatDateMMDD(delivery)}
+                    Est. delivery: {typeof delivery === "string" ? delivery : formatDateMMDD(delivery)}
                   </div>
                 </button>
               );
             })}
-
-          </div>
-          <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem", alignItems: "center" }}>
-            <span style={{ opacity: 0.6 }}>— or —</span>
-            <button
-              onClick={handleShip}
-              disabled={selected.length === 0}
-              style={{
-                padding: "0.75rem 1.25rem",
-                fontWeight: "bold",
-                borderRadius: "6px",
-                border: "1px solid #333",
-                background: selected.length === 0 ? "#ddd" : "#000",
-                color: "#fff",
-                cursor: selected.length === 0 ? "not-allowed" : "pointer"
-              }}
-              title={selected.length === 0 ? "Select at least one job" : "Ship the selected jobs now"}
-            >
-              Ship Selected Now
-            </button>
-            <button onClick={() => setSelected([])} style={{ marginLeft: "auto" }}>
-              Cancel
-            </button>
           </div>
         </div>
       )}
+
 
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
