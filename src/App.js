@@ -373,10 +373,13 @@ function scheduleMachineJobs(jobs, machineKey = '') {
 
   return jobs.map((job, idx) => {
     // 1) Compute late cutoff for this job
-    const eedDay = subWorkDays(parseDueDate(job.due_date), 6);
-    const cutoff = new Date(eedDay);
-    cutoff.setHours(WORK_END_HR, WORK_END_MIN, 0, 0);
-
+    const due = parseDueDate(job.due_date);
+    let cutoff = null;
+    if (due) {
+      const eedDay = subWorkDays(due, 6);
+      cutoff = new Date(eedDay);
+      cutoff.setHours(WORK_END_HR, WORK_END_MIN, 0, 0);
+    }
     // 2) Determine start time
     let start;
     if (idx === 0) {
@@ -405,7 +408,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     job.start     = fmtDT(start);
     job.end       = fmtDT(end);
     job.delivery  = fmtMMDD(addWorkDays(end, 6));
-    job.isLate    = end > cutoff;
+    job.isLate = cutoff instanceof Date && !isNaN(cutoff) && end > cutoff;
 
     // 5) Advance tracker
     prevEnd = end;
