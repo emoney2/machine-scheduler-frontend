@@ -497,12 +497,15 @@ const handleShip = async () => {
   try {
     // ── PREPARE ─────────────────────────────────────────
     let result;
+    // Use a consistent base (handles whether REACT_APP_API_ROOT ends with /api)
+    const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+
     try {
       const response = await fetch(
-        `${process.env.REACT_APP_API_ROOT}/prepare-shipment`,
+        `${API_BASE}/api/prepare-shipment`,
         {
-          method:      "POST",
-          headers:     { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
             order_ids: selected,
@@ -536,20 +539,20 @@ const handleShip = async () => {
     let shipData;
     try {
       const shipRes = await fetch(
-        `${process.env.REACT_APP_API_ROOT}/process-shipment`,
+        `${API_BASE}/api/process-shipment`,
         {
-          method:      "POST",
-          headers:     { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({
-            order_ids:         selected,
-            boxes:             packedBoxes,
+            order_ids:          selected,
+            boxes:              packedBoxes,
             shipped_quantities: Object.fromEntries(
               jobs
                 .filter((j) => selected.includes(j.orderId.toString()))
                 .map((j) => [j.orderId, j.shipQty])
             ),
-            shipping_method:   shippingMethod,
+            shipping_method:    shippingMethod,
             qboEnv: "production",
           }),
         }
@@ -946,7 +949,7 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
               return (
                 <button
                   key={method}
-                  onClick={() => handleRateAndShip(method)}
+                  onClick={() => handleRateAndShip(method, rate, delivery)}
                   style={{
                     backgroundColor,
                     color: "#000",
@@ -962,15 +965,36 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
                 >
                   <div style={{ fontWeight: "bold" }}>{method}</div>
                   <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#333" }}>Est. delivery: {formatDateMMDD(delivery)}</div>
+                  <div style={{ fontSize: "0.85rem", color: "#333" }}>
+                    Est. delivery: {formatDateMMDD(delivery)}
+                  </div>
                 </button>
               );
             })}
 
           </div>
-          <button onClick={() => setSelected([])} style={{ marginTop: "1rem" }}>
-            Cancel
-          </button>
+          <div style={{ marginTop: "1rem", display: "flex", gap: "0.75rem", alignItems: "center" }}>
+            <span style={{ opacity: 0.6 }}>— or —</span>
+            <button
+              onClick={handleShip}
+              disabled={selected.length === 0}
+              style={{
+                padding: "0.75rem 1.25rem",
+                fontWeight: "bold",
+                borderRadius: "6px",
+                border: "1px solid #333",
+                background: selected.length === 0 ? "#ddd" : "#000",
+                color: "#fff",
+                cursor: selected.length === 0 ? "not-allowed" : "pointer"
+              }}
+              title={selected.length === 0 ? "Select at least one job" : "Ship the selected jobs now"}
+            >
+              Ship Selected Now
+            </button>
+            <button onClick={() => setSelected([])} style={{ marginLeft: "auto" }}>
+              Cancel
+            </button>
+          </div>
         </div>
       )}
       {boxes.length > 0 && (
