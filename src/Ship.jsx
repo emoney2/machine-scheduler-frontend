@@ -716,7 +716,7 @@ const fetchRates = async () => {
       {
         method:       "Manual Shipping",
         rate:         "N/A",
-        deliveryDate: "TBD"
+        delivery: "TBD"
       }
     ]);
     return;
@@ -774,17 +774,6 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
   setShippingMethod(method);
   await handleShip();
 };
-
-// …in your render…
-{shippingOptions.map(opt => (
-  <button
-    key={opt.method}
-    onClick={() => handleRateAndShip(opt.method, opt.rate, opt.deliveryDate)}
-  >
-    {opt.method} – {opt.rate} – {opt.deliveryDate}
-  </button>
-))}
-
 
   return (
     <div style={{ padding: "2rem" }}>
