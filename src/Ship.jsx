@@ -36,8 +36,6 @@ function parseDateFromString(dateStr) {
   return null;
 }
 
-
-
 function formatDateMMDD(dateStr) {
   if (!dateStr) return "";
   const parts = dateStr.includes("-")
@@ -90,7 +88,6 @@ function parseDeliveryDate(text) {
   return new Date(now.getFullYear(), parseInt(mm) - 1, parseInt(dd));
 }
 
-
 function getEarliestDueDate(selected, jobs) {
   const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
   const dueDates = selectedJobs
@@ -100,10 +97,10 @@ function getEarliestDueDate(selected, jobs) {
 }
 
 export default function Ship() {
-// 📌 give this tab a name so we can re-focus it later
-useEffect(() => {
-  window.name = 'mainShipTab';
-}, []);
+  // 📌 give this tab a name so we can re-focus it later
+  useEffect(() => {
+    window.name = 'mainShipTab';
+  }, []);
   const [searchParams] = useSearchParams();
   const targetCompany = searchParams.get("company");
   const targetOrder = searchParams.get("order");
@@ -124,96 +121,95 @@ useEffect(() => {
   const [shippingStage, setShippingStage] = useState(""); // dynamic overlay message
   const navigate = useNavigate();
 
-
-// === useEffect 1: Initial load ===
-useEffect(() => {
-  async function loadJobsForCompany(company) {
-    try {
-      const res = await fetch(
-        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
-        { credentials: "include" }
-      );
-      const data = await res.json();
-
-      if (res.ok) {
-        // 1) Build job array and initialize shipQty from the sheet quantity
-        const updatedJobs = data.jobs.map((job) => {
-          // Pull from the sheet’s "Quantity" column (capital Q)
-          const qty = Number(job.Quantity ?? job.quantity ?? 0);
-          return {
-            ...job,
-            shipQty: qty,
-            ShippedQty: qty,
-          };
-        });
-
-        // 2) Push into state
-        setJobs(updatedJobs);
-
-        // 3) Drop any selected IDs that no longer exist
-        setSelected((prevSelected) =>
-          prevSelected.filter((id) =>
-            updatedJobs.some((j) => j.orderId.toString() === id)
-          )
+  // === useEffect 1: Initial load ===
+  useEffect(() => {
+    async function loadJobsForCompany(company) {
+      try {
+        const res = await fetch(
+          `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
+          { credentials: "include" }
         );
-      } else {
-        console.error("Fetch error:", data.error);
-      }
-    } catch (err) {
-      console.error("Error loading jobs:", err);
-    }
-  }
+        const data = await res.json();
 
-  async function setup() {
-    await fetchCompanyNames();
-    if (defaultCompany) {
-      setCompanyInput(defaultCompany);
-      await loadJobsForCompany(defaultCompany);
-    }
-  }
-
-  setup();
-}, []);
-// === End useEffect 1 ===
-
-// === useEffect 2: Live update polling ===
-useEffect(() => {
-  if (!companyInput || !allCompanies.includes(companyInput)) return;
-
-  const interval = setInterval(() => {
-    fetch(
-      `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
-      { credentials: "include" }
-    )
-      .then(res => res.json())
-      .then(data => {
-        if (data.jobs) {
-          setJobs(prev => {
-            const prevMap = Object.fromEntries(prev.map(j => [j.orderId, j]));
-            return data.jobs.map(newJob => {
-              const existing = prevMap[newJob.orderId];
-              return {
-                ...newJob,
-                shipQty: existing?.shipQty ?? newJob.quantity,
-                ShippedQty: existing?.shipQty ?? newJob.quantity,
-              };
-            });
+        if (res.ok) {
+          // 1) Build job array and initialize shipQty from the sheet quantity
+          const updatedJobs = data.jobs.map((job) => {
+            // Pull from the sheet’s "Quantity" column (capital Q)
+            const qty = Number(job.Quantity ?? job.quantity ?? 0);
+            return {
+              ...job,
+              shipQty: qty,
+              ShippedQty: qty,
+            };
           });
 
-          // 🧼 Remove any selected jobs that no longer exist
-          setSelected(prevSelected => {
-            const newOrderIds = new Set(data.jobs.map(j => j.orderId.toString()));
-            return prevSelected.filter(id => newOrderIds.has(id));
-          });
+          // 2) Push into state
+          setJobs(updatedJobs);
+
+          // 3) Drop any selected IDs that no longer exist
+          setSelected((prevSelected) =>
+            prevSelected.filter((id) =>
+              updatedJobs.some((j) => j.orderId.toString() === id)
+            )
+          );
+        } else {
+          console.error("Fetch error:", data.error);
         }
-      })
-      .catch(err => console.error("Live update error", err));
-  }, 15000);
+      } catch (err) {
+        console.error("Error loading jobs:", err);
+      }
+    }
 
-  return () => clearInterval(interval);
-}, [companyInput, allCompanies]);
+    async function setup() {
+      await fetchCompanyNames();
+      if (defaultCompany) {
+        setCompanyInput(defaultCompany);
+        await loadJobsForCompany(defaultCompany);
+      }
+    }
 
-// === End useEffect 2 ===
+    setup();
+  }, []);
+  // === End useEffect 1 ===
+
+  // === useEffect 2: Live update polling ===
+  useEffect(() => {
+    if (!companyInput || !allCompanies.includes(companyInput)) return;
+
+    const interval = setInterval(() => {
+      fetch(
+        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
+        { credentials: "include" }
+      )
+        .then(res => res.json())
+        .then(data => {
+          if (data.jobs) {
+            setJobs(prev => {
+              const prevMap = Object.fromEntries(prev.map(j => [j.orderId, j]));
+              return data.jobs.map(newJob => {
+                const existing = prevMap[newJob.orderId];
+                return {
+                  ...newJob,
+                  shipQty: existing?.shipQty ?? newJob.quantity,
+                  ShippedQty: existing?.shipQty ?? newJob.quantity,
+                };
+              });
+            });
+
+            // 🧼 Remove any selected jobs that no longer exist
+            setSelected(prevSelected => {
+              const newOrderIds = new Set(data.jobs.map(j => j.orderId.toString()));
+              return prevSelected.filter(id => newOrderIds.has(id));
+            });
+          }
+        })
+        .catch(err => console.error("Live update error", err));
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [companyInput, allCompanies]);
+
+  // === End useEffect 2 ===
 
   useEffect(() => {
     // 1) Retry any pending shipment
@@ -298,7 +294,6 @@ useEffect(() => {
       }
     }
   }, [jobs, targetOrder, navigate]);
-
 
   // ▶︎ Whenever selection changes, re-fetch box requirements
   useEffect(() => {
@@ -394,7 +389,6 @@ useEffect(() => {
     );
   };
 
-
   const promptDimensionsForProduct = (product) => {
     return new Promise((resolve) => {
       const container = document.createElement("div");
@@ -479,301 +473,301 @@ useEffect(() => {
     });
   };
 
-const handleShip = async () => {
-  if (selected.length === 0) {
-    alert("Select at least one job to ship.");
-    return;
-  }
-
-  // ── PRE-OPEN POPUPS ──────────────────────────────────
-  const labelWindows = selected.map((_, i) =>
-    window.open("", `labelWindow${i}`, "width=600,height=400")
-  );
-
-  setIsShippingOverlay(true);
-  setShippingStage("📦 Preparing shipment...");
-  setLoading(true);
-
-  try {
-    // ── PREPARE ─────────────────────────────────────────
-    let result;
-    // Use a consistent base (handles whether REACT_APP_API_ROOT ends with /api)
-    const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-
-    try {
-      const response = await fetch(
-        `${API_BASE}/api/prepare-shipment`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            order_ids: selected,
-            shipped_quantities: Object.fromEntries(
-              jobs
-                .filter((j) => selected.includes(j.orderId.toString()))
-                .map((j) => [j.orderId, j.shipQty])
-            ),
-          }),
-        }
-      );
-      const data = await response.json();
-      if (!response.ok) {
-        console.warn("prepare-shipment error:", data.error);
-        result = { boxes: [] };
-      } else {
-        result = data;
-      }
-    } catch (prepErr) {
-      console.error("prepare-shipment failed:", prepErr);
-      result = { boxes: [] };
-    }
-
-    // pack boxes
-    const packedBoxes = result.boxes || [];
-    setShippingStage("📦 Packing boxes...");
-    setBoxes(packedBoxes);
-
-    // ── PROCESS ─────────────────────────────────────────
-    setShippingStage("🚚 Processing shipment...");
-    let shipData;
-    try {
-      const shipRes = await fetch(
-        `${API_BASE}/api/process-shipment`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            order_ids:          selected,
-            boxes:              packedBoxes,
-            shipped_quantities: Object.fromEntries(
-              jobs
-                .filter((j) => selected.includes(j.orderId.toString()))
-                .map((j) => [j.orderId, j.shipQty])
-            ),
-            shipping_method:    shippingMethod,
-            qboEnv: "production",
-          }),
-        }
-      );
-      const data = await shipRes.json();
-      if (!shipRes.ok) {
-        console.warn("process-shipment error:", data.error);
-        shipData = { labels: [], slips: [], invoice: null, redirect: data.redirect };
-      } else {
-        shipData = data;
-      }
-    } catch (procErr) {
-      console.error("process-shipment failed:", procErr);
-      shipData = { labels: [], slips: [], invoice: null };
-    }
-
-    // ── HANDLE QBO REDIRECT ──────────────────────────────
-    if (shipData.redirect) {
-      sessionStorage.setItem(
-        "pendingShipment",
-        JSON.stringify({
-          order_ids:         selected,
-          boxes:             packedBoxes,
-          shipped_quantities: Object.fromEntries(
-            jobs
-              .filter((j) => selected.includes(j.orderId.toString()))
-              .map((j) => [j.orderId, j.shipQty])
-          ),
-          shipping_method:   shippingMethod,
-          qboEnv:            "production",
-        })
-      );
-      window.location.href = `${process.env.REACT_APP_API_ROOT.replace(
-        /\/api$/,
-        ""
-      )}${shipData.redirect}`;
+  const handleShip = async () => {
+    if (selected.length === 0) {
+      alert("Select at least one job to ship.");
       return;
     }
 
-    // ── SUCCESS ─────────────────────────────────────────
-    setIsShippingOverlay(false);
-    setLoading(false);
-
-    // build invoiceUrl but do NOT open it here
-    const invoiceUrl = shipData.invoice
-      ? shipData.invoice.startsWith("http")
-        ? shipData.invoice
-        : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
-      : "";
-
-    // 4a) Shipping labels
-    setShippingStage(
-      `🖨️ Printing ${shipData.labels.length} shipping label${shipData.labels.length > 1 ? "s" : ""}…`
+    // ── PRE-OPEN POPUPS ──────────────────────────────────
+    const labelWindows = selected.map((_, i) =>
+      window.open("", `labelWindow${i}`, "width=600,height=400")
     );
-    shipData.labels.forEach((url, i) => {
-      const win = labelWindows[i];
-      if (win) {
-        win.location = url;
-        win.blur();
+
+    setIsShippingOverlay(true);
+    setShippingStage("📦 Preparing shipment...");
+    setLoading(true);
+
+    try {
+      // ── PREPARE ─────────────────────────────────────────
+      let result;
+      // Use a consistent base (handles whether REACT_APP_API_ROOT ends with /api)
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/prepare-shipment`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              order_ids: selected,
+              shipped_quantities: Object.fromEntries(
+                jobs
+                  .filter((j) => selected.includes(j.orderId.toString()))
+                  .map((j) => [j.orderId, j.shipQty])
+              ),
+            }),
+          }
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          console.warn("prepare-shipment error:", data.error);
+          result = { boxes: [] };
+        } else {
+          result = data;
+        }
+      } catch (prepErr) {
+        console.error("prepare-shipment failed:", prepErr);
+        result = { boxes: [] };
       }
-    });
 
-    // 4b) QuickBooks customer/item setup
-    setShippingStage("👤 Setting up QuickBooks customer…");
-    setShippingStage("📦 Setting up QuickBooks product info…");
+      // pack boxes
+      const packedBoxes = result.boxes || [];
+      setShippingStage("📦 Packing boxes...");
+      setBoxes(packedBoxes);
 
-    // 4c) Packing slip saved
-    setShippingStage(
-      `📋 Packing slip PDF saved for ${packedBoxes.length} box${packedBoxes.length > 1 ? "es" : ""} (watching folder for print)…`
-    );
+      // ── PROCESS ─────────────────────────────────────────
+      setShippingStage("🚚 Processing shipment...");
+      let shipData;
+      try {
+        const shipRes = await fetch(
+          `${API_BASE}/api/process-shipment`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              order_ids:          selected,
+              boxes:              packedBoxes,
+              shipped_quantities: Object.fromEntries(
+                jobs
+                  .filter((j) => selected.includes(j.orderId.toString()))
+                  .map((j) => [j.orderId, j.shipQty])
+              ),
+              shipping_method:    shippingMethod,
+              qboEnv: "production",
+            }),
+          }
+        );
+        const data = await shipRes.json();
+        if (!shipRes.ok) {
+          console.warn("process-shipment error:", data.error);
+          shipData = { labels: [], slips: [], invoice: null, redirect: data.redirect };
+        } else {
+          shipData = data;
+        }
+      } catch (procErr) {
+        console.error("process-shipment failed:", procErr);
+        shipData = { labels: [], slips: [], invoice: null };
+      }
 
-    // 4d) refocus main tab immediately
-    setTimeout(() => {
-      const mainTab = window.open("", "mainShipTab");
-      if (mainTab && mainTab.focus) mainTab.focus();
-    }, 100);
+      // ── HANDLE QBO REDIRECT ──────────────────────────────
+      if (shipData.redirect) {
+        sessionStorage.setItem(
+          "pendingShipment",
+          JSON.stringify({
+            order_ids:         selected,
+            boxes:             packedBoxes,
+            shipped_quantities: Object.fromEntries(
+              jobs
+                .filter((j) => selected.includes(j.orderId.toString()))
+                .map((j) => [j.orderId, j.shipQty])
+            ),
+            shipping_method:   shippingMethod,
+            qboEnv:            "production",
+          })
+        );
+        window.location.href = `${process.env.REACT_APP_API_ROOT.replace(
+          /\/api$/,
+          ""
+        )}${shipData.redirect}`;
+        return;
+      }
 
-    // 4e) Finalize
-    setShippingStage("✅ Complete!");
-    setTimeout(() => {
-      navigate("/shipment-complete", {
-        state: {
-          shippedOk:     true,
-          labelsPrinted: shipData.labels.length > 0,
-          slipsPrinted:  packedBoxes.length > 0,
-          invoiceUrl
-        },
+      // ── SUCCESS ─────────────────────────────────────────
+      setIsShippingOverlay(false);
+      setLoading(false);
+
+      // build invoiceUrl but do NOT open it here
+      const invoiceUrl = shipData.invoice
+        ? shipData.invoice.startsWith("http")
+          ? shipData.invoice
+          : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
+        : "";
+
+      // 4a) Shipping labels
+      setShippingStage(
+        `🖨️ Printing ${shipData.labels.length} shipping label${shipData.labels.length > 1 ? "s" : ""}…`
+      );
+      shipData.labels.forEach((url, i) => {
+        const win = labelWindows[i];
+        if (win) {
+          win.location = url;
+          win.blur();
+        }
       });
-    }, 500);
-  } catch (err) {
-    console.error(err);
-    alert("Failed to ship.");
-    setLoading(false);
-    setIsShippingOverlay(false);
-  }
-}; // end handleShip
 
-// ─── 0) Feature flag at top ───
-const SKIP_UPS = true;
+      // 4b) QuickBooks customer/item setup
+      setShippingStage("👤 Setting up QuickBooks customer…");
+      setShippingStage("📦 Setting up QuickBooks product info…");
 
-// 1) State for live UPS rates
-const [shippingOptions, setShippingOptions] = useState([]);
+      // 4c) Packing slip saved
+      setShippingStage(
+        `📋 Packing slip PDF saved for ${packedBoxes.length} box${packedBoxes.length > 1 ? "es" : ""} (watching folder for print)…`
+      );
 
-// 2) Your package payloads (Customer Supplied = 02)
-const packagesPayload = [
-  { PackagingType: "02", Weight:  7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
-  { PackagingType: "02", Weight: 24,  Dimensions: { Length: 15, Width: 15, Height: 15 } },
-  { PackagingType: "02", Weight: 55,  Dimensions: { Length: 20, Width: 20, Height: 20 } },
-];
+      // 4d) refocus main tab immediately
+      setTimeout(() => {
+        const mainTab = window.open("", "mainShipTab");
+        if (mainTab && mainTab.focus) mainTab.focus();
+      }, 100);
 
-// 3) Static shipper
-const shipper = {
-  Name:           "JR & Co.",
-  AttentionName:  "Justin Eckard",
-  Phone:          "678-294-5350",
-  Address: {
-    AddressLine1:      "3653 Lost Oak Drive",
-    AddressLine2:      "",
-    City:              "Buford",
-    StateProvinceCode: "GA",
-    PostalCode:        "30519",
-    CountryCode:       "US"
-  }
-};
+      // 4e) Finalize
+      setShippingStage("✅ Complete!");
+      setTimeout(() => {
+        navigate("/shipment-complete", {
+          state: {
+            shippedOk:     true,
+            labelsPrinted: shipData.labels.length > 0,
+            slipsPrinted:  packedBoxes.length > 0,
+            invoiceUrl
+          },
+        });
+      }, 500);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to ship.");
+      setLoading(false);
+      setIsShippingOverlay(false);
+    }
+  }; // end handleShip
 
-// 5) Helper to fetch live UPS rates (with safety checks + fallback)
-const fetchRates = async () => {
-  // 5a) If nothing selected, clear rates and stop
-  if (selected.length === 0) {
-    setShippingOptions([]);
-    return;
-  }
+  // ─── 0) Feature flag at top ───
+  const SKIP_UPS = true;
 
-  // 5b) Find the one job we’re quoting
-  const jobToShip = jobs.find(j => selected.includes(j.orderId.toString()));
-  if (!jobToShip) {
-    console.warn("No matching job for selected IDs:", selected);
-    setShippingOptions([]);
-    return;
-  }
+  // 1) State for live UPS rates
+  const [shippingOptions, setShippingOptions] = useState([]);
 
-  // 5c) Build the UPS “ship to” payload from that job
-  const recipient = {
-    Name:            jobToShip["Company Name"],
-    AttentionName:   `${jobToShip["Contact First Name"]} ${jobToShip["Contact Last Name"]}`,
-    Phone:           jobToShip["Phone Number"],
+  // 2) Your package payloads (Customer Supplied = 02)
+  const packagesPayload = [
+    { PackagingType: "02", Weight:  7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
+    { PackagingType: "02", Weight: 24,  Dimensions: { Length: 15, Width: 15, Height: 15 } },
+    { PackagingType: "02", Weight: 55,  Dimensions: { Length: 20, Width: 20, Height: 20 } },
+  ];
+
+  // 3) Static shipper
+  const shipper = {
+    Name:           "JR & Co.",
+    AttentionName:  "Justin Eckard",
+    Phone:          "678-294-5350",
     Address: {
-      AddressLine1:      jobToShip["Street Address 1"],
-      AddressLine2:      jobToShip["Street Address 2"] || "",
-      City:              jobToShip["City"],
-      StateProvinceCode: jobToShip["State"],
-      PostalCode:        jobToShip["Zip Code"],
+      AddressLine1:      "3653 Lost Oak Drive",
+      AddressLine2:      "",
+      City:              "Buford",
+      StateProvinceCode: "GA",
+      PostalCode:        "30519",
       CountryCode:       "US"
     }
   };
 
-  // 5d) Either bypass UPS or call /api/rate
-  if (SKIP_UPS) {
-    // bypass UPS: always provide one manual option
-    setShippingOptions([
-      {
-        method:       "Manual Shipping",
-        rate:         "N/A",
-        delivery: "TBD"
-      }
-    ]);
-    return;
-  }
+  // 5) Helper to fetch live UPS rates (with safety checks + fallback)
+  const fetchRates = async () => {
+    // 5a) If nothing selected, clear rates and stop
+    if (selected.length === 0) {
+      setShippingOptions([]);
+      return;
+    }
 
-  try {
-    const resp = await fetch(
-      `${process.env.REACT_APP_API_ROOT}/rate`,
-      {
-        method:      "POST",
-        credentials: "include",
-        headers:     { "Content-Type": "application/json" },
-        body:        JSON.stringify({ shipper, recipient, packages: packagesPayload })
+    // 5b) Find the one job we’re quoting
+    const jobToShip = jobs.find(j => selected.includes(j.orderId.toString()));
+    if (!jobToShip) {
+      console.warn("No matching job for selected IDs:", selected);
+      setShippingOptions([]);
+      return;
+    }
+
+    // 5c) Build the UPS “ship to” payload from that job
+    const recipient = {
+      Name:            jobToShip["Company Name"],
+      AttentionName:   `${jobToShip["Contact First Name"]} ${jobToShip["Contact Last Name"]}`,
+      Phone:           jobToShip["Phone Number"],
+      Address: {
+        AddressLine1:      jobToShip["Street Address 1"],
+        AddressLine2:      jobToShip["Street Address 2"] || "",
+        City:              jobToShip["City"],
+        StateProvinceCode: jobToShip["State"],
+        PostalCode:        jobToShip["Zip Code"],
+        CountryCode:       "US"
       }
+    };
+
+    // 5d) Either bypass UPS or call /api/rate
+    if (SKIP_UPS) {
+      // bypass UPS: always provide one manual option
+      setShippingOptions([
+        {
+          method:   "Manual Shipping",
+          rate:     "N/A",
+          delivery: "TBD"
+        }
+      ]);
+      return;
+    }
+
+    try {
+      const resp = await fetch(
+        `${process.env.REACT_APP_API_ROOT}/rate`,
+        {
+          method:      "POST",
+          credentials: "include",
+          headers:     { "Content-Type": "application/json" },
+          body:        JSON.stringify({ shipper, recipient, packages: packagesPayload })
+        }
+      );
+      if (!resp.ok) throw new Error(`Rate fetch failed: ${resp.status}`);
+      const data = await resp.json();
+      setShippingOptions(data);
+    } catch (err) {
+      console.error("UPS rate error:", err);
+      alert("Unable to fetch UPS rates; using manual fallback.");
+      setShippingOptions([
+        {
+          method:   "Manual Shipping",
+          rate:     "N/A",
+          delivery: "TBD"
+        }
+      ]);
+    }
+  };
+
+  // 6) Auto-fetch rates whenever a job is selected
+  useEffect(() => {
+    if (selected.length > 0) {
+      fetchRates();
+    }
+  }, [selected]);
+
+  // 🧠 Updated rate-based shipping handler
+  const handleRateAndShip = async (method, rate, deliveryDate) => {
+    if (SKIP_UPS) {
+      const ok = window.confirm(
+        "Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice."
+      );
+      if (!ok) return;
+      await handleShip();
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${deliveryDate}\nProceed?`
     );
-    if (!resp.ok) throw new Error(`Rate fetch failed: ${resp.status}`);
-    const data = await resp.json();
-    setShippingOptions(data);
-  } catch (err) {
-    console.error("UPS rate error:", err);
-    alert("Unable to fetch UPS rates; using manual fallback.");
-    setShippingOptions([
-      {
-        method:       "Manual Shipping",
-        rate:         "N/A",
-        deliveryDate: "TBD"
-      }
-    ]);
-  }
-};
+    if (!confirmed) return;
 
-// 6) Auto‑fetch rates whenever a job is selected
-useEffect(() => {
-  if (selected.length > 0) {
-    fetchRates();
-  }
-}, [selected]);
-
-// 🧠 Updated rate‑based shipping handler
-const handleRateAndShip = async (method, rate, deliveryDate) => {
-  if (SKIP_UPS) {
-    const ok = window.confirm(
-      "Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice."
-    );
-    if (!ok) return;
+    setShippingMethod(method);
     await handleShip();
-    return;
-  }
-
-  const confirmed = window.confirm(
-    `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${deliveryDate}\nProceed?`
-  );
-  if (!confirmed) return;
-
-  setShippingMethod(method);
-  await handleShip();
-};
+  };
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -892,10 +886,6 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
               const { method, rate, delivery } = opt;
               const deliveryDate = parseDateFromString(delivery);
 
-              function toDateOnly(d) {
-                return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-              }
-
               const dueDates = jobs
                 .filter(j => selected.includes(j.orderId.toString()))
                 .map(j => {
@@ -907,10 +897,6 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
               const earliestDueDate = dueDates.length > 0
                 ? new Date(Math.min(...dueDates.map(d => d.getTime())))
                 : null;
-
-              function stripTime(d) {
-                return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-              }
 
               let backgroundColor = "#ccc"; // default grey
 
@@ -986,6 +972,7 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
           </div>
         </div>
       )}
+
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
           <h3>📦 Packed Boxes</h3>
@@ -998,6 +985,34 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
           </ul>
         </div>
       )}
+
+      {/* Sticky action bar — always visible */}
+      <div style={{
+        position: "fixed",
+        bottom: 12,
+        right: 12,
+        display: "flex",
+        gap: "0.5rem",
+        zIndex: 1000
+      }}>
+        <button
+          onClick={handleShip}
+          disabled={selected.length === 0}
+          style={{
+            padding: "0.75rem 1.25rem",
+            fontWeight: "bold",
+            borderRadius: "999px",
+            border: "1px solid #333",
+            background: selected.length === 0 ? "#ddd" : "#000",
+            color: "#fff",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+            cursor: selected.length === 0 ? "not-allowed" : "pointer"
+          }}
+          title={selected.length === 0 ? "Select at least one job" : "Ship the selected jobs now"}
+        >
+          Ship Selected Now
+        </button>
+      </div>
     </div>
   );
 }
