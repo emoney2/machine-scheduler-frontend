@@ -116,7 +116,6 @@ useEffect(() => {
   const [companyInput, setCompanyInput] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
   const [projectedBoxes, setProjectedBoxes] = useState([]);
-  const [useProduction, setUseProduction] = useState(false);
 
   const query = new URLSearchParams(window.location.search);
   const defaultCompany = query.get("company");
@@ -551,7 +550,7 @@ const handleShip = async () => {
                 .map((j) => [j.orderId, j.shipQty])
             ),
             shipping_method:   shippingMethod,
-            qboEnv: useProduction ? "production" : "sandbox",
+            qboEnv: "production",
           }),
         }
       );
@@ -580,6 +579,7 @@ const handleShip = async () => {
               .map((j) => [j.orderId, j.shipQty])
           ),
           shipping_method:   shippingMethod,
+          qboEnv:            "production",
         })
       );
       window.location.href = `${process.env.REACT_APP_API_ROOT.replace(
@@ -785,18 +785,6 @@ const handleRateAndShip = async (method, rate, deliveryDate) => {
 
   return (
     <div style={{ padding: "2rem" }}>
-      {/* QuickBooks: sandbox vs production */}
-      <div style={{ marginBottom: "1rem" }}>
-        <label style={{ display: "inline-flex", alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={useProduction}
-            onChange={() => setUseProduction(!useProduction)}
-            style={{ marginRight: "0.5rem" }}
-          />
-          Use QuickBooks Production
-        </label>
-      </div>
       {/* 🚚 Shipping Overlay */}
       {isShippingOverlay && (
         <div style={{
