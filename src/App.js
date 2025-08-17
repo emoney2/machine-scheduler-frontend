@@ -98,8 +98,42 @@ const BUBBLE_END    = '#ffe0b2';
 const BUBBLE_DELIV  = '#c8e6c9';
 
 export default function App() {
-  console.log('🔔 App component mounted');
-  const [manualReorder, setManualReorder] = useState(false);
+  // Derive backend origin (no /api) for login redirects
+  const BACKEND_ORIGIN = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+
+  // Log once on mount (optional — keeps your existing console signal)
+  useEffect(() => {
+    console.log("🔔 App component mounted");
+  }, []);
+
+  // Session check: if not logged in, bounce to backend /login and return here after
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_API_ROOT}/ping`, {
+          method: "GET",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" }
+        });
+
+        if (res.status === 200) {
+          console.log("✅ /api/ping OK (session present)");
+          return;
+        }
+
+        if (res.status === 401) {
+          console.warn("🔒 /api/ping 401 — redirecting to backend login");
+          const next = encodeURIComponent(window.location.href);
+          window.location.href = `${BACKEND_ORIGIN}/login?next=${next}`;
+          return;
+        }
+
+        console.warn("⚠️ /api/ping unexpected status:", res.status);
+      } catch (err) {
+        console.warn("🟡 /api/ping failed:", err?.message || err);
+      }
+    })();
+  }, []);
 
   // ─── Section 1.5: Auto‐bump setup ────────────────────────────────────────────
   // Track last‐seen top job on each machine
