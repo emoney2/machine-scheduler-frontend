@@ -547,6 +547,7 @@ export default function Ship() {
                   .map((j) => [j.orderId, j.shipQty])
               ),
               shipping_method:    shippingMethod,
+              service_code:       (shippingSelection && shippingSelection.code) || null,
               qboEnv: "production",
             }),
           }
@@ -645,10 +646,12 @@ export default function Ship() {
   }; // end handleShip
 
   // ─── 0) Feature flag at top ───
-  const SKIP_UPS = true;
+  const SKIP_UPS = flase;
 
   // 1) State for live UPS rates
   const [shippingOptions, setShippingOptions] = useState([]);
+  // Store the user’s chosen UPS option (includes .code)
+  const [shippingSelection, setShippingSelection] = useState(null);
 
   // 2) Your package payloads (Customer Supplied = 02)
   const packagesPayload = [
@@ -750,24 +753,31 @@ export default function Ship() {
   }, [selected]);
 
   // 🧠 Updated rate-based shipping handler
-  const handleRateAndShip = async (method, rate, deliveryDate) => {
+  const handleRateAndShip = async (opt) => {
+    // opt looks like { code, method, rate, delivery, ... }
+    const { method, rate, delivery } = opt || {};
+
     if (SKIP_UPS) {
       const ok = window.confirm(
         "Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice."
       );
       if (!ok) return;
+      setShippingSelection(null);       // no live UPS selection
+      setShippingMethod("Manual Shipping");
       await handleShip();
       return;
     }
 
     const confirmed = window.confirm(
-      `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${deliveryDate}\nProceed?`
+      `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${delivery}\nProceed?`
     );
     if (!confirmed) return;
 
-    setShippingMethod(method);
-    await handleShip();
+    setShippingSelection(opt);          // save {code, method, ...}
+    setShippingMethod(method || "UPS"); // friendly label for your UI
+    await handleShip();                 // this will include service_code now
   };
+
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -868,11 +878,11 @@ export default function Ship() {
           <h4>Select UPS Shipping Option:</h4>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
             {shippingOptions.map((opt) => {
-              const { method, rate, delivery } = opt;
+              const { code, method, rate, delivery } = opt;
               return (
                 <button
-                  key={method}
-                  onClick={() => handleRateAndShip(method, rate, delivery)}
+                  key={`${code || method}`}
+                  onClick={() => handleRateAndShip(opt)}   // pass the whole object
                   style={{
                     backgroundColor: "#eee",
                     color: "#000",
