@@ -343,12 +343,37 @@ export default function Section9(props) {
     }}
   >
     {(() => {
-      // Use globalIdx if that's your map index; load first 8 eagerly
+      // 1) Try your normal preview builder
+      let src = toPreviewUrl(job.imageLink);
+
+      // 2) If that failed, try to parse a Drive file id locally and build a proxy URL
+      if (!src) {
+        try {
+          const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+          const altId = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
+          if (altId) {
+            src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
+
+      // 3) If we still don't have a URL, show a small label instead of a white box
+      if (!src) {
+        return (
+          <span style={{ fontSize: 11, color: '#888', padding: 4, display: 'block', textAlign: 'center' }}>
+            No image
+          </span>
+        );
+      }
+
+      // First 8 jobs per column: eager/high for snappier first paint
       const isAboveFold = typeof globalIdx === 'number' ? globalIdx < 8 : false;
 
       return (
         <img
-          src={toPreviewUrl(job.imageLink)}
+          src={src}
           alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
           width={56}
           height={56}
@@ -357,11 +382,13 @@ export default function Section9(props) {
           decoding="async"
           fetchPriority={isAboveFold ? 'high' : 'low'}
           onError={(e) => {
-            // Fallback: if thumbnail fails, show full file via proxy inline
+            // Final fallback: full file via proxy
             try {
               const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
               const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-              if (id) e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
+              if (id) {
+                e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
+              }
             } catch (_) { /* no-op */ }
           }}
         />
