@@ -47,16 +47,35 @@ axios.interceptors.response.use(
 
 
 // CONFIGURATION
-const API_ROOT   = process.env.REACT_APP_API_ROOT;
-const SOCKET_URL = API_ROOT.replace(/\/api$/, '');
-const socket     = io(SOCKET_URL, {
-  transports: ['websocket','polling'],
-  withCredentials: true   // ← send the session cookie on the WS handshake
-});
+const API_ROOT    = process.env.REACT_APP_API_ROOT;
+// Example: "https://machine-scheduler-backend.onrender.com/api"
+const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, "");   // → https://machine-scheduler-backend.onrender.com
+const SOCKET_PATH   = "/socket.io";                     // server uses default path
 
-socket.on("connect",        () => console.log("⚡ socket connected, id =", socket.id));
-socket.on("disconnect",     reason => console.log("🛑 socket disconnected:", reason));
-socket.on("connect_error",  err    => console.error("🚨 socket connection error:", err));
+let socket = null;
+try {
+  socket = io(SOCKET_ORIGIN, {
+    path: SOCKET_PATH,               // ← explicit path
+    transports: ['websocket','polling'],
+    timeout: 8000,
+    reconnection: true,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    withCredentials: true
+  });
+
+  socket.on("connect",       () => console.log("⚡ socket connected, id =", socket.id));
+  socket.on("disconnect",    reason => console.log("🛑 socket disconnected:", reason));
+  socket.on("connect_error", err    => console.error("🚨 socket connection error:", err?.message || err));
+  socket.on("error",         err    => console.warn("🟡 socket error:", err?.message || err));
+} catch (e) {
+  console.warn("🟡 socket init failed:", e);
+}
+
+// Helper to guard usage elsewhere in the file
+const isSocketLive = () => !!(socket && socket.connected);
+
 
 // WORK HOURS / HOLIDAYS
 const WORK_START_HR  = 8;
