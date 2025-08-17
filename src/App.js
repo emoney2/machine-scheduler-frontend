@@ -406,8 +406,6 @@ function toPreviewUrl(originalUrl) {
   return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w256`;
 }
 
-
-
 function unique(arr) {
   return Array.from(new Set((arr || []).filter(Boolean)));
 }
