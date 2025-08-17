@@ -100,6 +100,7 @@ const BUBBLE_DELIV  = '#c8e6c9';
 export default function App() {
   // Derive backend origin (no /api) for login redirects
   const BACKEND_ORIGIN = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+  const [manualReorder, setManualReorder] = useState(false);
 
   // Log once on mount (optional — keeps your existing console signal)
   useEffect(() => {
@@ -1090,6 +1091,10 @@ const onDragEnd = async (result) => {
     }
 
     console.log('⏹ onDragEnd end (reorder same col), new columns:', nextCols);
+
+    // Trigger top-of-list start-time update effect
+    setManualReorder(true);   // ← ADD
+
     return;
   }
 
@@ -1158,7 +1163,11 @@ const onDragEnd = async (result) => {
   } catch (err) {
     console.error('❌ manualState save failed (cross-col)', err);
   }
+
+  // Trigger top-of-list start-time update effect
+  setManualReorder(true);   // ← ADD
 };
+
 // === Section 9: Render via Section9.jsx ===
 
   return (
