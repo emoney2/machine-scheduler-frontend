@@ -47,33 +47,37 @@ axios.interceptors.response.use(
 
 
 // CONFIGURATION
-const API_ROOT    = process.env.REACT_APP_API_ROOT;
-// Example: "https://machine-scheduler-backend.onrender.com/api"
-const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, "");   // → https://machine-scheduler-backend.onrender.com
-const SOCKET_PATH   = "/socket.io";                     // server uses default path
+const API_ROOT     = process.env.REACT_APP_API_ROOT;            // e.g. https://machine-scheduler-backend.onrender.com/api
+const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');           // → https://machine-scheduler-backend.onrender.com
+const SOCKET_PATH   = '/socket.io';                             // backend uses default path
 
 let socket = null;
 try {
   socket = io(SOCKET_ORIGIN, {
-    path: SOCKET_PATH,               // ← explicit path
-    transports: ['websocket','polling'],
-    timeout: 8000,
+    path: SOCKET_PATH,
+    transports: ['polling','websocket'], // ← prefer polling so it doesn't hang on WS
+    timeout: 7000,                       // quicker failover
     reconnection: true,
-    reconnectionAttempts: 10,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 8,
+    reconnectionDelay: 800,
+    reconnectionDelayMax: 3000,
     withCredentials: true
   });
 
   socket.on("connect",       () => console.log("⚡ socket connected, id =", socket.id));
-  socket.on("disconnect",    reason => console.log("🛑 socket disconnected:", reason));
-  socket.on("connect_error", err    => console.error("🚨 socket connection error:", err?.message || err));
-  socket.on("error",         err    => console.warn("🟡 socket error:", err?.message || err));
+  socket.on("disconnect",    (reason) => console.log("🛑 socket disconnected:", reason));
+  socket.on("connect_error", (err) => {
+    console.warn("🟡 socket connect_error:", err?.message || err);
+    // make sure the rest of the app never waits on socket
+    window.__SOCKET_DOWN__ = true;
+  });
+  socket.on("error", (err) => console.warn("🟡 socket error:", err?.message || err));
 } catch (e) {
   console.warn("🟡 socket init failed:", e);
+  window.__SOCKET_DOWN__ = true;
 }
 
-// Helper to guard usage elsewhere in the file
+// Helper: only use socket if live
 const isSocketLive = () => !!(socket && socket.connected);
 
 
