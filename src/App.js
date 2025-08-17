@@ -46,17 +46,16 @@ axios.interceptors.response.use(
 );
 
 
-// CONFIGURATION
 const API_ROOT     = process.env.REACT_APP_API_ROOT;            // e.g. https://machine-scheduler-backend.onrender.com/api
 const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');           // → https://machine-scheduler-backend.onrender.com
-const SOCKET_PATH   = '/socket.io';                             // backend uses default path
+const SOCKET_PATH   = '/socket.io';
 
 let socket = null;
 try {
   socket = io(SOCKET_ORIGIN, {
     path: SOCKET_PATH,
-    transports: ['polling','websocket'], // ← prefer polling so it doesn't hang on WS
-    timeout: 7000,                       // quicker failover
+    transports: ['polling','websocket'], // prefer polling first
+    timeout: 7000,
     reconnection: true,
     reconnectionAttempts: 8,
     reconnectionDelay: 800,
@@ -68,7 +67,6 @@ try {
   socket.on("disconnect",    (reason) => console.log("🛑 socket disconnected:", reason));
   socket.on("connect_error", (err) => {
     console.warn("🟡 socket connect_error:", err?.message || err);
-    // make sure the rest of the app never waits on socket
     window.__SOCKET_DOWN__ = true;
   });
   socket.on("error", (err) => console.warn("🟡 socket error:", err?.message || err));
