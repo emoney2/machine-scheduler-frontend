@@ -336,28 +336,39 @@ export default function Section9(props) {
       background: '#fff',
       cursor: 'pointer'
     }}
-    onMouseDown={(e) => e.stopPropagation()} // prevent dragging conflicts
+    onMouseDown={(e) => e.stopPropagation()} {/* prevent dragging conflicts */}
     onClick={(e) => {
       e.stopPropagation();
       openArtwork(job.imageLink); // full file via backend proxy (thumb=0)
     }}
   >
-    <img
-      src={toPreviewUrl(job.imageLink)} // proxy thumbnail (thumb=1&sz=w512)
-      alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
-      style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
-      loading="lazy"
-      onError={(e) => {
-        // Fallback: if thumbnail fails, show full file via proxy inline
-        try {
-          const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-          const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-          if (id) e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
-        } catch (_) {
-          // leave broken if we can’t parse the id
-        }
-      }}
-    />
+    {(() => {
+      // Use globalIdx if that's your map index; load first 8 eagerly
+      const isAboveFold = typeof globalIdx === 'number' ? globalIdx < 8 : false;
+
+      return (
+        <img
+          src={toPreviewUrl(job.imageLink)}
+          alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
+          width={56}
+          height={56}
+          style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
+          loading={isAboveFold ? 'eager' : 'lazy'}
+          decoding="async"
+          fetchPriority={isAboveFold ? 'high' : 'low'}
+          onError={(e) => {
+            // Fallback: if thumbnail fails, show full file via proxy inline
+            try {
+              const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+              const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
+              if (id) e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
+            } catch (_) {
+              /* no-op */
+            }
+          }}
+        />
+      );
+    })()}
   </div>
 ) : null}
 
