@@ -402,38 +402,13 @@ function toPreviewUrl(originalUrl) {
     if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
     return '';
   }
-  // Works for images *and* PDFs
-  return `https://drive.google.com/thumbnail?id=${id}&sz=w256`;
-}
-
-// Ensure a Drive file is public (anyone-with-link → reader)
-async function ensureDriveFileIsPublic(fileId) {
-  if (!fileId) return;
-  try {
-    await axios.post(
-      API_ROOT + '/drive/makePublic',
-      { fileId },
-      { timeout: 4000 } // don't let this tie up the thread
-    );
-  } catch (err) {
-    // Log very lightly; we don't want this to be noisy or block
-    console.warn('ensureDriveFileIsPublic failed for', fileId);
-  }
+  // Ask our backend to proxy the image from Google Drive using OAuth
+  return `${API_ROOT}/drive/proxy/${id}?sz=w256`; // sz is optional, used for thumbnails
 }
 
 
 function unique(arr) {
   return Array.from(new Set((arr || []).filter(Boolean)));
-}
-
-// Fire-and-forget, throttled "make public" calls so UI never waits
-function makePublicThrottled(ids, perMs = 200, maxCount = 30) {
-  const uniq = unique(ids).slice(0, maxCount); // cap to avoid stampede
-  uniq.forEach((id, idx) => {
-    setTimeout(() => {
-      ensureDriveFileIsPublic(id); // don't await
-    }, idx * perMs);
-  });
 }
 
 function sortQueue(arr) {
@@ -615,9 +590,6 @@ const fetchOrdersEmbroLinksCore = async () => {
         linkedTo:         linksData[sid] || null
       };
     });
-
-    // 5) Proactively make Drive image files public (fire-and-forget, throttled)
-    makePublicThrottled(driveIdsToPublicize, 200, 30);
 
     // 6) Initialize newCols from current columns (retaining headCount)
     const newCols = {
