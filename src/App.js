@@ -351,6 +351,21 @@ function toPreviewUrl(originalUrl) {
   return `https://drive.google.com/thumbnail?id=${id}&sz=w256`;
 }
 
+// Ensure a Drive file is public (anyone-with-link → reader)
+async function ensureDriveFileIsPublic(fileId) {
+  if (!fileId) return;
+  try {
+    await axios.post(API_ROOT + '/drive/makePublic', { fileId });
+  } catch (err) {
+    console.warn('ensureDriveFileIsPublic failed for', fileId, err?.response?.data || err?.message);
+  }
+}
+
+function unique(arr) {
+  return Array.from(new Set((arr || []).filter(Boolean)));
+}
+
+
 
 function sortQueue(arr) {
   return [...arr].sort((a, b) => {
@@ -497,6 +512,8 @@ function getChain(jobs, id) {
 
       // 5) Build a map of all jobs (orders + placeholders) using Production Orders as source of truth
       const jobById = {};
+      const driveIdsToPublicize = []; // ← ADD
+
       orders.forEach(o => {
         const sid = String(o['Order #'] || '').trim();
         if (!sid) return;
@@ -508,10 +525,14 @@ function getChain(jobs, id) {
         const rawImageLink = o['Image'] || '';
         const artworkUrl   = toPreviewUrl(rawImageLink);
 
+        // ← ADD: collect Drive file IDs so we can make them public
+        const maybeId = extractDriveId(rawImageLink);
+        if (maybeId) driveIdsToPublicize.push(maybeId); // ← ADD
+
         jobById[sid] = {
           id:               sid,
           company:          o['Company Name'] || '',
-          product:          o['Product'] || '',           // ← ADD THIS
+          product:          o['Product'] || '',
           design:           o['Design'] || '',
           quantity:         +o['Quantity'] || 0,
           stitch_count:     +o['Stitch Count'] || 0,
@@ -527,6 +548,10 @@ function getChain(jobs, id) {
           linkedTo:         linksData[sid] || null
         };
       });
+
+      // ← ADD: proactively make all Drive image files public (idempotent)
+      await Promise.all(unique(driveIdsToPublicize).map(ensureDriveFileIsPublic)); // ← ADD
+
 
 
       // 6) Inject placeholders so they persist
