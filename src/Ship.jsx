@@ -646,7 +646,7 @@ export default function Ship() {
   }; // end handleShip
 
   // ─── 0) Feature flag at top ───
-  const SKIP_UPS = flase;
+  const SKIP_UPS = false;
 
   // 1) State for live UPS rates
   const [shippingOptions, setShippingOptions] = useState([]);
