@@ -373,7 +373,7 @@ export default function Section9(props) {
 
       return (
         <img
-          src={src}
+          src={src}  // keep your computed src from toPreviewUrl/fallback
           alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
           width={56}
           height={56}
@@ -381,15 +381,33 @@ export default function Section9(props) {
           loading={isAboveFold ? 'eager' : 'lazy'}
           decoding="async"
           fetchPriority={isAboveFold ? 'high' : 'low'}
+          data-fallback="0"
+          onLoad={(e) => {
+            // If Drive returned a 1x1 (or similarly tiny) image, auto-switch to full file once
+            const img = e.currentTarget;
+            const nw = img.naturalWidth, nh = img.naturalHeight;
+            if ((nw <= 2 || nh <= 2) && img.dataset.fallback !== '1') {
+              try {
+                const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+                const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
+                if (id) {
+                  img.dataset.fallback = '1';
+                  img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
+                }
+              } catch { /* no-op */ }
+            }
+          }}
           onError={(e) => {
-            // Final fallback: full file via proxy
+            // If decode fails, also try full file once
             try {
+              if (e.currentTarget.dataset.fallback === '1') return; // already tried
               const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
               const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
               if (id) {
+                e.currentTarget.dataset.fallback = '1';
                 e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
               }
-            } catch (_) { /* no-op */ }
+            } catch { /* no-op */ }
           }}
         />
       );
