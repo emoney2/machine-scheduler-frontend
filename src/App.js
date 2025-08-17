@@ -1240,7 +1240,7 @@ const onDragEnd = async (result) => {
               BUBBLE_START={BUBBLE_START}
               BUBBLE_END={BUBBLE_END}
               BUBBLE_DELIV={BUBBLE_DELIV}
-              toPreviewUrl={toPreviewUrl}       {/* ← add */}
+              toPreviewUrl={toPreviewUrl}
               openArtwork={openArtwork}  
             />
           }
