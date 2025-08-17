@@ -228,23 +228,22 @@ export default function App() {
 
 // Listen for just-startTime updates, splice machine1 only
 useEffect(() => {
-  socket.on("startTimeUpdated", ({ orderId, startTime }) => {
+  const handler = ({ orderId, startTime }) => {
     setColumns(cols => {
-      const m1 = cols.machine1.jobs.filter(j => j.id !== orderId);
-      if (m1.length) {
-        // bump the next job’s start time
-        m1[0] = { ...m1[0], embroidery_start: startTime };
-      }
+      const patch = (jobs) =>
+        jobs.map(j => j.id === orderId ? { ...j, embroidery_start: startTime } : j);
+
       return {
         ...cols,
-        machine1: { ...cols.machine1, jobs: m1 }
-        // machine2 is untouched
+        queue:    { ...cols.queue,    jobs: patch(cols.queue.jobs) },
+        machine1: { ...cols.machine1, jobs: patch(cols.machine1.jobs) },
+        machine2: { ...cols.machine2, jobs: patch(cols.machine2.jobs) },
       };
     });
-  });
-  return () => {
-    socket.off("startTimeUpdated");
   };
+
+  socket.on("startTimeUpdated", handler);
+  return () => socket.off("startTimeUpdated", handler);
 }, []);
 
 useEffect(() => {
@@ -799,32 +798,28 @@ const fetchManualStateCore = async (previousCols) => {
     setTimeout(() => setSyncStatus(''), 2000);
   };
 
-// ─── Section 5E: Only set start time on top‐of‐list change if blank ───────────
+// ─── Section 5E: Only set start time on top-of-list change if it was blank ────
 useEffect(() => {
   const updateTopStartTimeIfBlank = async (prevRef, jobs, machineKey) => {
     const topJob = jobs?.[0];
     const newTop = topJob?.id || null;
     const prev = prevRef.current?.id || null;
 
-    // no change or no job
     if (!newTop || newTop === prev) return;
 
-    // 🚫 Do NOT overwrite if sheet already has an Embroidery Start Time
+    // If the sheet already has an Embroidery Start Time, don't overwrite it
     if (topJob?.embroidery_start) {
       prevRef.current = { id: newTop, ts: Date.now() };
       return;
     }
 
-    console.log(`✏️ Top changed and start was blank: setting start for ${newTop} on ${machineKey}`);
+    console.log(`✏️ Top changed & start was blank; setting ${newTop} on ${machineKey}`);
 
     const nowClamped = clampToWorkHours(new Date());
     const isoStamp = nowClamped.toISOString();
 
     try {
-      await axios.post(API_ROOT + '/updateStartTime', {
-        id: newTop,
-        startTime: isoStamp
-      });
+      await axios.post(API_ROOT + '/updateStartTime', { id: newTop, startTime: isoStamp });
 
       setColumns(cols => ({
         ...cols,
@@ -842,7 +837,6 @@ useEffect(() => {
     }
   };
 
-  // ✅ Only do this if manualReorder is true
   if (manualReorder) {
     if (columns.machine1.jobs.length > 0) {
       updateTopStartTimeIfBlank(prevMachine1Top, columns.machine1.jobs, 'machine1');
@@ -850,9 +844,10 @@ useEffect(() => {
     if (columns.machine2.jobs.length > 0) {
       updateTopStartTimeIfBlank(prevMachine2Top, columns.machine2.jobs, 'machine2');
     }
-    setManualReorder(false); // turn off flag so polling doesn't trigger this
+    setManualReorder(false);
   }
-}, [manualReorder]); // 👈 only runs when manualReorder is true
+}, [manualReorder]);
+
 
 // === Section 6: Placeholder Management ===
 
