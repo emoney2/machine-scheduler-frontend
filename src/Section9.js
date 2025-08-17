@@ -343,23 +343,19 @@ export default function Section9(props) {
     }}
   >
     {(() => {
-      // 1) Try your normal preview builder
-      let src = toPreviewUrl(job.imageLink);
+      // 1) Build a safe thumbnail src
+      let src = toPreviewUrl(job.imageLink); // usually /drive/proxy/<id>?thumb=1&sz=w240
 
-      // 2) If that failed, try to parse a Drive file id locally and build a proxy URL
       if (!src) {
+        // Parse Google Drive id if toPreviewUrl couldn't
         try {
           const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
           const altId = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-          if (altId) {
-            src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
-          }
-        } catch (_) {
-          // ignore
-        }
+          if (altId) src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
+        } catch {}
       }
 
-      // 3) If we still don't have a URL, show a small label instead of a white box
+      // 2) If still nothing, render a label (no white boxes)
       if (!src) {
         return (
           <span style={{ fontSize: 11, color: '#888', padding: 4, display: 'block', textAlign: 'center' }}>
@@ -368,12 +364,12 @@ export default function Section9(props) {
         );
       }
 
-      // First 8 jobs per column: eager/high for snappier first paint
+      // 3) Prioritize first 8 rows
       const isAboveFold = typeof globalIdx === 'number' ? globalIdx < 8 : false;
 
       return (
         <img
-          src={src}  // keep your computed src from toPreviewUrl/fallback
+          src={src}
           alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
           width={56}
           height={56}
@@ -381,33 +377,34 @@ export default function Section9(props) {
           loading={isAboveFold ? 'eager' : 'lazy'}
           decoding="async"
           fetchPriority={isAboveFold ? 'high' : 'low'}
-          data-fallback="0"
+          data-upscaled="0"
           onLoad={(e) => {
-            // If Drive returned a 1x1 (or similarly tiny) image, auto-switch to full file once
+            // If Drive thumb came back tiny (like 1x1), retry once with a bigger thumbnail (w512)
             const img = e.currentTarget;
-            const nw = img.naturalWidth, nh = img.naturalHeight;
-            if ((nw <= 2 || nh <= 2) && img.dataset.fallback !== '1') {
+            if (img.dataset.upscaled === '1') return;
+            if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
               try {
                 const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
                 const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
                 if (id) {
-                  img.dataset.fallback = '1';
-                  img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
+                  img.dataset.upscaled = '1';
+                  img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
                 }
-              } catch { /* no-op */ }
+              } catch {}
             }
           }}
           onError={(e) => {
-            // If decode fails, also try full file once
+            // If the smaller thumb failed, try once more with a bigger thumb
+            const img = e.currentTarget;
+            if (img.dataset.upscaled === '1') return;
             try {
-              if (e.currentTarget.dataset.fallback === '1') return; // already tried
               const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
               const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
               if (id) {
-                e.currentTarget.dataset.fallback = '1';
-                e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
+                img.dataset.upscaled = '1';
+                img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
               }
-            } catch { /* no-op */ }
+            } catch {}
           }}
         />
       );
