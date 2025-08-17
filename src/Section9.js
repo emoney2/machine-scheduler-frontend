@@ -30,8 +30,12 @@ export default function Section9(props) {
     DARK_PURPLE,
     BUBBLE_START,
     BUBBLE_END,
-    BUBBLE_DELIV
+    BUBBLE_DELIV,
+    // ⬇️ NEW: helpers passed from App.js
+    toPreviewUrl,
+    openArtwork
   } = props;
+
 
   return (
     <div style={{ padding: 16, fontFamily: 'sans-serif', fontSize: 13 }}>
@@ -302,7 +306,7 @@ export default function Section9(props) {
                                       paddingTop: 6,
                                       paddingBottom: 6,
                                       paddingRight: rightPadding,
-                                      paddingLeft: job.artworkUrl ? 6 + 56 + 8 : 6,
+                                      paddingLeft: job.imageLink ? 6 + 56 + 8 : 6,
                                       margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
                                       background: job.isLate
                                         ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
@@ -314,40 +318,47 @@ export default function Section9(props) {
                                     }}
 
                                   >
-{/* Artwork thumbnail (absolute, top-left); hidden if no artwork */}
-{job.artworkUrl ? (
-  <a
-    href={job.imageLink || job.artworkUrl}
-    target="_blank"
-    rel="noreferrer noopener"
-    title="Open full artwork"
+{/* Artwork thumbnail (absolute, top-left); hidden if no imageLink */}
+{job.imageLink ? (
+  <div
+    title="Click to open full artwork"
     style={{
       position: 'absolute',
       top: 6,
       left: 6,
       display: 'block',
-      zIndex: 5
+      zIndex: 5,
+      width: 56,
+      height: 56,
+      borderRadius: 8,
+      overflow: 'hidden',
+      border: '1px solid #eee',
+      background: '#fff',
+      cursor: 'pointer'
     }}
     onMouseDown={(e) => e.stopPropagation()} // prevent dragging conflicts
-    onClick={(e) => e.stopPropagation()}
+    onClick={(e) => {
+      e.stopPropagation();
+      openArtwork(job.imageLink); // full file via backend proxy (thumb=0)
+    }}
   >
     <img
-      src={job.artworkUrl}
+      src={toPreviewUrl(job.imageLink)} // proxy thumbnail (thumb=1&sz=w512)
       alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
-      style={{
-        display: 'block',
-        width: 56,
-        height: 56,
-        objectFit: 'cover',
-        borderRadius: 8,
-        border: '1px solid #eee',
-        background: '#fff',
-        cursor: 'pointer'
-      }}
+      style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
       loading="lazy"
-      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+      onError={(e) => {
+        // Fallback: if thumbnail fails, show full file via proxy inline
+        try {
+          const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+          const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
+          if (id) e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
+        } catch (_) {
+          // leave broken if we can’t parse the id
+        }
+      }}
     />
-  </a>
+  </div>
 ) : null}
 
 
