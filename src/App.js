@@ -410,17 +410,31 @@ function toPreviewUrl(originalUrl) {
 async function ensureDriveFileIsPublic(fileId) {
   if (!fileId) return;
   try {
-    await axios.post(API_ROOT + '/drive/makePublic', { fileId });
+    await axios.post(
+      API_ROOT + '/drive/makePublic',
+      { fileId },
+      { timeout: 4000 } // don't let this tie up the thread
+    );
   } catch (err) {
-    console.warn('ensureDriveFileIsPublic failed for', fileId, err?.response?.data || err?.message);
+    // Log very lightly; we don't want this to be noisy or block
+    console.warn('ensureDriveFileIsPublic failed for', fileId);
   }
 }
+
 
 function unique(arr) {
   return Array.from(new Set((arr || []).filter(Boolean)));
 }
 
-
+// Fire-and-forget, throttled "make public" calls so UI never waits
+function makePublicThrottled(ids, perMs = 200, maxCount = 30) {
+  const uniq = unique(ids).slice(0, maxCount); // cap to avoid stampede
+  uniq.forEach((id, idx) => {
+    setTimeout(() => {
+      ensureDriveFileIsPublic(id); // don't await
+    }, idx * perMs);
+  });
+}
 
 function sortQueue(arr) {
   return [...arr].sort((a, b) => {
@@ -605,7 +619,8 @@ function getChain(jobs, id) {
       });
 
       // ← ADD: proactively make all Drive image files public (idempotent)
-      await Promise.all(unique(driveIdsToPublicize).map(ensureDriveFileIsPublic)); // ← ADD
+      makePublicThrottled(driveIdsToPublicize, 200, 30); // fire-and-forget; UI continues immediately
+
 
 
 
