@@ -395,6 +395,19 @@ function extractDriveId(url) {
   return '';
 }
 
+// === Artwork / Image Helpers ===
+function extractDriveId(url) {
+  if (!url) return '';
+  try {
+    const m1 = url.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+    if (m1) return m1[1];
+    const idParam = new URL(url).searchParams.get('id');
+    if (idParam) return idParam;
+  } catch (_) {}
+  return '';
+}
+
+// Use backend thumbnail proxy (thumb=1) with a slightly larger size for better clarity
 function toPreviewUrl(originalUrl) {
   if (!originalUrl) return '';
   const id = extractDriveId(originalUrl);
@@ -402,13 +415,23 @@ function toPreviewUrl(originalUrl) {
     if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
     return '';
   }
-  // Use backend thumbnail proxy (thumb=1) with size hint
-  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w256`;
+  // bump size to w=512 for a sharper card preview
+  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
 }
 
-function unique(arr) {
-  return Array.from(new Set((arr || []).filter(Boolean)));
+// Full-view URL (original quality / inline display)
+function toFullViewUrl(originalUrl) {
+  if (!originalUrl) return '';
+  const id = extractDriveId(originalUrl);
+  return id ? `${API_ROOT}/drive/proxy/${id}?thumb=0` : originalUrl;
 }
+
+// Click handler to open full-view in a new tab
+function openArtwork(originalUrl) {
+  const url = toFullViewUrl(originalUrl);
+  if (url) window.open(url, '_blank', 'noopener,noreferrer');
+}
+
 
 function sortQueue(arr) {
   return [...arr].sort((a, b) => {
@@ -1217,6 +1240,8 @@ const onDragEnd = async (result) => {
               BUBBLE_START={BUBBLE_START}
               BUBBLE_END={BUBBLE_END}
               BUBBLE_DELIV={BUBBLE_DELIV}
+              toPreviewUrl={toPreviewUrl}       {/* ← add */}
+              openArtwork={openArtwork}  
             />
           }
         />
