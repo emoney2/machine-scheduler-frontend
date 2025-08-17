@@ -547,174 +547,138 @@ function getChain(jobs, id) {
   const [isLoading, setIsLoading] = useState(false);
   const [hasError,   setHasError]   = useState(false);
 
-  // ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
-  const fetchOrdersEmbroLinksCore = async () => {
-    console.log('fetchOrdersEmbroLinksCore ▶ start');
-    setIsLoading(true);
-    setHasError(false);
+// ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
+const fetchOrdersEmbroLinksCore = async () => {
+  console.log('fetchOrdersEmbroLinksCore ▶ start');
+  setIsLoading(true);
+  setHasError(false);
 
-    try {
-      // 1) Fetch orders, embroideryList, and links in parallel
-      const [ordersRes, embRes, linksRes] = await Promise.all([
-        axios.get(API_ROOT + '/orders'),
-        axios.get(API_ROOT + '/embroideryList'),
-        axios.get(API_ROOT + '/links'),
-      ]);
+  try {
+    // 1) Fetch orders, embroideryList, and links in parallel
+    const [ordersRes, embRes, linksRes] = await Promise.all([
+      axios.get(API_ROOT + '/orders'),
+      axios.get(API_ROOT + '/embroideryList'),
+      axios.get(API_ROOT + '/links'),
+    ]);
 
-      // 2) Prepare orders array, filter out completed
-      let orders = (ordersRes.data || []).filter(
-        o => (o['Stage'] || '').toLowerCase() !== 'complete'
-      );
-      const embList = embRes.data || [];
-      let linksData = linksRes.data || {};
+    // 2) Prepare orders array, filter out completed
+    let orders = (ordersRes.data || []).filter(
+      o => (o['Stage'] || '').toLowerCase() !== 'complete'
+    );
+    const embList = embRes.data || [];
+    let linksData = linksRes.data || {};
 
-      // 3) Filter out any doNotRelink entries
-      const doNotRelink = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
-      linksData = Object.fromEntries(
-        Object.entries(linksData)
-          .filter(([key, val]) =>
-            !doNotRelink.includes(key) && !doNotRelink.includes(val)
-          )
-      );
+    // 3) Filter out any doNotRelink entries
+    const doNotRelink = JSON.parse(localStorage.getItem('doNotRelink') || '[]');
+    linksData = Object.fromEntries(
+      Object.entries(linksData)
+        .filter(([key, val]) =>
+          !doNotRelink.includes(key) && !doNotRelink.includes(val)
+        )
+    );
 
-      // 4) (Removed embMap) — we now read Embroidery Start Time directly from Production Orders
+    // 4) Build a map of all jobs (orders only)
+    const jobById = {};
+    const driveIdsToPublicize = [];
 
-      // 5) Build a map of all jobs (orders + placeholders) using Production Orders as source of truth
-      const jobById = {};
-      const driveIdsToPublicize = []; // ← ADD
+    orders.forEach(o => {
+      const sid = String(o['Order #'] || '').trim();
+      if (!sid) return;
 
-      orders.forEach(o => {
-        const sid = String(o['Order #'] || '').trim();
-        if (!sid) return;
+      // Persisted start time (from Production Orders)
+      const persistedStart = o['Embroidery Start Time'] || '';
 
-        // Persisted start time (from Production Orders)
-        const persistedStart = o['Embroidery Start Time'] || '';
+      // Artwork link (from Production Orders → Image) → thumbnailable URL
+      const rawImageLink = o['Image'] || '';
+      const artworkUrl   = toPreviewUrl(rawImageLink);
 
-        // Artwork link (from Production Orders → Image) → thumbnailable URL
-        const rawImageLink = o['Image'] || '';
-        const artworkUrl   = toPreviewUrl(rawImageLink);
+      // Collect Drive file IDs so we can make them public (non-blocking)
+      const maybeId = extractDriveId(rawImageLink);
+      if (maybeId) driveIdsToPublicize.push(maybeId);
 
-        // ← ADD: collect Drive file IDs so we can make them public
-        const maybeId = extractDriveId(rawImageLink);
-        if (maybeId) driveIdsToPublicize.push(maybeId); // ← ADD
-
-        jobById[sid] = {
-          id:               sid,
-          company:          o['Company Name'] || '',
-          product:          o['Product'] || '',
-          design:           o['Design'] || '',
-          quantity:         +o['Quantity'] || 0,
-          stitch_count:     +o['Stitch Count'] || 0,
-          due_date:         o['Due Date'] || '',
-          due_type:         o['Hard Date/Soft Date'] || '',
-          embroidery_start: persistedStart,
-          start_date:       persistedStart,
-          status:           o['Stage'] || '',
-          threadColors:     o['Threads'] || '',
-          imageLink:        rawImageLink,
-          artworkUrl,
-          machineId:        'queue',
-          linkedTo:         linksData[sid] || null
-        };
-      });
-
-      // ← ADD: proactively make all Drive image files public (idempotent)
-      makePublicThrottled(driveIdsToPublicize, 200, 30); // fire-and-forget; UI continues immediately
-
-
-
-
-      // 6) Inject placeholders so they persist
-      placeholders.forEach(ph => {
-        if (!jobById[ph.id]) {
-          jobById[ph.id] = {
-            id:               ph.id,
-            company:          ph.company || '',
-            design:           '',
-            quantity:         +ph.quantity || 0,
-            stitch_count:     +ph.stitchCount || 0,
-            due_date:         ph.inHand || '',
-            due_type:         ph.dueType || '',
-            embroidery_start: '',
-            start_date:       '',
-            status:           '',
-            threadColors:     '',
-            machineId:        'queue',
-            linkedTo:         null
-          };
-        } else {
-          // update existing placeholder fields
-          const existing = jobById[ph.id];
-          existing.company      = ph.company      || '';
-          existing.quantity     = +ph.quantity    || 0;
-          existing.stitch_count = +ph.stitchCount || 0;
-          existing.due_date     = ph.inHand       || '';
-          existing.due_type     = ph.dueType      || '';
-        }
-      });
-
-      // 7) Initialize newCols from current columns (retaining headCount)
-      const newCols = {
-        queue:    { ...columns.queue,    jobs: [] },
-        machine1: { ...columns.machine1, jobs: [] },
-        machine2: { ...columns.machine2, jobs: [] },
+      jobById[sid] = {
+        id:               sid,
+        company:          o['Company Name'] || '',
+        product:          o['Product'] || '',
+        design:           o['Design'] || '',
+        quantity:         +o['Quantity'] || 0,
+        stitch_count:     +o['Stitch Count'] || 0,
+        due_date:         o['Due Date'] || '',
+        due_type:         o['Hard Date/Soft Date'] || '',
+        embroidery_start: persistedStart,
+        start_date:       persistedStart,
+        status:           o['Stage'] || '',
+        threadColors:     o['Threads'] || '',
+        imageLink:        rawImageLink,
+        artworkUrl,
+        machineId:        'queue',
+        linkedTo:         linksData[sid] || null
       };
+    });
 
-      // 8) Preserve any manual placements
-      columns.machine1.jobs.forEach(job => {
-        if (jobById[job.id]) jobById[job.id].machineId = 'machine1';
-      });
-      columns.machine2.jobs.forEach(job => {
-        if (jobById[job.id]) jobById[job.id].machineId = 'machine2';
-      });
+    // 5) Proactively make Drive image files public (fire-and-forget, throttled)
+    makePublicThrottled(driveIdsToPublicize, 200, 30);
 
-      // 9) Distribute jobs into newCols
-      Object.values(jobById).forEach(job => {
-        if (job.machineId === 'machine1') {
-          job.machineId = 'Machine 1 (1)';
-          newCols['machine1'].jobs.push(job);
-        } else if (job.machineId === 'machine2') {
-          job.machineId = 'Machine 2';
-          newCols['machine2'].jobs.push(job);
-        } else {
-          newCols.queue.jobs.push(job);
-        }
-      });
+    // 6) Initialize newCols from current columns (retaining headCount)
+    const newCols = {
+      queue:    { ...columns.queue,    jobs: [] },
+      machine1: { ...columns.machine1, jobs: [] },
+      machine2: { ...columns.machine2, jobs: [] },
+    };
 
-      // 10) Sort queue by due_date
-      newCols.queue.jobs.sort((a, b) => {
-        const da = parseDueDate(a.due_date);
-        const db = parseDueDate(b.due_date);
-        if (da && db) return da - db;
-        if (da) return -1;
-        if (db) return 1;
-        return 0;
-      });
+    // 7) Preserve any manual placements
+    columns.machine1.jobs.forEach(job => {
+      if (jobById[job.id]) jobById[job.id].machineId = 'machine1';
+    });
+    columns.machine2.jobs.forEach(job => {
+      if (jobById[job.id]) jobById[job.id].machineId = 'machine2';
+    });
 
-      // 11) Re-run scheduleMachineJobs for each machine using its headCount
-      newCols.machine1.jobs = scheduleMachineJobs(
-        newCols.machine1.jobs,
-        newCols.machine1.headCount,
-        'Machine 1 (1)'
-      );
-      newCols.machine2.jobs = scheduleMachineJobs(
-        newCols.machine2.jobs,
-        newCols.machine2.headCount,
-        'Machine 2 (6)'
-      );
-      // 12) Return the updated columns
-      return newCols;
-    } catch (err) {
-      console.error('❌ fetchOrdersEmbroLinksCore error', err);
-      setHasError(true);
-      return columns;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    // 8) Distribute jobs into newCols
+    Object.values(jobById).forEach(job => {
+      if (job.machineId === 'machine1') {
+        job.machineId = 'Machine 1 (1)';
+        newCols['machine1'].jobs.push(job);
+      } else if (job.machineId === 'machine2') {
+        job.machineId = 'Machine 2';
+        newCols['machine2'].jobs.push(job);
+      } else {
+        newCols.queue.jobs.push(job);
+      }
+    });
 
+    // 9) Sort queue by due_date
+    newCols.queue.jobs.sort((a, b) => {
+      const da = parseDueDate(a.due_date);
+      const db = parseDueDate(b.due_date);
+      if (da && db) return da - db;
+      if (da) return -1;
+      if (db) return 1;
+      return 0;
+    });
 
+    // 10) Re-run scheduleMachineJobs for each machine using its headCount
+    newCols.machine1.jobs = scheduleMachineJobs(
+      newCols.machine1.jobs,
+      newCols.machine1.headCount,
+      'Machine 1 (1)'
+    );
+    newCols.machine2.jobs = scheduleMachineJobs(
+      newCols.machine2.jobs,
+      newCols.machine2.headCount,
+      'Machine 2 (6)'
+    );
 
+    // 11) Return the updated columns
+    return newCols;
+  } catch (err) {
+    console.error('❌ fetchOrdersEmbroLinksCore error', err);
+    setHasError(true);
+    return columns;
+  } finally {
+    setIsLoading(false);
+  }
+};
 // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
 const fetchManualStateCore = async (previousCols) => {
   console.log('fetchManualStateCore ▶ start');
