@@ -336,7 +336,7 @@ export default function Section9(props) {
       background: '#fff',
       cursor: 'pointer'
     }}
-    onMouseDown={(e) => e.stopPropagation()} {/* prevent dragging conflicts */}
+    onMouseDown={(e) => { e.stopPropagation(); }}
     onClick={(e) => {
       e.stopPropagation();
       openArtwork(job.imageLink); // full file via backend proxy (thumb=0)
@@ -362,15 +362,14 @@ export default function Section9(props) {
               const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
               const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
               if (id) e.currentTarget.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=0`;
-            } catch (_) {
-              /* no-op */
-            }
+            } catch (_) { /* no-op */ }
           }}
         />
       );
     })()}
   </div>
 ) : null}
+
 
 
 {/* only show badge outside strip on real jobs */}
