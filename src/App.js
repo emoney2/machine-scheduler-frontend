@@ -334,6 +334,30 @@ function fmtDT(dt) {
   return month + '/' + day + ' ' + pad(h) + ':' + m + ' ' + ap;
 }
 
+// Parse "Embroidery Start Time" from the sheet into a reliable ISO string
+function parseEmbroideryStart(val) {
+  if (!val) return '';
+  const s = String(val).trim();
+
+  // Already ISO?
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s;
+
+  // Common "M/D/YYYY H:MM AM/PM"
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (m) {
+    let [_, mo, da, yr, hh, mm, ap] = m;
+    mo = +mo; da = +da; yr = +yr; hh = +hh; mm = +mm;
+    if (/pm/i.test(ap) && hh < 12) hh += 12;
+    if (/am/i.test(ap) && hh === 12) hh = 0;
+    const dt = new Date(yr, mo - 1, da, hh, mm, 0, 0);
+    return isNaN(dt) ? '' : dt.toISOString();
+  }
+
+  // Fallback: Date.parse
+  const dt = new Date(s);
+  return isNaN(dt) ? '' : dt.toISOString();
+}
+
 
 function parseDueDate(d) {
   if (!d) return null;
@@ -582,7 +606,7 @@ const fetchOrdersEmbroLinksCore = async () => {
       if (!sid) return;
 
       // Persisted start time (from Production Orders)
-      const persistedStart = o['Embroidery Start Time'] || '';
+      const persistedStart = parseEmbroideryStart(o['Embroidery Start Time']);
 
       // Artwork link (from Production Orders → Image) → thumbnailable URL
       const rawImageLink = o['Image'] || '';
