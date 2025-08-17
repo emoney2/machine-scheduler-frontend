@@ -651,17 +651,9 @@ const fetchOrdersEmbroLinksCore = async () => {
       return 0;
     });
 
-    // 10) Re-run scheduleMachineJobs for each machine using its headCount
-    newCols.machine1.jobs = scheduleMachineJobs(
-      newCols.machine1.jobs,
-      newCols.machine1.headCount,
-      'Machine 1 (1)'
-    );
-    newCols.machine2.jobs = scheduleMachineJobs(
-      newCols.machine2.jobs,
-      newCols.machine2.headCount,
-      'Machine 2 (6)'
-    );
+    // 10) Re-run scheduleMachineJobs with machine labels so head counts are correct
+    newCols.machine1.jobs = scheduleMachineJobs(newCols.machine1.jobs, 'Machine 1 (1)');
+    newCols.machine2.jobs = scheduleMachineJobs(newCols.machine2.jobs, 'Machine 2 (6)');
 
     // 11) Return the updated columns
     return newCols;
@@ -807,15 +799,23 @@ const fetchManualStateCore = async (previousCols) => {
     setTimeout(() => setSyncStatus(''), 2000);
   };
 
-// ─── Section 5E: Always overwrite start time on top‐of‐list change ────────────
+// ─── Section 5E: Only set start time on top‐of‐list change if blank ───────────
 useEffect(() => {
-  const updateTopStartTime = async (prevRef, jobs, machineKey) => {
-    const newTop = jobs[0]?.id || null;
+  const updateTopStartTimeIfBlank = async (prevRef, jobs, machineKey) => {
+    const topJob = jobs?.[0];
+    const newTop = topJob?.id || null;
     const prev = prevRef.current?.id || null;
 
+    // no change or no job
     if (!newTop || newTop === prev) return;
 
-    console.log(`✏️ Manually promoted job to top: ${newTop} on ${machineKey}`);
+    // 🚫 Do NOT overwrite if sheet already has an Embroidery Start Time
+    if (topJob?.embroidery_start) {
+      prevRef.current = { id: newTop, ts: Date.now() };
+      return;
+    }
+
+    console.log(`✏️ Top changed and start was blank: setting start for ${newTop} on ${machineKey}`);
 
     const nowClamped = clampToWorkHours(new Date());
     const isoStamp = nowClamped.toISOString();
@@ -845,10 +845,10 @@ useEffect(() => {
   // ✅ Only do this if manualReorder is true
   if (manualReorder) {
     if (columns.machine1.jobs.length > 0) {
-      updateTopStartTime(prevMachine1Top, columns.machine1.jobs, 'machine1');
+      updateTopStartTimeIfBlank(prevMachine1Top, columns.machine1.jobs, 'machine1');
     }
     if (columns.machine2.jobs.length > 0) {
-      updateTopStartTime(prevMachine2Top, columns.machine2.jobs, 'machine2');
+      updateTopStartTimeIfBlank(prevMachine2Top, columns.machine2.jobs, 'machine2');
     }
     setManualReorder(false); // turn off flag so polling doesn't trigger this
   }
