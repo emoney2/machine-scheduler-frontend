@@ -45,20 +45,23 @@ axios.interceptors.response.use(
   }
 );
 
+// CONFIGURATION
+const API_ROOT      = process.env.REACT_APP_API_ROOT;           // e.g. https://machine-scheduler-backend.onrender.com/api
+const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');           // → https://machine-scheduler-backend.onrender.com
+const SOCKET_PATH   = '/socket.io';
 
-const API_ROOT      = process.env.REACT_APP_API_ROOT;
-const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');
-const socket        = io(SOCKET_ORIGIN, {
-  path: '/socket.io',
-  transports: ['polling','websocket'], // prefer polling first so WS failures don't stall
-  timeout: 7000,
-  reconnection: true,
-  reconnectionAttempts: 8,
-  reconnectionDelay: 800,
-  reconnectionDelayMax: 3000,
-  withCredentials: true
-});
-
+let socket = null;
+try {
+  socket = io(SOCKET_ORIGIN, {
+    path: SOCKET_PATH,
+    transports: ['polling','websocket'], // prefer polling first, then upgrade
+    timeout: 7000,
+    reconnection: true,
+    reconnectionAttempts: 8,
+    reconnectionDelay: 800,
+    reconnectionDelayMax: 3000,
+    withCredentials: true
+  });
 
   socket.on("connect",       () => console.log("⚡ socket connected, id =", socket.id));
   socket.on("disconnect",    (reason) => console.log("🛑 socket disconnected:", reason));
@@ -72,9 +75,8 @@ const socket        = io(SOCKET_ORIGIN, {
   window.__SOCKET_DOWN__ = true;
 }
 
-// Helper: only use socket if live
+// Optional helper if you emit elsewhere:
 const isSocketLive = () => !!(socket && socket.connected);
-
 
 // WORK HOURS / HOLIDAYS
 const WORK_START_HR  = 8;
