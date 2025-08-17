@@ -402,9 +402,10 @@ function toPreviewUrl(originalUrl) {
     if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
     return '';
   }
-  // Ask our backend to proxy the image from Google Drive using OAuth
-  return `${API_ROOT}/drive/proxy/${id}?sz=w256`; // sz is optional, used for thumbnails
+  // Use backend thumbnail proxy (thumb=1) with size hint
+  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w256`;
 }
+
 
 
 function unique(arr) {
