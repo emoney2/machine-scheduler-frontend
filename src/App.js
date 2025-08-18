@@ -502,7 +502,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
       : Math.ceil(job.quantity / headCount) * headCount;
 
     const stitches = job.stitch_count > 0 ? job.stitch_count : 30000;
-    const runMs    = (stitches / 30000) * (qty / headCount) * 3600000;
+    const runMs    = (stitches / 35000) * (qty / headCount) * 3600000;
 
     const end = addWorkTime(start, runMs);
 
