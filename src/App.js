@@ -439,7 +439,7 @@ function toPreviewUrl(originalUrl) {
     return '';
   }
   // bump size to w=512 for a sharper card preview
-  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w200`;
+  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w240`;
 }
 
 // Full-view URL (original quality / inline display)
