@@ -211,13 +211,41 @@ export default function App() {
   // Send a new start time when needed
   const bumpJobStartTime = async (jobId) => {
     try {
-      console.log("⏱️ Setting embroidery start time for job", jobId);
-      const iso = new Date().toISOString(); // write the real moment
-      await axios.post(API_ROOT + '/updateStartTime', { id: jobId, startTime: iso });
-        id:        jobId,
-        startTime: iso
+      // If this job already has a valid start, skip
+      const findJobById = () => {
+        for (const key of ['machine1', 'machine2', 'queue']) {
+          const hit = (columns?.[key]?.jobs || []).find(j => j.id === jobId);
+          if (hit) return hit;
+        }
+        return null;
+      };
+
+      const existing = findJobById();
+      if (existing && normalizeStart(existing.embroidery_start)) {
+        console.log(`⏭️ Job ${jobId} already has start time (${existing.embroidery_start}), skipping`);
+        return;
+      }
+  
+      // Write the real moment (no clamp) as ISO UTC
+      const iso = new Date().toISOString();
+      await axios.post(API_ROOT + '/updateStartTime', {
+        id: jobId,
+        startTime: iso,
       });
 
+      // Optimistically update all columns so UI reflects immediately
+      setColumns((cols) => {
+        const patch = (jobs) =>
+          jobs.map((j) => (j.id === jobId ? { ...j, embroidery_start: iso, start_date: iso } : j));
+        return {
+          ...cols,
+          queue:    { ...cols.queue,    jobs: patch(cols.queue.jobs) },
+          machine1: { ...cols.machine1, jobs: patch(cols.machine1.jobs) },
+          machine2: { ...cols.machine2, jobs: patch(cols.machine2.jobs) },
+        };
+      });
+
+      console.log(`✅ Set start time for ${jobId}: ${fmtET(iso)} ET`);
     } catch (err) {
       console.error('Failed to bump start time', err);
     }
