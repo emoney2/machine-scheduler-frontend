@@ -822,55 +822,45 @@ const fetchManualStateCore = async (previousCols) => {
     setTimeout(() => setSyncStatus(''), 2000);
   };
 
-// ─── Section 5E: Only set start time on top-of-list change if it was blank ────
+// ─── Section 5E: Always ensure top jobs have a start time ────
 useEffect(() => {
-  const updateTopStartTimeIfBlank = async (prevRef, jobs, machineKey) => {
-    const topJob = jobs?.[0];
-    const newTop = topJob?.id || null;
-    const prev = prevRef.current?.id || null;
+  const ensureTopHasStart = async (machineKey) => {
+    const jobs = columns[machineKey]?.jobs || [];
+    const top = jobs[0];
+    if (!top) return;
 
-    if (!newTop || newTop === prev) return;
+    // If the sheet already has an Embroidery Start Time, do nothing
+    if (top.embroidery_start) return;
 
-    // If the sheet already has an Embroidery Start Time, don't overwrite it
-    if (topJob?.embroidery_start) {
-      prevRef.current = { id: newTop, ts: Date.now() };
-      return;
-    }
-
-    console.log(`✏️ Top changed & start was blank; setting ${newTop} on ${machineKey}`);
-
+    // Write start time now (clamped to work hours)
     const nowClamped = clampToWorkHours(new Date());
-    const isoStamp = nowClamped.toISOString();
+    const isoStamp   = nowClamped.toISOString();
 
     try {
-      await axios.post(API_ROOT + '/updateStartTime', { id: newTop, startTime: isoStamp });
+      await axios.post(API_ROOT + '/updateStartTime', {
+        id: top.id,
+        startTime: isoStamp
+      });
 
+      // Optimistically patch local state so UI reflects immediately
       setColumns(cols => ({
         ...cols,
         [machineKey]: {
           ...cols[machineKey],
           jobs: cols[machineKey].jobs.map(j =>
-            j.id === newTop ? { ...j, embroidery_start: isoStamp } : j
+            j.id === top.id ? { ...j, embroidery_start: isoStamp, start_date: isoStamp } : j
           )
         }
       }));
-
-      prevRef.current = { id: newTop, ts: Date.now() };
     } catch (err) {
-      console.error(`❌ Failed to set start time for ${newTop}`, err);
+      console.error(`❌ Failed to set start time for ${top.id}`, err);
     }
   };
 
-  if (manualReorder) {
-    if (columns.machine1.jobs.length > 0) {
-      updateTopStartTimeIfBlank(prevMachine1Top, columns.machine1.jobs, 'machine1');
-    }
-    if (columns.machine2.jobs.length > 0) {
-      updateTopStartTimeIfBlank(prevMachine2Top, columns.machine2.jobs, 'machine2');
-    }
-    setManualReorder(false);
-  }
-}, [manualReorder]);
+  // Check both machines every time the job lists change (initial load + every poll)
+  ensureTopHasStart('machine1');
+  ensureTopHasStart('machine2');
+}, [columns.machine1.jobs, columns.machine2.jobs]);
 
 
 // === Section 6: Placeholder Management ===
