@@ -386,13 +386,12 @@ function addWorkTime(start, ms) {
 }
 
 function fmtDT(dtLike) {
-  // Accept Date or string (ISO or otherwise)
   const d = typeof dtLike === "string" ? new Date(dtLike) : dtLike;
   if (!(d instanceof Date) || isNaN(d)) return "";
 
-  // Format in America/New_York regardless of the browser’s local timezone
+  // Render in UTC so it matches Google Sheet's ISO Z entries
   const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
+    timeZone: "UTC",
     month: "2-digit",
     day: "2-digit",
     hour: "numeric",
@@ -401,15 +400,9 @@ function fmtDT(dtLike) {
   }).formatToParts(d);
 
   const get = (t) => parts.find((p) => p.type === t)?.value || "";
-  const mm = get("month");
-  const dd = get("day");
-  const hr = get("hour");
-  const min = get("minute");
-  const ap = get("dayPeriod"); // AM/PM
-
-  // Example: 08/20 8:30 AM
-  return `${mm}/${dd} ${hr}:${min} ${ap}`;
+  return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
 }
+
 
 // Parse "Embroidery Start Time" from the sheet into a reliable ISO string
 function parseEmbroideryStart(val) {
