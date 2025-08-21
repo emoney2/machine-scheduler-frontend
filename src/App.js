@@ -19,6 +19,68 @@ import ShipmentComplete from "./ShipmentComplete";
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
+// Time helpers: normalize to ISO (UTC), display in Eastern
+
+function isISO8601Z(s) {
+  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(s);
+}
+
+// Format a Date/string in America/New_York as "MM/DD h:mm AM/PM"
+function fmtET(dtLike) {
+  const d = typeof dtLike === "string" ? new Date(dtLike) : dtLike;
+  if (!(d instanceof Date) || isNaN(d)) return "";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(d);
+  const get = (t) => parts.find((p) => p.type === t)?.value || "";
+  return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
+}
+
+// Convert "M/D/YYYY H:MM AM/PM" (Eastern local text) → ISO (UTC) safely, DST-aware.
+function etDisplayToISO(s) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)$/.exec(s?.trim() || "");
+  if (!m) return null;
+  let [, MM, DD, YYYY, hh, mm, ap] = m;
+  const y = +YYYY, mon = +MM, d = +DD, min = +mm;
+  let h = (+hh % 12) + (ap === "PM" ? 12 : 0);
+
+  // Build a "naive UTC" ms from the ET wall time
+  const naiveUtcMs = Date.UTC(y, mon - 1, d, h, min, 0);
+
+  // Find ET offset (GMT-4 or GMT-5) at that date
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    timeZoneName: "shortOffset",
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hour12: false,
+  });
+  const tzName = dtf.formatToParts(new Date(naiveUtcMs)).find(p => p.type === "timeZoneName")?.value || "GMT-05";
+  const m2 = /GMT([+-]\d{1,2})/.exec(tzName);
+  const offsetHours = m2 ? parseInt(m2[1], 10) : -5; // -4 or -5
+  // ET local + (UTC - ET) => UTC
+  const realUtcMs = naiveUtcMs - (offsetHours * 60 * 60 * 1000);
+
+  return new Date(realUtcMs).toISOString();
+}
+
+// Normalize the sheet value: return ISO (UTC) no matter what we got.
+function normalizeStart(val) {
+  if (!val) return null;
+  if (isISO8601Z(val)) return val;             // already ISO UTC
+  const iso = etDisplayToISO(val);              // ET text → ISO
+  if (iso) return iso;
+  // Fallback: let JS parse (local), then convert to ISO
+  const d = new Date(val);
+  return isNaN(d) ? null : d.toISOString();
+}
+
+
 function QuickBooksRedirect() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -499,21 +561,29 @@ function scheduleMachineJobs(jobs, machineKey = '') {
       cutoff = new Date(eedDay);
       cutoff.setHours(WORK_END_HR, WORK_END_MIN, 0, 0);
     }
-    // 2) Determine start time
+    // 2) Determine start time (normalize anything from the sheet to ISO first)
+    let startIso = job.embroidery_start ? normalizeStart(job.embroidery_start) : null;
     let start;
-    if (job.embroidery_start) {
-      // If the sheet has an Embroidery Start Time, trust it (for any position)
-      start = new Date(job.embroidery_start);
+
+    if (startIso) {
+      start = new Date(startIso);                 // use sheet start when present
     } else if (idx === 0) {
-      // No sheet start; top job starts now (clamped to work hours)
-      start = new Date(); // ← show the real start moment on the card
+      start = new Date();                         // top job with no sheet start: actual now, no clamp
+      startIso = start.toISOString();
     } else {
-      // Queue-based start for downstream jobs
+      // downstream jobs: compute from previous end + buffer (and clamp if you do)
       const base = prevEnd instanceof Date && !isNaN(prevEnd) ? prevEnd : new Date();
       const buffered = new Date(base.getTime() + BUFFER_MS);
       start = clampToWorkHours(buffered);
+      startIso = start.toISOString();
     }
 
+    // when pushing the scheduled job, keep ISO for consistency
+    scheduled.push({
+      ...job,
+      start_date: startIso,  // ISO (UTC) for internal use
+      // ...rest, including computed end_date in ISO
+    });
 
     // 3) Calculate end time based on stitches and head count
     const qty = job.quantity % headCount === 0
