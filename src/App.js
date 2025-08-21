@@ -323,15 +323,30 @@ function addWorkTime(start, ms) {
   return current;
 }
 
-function fmtDT(dt) {
-  const pad = n => String(n).padStart(2, '0');
-  const month = pad(dt.getMonth() + 1);
-  const day   = pad(dt.getDate());
-  let h       = dt.getHours();
-  const m     = pad(dt.getMinutes());
-  let ap      = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  return month + '/' + day + ' ' + pad(h) + ':' + m + ' ' + ap;
+function fmtDT(dtLike) {
+  // Accept Date or string (ISO or otherwise)
+  const d = typeof dtLike === "string" ? new Date(dtLike) : dtLike;
+  if (!(d instanceof Date) || isNaN(d)) return "";
+
+  // Format in America/New_York regardless of the browser’s local timezone
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(d);
+
+  const get = (t) => parts.find((p) => p.type === t)?.value || "";
+  const mm = get("month");
+  const dd = get("day");
+  const hr = get("hour");
+  const min = get("minute");
+  const ap = get("dayPeriod"); // AM/PM
+
+  // Example: 08/20 8:30 AM
+  return `${mm}/${dd} ${hr}:${min} ${ap}`;
 }
 
 // Parse "Embroidery Start Time" from the sheet into a reliable ISO string
