@@ -589,25 +589,31 @@ function scheduleMachineJobs(jobs, machineKey = '') {
       cutoff = new Date(eedDay);
       cutoff.setHours(WORK_END_HR, WORK_END_MIN, 0, 0);
     }
-    // 2) Determine start time (normalize anything from the sheet to ISO first)
-    let startIso = job.embroidery_start ? normalizeStart(job.embroidery_start) : null;
+    // 2) Determine start time
+    let startIso = null;
     let start;
 
-    if (startIso) {
-      start = new Date(startIso);                 // use sheet start when present
-    } else if (idx === 0) {
-      start = new Date();                         // top job with no sheet start: actual now, no clamp
-      startIso = start.toISOString();
+    if (idx === 0) {
+      // Top job: use sheet start if present, else actual now (no clamp)
+      const sheetIso = job.embroidery_start ? normalizeStart(job.embroidery_start) : null;
+      if (sheetIso) {
+        startIso = sheetIso;
+        start = new Date(sheetIso);
+      } else {
+        start = new Date();
+        startIso = start.toISOString();
+      }
     } else {
-      // downstream jobs: compute from previous end + buffer (and clamp if you do)
-      const base = prevEnd instanceof Date && !isNaN(prevEnd) ? prevEnd : new Date();
+      // Job 1..N: always chain from previous job's end + 30 min buffer
+      const base = (prevEnd instanceof Date && !isNaN(prevEnd)) ? prevEnd : new Date();
       const buffered = new Date(base.getTime() + BUFFER_MS);
       start = clampToWorkHours(buffered);
       startIso = start.toISOString();
     }
 
-    // persist ISO on the job itself (no external 'scheduled' array)
+    // Persist ISO on the job for consistent display/calcs
     job.start_date = startIso;
+
 
     // 3) Calculate end time based on stitches and head count
     const qty = job.quantity % headCount === 0
