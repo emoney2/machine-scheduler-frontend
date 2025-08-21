@@ -568,8 +568,15 @@ function sortQueue(arr) {
 // === Section 3: Scheduling & Late (using embroidery_start) ===
 function scheduleMachineJobs(jobs, machineKey = '') {
   const BUFFER_MS = 30 * 60 * 1000;
-  const isOneHead = String(machineKey).toLowerCase().includes('(1)');
-  const headCount = isOneHead ? 1 : 6;
+
+  // Accept either a label ("Machine 1 (1)") or a number (1 or 6)
+  let headCount = 6;
+  if (typeof machineKey === 'number') {
+    headCount = Number(machineKey) || 6;
+  } else if (String(machineKey).toLowerCase().includes('(1)')) {
+    headCount = 1;
+  }
+
   console.log(`🧵 Scheduling for ${machineKey} → ${headCount} heads`);
   let prevEnd = null;
 
@@ -1143,7 +1150,11 @@ const onDragEnd = async (result) => {
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
     const updatedJobs = srcCol === 'queue'
       ? sortQueue(newSrcJobs)
-      : scheduleMachineJobs(newSrcJobs, columns[srcCol].headCount, columns[srcCol].name);
+      : scheduleMachineJobs(
+          newSrcJobs,
+          srcCol === 'machine1' ? 1 : 6   // pass a number to be unambiguous
+        );
+
 
     // 2a) Update local state
     setColumns(cols => ({
