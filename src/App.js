@@ -506,7 +506,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
       start = new Date(job.embroidery_start);
     } else if (idx === 0) {
       // No sheet start; top job starts now (clamped to work hours)
-      start = clampToWorkHours(new Date());
+      start = new Date(); // ← show the real start moment on the card
     } else {
       // Queue-based start for downstream jobs
       const base = prevEnd instanceof Date && !isNaN(prevEnd) ? prevEnd : new Date();
@@ -852,14 +852,9 @@ useEffect(() => {
     if (top.embroidery_start) return;
 
     // Write start time now (clamped to work hours)
-    const nowClamped = clampToWorkHours(new Date());
-    const isoStamp   = nowClamped.toISOString();
+    const isoStamp = new Date().toISOString(); // ← no clamp for top-job start
+    await axios.post(API_ROOT + '/updateStartTime', { id: top.id, startTime: isoStamp });
 
-    try {
-      await axios.post(API_ROOT + '/updateStartTime', {
-        id: top.id,
-        startTime: isoStamp
-      });
 
       // Optimistically patch local state so UI reflects immediately
       setColumns(cols => ({
