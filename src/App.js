@@ -486,15 +486,19 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     }
     // 2) Determine start time
     let start;
-    if (idx === 0) {
-      // First job: use saved embroidery_start if available
-      start = job.embroidery_start
-        ? new Date(job.embroidery_start)
-        : clampToWorkHours(new Date());
+    if (job.embroidery_start) {
+      // If the sheet has an Embroidery Start Time, trust it (for any position)
+      start = new Date(job.embroidery_start);
+    } else if (idx === 0) {
+      // No sheet start; top job starts now (clamped to work hours)
+      start = clampToWorkHours(new Date());
     } else {
-      const buffered = new Date(prevEnd.getTime() + BUFFER_MS);
+      // Queue-based start for downstream jobs
+      const base = prevEnd instanceof Date && !isNaN(prevEnd) ? prevEnd : new Date();
+      const buffered = new Date(base.getTime() + BUFFER_MS);
       start = clampToWorkHours(buffered);
     }
+
 
     // 3) Calculate end time based on stitches and head count
     const qty = job.quantity % headCount === 0
