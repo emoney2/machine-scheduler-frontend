@@ -842,34 +842,47 @@ const fetchManualStateCore = async (previousCols) => {
   };
 
 // ─── Section 5E: Always ensure top jobs have a start time ────
+// ─── Section 5E: Always ensure top jobs have a start time (no clamp) ───
 useEffect(() => {
   const ensureTopHasStart = async (machineKey) => {
-    const jobs = columns[machineKey]?.jobs || [];
+    const jobs = (columns?.[machineKey]?.jobs) || [];
     const top = jobs[0];
     if (!top) return;
 
     // If the sheet already has an Embroidery Start Time, do nothing
     if (top.embroidery_start) return;
 
-    // Write start time now (clamped to work hours)
-    const isoStamp = new Date().toISOString(); // ← no clamp for top-job start
-    await axios.post(API_ROOT + '/updateStartTime', { id: top.id, startTime: isoStamp });
+    // Write start time now (actual moment, no clamp)
+    const isoStamp = new Date().toISOString();
 
+    try {
+      await axios.post(`${API_ROOT}/api/updateStartTime`, {
+        id: top.id,
+        startTime: isoStamp,
+      });
 
       // Optimistically patch local state so UI reflects immediately
-      setColumns(cols => ({
+      setColumns((cols) => ({
         ...cols,
         [machineKey]: {
           ...cols[machineKey],
-          jobs: cols[machineKey].jobs.map(j =>
-            j.id === top.id ? { ...j, embroidery_start: isoStamp, start_date: isoStamp } : j
-          )
-        }
+          jobs: cols[machineKey].jobs.map((j) =>
+            j.id === top.id
+              ? { ...j, embroidery_start: isoStamp, start_date: isoStamp }
+              : j
+          ),
+        },
       }));
     } catch (err) {
       console.error(`❌ Failed to set start time for ${top.id}`, err);
     }
   };
+
+  // Check both machines on initial load + every poll
+  ensureTopHasStart("machine1");
+  ensureTopHasStart("machine2");
+}, [columns?.machine1?.jobs, columns?.machine2?.jobs]);
+
 
   // Check both machines every time the job lists change (initial load + every poll)
   ensureTopHasStart('machine1');
