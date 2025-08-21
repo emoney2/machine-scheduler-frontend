@@ -212,8 +212,8 @@ export default function App() {
   const bumpJobStartTime = async (jobId) => {
     try {
       console.log("⏱️ Setting embroidery start time for job", jobId);
-      const iso = new Date().toISOString();
-      await axios.post(API_ROOT + '/updateStartTime', {
+      const iso = new Date().toISOString(); // write the real moment
+      await axios.post(API_ROOT + '/updateStartTime', { id: jobId, startTime: iso });
         id:        jobId,
         startTime: iso
       });
@@ -900,21 +900,25 @@ const fetchManualStateCore = async (previousCols) => {
     setTimeout(() => setSyncStatus(''), 2000);
   };
 
-// ─── Section 5E: Always ensure top jobs have a start time ────
 // ─── Section 5E: Always ensure top jobs have a start time (no clamp) ───
 useEffect(() => {
   const ensureTopHasStart = async (machineKey) => {
-    const jobs = (columns?.[machineKey]?.jobs) || [];
-    const top = jobs[0];
-    if (!top) return;
-
-    // If the sheet already has an Embroidery Start Time, do nothing
-    if (top.embroidery_start) return;
-
-    // Write start time now (actual moment, no clamp)
-    const isoStamp = new Date().toISOString();
-
     try {
+      const jobs = (columns?.[machineKey]?.jobs) || [];
+      const top = jobs[0];
+      if (!top) return;
+
+      // Skip placeholders and completed rows
+      if (String(top.id || '').startsWith('ph-')) return;
+      if (String(top.status || '').toLowerCase() === 'complete') return;
+
+      // Robust check: treat "", null, and non-parseable values as empty
+      const hasStart = !!(top.embroidery_start && normalizeStart(top.embroidery_start));
+      if (hasStart) return;
+
+      // Write start time now (actual moment, no clamp)
+      const isoStamp = new Date().toISOString();
+
       await axios.post(API_ROOT + '/updateStartTime', {
         id: top.id,
         startTime: isoStamp,
@@ -933,13 +937,13 @@ useEffect(() => {
         },
       }));
     } catch (err) {
-      console.error(`❌ Failed to set start time for ${top.id}`, err);
+      console.error(`❌ ensureTopHasStart(${machineKey}) failed:`, err);
     }
   };
 
   // Check both machines on initial load + every poll
-  ensureTopHasStart("machine1");
-  ensureTopHasStart("machine2");
+  ensureTopHasStart('machine1');
+  ensureTopHasStart('machine2');
 }, [columns?.machine1?.jobs, columns?.machine2?.jobs]);
 
 
