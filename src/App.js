@@ -212,12 +212,12 @@ export default function App() {
   const bumpJobStartTime = async (jobId) => {
     try {
       console.log("⏱️ Setting embroidery start time for job", jobId);
-      const clamped = clampToWorkHours(new Date());
-      const iso     = clamped.toISOString();
+      const iso = new Date().toISOString();
       await axios.post(API_ROOT + '/updateStartTime', {
         id:        jobId,
         startTime: iso
       });
+
     } catch (err) {
       console.error('Failed to bump start time', err);
     }
@@ -578,12 +578,8 @@ function scheduleMachineJobs(jobs, machineKey = '') {
       startIso = start.toISOString();
     }
 
-    // when pushing the scheduled job, keep ISO for consistency
-    scheduled.push({
-      ...job,
-      start_date: startIso,  // ISO (UTC) for internal use
-      // ...rest, including computed end_date in ISO
-    });
+    // persist ISO on the job itself (no external 'scheduled' array)
+    job.start_date = startIso;
 
     // 3) Calculate end time based on stitches and head count
     const qty = job.quantity % headCount === 0
@@ -926,7 +922,7 @@ useEffect(() => {
     const isoStamp = new Date().toISOString();
 
     try {
-      await axios.post(`${API_ROOT}/api/updateStartTime`, {
+      await axios.post(API_ROOT + '/updateStartTime', {
         id: top.id,
         startTime: isoStamp,
       });
