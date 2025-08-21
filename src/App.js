@@ -884,12 +884,6 @@ useEffect(() => {
 }, [columns?.machine1?.jobs, columns?.machine2?.jobs]);
 
 
-  // Check both machines every time the job lists change (initial load + every poll)
-  ensureTopHasStart('machine1');
-  ensureTopHasStart('machine2');
-}, [columns.machine1.jobs, columns.machine2.jobs]);
-
-
 // === Section 6: Placeholder Management ===
 
 // Populate edit modal
