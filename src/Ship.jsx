@@ -706,13 +706,13 @@ export default function Ship() {
       "texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY",
       "district of columbia":"DC","washington dc":"DC","dc":"DC"
     };
-    function toStateAbbr(v="") {
+    function toStateAbbr(v = "") {
       const s = String(v).trim();
       if (s.length === 2) return s.toUpperCase();
       const ab = US_STATE_NAME_TO_ABBR[s.toLowerCase()];
       return ab ? ab : s.toUpperCase(); // fallback unchanged
     }
-    function toZip5(v="") {
+    function toZip5(v = "") {
       const m = String(v).match(/(\d{5})/);
       return m ? m[1] : "";
     }
@@ -720,24 +720,46 @@ export default function Ship() {
     function pick(obj, keys) {
       for (const k of keys) {
         const val = obj?.[k];
-        if (val !== undefined && val !== null && String(val).trim() !== "") return String(val).trim();
+        if (val !== undefined && val !== null && String(val).trim() !== "") {
+          return String(val).trim();
+        }
       }
       return "";
     }
 
     // ---- build recipient with robust key mapping & normalization ----
+    // NOTE: exact headers you shared are listed first, with sane fallbacks after.
     const recipient = {
-      Name:          pick(jobToShip, ["Company Name","Company","Customer","Client"]),
-      AttentionName: `${pick(jobToShip, ["Contact First Name","First Name","Contact First"])} ${pick(jobToShip, ["Contact Last Name","Last Name","Contact     Last"])}`.trim(),
-      Phone:         pick(jobToShip, ["Phone Number","Phone","Tel","Telephone"]),
+      Name: pick(jobToShip, ["Company Name", "Company", "Customer", "Client"]),
+      AttentionName: `${pick(jobToShip, [
+        "Contact First Name",
+        "First Name",
+        "Contact First",
+      ])} ${pick(jobToShip, [
+        "Contact Last Name",
+        "Contact Last",
+        "Last Name",
+      ])}`.trim(),
+      Phone: pick(jobToShip, ["Phone Number", "Phone", "Tel", "Telephone"]),
       Address: {
-        AddressLine1:      pick(jobToShip, ["Street Address 1","Address 1","Street 1","Addr1"]),
-        AddressLine2:      pick(jobToShip, ["Street Address 2","Address 2","Street 2","Addr2"]),
-        City:              pick(jobToShip, ["City","Town"]),
-        StateProvinceCode: toStateAbbr(pick(jobToShip, ["State","State/Province","Province","Region"])),
-        PostalCode:        toZip5(pick(jobToShip, ["Zip Code","ZIP","Zip","Postal Code","Postcode"])),
-        CountryCode:       "US"
-      }
+        AddressLine1: pick(jobToShip, [
+          "Street Address 1",
+          "Address 1",
+          "Street 1",
+          "Addr1",
+          "Address",
+          "Street",
+        ]),
+        AddressLine2: pick(jobToShip, ["Street Address 2", "Address 2", "Street 2", "Addr2", "Suite", "Apt"]),
+        City: pick(jobToShip, ["City", "Town"]),
+        StateProvinceCode: toStateAbbr(
+          pick(jobToShip, ["State", "State/Province", "Province", "Region"])
+        ),
+        PostalCode: toZip5(
+          pick(jobToShip, ["Zip Code", "ZIP", "Zip", "Postal Code", "Postcode"])
+        ),
+        CountryCode: "US",
+      },
     };
 
     // ---- validation that tells you exactly what's missing ----
@@ -754,24 +776,20 @@ export default function Ship() {
       return;
     }
 
-
-    // Quick validation
-    const addr = recipient.Address;
-    if (!addr.AddressLine1 || !addr.City || addr.StateProvinceCode.length !== 2 || addr.PostalCode.length < 5) {
-      notify("Recipient address is incomplete (need street, city, 2-letter state, 5-digit ZIP).");
-      setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
-      return;
-    }
-
     // Build packages from projectedBoxes if available
-    const boxesToUse = (projectedBoxes && projectedBoxes.length > 0)
-      ? projectedBoxes.map(b => {
-          const dimStr = BOX_DIMENSIONS[b.size] || "10×10×10";
-          const [L, W, H] = dimStr.split(/[x×]/i).map(n => parseInt(n, 10) || 10);
-          const weight = Math.max(1, Math.ceil((L * W * H) / 1728)); // rough 1lb per cubic ft
-          return { PackagingType: "02", Weight: weight, Dimensions: { Length: L, Width: W, Height: H } };
-        })
-      : packagesPayload;
+    const boxesToUse =
+      projectedBoxes && projectedBoxes.length > 0
+        ? projectedBoxes.map((b) => {
+            const dimStr = BOX_DIMENSIONS[b.size] || "10×10×10";
+            const [L, W, H] = dimStr.split(/[x×]/i).map((n) => parseInt(n, 10) || 10);
+            const weight = Math.max(1, Math.ceil((L * W * H) / 1728)); // rough 1lb per cubic ft
+            return {
+              PackagingType: "02",
+              Weight: weight,
+              Dimensions: { Length: L, Width: W, Height: H },
+            };
+          })
+        : packagesPayload;
 
     if (SKIP_UPS) {
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
@@ -789,24 +807,29 @@ export default function Ship() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       const raw = await res.text();
       let body = null;
-      try { body = JSON.parse(raw); } catch { /* leave raw */ }
+      try {
+        body = JSON.parse(raw);
+      } catch {
+        /* leave raw */
+      }
 
       if (!res.ok) {
         const detail =
           (body && (body.error || body.message || body.detail)) ||
-          raw || `HTTP ${res.status}`;
+          raw ||
+          `HTTP ${res.status}`;
         console.error("❌ UPS rates failed:", detail);
         notify(`UPS rates error: ${detail}`);
         setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
         return;
       }
 
-      const options = Array.isArray(body) ? body : (body?.rates || []);
+      const options = Array.isArray(body) ? body : body?.rates || [];
       console.log("✅ UPS rates response ←", options);
       setShippingOptions(options);
     } catch (err) {
@@ -814,37 +837,6 @@ export default function Ship() {
       notify(`UPS rates error: ${(err && err.message) || err}`);
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
     }
-  };
-
-  // 6) Auto-fetch rates whenever a job is selected
-  useEffect(() => {
-    if (selected.length > 0) {
-      fetchRates();
-    }
-  }, [selected]);
-
-  // 🧠 Updated rate-based shipping handler
-  const handleRateAndShip = async (opt) => {
-    const { method, rate, delivery } = opt || {};
-
-    if (SKIP_UPS) {
-      const ok = window.confirm("Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice.");
-      if (!ok) return;
-      setShippingSelection(null);
-      setShippingMethod("Manual Shipping");
-      await handleShip();
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${delivery}\nProceed?`
-    );
-    if (!confirmed) return;
-
-    setShippingSelection(opt);
-    setShippingMethod(method || "UPS");
-    await handleShip();
-  };
 
 
   return (
