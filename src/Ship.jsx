@@ -689,6 +689,7 @@ export default function Ship() {
 
     // Pick one selected job (first one)
     const jobToShip = jobs.find(j => selected.includes(j.orderId.toString()));
+    console.log("🔎 jobToShip object →", jobToShip);
     if (!jobToShip) {
       console.warn("No matching job for selected IDs:", selected);
       setShippingOptions([]);
