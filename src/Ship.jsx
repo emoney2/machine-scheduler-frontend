@@ -696,7 +696,7 @@ export default function Ship() {
       return;
     }
 
-    // --- helpers: normalize state + zip, and pick from multiple key spellings ---
+    // Helpers for state/ZIP + getters
     const US_STATE_NAME_TO_ABBR = {
       "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO","connecticut":"CT",
       "delaware":"DE","florida":"FL","georgia":"GA","hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA",
@@ -707,63 +707,70 @@ export default function Ship() {
       "texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY",
       "district of columbia":"DC","washington dc":"DC","dc":"DC"
     };
-    function toStateAbbr(v = "") {
+    const toStateAbbr = (v="") => {
       const s = String(v).trim();
       if (s.length === 2) return s.toUpperCase();
-      const ab = US_STATE_NAME_TO_ABBR[s.toLowerCase()];
-      return ab ? ab : s.toUpperCase(); // fallback unchanged
-    }
-    function toZip5(v = "") {
+      return US_STATE_NAME_TO_ABBR[s.toLowerCase()] || s.toUpperCase();
+    };
+    const toZip5 = (v="") => {
       const m = String(v).match(/(\d{5})/);
       return m ? m[1] : "";
-    }
-    // pick first non-empty value by trying several sheet column spellings
-    function pick(obj, keys) {
-      for (const k of keys) {
-        const val = obj?.[k];
-        if (val !== undefined && val !== null && String(val).trim() !== "") {
-          return String(val).trim();
-        }
-      }
-      return "";
-    }
-
-    // ---- build recipient with robust key mapping & normalization ----
-    // NOTE: exact headers you shared are listed first, with sane fallbacks after.
-    const recipient = {
-      Name: pick(jobToShip, ["Company Name", "Company", "Customer", "Client"]),
-      AttentionName: `${pick(jobToShip, [
-        "Contact First Name",
-        "First Name",
-        "Contact First",
-      ])} ${pick(jobToShip, [
-        "Contact Last Name",
-        "Contact Last",
-        "Last Name",
-      ])}`.trim(),
-      Phone: pick(jobToShip, ["Phone Number", "Phone", "Tel", "Telephone"]),
-      Address: {
-        AddressLine1: pick(jobToShip, [
-          "Street Address 1",
-          "Address 1",
-          "Street 1",
-          "Addr1",
-          "Address",
-          "Street",
-        ]),
-        AddressLine2: pick(jobToShip, ["Street Address 2", "Address 2", "Street 2", "Addr2", "Suite", "Apt"]),
-        City: pick(jobToShip, ["City", "Town"]),
-        StateProvinceCode: toStateAbbr(
-          pick(jobToShip, ["State", "State/Province", "Province", "Region"])
-        ),
-        PostalCode: toZip5(
-          pick(jobToShip, ["Zip Code", "ZIP", "Zip", "Postal Code", "Postcode"])
-        ),
-        CountryCode: "US",
-      },
     };
+    const get = (obj, key) => (obj && obj[key] != null ? String(obj[key]).trim() : "");
 
-    // ---- validation that tells you exactly what's missing ----
+    // Build recipient from a generic row that uses your Directory headers
+    function buildRecipientFrom(row) {
+      return {
+        Name:          get(row, "Company Name"),
+        AttentionName: `${get(row, "Contact First Name")} ${get(row, "Contact Last Name")}`.trim(),
+        Phone:         get(row, "Phone Number"),
+        Address: {
+          AddressLine1:      get(row, "Street Address 1"),
+          AddressLine2:      get(row, "Street Address 2"),
+          City:              get(row, "City"),
+          StateProvinceCode: toStateAbbr(get(row, "State")),
+          PostalCode:        toZip5(get(row, "Zip Code")),
+          CountryCode:       "US",
+        },
+      };
+    }
+
+    // 1) Try to build recipient from the job row (may not have address fields)
+    let recipient = buildRecipientFrom(jobToShip);
+
+    // Check what's missing
+    const missing1 = [];
+    if (!recipient.Address.AddressLine1) missing1.push("street");
+    if (!recipient.Address.City) missing1.push("city");
+    if (!recipient.Address.StateProvinceCode || recipient.Address.StateProvinceCode.length !== 2) missing1.push("2-letter state");
+    if (!recipient.Address.PostalCode || recipient.Address.PostalCode.length !== 5) missing1.push("5-digit ZIP");
+
+    if (missing1.length) {
+      // 2) Pull the Directory row by company name and rebuild recipient from it
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const companyName =
+        get(jobToShip, "Company Name") ||
+        jobToShip.Company ||
+        jobToShip.Customer ||
+        "";
+
+      try {
+        const dirRes = await fetch(
+          `${API_BASE}/api/directory-row?company=${encodeURIComponent(companyName)}`,
+          { credentials: "include" }
+        );
+        if (dirRes.ok) {
+          const dirRow = await dirRes.json(); // expect an object with the same headers as Directory
+          recipient = buildRecipientFrom(dirRow);
+        } else {
+          console.warn("Directory fetch failed", await dirRes.text());
+        }
+      } catch (e) {
+        console.warn("Directory fetch error", e);
+      }
+    }
+
+    // Final validation
     const missing = [];
     if (!recipient.Address.AddressLine1) missing.push("street");
     if (!recipient.Address.City) missing.push("city");
@@ -771,64 +778,68 @@ export default function Ship() {
     if (!recipient.Address.PostalCode || recipient.Address.PostalCode.length !== 5) missing.push("5-digit ZIP");
 
     if (missing.length) {
-      console.warn("Job record missing fields →", { jobToShip, recipient, missing });
+      console.warn("Job row lacks address and Directory lookup didn’t fill it.", {
+        jobToShip,
+        recipient,
+        missing
+      });
       notify(`Recipient address is incomplete (missing: ${missing.join(", ")}).`);
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
 
-    // Build packages from projectedBoxes if available
-    const boxesToUse =
-      projectedBoxes && projectedBoxes.length > 0
-        ? projectedBoxes.map((b) => {
-            const dimStr = BOX_DIMENSIONS[b.size] || "10×10×10";
-            const [L, W, H] = dimStr.split(/[x×]/i).map((n) => parseInt(n, 10) || 10);
-            const weight = Math.max(1, Math.ceil((L * W * H) / 1728)); // rough 1lb per cubic ft
-            return {
-              PackagingType: "02",
-              Weight: weight,
-              Dimensions: { Length: L, Width: W, Height: H },
-            };
-          })
-        : packagesPayload;
+      // Build packages from projectedBoxes if available
+      const boxesToUse =
+        projectedBoxes && projectedBoxes.length > 0
+          ? projectedBoxes.map((b) => {
+              const dimStr = BOX_DIMENSIONS[b.size] || "10×10×10";
+              const [L, W, H] = dimStr.split(/[x×]/i).map((n) => parseInt(n, 10) || 10);
+              const weight = Math.max(1, Math.ceil((L * W * H) / 1728)); // rough 1lb per cubic ft
+              return {
+                PackagingType: "02",
+                Weight: weight,
+                Dimensions: { Length: L, Width: W, Height: H },
+              };
+            })
+          : packagesPayload;
 
-    if (SKIP_UPS) {
-      setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
-      return;
-    }
-
-    const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-    const url = `${API_BASE}/api/ups/rates`;
-    const payload = { shipper, recipient, packages: boxesToUse };
-
-    console.log("🔎 UPS rates request →", payload);
-
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const raw = await res.text();
-      let body = null;
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        /* leave raw */
-      }
-
-      if (!res.ok) {
-        const detail =
-          (body && (body.error || body.message || body.detail)) ||
-          raw ||
-          `HTTP ${res.status}`;
-        console.error("❌ UPS rates failed:", detail);
-        notify(`UPS rates error: ${detail}`);
+      if (SKIP_UPS) {
         setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
         return;
       }
+
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const url = `${API_BASE}/api/ups/rates`;
+      const payload = { shipper, recipient, packages: boxesToUse };
+
+      console.log("🔎 UPS rates request →", payload);
+
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        const raw = await res.text();
+        let body = null;
+        try {
+          body = JSON.parse(raw);
+        } catch {
+          /* leave raw */
+        }
+
+        if (!res.ok) {
+          const detail =
+            (body && (body.error || body.message || body.detail)) ||
+            raw ||
+            `HTTP ${res.status}`;
+          console.error("❌ UPS rates failed:", detail);
+          notify(`UPS rates error: ${detail}`);
+          setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
+          return;
+        }
 
       const options = Array.isArray(body) ? body : body?.rates || [];
       console.log("✅ UPS rates response ←", options);
