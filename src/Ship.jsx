@@ -844,7 +844,6 @@ export default function Ship() {
     if (selected.length > 0) {
       fetchRates();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
   // 🧠 Updated rate-based shipping handler
