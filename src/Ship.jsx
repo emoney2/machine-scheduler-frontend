@@ -653,18 +653,18 @@ export default function Ship() {
   // Store the user’s chosen UPS option (includes .code)
   const [shippingSelection, setShippingSelection] = useState(null);
 
-  // 2) Your package payloads (Customer Supplied = 02)
+  // 2) Static fallback package payloads (Customer Supplied = 02)
   const packagesPayload = [
-    { PackagingType: "02", Weight:  7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
-    { PackagingType: "02", Weight: 24,  Dimensions: { Length: 15, Width: 15, Height: 15 } },
-    { PackagingType: "02", Weight: 55,  Dimensions: { Length: 20, Width: 20, Height: 20 } },
+    { PackagingType: "02", Weight: 7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
+    { PackagingType: "02", Weight: 24, Dimensions: { Length: 15, Width: 15, Height: 15 } },
+    { PackagingType: "02", Weight: 55, Dimensions: { Length: 20, Width: 20, Height: 20 } },
   ];
 
   // 3) Static shipper
   const shipper = {
-    Name:           "JR & Co.",
-    AttentionName:  "Justin Eckard",
-    Phone:          "678-294-5350",
+    Name:          "JR & Co.",
+    AttentionName: "Justin Eckard",
+    Phone:         "678-294-5350",
     Address: {
       AddressLine1:      "3653 Lost Oak Drive",
       AddressLine2:      "",
@@ -675,15 +675,19 @@ export default function Ship() {
     }
   };
 
+  // 4) Simple notifier. If you already have a toast system, use that instead.
+  function notify(msg) {
+    alert(msg);
+  }
+
   // 5) Helper to fetch live UPS rates (with safety checks + fallback)
   const fetchRates = async () => {
-    // 5a) If nothing selected, clear rates and stop
     if (selected.length === 0) {
       setShippingOptions([]);
       return;
     }
 
-    // 5b) Find the one job we’re quoting
+    // Pick one selected job (first one)
     const jobToShip = jobs.find(j => selected.includes(j.orderId.toString()));
     if (!jobToShip) {
       console.warn("No matching job for selected IDs:", selected);
@@ -691,57 +695,79 @@ export default function Ship() {
       return;
     }
 
-    // 5c) Build the UPS “ship to” payload from that job
+    // Build recipient payload
     const recipient = {
-      Name:            jobToShip["Company Name"],
-      AttentionName:   `${jobToShip["Contact First Name"]} ${jobToShip["Contact Last Name"]}`,
-      Phone:           jobToShip["Phone Number"],
+      Name:          jobToShip["Company Name"] || "",
+      AttentionName: `${jobToShip["Contact First Name"] || ""} ${jobToShip["Contact Last Name"] || ""}`.trim(),
+      Phone:         jobToShip["Phone Number"] || "",
       Address: {
-        AddressLine1:      jobToShip["Street Address 1"],
+        AddressLine1:      jobToShip["Street Address 1"] || "",
         AddressLine2:      jobToShip["Street Address 2"] || "",
-        City:              jobToShip["City"],
-        StateProvinceCode: jobToShip["State"],
-        PostalCode:        jobToShip["Zip Code"],
+        City:              jobToShip["City"] || "",
+        StateProvinceCode: jobToShip["State"] || "",
+        PostalCode:        (jobToShip["Zip Code"] || "").toString().slice(0, 5),
         CountryCode:       "US"
       }
     };
 
-    // 5d) Either bypass UPS or call /api/rate
-    if (SKIP_UPS) {
-      // bypass UPS: always provide one manual option
-      setShippingOptions([
-        {
-          method:   "Manual Shipping",
-          rate:     "N/A",
-          delivery: "TBD"
-        }
-      ]);
+    // Quick validation
+    const addr = recipient.Address;
+    if (!addr.AddressLine1 || !addr.City || addr.StateProvinceCode.length !== 2 || addr.PostalCode.length < 5) {
+      notify("Recipient address is incomplete (need street, city, 2-letter state, 5-digit ZIP).");
+      setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
 
+    // Build packages from projectedBoxes if available
+    const boxesToUse = (projectedBoxes && projectedBoxes.length > 0)
+      ? projectedBoxes.map(b => {
+          const dimStr = BOX_DIMENSIONS[b.size] || "10×10×10";
+          const [L, W, H] = dimStr.split(/[x×]/i).map(n => parseInt(n, 10) || 10);
+          const weight = Math.max(1, Math.ceil((L * W * H) / 1728)); // rough 1lb per cubic ft
+          return { PackagingType: "02", Weight: weight, Dimensions: { Length: L, Width: W, Height: H } };
+        })
+      : packagesPayload;
+
+    if (SKIP_UPS) {
+      setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
+      return;
+    }
+
+    const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+    const url = `${API_BASE}/api/ups/rates`;
+    const payload = { shipper, recipient, packages: boxesToUse };
+
+    console.log("🔎 UPS rates request →", payload);
+
     try {
-      const resp = await fetch(
-        `${process.env.REACT_APP_API_ROOT}/rate`,
-        {
-          method:      "POST",
-          credentials: "include",
-          headers:     { "Content-Type": "application/json" },
-          body:        JSON.stringify({ shipper, recipient, packages: packagesPayload })
-        }
-      );
-      if (!resp.ok) throw new Error(`Rate fetch failed: ${resp.status}`);
-      const data = await resp.json();
-      setShippingOptions(data);
+      const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const raw = await res.text();
+      let body = null;
+      try { body = JSON.parse(raw); } catch { /* leave raw */ }
+
+      if (!res.ok) {
+        const detail =
+          (body && (body.error || body.message || body.detail)) ||
+          raw || `HTTP ${res.status}`;
+        console.error("❌ UPS rates failed:", detail);
+        notify(`UPS rates error: ${detail}`);
+        setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
+        return;
+      }
+
+      const options = Array.isArray(body) ? body : (body?.rates || []);
+      console.log("✅ UPS rates response ←", options);
+      setShippingOptions(options);
     } catch (err) {
       console.error("UPS rate error:", err);
-      alert("Unable to fetch UPS rates; using manual fallback.");
-      setShippingOptions([
-        {
-          method:   "Manual Shipping",
-          rate:     "N/A",
-          delivery: "TBD"
-        }
-      ]);
+      notify(`UPS rates error: ${(err && err.message) || err}`);
+      setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
     }
   };
 
@@ -754,15 +780,12 @@ export default function Ship() {
 
   // 🧠 Updated rate-based shipping handler
   const handleRateAndShip = async (opt) => {
-    // opt looks like { code, method, rate, delivery, ... }
     const { method, rate, delivery } = opt || {};
 
     if (SKIP_UPS) {
-      const ok = window.confirm(
-        "Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice."
-      );
+      const ok = window.confirm("Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice.");
       if (!ok) return;
-      setShippingSelection(null);       // no live UPS selection
+      setShippingSelection(null);
       setShippingMethod("Manual Shipping");
       await handleShip();
       return;
@@ -773,9 +796,9 @@ export default function Ship() {
     );
     if (!confirmed) return;
 
-    setShippingSelection(opt);          // save {code, method, ...}
-    setShippingMethod(method || "UPS"); // friendly label for your UI
-    await handleShip();                 // this will include service_code now
+    setShippingSelection(opt);
+    setShippingMethod(method || "UPS");
+    await handleShip();
   };
 
 
