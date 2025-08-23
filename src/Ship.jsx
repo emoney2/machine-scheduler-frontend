@@ -798,19 +798,21 @@ export default function Ship() {
       return;
     }
 
-    // 6) Try multiple backend endpoints for rates until one works
+    // 6) Try multiple backend endpoints for rates until one works (log real status)
     const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
     const payload = { shipper, recipient, packages: boxesToUse };
 
+    // Try your original endpoint FIRST, then others
     const candidateUrls = [
-      `${API_BASE}/api/ups/rates`,          // preferred
-      `${API_BASE}/api/rate`,               // alt
-      `${API_BASE}/ups/rates`,              // no /api
-      `${API_BASE}/ups/rate`,               // singular
-      `${process.env.REACT_APP_API_ROOT}/rate` // original
+      `${process.env.REACT_APP_API_ROOT}/rate`, // original you had working before
+      `${API_BASE}/api/rate`,                   // alt singular under /api
+      `${API_BASE}/api/ups/rates`,              // preferred plural under /api
+      `${API_BASE}/ups/rate`,                   // no /api singular
+      `${API_BASE}/ups/rates`,                  // no /api plural
     ];
 
-    let lastErrorText = "";
+    let lastStatus = null;
+    let lastRaw = "";
     let usedUrl = null;
     let options = null;
 
@@ -822,39 +824,48 @@ export default function Ship() {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         });
       } catch (netErr) {
         console.warn("Network error on", tryUrl, netErr);
-        lastErrorText = String(netErr?.message || netErr);
+        lastStatus = "NETWORK";
+        lastRaw = String(netErr?.message || netErr);
         continue;
       }
 
+      const status = res.status;
       const raw = await res.text();
+      lastStatus = status;
+      lastRaw = raw;
+
       let body = null;
       try { body = JSON.parse(raw); } catch { /* leave raw */ }
 
-      if (res.status === 404) {
-        console.warn("➡️  404 on", tryUrl, "— trying next candidate.");
-        lastErrorText = raw || "404 Not Found";
+      if (status === 404) {
+        console.warn(`➡️  ${status} on`, tryUrl, "— trying next candidate.");
         continue;
       }
 
       if (!res.ok) {
-        const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${res.status}`;
-        console.error("❌ UPS rates failed at", tryUrl, ":", detail);
-        lastErrorText = detail;
-        // stop on non-404 errors
+        const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${status}`;
+        console.error(`❌ UPS rates failed at ${tryUrl} [${status}]:`, detail);
+        // Stop on non-404 (real server error at a found route)
         break;
       }
 
+      // OK!
       options = Array.isArray(body) ? body : (body?.rates || []);
       usedUrl = tryUrl;
       break;
     }
 
     if (!options) {
-      notify(`UPS rates error: ${lastErrorText || "No response"}.\nTried: ${candidateUrls.join(", ")}`);
+      const tried = candidateUrls.join(", ");
+      notify(
+        `UPS rates error [${lastStatus ?? "NO_STATUS"}]: ${
+          lastRaw ? String(lastRaw).slice(0, 400) : "No response"
+        }\nTried: ${tried}`
+      );
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
