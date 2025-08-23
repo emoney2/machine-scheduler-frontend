@@ -695,20 +695,65 @@ export default function Ship() {
       return;
     }
 
-    // Build recipient payload
+    // --- helpers: normalize state + zip, and pick from multiple key spellings ---
+    const US_STATE_NAME_TO_ABBR = {
+      "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO","connecticut":"CT",
+      "delaware":"DE","florida":"FL","georgia":"GA","hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA",
+      "kansas":"KS","kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA","michigan":"MI",
+      "minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT","nebraska":"NE","nevada":"NV","new hampshire":"NH",
+      "new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND","ohio":"OH","oklahoma":"OK",
+      "oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC","south dakota":"SD","tennessee":"TN",
+      "texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY",
+      "district of columbia":"DC","washington dc":"DC","dc":"DC"
+    };
+    function toStateAbbr(v="") {
+      const s = String(v).trim();
+      if (s.length === 2) return s.toUpperCase();
+      const ab = US_STATE_NAME_TO_ABBR[s.toLowerCase()];
+      return ab ? ab : s.toUpperCase(); // fallback unchanged
+    }
+    function toZip5(v="") {
+      const m = String(v).match(/(\d{5})/);
+      return m ? m[1] : "";
+    }
+    // pick first non-empty value by trying several sheet column spellings
+    function pick(obj, keys) {
+      for (const k of keys) {
+        const val = obj?.[k];
+        if (val !== undefined && val !== null && String(val).trim() !== "") return String(val).trim();
+      }
+      return "";
+    }
+
+    // ---- build recipient with robust key mapping & normalization ----
     const recipient = {
-      Name:          jobToShip["Company Name"] || "",
-      AttentionName: `${jobToShip["Contact First Name"] || ""} ${jobToShip["Contact Last Name"] || ""}`.trim(),
-      Phone:         jobToShip["Phone Number"] || "",
+      Name:          pick(jobToShip, ["Company Name","Company","Customer","Client"]),
+      AttentionName: `${pick(jobToShip, ["Contact First Name","First Name","Contact First"])} ${pick(jobToShip, ["Contact Last Name","Last Name","Contact     Last"])}`.trim(),
+      Phone:         pick(jobToShip, ["Phone Number","Phone","Tel","Telephone"]),
       Address: {
-        AddressLine1:      jobToShip["Street Address 1"] || "",
-        AddressLine2:      jobToShip["Street Address 2"] || "",
-        City:              jobToShip["City"] || "",
-        StateProvinceCode: jobToShip["State"] || "",
-        PostalCode:        (jobToShip["Zip Code"] || "").toString().slice(0, 5),
+        AddressLine1:      pick(jobToShip, ["Street Address 1","Address 1","Street 1","Addr1"]),
+        AddressLine2:      pick(jobToShip, ["Street Address 2","Address 2","Street 2","Addr2"]),
+        City:              pick(jobToShip, ["City","Town"]),
+        StateProvinceCode: toStateAbbr(pick(jobToShip, ["State","State/Province","Province","Region"])),
+        PostalCode:        toZip5(pick(jobToShip, ["Zip Code","ZIP","Zip","Postal Code","Postcode"])),
         CountryCode:       "US"
       }
     };
+
+    // ---- validation that tells you exactly what's missing ----
+    const missing = [];
+    if (!recipient.Address.AddressLine1) missing.push("street");
+    if (!recipient.Address.City) missing.push("city");
+    if (!recipient.Address.StateProvinceCode || recipient.Address.StateProvinceCode.length !== 2) missing.push("2-letter state");
+    if (!recipient.Address.PostalCode || recipient.Address.PostalCode.length !== 5) missing.push("5-digit ZIP");
+
+    if (missing.length) {
+      console.warn("Job record missing fields →", { jobToShip, recipient, missing });
+      notify(`Recipient address is incomplete (missing: ${missing.join(", ")}).`);
+      setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
+      return;
+    }
+
 
     // Quick validation
     const addr = recipient.Address;
