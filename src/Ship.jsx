@@ -837,6 +837,38 @@ export default function Ship() {
       notify(`UPS rates error: ${(err && err.message) || err}`);
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
     }
+  }; // ← CLOSES fetchRates PROPERLY
+
+  // 6) Auto-fetch rates whenever a job is selected
+  useEffect(() => {
+    if (selected.length > 0) {
+      fetchRates();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  // 🧠 Updated rate-based shipping handler
+  const handleRateAndShip = async (opt) => {
+    const { method, rate, delivery } = opt || {};
+
+    if (SKIP_UPS) {
+      const ok = window.confirm("Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice.");
+      if (!ok) return;
+      setShippingSelection(null);
+      setShippingMethod("Manual Shipping");
+      await handleShip();
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${delivery}\nProceed?`
+    );
+    if (!confirmed) return;
+
+    setShippingSelection(opt);
+    setShippingMethod(method || "UPS");
+    await handleShip();
+  };
 
 
   return (
