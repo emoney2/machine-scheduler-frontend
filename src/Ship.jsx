@@ -822,15 +822,15 @@ export default function Ship() {
       return;
     }
 
-    // 6) Post to the known route with the shape it expects; ensure .name fields; fallback on 400 'name'
+    // 6) Post to the known route; if 400 mentions 'name' or 'addr1', retry with legacy addr keys
     const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
     const ratesUrl =
       (process.env.REACT_APP_RATES_URL && process.env.REACT_APP_RATES_URL.trim()) ||
       `${API_BASE}/api/rate`;
 
-    // Build lowercase, FLAT party objects for backend (with guaranteed .name)
+    // Build lowercase, FLAT party objects (current style)
     const toFlatParty = (p, fallbackName = "Unknown") => ({
-      name: (p && p.Name) ? String(p.Name).trim() : String(fallbackName).trim(),
+      name: (p?.Name ? String(p.Name).trim() : String(fallbackName).trim()),
       attentionName: p?.AttentionName || "",
       phone: p?.Phone || "",
       addressLine1: p?.Address?.AddressLine1 || "",
@@ -841,18 +841,32 @@ export default function Ship() {
       countryCode: p?.Address?.CountryCode || "US",
     });
 
-    // Fallback names if missing
+    // Legacy party (backend expects addr1/addr2/zip/country)
+    const toLegacyParty = (p, fallbackName = "Unknown") => ({
+      name: (p?.Name ? String(p.Name).trim() : String(fallbackName).trim()),
+      attention: p?.AttentionName || "",
+      phone: p?.Phone || "",
+      addr1: p?.Address?.AddressLine1 || "",
+      addr2: p?.Address?.AddressLine2 || "",
+      city: p?.Address?.City || "",
+      state: p?.Address?.StateProvinceCode || "",
+      zip: p?.Address?.PostalCode || "",
+      country: p?.Address?.CountryCode || "US",
+    });
+
+    // Ensure non-empty names
     const fallbackRecipientName =
       (recipient?.Name && String(recipient.Name).trim()) ||
       (jobToShip?.["Company Name"] && String(jobToShip["Company Name"]).trim()) ||
       (jobToShip?.Company && String(jobToShip.Company).trim()) ||
       "Unknown";
-
     const fallbackShipperName =
       (shipper?.Name && String(shipper.Name).trim()) || "JR & Co.";
 
-    const recipientFlat = toFlatParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
-    const shipperFlat   = toFlatParty({ ...shipper, Name: fallbackShipperName }, fallbackShipperName);
+    const recipientFlat  = toFlatParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
+    const shipperFlat    = toFlatParty({ ...shipper,   Name: fallbackShipperName },   fallbackShipperName);
+    const recipientLegacy= toLegacyParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
+    const shipperLegacy  = toLegacyParty({ ...shipper,   Name: fallbackShipperName },   fallbackShipperName);
 
     // Flat packages (units explicit)
     const packagesFlat = (boxesToUse || []).map((pkg) => {
@@ -871,11 +885,9 @@ export default function Ship() {
       };
     });
 
-    const primaryPayload = {
-      shipper:   shipperFlat,
-      recipient: recipientFlat, // must contain .name
-      packages:  packagesFlat,
-    };
+    const primaryPayload = { shipper: shipperFlat, recipient: recipientFlat, packages: packagesFlat };
+    const legacyPayload  = { shipper: shipperLegacy, recipient: recipientLegacy, packages: packagesFlat };
+    const altFromTo      = { from: shipperLegacy, to: recipientLegacy, packages: packagesFlat };
 
     console.log("🔎 UPS rates POST →", { url: ratesUrl, payload: primaryPayload });
 
@@ -894,14 +906,19 @@ export default function Ship() {
     };
 
     try {
-      // First attempt: { shipper, recipient, packages }
+      // 1) Try modern shape
       let { res, raw, body } = await postAndParse(ratesUrl, primaryPayload);
 
-      // If 400 and contains `'name'`, try fallback shape: { from, to, packages }
-      if (res.status === 400 && typeof raw === "string" && /'name'/.test(raw)) {
-        console.warn("⚠️  400 'name' — retrying with { from, to, packages }");
-        const altPayload = { from: shipperFlat, to: recipientFlat, packages: packagesFlat };
-        ({ res, raw, body } = await postAndParse(ratesUrl, altPayload));
+      // 2) If 400 mentions 'name' or 'addr1', try legacy shipper/recipient keys
+      if (res.status === 400 && typeof raw === "string" && /'name'|'addr1'/.test(raw)) {
+        console.warn("⚠️  400 complaining about 'name' or 'addr1' — retrying with legacy { addr1, addr2, zip, country } keys");
+        ({ res, raw, body } = await postAndParse(ratesUrl, legacyPayload));
+      }
+
+      // 3) If still 400 about 'name' or 'addr1', try { from, to, packages } legacy flavor
+      if (res.status === 400 && typeof raw === "string" && /'name'|'addr1'/.test(raw)) {
+        console.warn("⚠️  Still 400 — retrying with { from, to, packages } using legacy keys");
+        ({ res, raw, body } = await postAndParse(ratesUrl, altFromTo));
       }
 
       if (!res.ok) {
@@ -921,6 +938,9 @@ export default function Ship() {
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
+
+
+
     console.log("✅ UPS rates response ←", options);
     setShippingOptions(options);
   };
