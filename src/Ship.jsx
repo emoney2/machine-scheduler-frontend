@@ -822,187 +822,85 @@ export default function Ship() {
       return;
     }
 
-    // 6) Try multiple backend endpoints for rates until one works (URL × payload variants)
+    // 6) Post to the known route with the shape it expects: { recipient: { name, ... }, shipper: {...}, packages: [...] }
     const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+    const ratesUrl =
+      (process.env.REACT_APP_RATES_URL && process.env.REACT_APP_RATES_URL.trim()) ||
+      `${API_BASE}/api/rate`;
 
-    // ---- Build backend-compatible payload helpers (lowercase + PascalCase) ----
-    const normalizeParty = (p) => ({
-      // lowercase camel (common for Python backends)
+    // Build lowercase, FLAT party objects for backend (name at recipient.name)
+    const toFlatParty = (p) => ({
       name: p.Name,
       attentionName: p.AttentionName,
       phone: p.Phone,
-      address: {
-        addressLine1: p.Address.AddressLine1,
-        addressLine2: p.Address.AddressLine2,
-        city: p.Address.City,
-        state: p.Address.StateProvinceCode,
-        postalCode: p.Address.PostalCode,
-        countryCode: p.Address.CountryCode,
-      },
-      // keep PascalCase too (if server expects this)
-      Name: p.Name,
-      AttentionName: p.AttentionName,
-      Phone: p.Phone,
-      Address: {
-        AddressLine1: p.Address.AddressLine1,
-        AddressLine2: p.Address.AddressLine2,
-        City: p.Address.City,
-        StateProvinceCode: p.Address.StateProvinceCode,
-        PostalCode: p.Address.PostalCode,
-        CountryCode: p.Address.CountryCode,
-      },
+      addressLine1: p.Address.AddressLine1,
+      addressLine2: p.Address.AddressLine2,
+      city: p.Address.City,
+      state: p.Address.StateProvinceCode,
+      postalCode: p.Address.PostalCode,
+      countryCode: p.Address.CountryCode,
     });
 
-    const normalizePackages = (arr) =>
-      (arr || []).map((pkg) => {
-        const w = Number(pkg.Weight) || 1;
-        const L = Number(pkg.Dimensions?.Length) || 1;
-        const W = Number(pkg.Dimensions?.Width) || 1;
-        const H = Number(pkg.Dimensions?.Height) || 1;
-        const type = pkg.PackagingType || "02";
-        return {
-          // lowercase camel
-          packagingType: type,
-          weight: w,
-          weightUnit: "LB",
-          dimensions: { length: L, width: W, height: H, unit: "IN" },
-          // PascalCase too
-          PackagingType: type,
-          Weight: w,
-          Dimensions: { Length: L, Width: W, Height: H, Unit: "IN" },
-        };
+    const recipientFlat = toFlatParty(recipient);
+    const shipperFlat   = toFlatParty(shipper);
+
+    // Flat packages (units explicit)
+    const packagesFlat = (boxesToUse || []).map((pkg) => {
+      const w = Number(pkg.Weight) || 1;
+      const L = Number(pkg.Dimensions?.Length) || 1;
+      const W = Number(pkg.Dimensions?.Width) || 1;
+      const H = Number(pkg.Dimensions?.Height) || 1;
+      return {
+        packagingType: pkg.PackagingType || "02",
+        weight: w,
+        weightUnit: "LB",
+        length: L,
+        width: W,
+        height: H,
+        dimUnit: "IN",
+      };
+    });
+
+    const payload = {
+      shipper:   shipperFlat,
+      recipient: recipientFlat, // <-- contains .name (this was the server’s complaint)
+      packages:  packagesFlat,
+    };
+
+    console.log("🔎 UPS rates POST →", { url: ratesUrl, payload });
+
+    try {
+      const res = await fetch(ratesUrl, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-    const shipperOut = normalizeParty(shipper);
-    const recipientOut = normalizeParty(recipient);
-    const packagesOut = normalizePackages(boxesToUse);
+      const raw = await res.text();
+      let body = null;
+      try { body = JSON.parse(raw); } catch { /* keep raw string */ }
 
-    // Flat variants (some backends want top-level fields, not nested objects)
-    const flattenPartyCamel = (p) => ({
-      name: p.name,
-      attentionName: p.attentionName,
-      phone: p.phone,
-      addressLine1: p.address.addressLine1,
-      addressLine2: p.address.addressLine2,
-      city: p.address.city,
-      state: p.address.state,
-      postalCode: p.address.postalCode,
-      countryCode: p.address.countryCode,
-    });
-
-    const recipientFlat = flattenPartyCamel(recipientOut);
-    const shipperFlat = flattenPartyCamel(shipperOut);
-
-    const packagesFlat = (packagesOut || []).map((p) => ({
-      packagingType: p.packagingType,
-      weight: p.weight,
-      weightUnit: p.weightUnit || "LB",
-      length: p.dimensions.length,
-      width: p.dimensions.width,
-      height: p.dimensions.height,
-      dimUnit: p.dimensions.unit || "IN",
-    }));
-
-    // Allow override via env if your backend uses a custom path
-    const CONFIG_RATES_URL = (process.env.REACT_APP_RATES_URL || "").trim();
-
-    // Candidate URLs (try explicit override first if set)
-    const candidateUrls = [
-      ...(CONFIG_RATES_URL ? [CONFIG_RATES_URL] : []),
-      `${process.env.REACT_APP_API_ROOT}/rate`, // original
-      `${API_BASE}/api/rate`,
-      `${API_BASE}/api/ups/rates`,
-      `${API_BASE}/ups/rate`,
-      `${API_BASE}/ups/rates`,
-    ];
-
-    // Candidate payloads (different shapes the server might expect)
-    const payloadVariants = [
-      // 1) Structured shipper/recipient
-      { label: "shipper+recipient", body: { shipper: shipperOut, recipient: recipientOut, packages: packagesOut } },
-      // 2) from/to
-      { label: "from+to", body: { from: shipperOut, to: recipientOut, packages: packagesOut } },
-      // 3) ship_from/ship_to
-      { label: "ship_from+ship_to", body: { ship_from: shipperOut, ship_to: recipientOut, packages: packagesOut } },
-      // 4) flattened recipient only (simple rate endpoints)
-      { label: "flatRecipient+packagesFlat", body: { ...recipientFlat, packages: packagesFlat } },
-      // 5) flattened shipper & recipient
-      { label: "flatShipper+flatRecipient", body: { shipper: shipperFlat, recipient: recipientFlat, packages: packagesFlat } },
-      // 6) flattened recipient + company alias for name
-      { label: "flatRecipient+companyAlias", body: { company: recipientFlat.name, ...recipientFlat, packages: packagesFlat } },
-    ];
-
-    let lastStatus = null;
-    let lastRaw = "";
-    let usedUrl = null;
-    let usedVariant = null;
-    let options = null;
-
-    for (const tryUrl of candidateUrls) {
-      for (const variant of payloadVariants) {
-        console.log("🔎 Trying:", { url: tryUrl, variant: variant.label, payload: variant.body });
-        let res;
-        try {
-          res = await fetch(tryUrl, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(variant.body),
-          });
-        } catch (netErr) {
-          console.warn("Network error on", tryUrl, netErr);
-          lastStatus = "NETWORK";
-          lastRaw = String(netErr?.message || netErr);
-          continue;
-        }
-
-        const status = res.status;
-        const raw = await res.text();
-        lastStatus = status;
-        lastRaw = raw;
-
-        let body = null;
-        try { body = JSON.parse(raw); } catch { /* keep raw */ }
-
-        // If backend complains about 'name', try next variant (payload shape mismatch)
-        const text = (typeof raw === "string" ? raw : JSON.stringify(raw));
-        if (status === 400 && text && /'name'/.test(text)) {
-          console.warn(`⚠️  ${status} on ${tryUrl} (${variant.label}) — server wants 'name' in a different place; trying next variant.`);
-          continue;
-        }
-
-        if (status === 404) {
-          console.warn(`➡️  ${status} on ${tryUrl} (${variant.label}) — trying next URL.`);
-          break; // move to next URL
-        }
-
-        if (!res.ok) {
-          const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${status}`;
-          console.error(`❌ Rates failed at ${tryUrl} (${variant.label}) [${status}]:`, detail);
-          // try next variant on same URL
-          continue;
-        }
-
-        // OK!
-        options = Array.isArray(body) ? body : (body?.rates || []);
-        usedUrl = tryUrl;
-        usedVariant = variant.label;
-        break;
+      if (!res.ok) {
+        const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${res.status}`;
+        console.error(`❌ UPS rates failed at ${ratesUrl} [${res.status}]:`, detail);
+        notify(`UPS rates error [${res.status}]: ${String(detail).slice(0, 500)}`);
+        setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
+        return;
       }
-      if (options) break;
-    }
 
-    if (!options) {
-      notify(
-        `UPS rates error [${lastStatus ?? "NO_STATUS"}]: ${
-          lastRaw ? String(lastRaw).slice(0, 500) : "No response"
-        }\nTried URLs: ${candidateUrls.join(", ")}`
-      );
+      const options = Array.isArray(body) ? body : (body?.rates || []);
+      console.log("✅ UPS rates response ←", options);
+      setShippingOptions(options);
+    } catch (err) {
+      console.error("UPS rate error:", err);
+      notify(`UPS rates error: ${(err && err.message) || String(err)}`);
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
 
-    console.log("✅ UPS rates response ←", { usedUrl, usedVariant, options });
+
+    console.log("✅ UPS rates response ←", options);
     setShippingOptions(options);
   };
 
