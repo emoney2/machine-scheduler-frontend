@@ -676,9 +676,25 @@ export default function Ship() {
   };
 
   // 4) Simple notifier. If you already have a toast system, use that instead.
-  function notify(msg) {
-    alert(msg);
+  // Copyable error banner
+  const [errorInfo, setErrorInfo] = useState(null);
+
+  function notify(message, detail = null) {
+    const text = [message, detail]
+      .filter(Boolean)
+      .map(v => (typeof v === "string" ? v : JSON.stringify(v, null, 2)))
+      .join("\n");
+    console.error(text);
+    setErrorInfo({ text, ts: new Date().toISOString() });
   }
+
+  // (Optional) route any window.alert(...) into the banner too
+  useEffect(() => {
+    const prev = window.alert;
+    window.alert = (m) => notify(String(m || "Alert"));
+    return () => { window.alert = prev; };
+  }, []);
+
 
   // 5) Helper to fetch live UPS rates (with Directory fallback + multi-endpoint retry)
   const fetchRates = async () => {
@@ -961,6 +977,42 @@ export default function Ship() {
 
   return (
     <div style={{ padding: "2rem" }}>
+      {/* 🔴 Error banner (copyable) */}
+      {errorInfo && (
+        <div
+          style={{
+            position: "fixed",
+            left: 12,
+            right: 12,
+            bottom: 12,
+            background: "#ffe9e9",
+            border: "1px solid #d33",
+            borderRadius: 8,
+            padding: 12,
+            zIndex: 10000,
+            boxShadow: "0 6px 18px rgba(0,0,0,0.15)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <strong style={{ color: "#900" }}>Error details</strong>
+            <div>
+              <button
+                onClick={() => navigator.clipboard && navigator.clipboard.writeText(errorInfo.text)}
+                style={{ marginRight: 8 }}
+              >
+                Copy
+              </button>
+              <button onClick={() => setErrorInfo(null)}>Dismiss</button>
+            </div>
+          </div>
+          <textarea
+            readOnly
+            value={errorInfo.text}
+            style={{ width: "100%", height: 140, fontFamily: "monospace", fontSize: 12 }}
+          />
+        </div>
+      )}
+
       {/* 🚚 Shipping Overlay */}
       {isShippingOverlay && (
         <div style={{
@@ -1087,7 +1139,6 @@ export default function Ship() {
           </div>
         </div>
       )}
-
 
       {boxes.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
