@@ -1065,11 +1065,6 @@ export default function Ship() {
   };
 
   // 6) Auto-fetch rates whenever a job is selected
-  useEffect(() => {
-    if (selected.length > 0) {
-      fetchRates();
-    }
-  }, [selected]);
 
   // 🧠 Updated rate-based shipping handler
   const handleRateAndShip = async (opt) => {
