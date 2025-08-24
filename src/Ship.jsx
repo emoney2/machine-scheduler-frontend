@@ -1229,17 +1229,27 @@ export default function Ship() {
         <div style={{ marginTop: "2rem" }}>
           <button
             onClick={() => {
-              // persist in a single, consistent shape
-              const selectedIds = selected.slice();
-              const jobsSnapshot = jobs;
+              const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
+              if (selectedJobs.length === 0) {
+                alert("Select at least one job.");
+                return;
+              }
+
+              // Persist under multiple keys (covers older/newer readers)
               try {
-                sessionStorage.setItem(
-                  "ship:selected",
-                  JSON.stringify({ selected: selectedIds, jobs: jobsSnapshot })
-                );
+                sessionStorage.setItem("ship:selectedJobs", JSON.stringify(selectedJobs));
+                sessionStorage.setItem("ship:selected", JSON.stringify({ selected, jobs }));
+                sessionStorage.setItem("ship.selected", JSON.stringify({ selected, jobs }));
               } catch {}
-              // send both keys the guard/BoxSelect accept
-              navigate("/box-select", { state: { selectedIds, selected: selectedIds, jobsSnapshot } });
+
+              // Pass via location.state too
+              navigate("/box-select", {
+                state: {
+                  selectedJobs,              // array of full job objects
+                  selectedIds: selected,     // array of orderId strings
+                  jobsSnapshot: jobs         // full jobs array for mapping if needed
+                }
+              });
             }}
             style={{
               padding: "12px 18px",
