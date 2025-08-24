@@ -800,7 +800,61 @@ export default function Ship() {
 
     // 6) Try multiple backend endpoints for rates until one works (log real status)
     const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-    const payload = { shipper, recipient, packages: boxesToUse };
+    // ---- Build a backend-compatible payload (lowercase + PascalCase) ----
+    const normalizeParty = (p) => ({
+      // lowercase keys (likely what your Flask/Python expects)
+      name: p.Name,
+      attentionName: p.AttentionName,
+      phone: p.Phone,
+      address: {
+        addressLine1: p.Address.AddressLine1,
+        addressLine2: p.Address.AddressLine2,
+        city: p.Address.City,
+        state: p.Address.StateProvinceCode,
+        postalCode: p.Address.PostalCode,
+        countryCode: p.Address.CountryCode,
+      },
+      // keep original PascalCase too (in case your server used those)
+      Name: p.Name,
+      AttentionName: p.AttentionName,
+      Phone: p.Phone,
+      Address: {
+        AddressLine1: p.Address.AddressLine1,
+        AddressLine2: p.Address.AddressLine2,
+        City: p.Address.City,
+        StateProvinceCode: p.Address.StateProvinceCode,
+        PostalCode: p.Address.PostalCode,
+        CountryCode: p.Address.CountryCode,
+      },
+    });
+
+    const normalizePackages = (arr) =>
+      (arr || []).map((pkg) => {
+        const w = Number(pkg.Weight) || 1;
+        const L = Number(pkg.Dimensions?.Length) || 1;
+        const W = Number(pkg.Dimensions?.Width) || 1;
+        const H = Number(pkg.Dimensions?.Height) || 1;
+        const type = pkg.PackagingType || "02";
+        return {
+          // lowercase keys (likely expected)
+          packagingType: type,
+          weight: w,
+          dimensions: { length: L, width: W, height: H },
+          // keep original style too
+          PackagingType: type,
+          Weight: w,
+          Dimensions: { Length: L, Width: W, Height: H },
+        };
+      });
+
+    const shipperOut = normalizeParty(shipper);
+    const recipientOut = normalizeParty(recipient);
+    const packagesOut = normalizePackages(boxesToUse);
+
+    const payload = { shipper: shipperOut, recipient: recipientOut, packages: packagesOut };
+
+    console.log("🔎 UPS rates request (normalized) →", payload);
+
 
     // Try your original endpoint FIRST, then others
     const candidateUrls = [
