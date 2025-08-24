@@ -1216,79 +1216,35 @@ export default function Ship() {
 
       {selected.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
-          <h4>Select UPS Shipping Option:</h4>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem" }}>
-            {shippingOptions.map((opt) => {
-              const { code, method, rate, delivery } = opt;
-              return (
-                <button
-                  key={`${code || method}`}
-                  onClick={() => handleRateAndShip(opt)}   // pass the whole object
-                  style={{
-                    backgroundColor: "#eee",
-                    color: "#000",
-                    padding: "1rem",
-                    marginRight: "1rem",
-                    marginBottom: "1rem",
-                    minWidth: "200px",
-                    border: "1px solid #333",
-                    borderRadius: "6px",
-                    textAlign: "left",
-                    lineHeight: "1.4"
-                  }}
-                >
-                  <div style={{ fontWeight: "bold" }}>{method}</div>
-                  <div style={{ fontSize: "0.9rem" }}>Price: {rate}</div>
-                  <div style={{ fontSize: "0.85rem", color: "#333" }}>
-                    Est. delivery: {typeof delivery === "string" ? delivery : formatDateMMDD(delivery)}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          <button
+            onClick={() => {
+              const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
+              if (selectedJobs.length === 0) {
+                alert("Select at least one job.");
+                return;
+              }
+              // Persist for next page / refresh safety
+              sessionStorage.setItem("ship:selectedJobs", JSON.stringify(selectedJobs));
+              navigate("/box-select", { state: { selectedJobs } });
+            }}
+            style={{
+              padding: "12px 18px",
+              fontWeight: "bold",
+              borderRadius: 8,
+              border: "1px solid #333",
+              background: "#000",
+              color: "#fff",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+              cursor: "pointer"
+            }}
+            title="Choose boxes, then get live rates"
+          >
+            Choose Boxes & Get Rates →
+          </button>
         </div>
       )}
 
-      {boxes.length > 0 && (
-        <div style={{ marginTop: "2rem" }}>
-          <h3>📦 Packed Boxes</h3>
-          <ul>
-            {boxes.map((box, i) => (
-              <li key={i}>
-                <b>{box.size}</b> → {box.jobs.join(", ")}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Sticky action bar — always visible */}
-      <div style={{
-        position: "fixed",
-        bottom: 12,
-        right: 12,
-        display: "flex",
-        gap: "0.5rem",
-        zIndex: 1000
-      }}>
-        <button
-          onClick={handleShip}
-          disabled={selected.length === 0}
-          style={{
-            padding: "0.75rem 1.25rem",
-            fontWeight: "bold",
-            borderRadius: "999px",
-            border: "1px solid #333",
-            background: selected.length === 0 ? "#ddd" : "#000",
-            color: "#fff",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-            cursor: selected.length === 0 ? "not-allowed" : "pointer"
-          }}
-          title={selected.length === 0 ? "Select at least one job" : "Ship the selected jobs now"}
-        >
-          Ship Selected Now
-        </button>
-      </div>
     </div>
   );
 }
+

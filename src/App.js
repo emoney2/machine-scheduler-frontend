@@ -16,6 +16,7 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import ReorderPage from "./ReorderPage";
 import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
+import BoxSelect from "./BoxSelect";
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
