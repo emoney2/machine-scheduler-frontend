@@ -1,7 +1,26 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import React, { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 
-// Your standard box catalog
+/** Format dates like Ship.jsx */
+function formatDateMMDD(dateStr) {
+  if (!dateStr) return "";
+  const parts = dateStr.includes("-")
+    ? dateStr.split("-")
+    : dateStr.includes("/")
+    ? dateStr.split("/")
+    : [];
+
+  if (parts.length !== 3) return dateStr;
+
+  const [a, b, c] = parts.map((p) => parseInt(p));
+  if (dateStr.includes("-")) {
+    return `${b.toString().padStart(2, "0")}/${c.toString().padStart(2, "0")}`;
+  } else {
+    return `${a.toString().padStart(2, "0")}/${b.toString().padStart(2, "0")}`;
+  }
+}
+
+/** The box presets you requested (single-row buttons) */
 const BOX_CATALOG = [
   { label: "10×10×10", L: 10, W: 10, H: 10 },
   { label: "13×13×13", L: 13, W: 13, H: 13 },
@@ -10,371 +29,417 @@ const BOX_CATALOG = [
   { label: "14×7×5",   L: 14, W: 7,  H: 5  },
 ];
 
-const US_STATE_NAME_TO_ABBR = {
-  "alabama":"AL","alaska":"AK","arizona":"AZ","arkansas":"AR","california":"CA","colorado":"CO","connecticut":"CT",
-  "delaware":"DE","florida":"FL","georgia":"GA","hawaii":"HI","idaho":"ID","illinois":"IL","indiana":"IN","iowa":"IA",
-  "kansas":"KS","kentucky":"KY","louisiana":"LA","maine":"ME","maryland":"MD","massachusetts":"MA","michigan":"MI",
-  "minnesota":"MN","mississippi":"MS","missouri":"MO","montana":"MT","nebraska":"NE","nevada":"NV","new hampshire":"NH",
-  "new jersey":"NJ","new mexico":"NM","new york":"NY","north carolina":"NC","north dakota":"ND","ohio":"OH","oklahoma":"OK",
-  "oregon":"OR","pennsylvania":"PA","rhode island":"RI","south carolina":"SC","south dakota":"SD","tennessee":"TN",
-  "texas":"TX","utah":"UT","vermont":"VT","virginia":"VA","washington":"WA","west virginia":"WV","wisconsin":"WI","wyoming":"WY",
-  "district of columbia":"DC","washington dc":"DC","dc":"DC"
-};
-const toStateAbbr = (v = "") => {
-  const s = String(v).trim();
-  if (s.length === 2) return s.toUpperCase();
-  return US_STATE_NAME_TO_ABBR[s.toLowerCase()] || s.toUpperCase();
-};
-const toZip5 = (v = "") => {
-  const m = String(v).match(/(\d{5})/);
-  return m ? m[1] : "";
-};
-const get = (obj, key) => (obj && obj[key] != null ? String(obj[key]).trim() : "");
+/** Convert (L×W×H) to a rough shipping weight (≥1lb, 1 lb / cubic foot) */
+function dimsToWeight(L, W, H) {
+  const cubicFeet = (L * W * H) / 1728;
+  return Math.max(1, Math.ceil(cubicFeet));
+}
 
 export default function BoxSelect() {
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  // Load selected jobs from navigation state or sessionStorage
-  const selectedJobs = useMemo(() => {
-    let fromState = location.state?.selectedJobs;
-    if (fromState && Array.isArray(fromState) && fromState.length > 0) {
-      sessionStorage.setItem("ship:selectedJobs", JSON.stringify(fromState));
-      return fromState;
-    }
-    const saved = sessionStorage.getItem("ship:selectedJobs");
-    try {
-      const parsed = saved ? JSON.parse(saved) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
+  // Expect navigation from Ship.jsx like: navigate("/box-select", { state: { selected, jobs } })
+  const selectedIds = useMemo(() => {
+    const st = location.state || {};
+    return (st.selected || st.selectedIds || []).map(String);
   }, [location.state]);
 
-  useEffect(() => {
-    if (!selectedJobs || selectedJobs.length === 0) {
-      alert("No jobs selected. Returning to Ship.");
-      navigate("/ship");
-    }
-  }, [selectedJobs, navigate]);
+  const allJobs = useMemo(() => {
+    const st = location.state || {};
+    return st.jobs || st.jobsData || [];
+  }, [location.state]);
 
-  // Box "cart": size label -> count
-  const [boxCounts, setBoxCounts] = useState({});
+  const selectedJobs = useMemo(() => {
+    if (!Array.isArray(allJobs) || selectedIds.length === 0) return [];
+    return allJobs.filter((j) =>
+      selectedIds.includes(String(j.orderId ?? j.id ?? ""))
+    );
+  }, [allJobs, selectedIds]);
+
+  // “Cart” of boxes you add by clicking the buttons
+  const [selectedBoxes, setSelectedBoxes] = useState([]);
+  // UPS options after clicking Get Rates
   const [shippingOptions, setShippingOptions] = useState([]);
-  const [selectedRate, setSelectedRate] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [errorText, setErrorText] = useState("");
+  const [loadingRates, setLoadingRates] = useState(false);
+  const [error, setError] = useState("");
 
-  const addBox = (label) => {
-    setSelectedRate(null);
-    setShippingOptions([]);
-    setBoxCounts((prev) => ({ ...prev, [label]: (prev[label] || 0) + 1 }));
+  const addBox = (box) => {
+    setSelectedBoxes((prev) => [...prev, { ...box }]);
   };
-  const removeBox = (label) => {
-    setSelectedRate(null);
-    setShippingOptions([]);
-    setBoxCounts((prev) => {
-      const next = { ...prev };
-      if (!next[label]) return next;
-      if (next[label] <= 1) delete next[label];
-      else next[label] = next[label] - 1;
-      return next;
+
+  const removeOne = (label) => {
+    setSelectedBoxes((prev) => {
+      const idx = prev.findIndex((b) => b.label === label);
+      if (idx === -1) return prev;
+      const copy = [...prev];
+      copy.splice(idx, 1);
+      return copy;
     });
   };
-  const totalBoxes = Object.values(boxCounts).reduce((a, b) => a + b, 0);
 
-  // Build packages array from cart (repeat each box count times)
-  const packagesFromCart = useMemo(() => {
-    const list = [];
-    for (const item of BOX_CATALOG) {
-      const count = boxCounts[item.label] || 0;
-      for (let i = 0; i < count; i++) {
-        const L = item.L, W = item.W, H = item.H;
-        const weight = Math.max(1, Math.ceil((L * W * H) / 1728)); // ~1 lb per cubic ft
-        list.push({
-          PackagingType: "02",
-          Weight: weight,
-          Dimensions: { Length: L, Width: W, Height: H }
-        });
-      }
-    }
-    return list;
-  }, [boxCounts]);
+  const removeAllOf = (label) =>
+    setSelectedBoxes((prev) => prev.filter((b) => b.label !== label));
 
-  // Build the ship-to address from the first job; you can expand this to choose one explicitly
-  const buildRecipientFrom = (row) => ({
-    Name:          get(row, "Company Name"),
-    AttentionName: `${get(row, "Contact First Name")} ${get(row, "Contact Last Name")}`.trim(),
-    Phone:         get(row, "Phone Number"),
-    Address: {
-      AddressLine1:      get(row, "Street Address 1"),
-      AddressLine2:      get(row, "Street Address 2"),
-      City:              get(row, "City"),
-      StateProvinceCode: toStateAbbr(get(row, "State")),
-      PostalCode:        toZip5(get(row, "Zip Code")),
-      CountryCode:       "US"
-    }
-  });
+  const grouped = useMemo(() => {
+    const m = new Map();
+    selectedBoxes.forEach((b) => {
+      m.set(b.label, (m.get(b.label) || 0) + 1);
+    });
+    return Array.from(m.entries()).map(([label, qty]) => ({ label, qty }));
+  }, [selectedBoxes]);
 
-  const tryDirectoryFallback = async (recipient, job) => {
-    const needs = !recipient.Address.AddressLine1 ||
-                  !recipient.Address.City ||
-                  !recipient.Address.StateProvinceCode ||
-                  recipient.Address.StateProvinceCode.length !== 2 ||
-                  !recipient.Address.PostalCode ||
-                  recipient.Address.PostalCode.length !== 5;
+  /** Build recipient (same headers you use on the sheet) */
+  const buildRecipientFromFirstJob = () => {
+    const j = selectedJobs[0] || {};
+    const val = (k) => (j && j[k] != null ? String(j[k]).trim() : "");
+    const toZip5 = (v = "") => {
+      const m = String(v).match(/(\d{5})/);
+      return m ? m[1] : "";
+    };
+    const toStateAbbr = (s = "") => {
+      const t = String(s).trim();
+      if (t.length === 2) return t.toUpperCase();
+      // minimal name→abbr (extend if you need more)
+      const MAP = { georgia: "GA" };
+      return MAP[t.toLowerCase()] || t.toUpperCase();
+    };
 
-    if (!needs) return recipient;
-
-    try {
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-      const company = get(job, "Company Name") || job.Company || job.Customer || "";
-      const res = await fetch(`${API_BASE}/api/directory-row?company=${encodeURIComponent(company)}`, { credentials: "include" });
-      if (!res.ok) return recipient;
-      const row = await res.json();
-      return buildRecipientFrom(row);
-    } catch {
-      return recipient;
-    }
-  };
-
-  const getRates = async () => {
-    setErrorText("");
-    setSelectedRate(null);
-    setShippingOptions([]);
-    if (totalBoxes === 0) {
-      alert("Add at least one box.");
-      return;
-    }
-    const job = selectedJobs[0]; // assume same destination; you can expand later
-    let recipient = buildRecipientFrom(job);
-    recipient = await tryDirectoryFallback(recipient, job);
-
-    const missing = [];
-    if (!recipient.Address.AddressLine1) missing.push("street");
-    if (!recipient.Address.City) missing.push("city");
-    if (!recipient.Address.StateProvinceCode || recipient.Address.StateProvinceCode.length !== 2) missing.push("2-letter state");
-    if (!recipient.Address.PostalCode || recipient.Address.PostalCode.length !== 5) missing.push("5-digit ZIP");
-    if (missing.length) {
-      setErrorText(`Recipient address incomplete (missing: ${missing.join(", ")}).`);
-      return;
-    }
-
-    // Build payloads
-    const shipper = {
-      Name: "JR & Co.",
-      AttentionName: "Justin Eckard",
-      Phone: "678-294-5350",
+    return {
+      Name: val("Company Name"),
+      AttentionName: `${val("Contact First Name")} ${val("Contact Last Name")}`.trim(),
+      Phone: val("Phone Number"),
       Address: {
-        AddressLine1: "3653 Lost Oak Drive",
-        AddressLine2: "",
-        City: "Buford",
-        StateProvinceCode: "GA",
-        PostalCode: "30519",
+        AddressLine1: val("Street Address 1"),
+        AddressLine2: val("Street Address 2"),
+        City: val("City"),
+        StateProvinceCode: toStateAbbr(val("State")),
+        PostalCode: toZip5(val("Zip Code")),
         CountryCode: "US",
       },
     };
+  };
 
-    // Mega + legacy compatibility
-    const normParty = (p) => {
-      const Name = p?.Name?.trim() || "Unknown";
-      const AttentionName = p?.AttentionName || "";
-      const Phone = p?.Phone || "";
-      const A1 = p?.Address?.AddressLine1 || "";
-      const A2 = p?.Address?.AddressLine2 || "";
-      const City = p?.Address?.City || "";
-      const State = p?.Address?.StateProvinceCode || "";
-      const Zip = p?.Address?.PostalCode || "";
-      const Ctry = p?.Address?.CountryCode || "US";
-      return { Name, AttentionName, Phone, A1, A2, City, State, Zip, Ctry };
-    };
-    const recip = normParty(recipient);
-    const shipr = normParty(shipper);
+  /** Build UPS packages from the selectedBoxes cart */
+  const buildPackages = () => {
+    if (selectedBoxes.length === 0) return [];
+    return selectedBoxes.map(({ L, W, H }) => ({
+      PackagingType: "02",
+      Weight: dimsToWeight(L, W, H),
+      Dimensions: { Length: L, Width: W, Height: H },
+    }));
+  };
 
-    const packagesMega = (packagesFromCart || []).map((pkg) => {
-      const Wt = Number(pkg.Weight) || 1;
-      const Lg = Number(pkg.Dimensions?.Length) || 1;
-      const Wd = Number(pkg.Dimensions?.Width) || 1;
-      const Hg = Number(pkg.Dimensions?.Height) || 1;
-      const PackType = pkg.PackagingType || "02";
-      return {
-        PackagingType: PackType,
-        Weight: Wt,
-        Dimensions: { Length: Lg, Width: Wd, Height: Hg, L: Lg, W: Wd, H: Hg, Unit: "IN" },
-        packagingType: PackType,
-        weight: Wt,
-        weightUnit: "LB",
-        dimensions: { length: Lg, width: Wd, height: Hg, unit: "IN", L: Lg, W: Wd, H: Hg },
-        Length: Lg, Width: Wd, Height: Hg, L: Lg, W: Wd, H: Hg, dimUnit: "IN",
-      };
-    });
+  /** Very simple “Get Rates” that tries /api/rate first; falls back to /rate */
+  const handleGetRates = async () => {
+    setError("");
+    setShippingOptions([]);
+    setLoadingRates(true);
 
-    const partyVariants = ({ Name, AttentionName, Phone, A1, A2, City, State, Zip, Ctry }) => ({
-      Name, AttentionName, Phone,
-      Address: { AddressLine1: A1, AddressLine2: A2, City, StateProvinceCode: State, PostalCode: Zip, CountryCode: Ctry },
-      name: Name, attentionName: AttentionName, phone: Phone,
-      address: { addressLine1: A1, addressLine2: A2, city: City, state: State, postalCode: Zip, countryCode: Ctry },
-      addressLine1: A1, addressLine2: A2, city: City, state: State, postalCode: Zip, countryCode: Ctry,
-      attention: AttentionName, addr1: A1, addr2: A2, zip: Zip, country: Ctry,
-    });
-
-    const shipperAll = partyVariants(shipr);
-    const recipientAll = partyVariants(recip);
-
-    const megaPayload = {
-      shipper: shipperAll,
-      recipient: recipientAll,
-      from: shipperAll,
-      to: recipientAll,
-      packages: packagesMega,
-    };
-
-    const legacyOnly = {
-      shipper: {
-        name: shipr.Name, attention: shipr.AttentionName, phone: shipr.Phone,
-        addr1: shipr.A1, addr2: shipr.A2, city: shipr.City, state: shipr.State, zip: shipr.Zip, country: shipr.Ctry,
-      },
-      recipient: {
-        name: recip.Name, attention: recip.AttentionName, phone: recip.Phone,
-        addr1: recip.A1, addr2: recip.A2, city: recip.City, state: recip.State, zip: recip.Zip, country: recip.Ctry,
-      },
-      packages: (packagesFromCart || []).map((pkg) => {
-        const Wt = Number(pkg.Weight) || 1;
-        const Lg = Number(pkg.Dimensions?.Length) || 1;
-        const Wd = Number(pkg.Dimensions?.Width) || 1;
-        const Hg = Number(pkg.Dimensions?.Height) || 1;
-        return { packagingType: pkg.PackagingType || "02", weight: Wt, length: Lg, width: Wd, height: Hg, L: Lg, W: Wd, H: Hg, dimUnit: "IN", weightUnit: "LB" };
-      }),
-    };
-
-    const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-    const ratesUrl = `${API_BASE}/api/rate`;
-
-    const postAndParse = async (url, payload) => {
-      const res = await fetch(url, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const raw = await res.text();
-      let body = null;
-      try { body = JSON.parse(raw); } catch { /* keep raw */ }
-      return { res, raw, body };
-    };
-
-    setLoading(true);
     try {
-      let { res, raw, body } = await postAndParse(ratesUrl, megaPayload);
-      if (res.status === 400) {
-        ({ res, raw, body } = await postAndParse(ratesUrl, legacyOnly));
-      }
-      if (!res.ok) {
-        const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${res.status}`;
-        setErrorText(`UPS rates error [${res.status}]: ${String(detail).slice(0, 500)}`);
-        setShippingOptions([]);
+      if (selectedJobs.length === 0) {
+        setError("No jobs selected — go back and choose some jobs in Ship.");
         return;
       }
-      const options = Array.isArray(body) ? body : (body?.rates || []);
-      if (!Array.isArray(options) || options.length === 0) {
-        setErrorText("No live UPS rates returned.");
-        setShippingOptions([]);
+      const recipient = buildRecipientFromFirstJob();
+
+      // Basic validation
+      const miss = [];
+      if (!recipient.Address.AddressLine1) miss.push("street");
+      if (!recipient.Address.City) miss.push("city");
+      if (!recipient.Address.StateProvinceCode || recipient.Address.StateProvinceCode.length !== 2) miss.push("state");
+      if (!recipient.Address.PostalCode || recipient.Address.PostalCode.length !== 5) miss.push("zip");
+      if (miss.length) {
+        setError(`Recipient is missing: ${miss.join(", ")}`);
         return;
       }
+
+      const packages = buildPackages();
+      if (packages.length === 0) {
+        setError("Add at least one box before getting rates.");
+        return;
+      }
+
+      const shipper = {
+        Name: "JR & Co.",
+        AttentionName: "Justin Eckard",
+        Phone: "678-294-5350",
+        Address: {
+          AddressLine1: "3653 Lost Oak Drive",
+          AddressLine2: "",
+          City: "Buford",
+          StateProvinceCode: "GA",
+          PostalCode: "30519",
+          CountryCode: "US",
+        },
+      };
+
+      const API_ROOT = process.env.REACT_APP_API_ROOT;
+      const API_BASE = API_ROOT.replace(/\/api$/, "");
+      const candidateUrls = [
+        `${API_ROOT}/rate`,
+        `${API_BASE}/api/rate`,
+        `${API_BASE}/ups/rate`,
+      ];
+
+      let options = null;
+      let lastErr = "";
+
+      for (const url of candidateUrls) {
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shipper, recipient, packages }),
+          });
+          const txt = await res.text();
+          let body = null;
+          try {
+            body = JSON.parse(txt);
+          } catch {
+            body = null;
+          }
+
+          if (!res.ok) {
+            lastErr = body?.error || body?.message || txt || `HTTP ${res.status}`;
+            continue;
+          }
+
+          options = Array.isArray(body) ? body : body?.rates || [];
+          break;
+        } catch (e) {
+          lastErr = e?.message || String(e);
+        }
+      }
+
+      if (!options || options.length === 0) {
+        setError(lastErr || "No rates returned.");
+        return;
+      }
+
       setShippingOptions(options);
-    } catch (err) {
-      setErrorText(`UPS rates error: ${(err && err.message) || String(err)}`);
     } finally {
-      setLoading(false);
+      setLoadingRates(false);
     }
   };
 
-  const uniqueCompanies = useMemo(() => {
-    return Array.from(new Set((selectedJobs || []).map(j => j["Company Name"] || j.Company || ""))).filter(Boolean);
-  }, [selectedJobs]);
+  if (selectedJobs.length === 0) {
+    return (
+      <div style={{ padding: "2rem" }}>
+        <h2>Box Select</h2>
+        <p>No jobs were provided. Go back to the Ship page and select jobs first.</p>
+        <button onClick={() => navigate("/ship")}>← Back to Ship</button>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: "2rem", maxWidth: 980, margin: "0 auto" }}>
-      <button onClick={() => navigate(-1)} style={{ marginBottom: 16 }}>← Back</button>
-      <h2>📦 Choose Boxes & Get Rates</h2>
+    <div style={{ padding: "2rem" }}>
+      <h2>📦 Box Select</h2>
 
-      {uniqueCompanies.length > 1 && (
-        <div style={{ background: "#fff7d6", border: "1px solid #e0c972", padding: 12, borderRadius: 8, margin: "12px 0" }}>
-          Multiple companies selected; using the first job’s address for rating.
-        </div>
-      )}
+      {/* Jobs list (same look as Ship) */}
+      <div
+        style={{
+          display: "flex",
+          fontWeight: "bold",
+          padding: "0.5rem 1rem",
+          borderBottom: "2px solid #333",
+          marginBottom: "0.5rem",
+          marginTop: "1rem",
+          fontSize: "0.85rem",
+        }}
+      >
+        <div style={{ width: 60 }}></div>
+        <div style={{ width: 60, textAlign: "center" }}>#</div>
+        <div style={{ width: 80, textAlign: "center" }}>Date</div>
+        <div style={{ width: 200, textAlign: "center" }}>Design</div>
+        <div style={{ width: 70, textAlign: "center" }}>Qty</div>
+        <div style={{ width: 120, textAlign: "center" }}>Product</div>
+        <div style={{ width: 120, textAlign: "center" }}>Stage</div>
+        <div style={{ width: 80, textAlign: "center" }}>Price</div>
+        <div style={{ width: 90, textAlign: "center" }}>Due</div>
+      </div>
 
-      <h4>Selected Jobs</h4>
-      <div style={{ border: "1px solid #ddd", borderRadius: 8, padding: 12, marginBottom: 16 }}>
-        {(selectedJobs || []).map((j) => (
-          <div key={j.orderId} style={{ display: "flex", gap: 12, padding: "6px 0", borderBottom: "1px dashed #eee" }}>
-            <div style={{ width: 70 }}>#{j.orderId}</div>
-            <div style={{ flex: 1 }}>{j.Design || j.Product || ""}</div>
-            <div style={{ width: 80, textAlign: "right" }}>{j.Quantity ?? j.shipQty ?? ""}</div>
+      {selectedJobs.map((job) => (
+        <div
+          key={job.orderId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            border: "1px solid #ccc",
+            padding: "0.5rem 1rem",
+            marginBottom: "0.3rem",
+            borderRadius: "6px",
+            backgroundColor: "#4CAF50",
+            color: "#fff",
+          }}
+        >
+          <div style={{ width: 60 }}>
+            {job.image && (
+              <img
+                src={job.image}
+                alt="Preview"
+                style={{
+                  width: "50px",
+                  height: "50px",
+                  objectFit: "cover",
+                  borderRadius: "4px",
+                  border: "1px solid #999",
+                }}
+              />
+            )}
           </div>
+          <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
+          <div style={{ width: 80, textAlign: "center" }}>
+            {formatDateMMDD(job["Date"])}
+          </div>
+          <div style={{ width: 200, textAlign: "center" }}>{job["Design"]}</div>
+          <div style={{ width: 70, textAlign: "center" }}>
+            {job.shipQty ?? job["Quantity"] ?? 0}
+          </div>
+          <div style={{ width: 120, textAlign: "center" }}>{job["Product"]}</div>
+          <div style={{ width: 120, textAlign: "center" }}>{job["Stage"]}</div>
+          <div style={{ width: 80, textAlign: "center" }}>${job["Price"]}</div>
+          <div style={{ width: 90, textAlign: "center" }}>
+            {formatDateMMDD(job["Due Date"])}
+          </div>
+        </div>
+      ))}
+
+      {/* One-row (scrollable) box buttons */}
+      <h3 style={{ marginTop: "1.5rem" }}>Choose Boxes</h3>
+      <div
+        style={{
+          display: "flex",
+          gap: "0.5rem",
+          whiteSpace: "nowrap",
+          overflowX: "auto",
+          paddingBottom: "0.5rem",
+          borderBottom: "1px dashed #ccc",
+        }}
+      >
+        {BOX_CATALOG.map((b) => (
+          <button
+            key={b.label}
+            onClick={() => addBox(b)}
+            style={{
+              flex: "0 0 auto",
+              padding: "0.75rem 1rem",
+              border: "1px solid #333",
+              borderRadius: 8,
+              background: "#eee",
+              cursor: "pointer",
+              minWidth: 120,
+            }}
+            title="Add this box"
+          >
+            {b.label}
+          </button>
         ))}
       </div>
 
-      <h4>Add Boxes</h4>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 8 }}>
-        {BOX_CATALOG.map(({ label }) => (
-          <div key={label} style={{ border: "1px solid #ccc", borderRadius: 8, padding: 12, minWidth: 180 }}>
-            <div style={{ fontWeight: "bold", marginBottom: 8 }}>{label}</div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button onClick={() => removeBox(label)} disabled={!boxCounts[label]}>−</button>
-              <div style={{ width: 32, textAlign: "center" }}>{boxCounts[label] || 0}</div>
-              <button onClick={() => addBox(label)}>＋</button>
-            </div>
-          </div>
-        ))}
+      {/* Selected boxes list below the buttons */}
+      <div style={{ marginTop: "1rem" }}>
+        <h4>Selected Boxes</h4>
+        {grouped.length === 0 ? (
+          <div style={{ color: "#555" }}>No boxes added yet.</div>
+        ) : (
+          <ul style={{ listStyle: "none", paddingLeft: 0 }}>
+            {grouped.map(({ label, qty }) => (
+              <li
+                key={label}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                  marginBottom: "0.35rem",
+                }}
+              >
+                <strong>{label}</strong>
+                <span>× {qty}</span>
+                <button onClick={() => removeOne(label)}>−1</button>
+                <button onClick={() => removeAllOf(label)}>Remove all</button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
-      <div style={{ marginTop: 12, marginBottom: 12 }}>
+      {/* Actions */}
+      <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+        <button onClick={() => navigate("/ship")}>← Back to Ship</button>
         <button
-          onClick={getRates}
-          disabled={totalBoxes === 0 || loading}
-          style={{ padding: "10px 16px", fontWeight: "bold" }}
+          onClick={handleGetRates}
+          disabled={loadingRates}
+          style={{
+            padding: "0.75rem 1.25rem",
+            fontWeight: "bold",
+            borderRadius: "999px",
+            border: "1px solid #333",
+            background: "#000",
+            color: "#fff",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+            cursor: "pointer",
+          }}
         >
-          {loading ? "Getting Rates..." : "Get Rates"}
-        </button>
-        <button
-          onClick={() => { setBoxCounts({}); setShippingOptions([]); setSelectedRate(null); setErrorText(""); }}
-          style={{ marginLeft: 8, padding: "10px 16px" }}
-        >
-          Reset Boxes
+          {loadingRates ? "Getting rates…" : "Get Rates"}
         </button>
       </div>
 
-      {errorText && (
-        <div style={{ background: "#ffe9e9", border: "1px solid #d33", padding: 12, borderRadius: 8, margin: "12px 0" }}>
-          {errorText}
+      {/* Error */}
+      {error && (
+        <div
+          style={{
+            marginTop: "1rem",
+            padding: "0.75rem",
+            border: "1px solid #d33",
+            background: "#ffe9e9",
+            borderRadius: 8,
+          }}
+        >
+          <strong style={{ color: "#900" }}>Error:</strong> {error}
         </div>
       )}
 
+      {/* Rate options */}
       {shippingOptions.length > 0 && (
-        <>
-          <h4>Rates</h4>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ marginTop: "1.5rem" }}>
+          <h4>UPS Options</h4>
+          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             {shippingOptions.map((opt, i) => (
               <button
                 key={i}
-                onClick={() => setSelectedRate(opt)}
                 style={{
+                  backgroundColor: "#eee",
+                  color: "#000",
+                  padding: "1rem",
+                  minWidth: "220px",
                   border: "1px solid #333",
-                  borderRadius: 8,
-                  padding: 12,
-                  minWidth: 220,
-                  background: selectedRate === opt ? "#e6f7ff" : "#fff",
+                  borderRadius: "6px",
                   textAlign: "left",
+                  lineHeight: "1.4",
+                }}
+                onClick={() => {
+                  // choose and go back; you can extend to pass this choice to Ship if you like
+                  navigate("/ship", {
+                    state: {
+                      selected: selectedIds,
+                      manualBoxes: selectedBoxes,
+                      selectedRate: opt,
+                    },
+                  });
                 }}
               >
                 <div style={{ fontWeight: "bold" }}>{opt.method || opt.service || "UPS"}</div>
-                <div>Price: {String(opt.rate ?? opt.price ?? "")}</div>
-                <div>ETA: {String(opt.delivery ?? opt.eta ?? "")}</div>
+                <div style={{ fontSize: "0.9rem" }}>Price: {opt.rate}</div>
+                <div style={{ fontSize: "0.85rem", color: "#333" }}>
+                  Est. delivery: {opt.delivery || ""}
+                </div>
               </button>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

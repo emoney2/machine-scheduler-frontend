@@ -12,7 +12,7 @@ import "./axios-setup";
 import Section9 from './Section9';
 import OrderSubmission from './OrderSubmission';
 import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import ReorderPage from "./ReorderPage";
 import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
@@ -90,6 +90,16 @@ function QuickBooksRedirect() {
   }, []);
 
   return <div>🔁 Redirecting to QuickBooks...</div>;
+}
+
+function BoxSelectGuard() {
+  const location = useLocation();
+  const st = location.state || {};
+  const hasSelection =
+    (Array.isArray(st.selected) && st.selected.length > 0) ||
+    (Array.isArray(st.selectedIds) && st.selectedIds.length > 0);
+
+  return hasSelection ? <BoxSelect /> : <Navigate to="/ship" replace />;
 }
 
 // send cookies on every API call so Flask session is preserved
@@ -1390,7 +1400,8 @@ const onDragEnd = async (result) => {
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
         <Route path="/ship" element={<Ship />} />
-        <Route path="/box-select" element={<BoxSelect />} />   {/* ← added */}
+        {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
+        <Route path="/box-select" element={<BoxSelectGuard />} />
         <Route path="/reorder" element={<ReorderPage />} />
         <Route path="/order" element={<OrderSubmission />} />
         <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
