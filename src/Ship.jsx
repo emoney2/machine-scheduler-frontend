@@ -814,11 +814,12 @@ export default function Ship() {
       return;
     }
 
-    // 6) Try multiple backend endpoints for rates until one works (log real status)
+    // 6) Try multiple backend endpoints for rates until one works (URL × payload variants)
     const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-    // ---- Build a backend-compatible payload (lowercase + PascalCase) ----
+
+    // ---- Build backend-compatible payload helpers (lowercase + PascalCase) ----
     const normalizeParty = (p) => ({
-      // lowercase keys (likely what your Flask/Python expects)
+      // lowercase camel (common for Python backends)
       name: p.Name,
       attentionName: p.AttentionName,
       phone: p.Phone,
@@ -830,7 +831,7 @@ export default function Ship() {
         postalCode: p.Address.PostalCode,
         countryCode: p.Address.CountryCode,
       },
-      // keep original PascalCase too (in case your server used those)
+      // keep PascalCase too (if server expects this)
       Name: p.Name,
       AttentionName: p.AttentionName,
       Phone: p.Phone,
@@ -852,14 +853,15 @@ export default function Ship() {
         const H = Number(pkg.Dimensions?.Height) || 1;
         const type = pkg.PackagingType || "02";
         return {
-          // lowercase keys (likely expected)
+          // lowercase camel
           packagingType: type,
           weight: w,
-          dimensions: { length: L, width: W, height: H },
-          // keep original style too
+          weightUnit: "LB",
+          dimensions: { length: L, width: W, height: H, unit: "IN" },
+          // PascalCase too
           PackagingType: type,
           Weight: w,
-          Dimensions: { Length: L, Width: W, Height: H },
+          Dimensions: { Length: L, Width: W, Height: H, Unit: "IN" },
         };
       });
 
@@ -867,80 +869,128 @@ export default function Ship() {
     const recipientOut = normalizeParty(recipient);
     const packagesOut = normalizePackages(boxesToUse);
 
-    const payload = { shipper: shipperOut, recipient: recipientOut, packages: packagesOut };
+    // Flat variants (some backends want top-level fields, not nested objects)
+    const flattenPartyCamel = (p) => ({
+      name: p.name,
+      attentionName: p.attentionName,
+      phone: p.phone,
+      addressLine1: p.address.addressLine1,
+      addressLine2: p.address.addressLine2,
+      city: p.address.city,
+      state: p.address.state,
+      postalCode: p.address.postalCode,
+      countryCode: p.address.countryCode,
+    });
 
-    console.log("🔎 UPS rates request (normalized) →", payload);
+    const recipientFlat = flattenPartyCamel(recipientOut);
+    const shipperFlat = flattenPartyCamel(shipperOut);
 
+    const packagesFlat = (packagesOut || []).map((p) => ({
+      packagingType: p.packagingType,
+      weight: p.weight,
+      weightUnit: p.weightUnit || "LB",
+      length: p.dimensions.length,
+      width: p.dimensions.width,
+      height: p.dimensions.height,
+      dimUnit: p.dimensions.unit || "IN",
+    }));
 
-    // Try your original endpoint FIRST, then others
+    // Candidate URLs (try original first)
     const candidateUrls = [
-      `${process.env.REACT_APP_API_ROOT}/rate`, // original you had working before
-      `${API_BASE}/api/rate`,                   // alt singular under /api
-      `${API_BASE}/api/ups/rates`,              // preferred plural under /api
-      `${API_BASE}/ups/rate`,                   // no /api singular
-      `${API_BASE}/ups/rates`,                  // no /api plural
+      `${process.env.REACT_APP_API_ROOT}/rate`, // original
+      `${API_BASE}/api/rate`,
+      `${API_BASE}/api/ups/rates`,
+      `${API_BASE}/ups/rate`,
+      `${API_BASE}/ups/rates`,
+    ];
+
+    // Candidate payloads (different shapes the server might expect)
+    const payloadVariants = [
+      // 1) Structured shipper/recipient
+      { label: "shipper+recipient", body: { shipper: shipperOut, recipient: recipientOut, packages: packagesOut } },
+      // 2) from/to
+      { label: "from+to", body: { from: shipperOut, to: recipientOut, packages: packagesOut } },
+      // 3) ship_from/ship_to
+      { label: "ship_from+ship_to", body: { ship_from: shipperOut, ship_to: recipientOut, packages: packagesOut } },
+      // 4) flattened recipient only (simple rate endpoints)
+      { label: "flatRecipient+packagesFlat", body: { ...recipientFlat, packages: packagesFlat } },
+      // 5) flattened shipper & recipient
+      { label: "flatShipper+flatRecipient", body: { shipper: shipperFlat, recipient: recipientFlat, packages: packagesFlat } },
+      // 6) flattened recipient + company alias for name
+      { label: "flatRecipient+companyAlias", body: { company: recipientFlat.name, ...recipientFlat, packages: packagesFlat } },
     ];
 
     let lastStatus = null;
     let lastRaw = "";
     let usedUrl = null;
+    let usedVariant = null;
     let options = null;
 
     for (const tryUrl of candidateUrls) {
-      console.log("🔎 Trying UPS rates endpoint:", tryUrl, "payload:", payload);
-      let res;
-      try {
-        res = await fetch(tryUrl, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } catch (netErr) {
-        console.warn("Network error on", tryUrl, netErr);
-        lastStatus = "NETWORK";
-        lastRaw = String(netErr?.message || netErr);
-        continue;
-      }
+      for (const variant of payloadVariants) {
+        console.log("🔎 Trying:", { url: tryUrl, variant: variant.label, payload: variant.body });
+        let res;
+        try {
+          res = await fetch(tryUrl, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(variant.body),
+          });
+        } catch (netErr) {
+          console.warn("Network error on", tryUrl, netErr);
+          lastStatus = "NETWORK";
+          lastRaw = String(netErr?.message || netErr);
+          continue;
+        }
 
-      const status = res.status;
-      const raw = await res.text();
-      lastStatus = status;
-      lastRaw = raw;
+        const status = res.status;
+        const raw = await res.text();
+        lastStatus = status;
+        lastRaw = raw;
 
-      let body = null;
-      try { body = JSON.parse(raw); } catch { /* leave raw */ }
+        let body = null;
+        try { body = JSON.parse(raw); } catch { /* keep raw */ }
 
-      if (status === 404) {
-        console.warn(`➡️  ${status} on`, tryUrl, "— trying next candidate.");
-        continue;
-      }
+        // If backend complains about 'name', try next variant (payload shape mismatch)
+        const text = (typeof raw === "string" ? raw : JSON.stringify(raw));
+        if (status === 400 && text && /'name'/.test(text)) {
+          console.warn(`⚠️  ${status} on ${tryUrl} (${variant.label}) — server wants 'name' in a different place; trying next variant.`);
+          continue;
+        }
 
-      if (!res.ok) {
-        const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${status}`;
-        console.error(`❌ UPS rates failed at ${tryUrl} [${status}]:`, detail);
-        // Stop on non-404 (real server error at a found route)
+        if (status === 404) {
+          console.warn(`➡️  ${status} on ${tryUrl} (${variant.label}) — trying next URL.`);
+          break; // move to next URL
+        }
+
+        if (!res.ok) {
+          const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${status}`;
+          console.error(`❌ Rates failed at ${tryUrl} (${variant.label}) [${status}]:`, detail);
+          // try next variant on same URL
+          continue;
+        }
+
+        // OK!
+        options = Array.isArray(body) ? body : (body?.rates || []);
+        usedUrl = tryUrl;
+        usedVariant = variant.label;
         break;
       }
-
-      // OK!
-      options = Array.isArray(body) ? body : (body?.rates || []);
-      usedUrl = tryUrl;
-      break;
+      if (options) break;
     }
 
     if (!options) {
-      const tried = candidateUrls.join(", ");
       notify(
         `UPS rates error [${lastStatus ?? "NO_STATUS"}]: ${
-          lastRaw ? String(lastRaw).slice(0, 400) : "No response"
-        }\nTried: ${tried}`
+          lastRaw ? String(lastRaw).slice(0, 500) : "No response"
+        }\nTried URLs: ${candidateUrls.join(", ")}`
       );
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
 
-    console.log("✅ UPS rates response ←", { usedUrl, options });
+    console.log("✅ UPS rates response ←", { usedUrl, usedVariant, options });
     setShippingOptions(options);
   };
 
