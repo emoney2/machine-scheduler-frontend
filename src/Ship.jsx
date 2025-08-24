@@ -1226,7 +1226,36 @@ export default function Ship() {
       ))}
 
       {selected.length > 0 && (
-        <div style={{ marginTop: "2rem" }}>
+        <div style={{ marginTop: "2rem", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          {/* Manual Shipping: skip UPS, immediately process shipment/invoice */}
+          <button
+            onClick={async () => {
+              const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
+              if (selectedJobs.length === 0) {
+                alert("Select at least one job.");
+                return;
+              }
+              // ensure the manual path is used by handleShip
+              setShippingSelection(null);
+              setShippingMethod("Manual Shipping");
+              await handleShip();
+            }}
+            style={{
+              padding: "12px 18px",
+              fontWeight: "bold",
+              borderRadius: 8,
+              border: "1px solid #333",
+              background: "#444",
+              color: "#fff",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+              cursor: "pointer"
+            }}
+            title="Mark complete, create packing slip & invoice (no UPS labels)"
+          >
+            Manual Shipping
+          </button>
+
+          {/* Ship UPS: go to Box Select flow */}
           <button
             onClick={() => {
               const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
@@ -1234,22 +1263,11 @@ export default function Ship() {
                 alert("Select at least one job.");
                 return;
               }
-
-              // Persist under multiple keys (covers older/newer readers)
+              // Persist for next page / refresh safety
               try {
                 sessionStorage.setItem("ship:selectedJobs", JSON.stringify(selectedJobs));
-                sessionStorage.setItem("ship:selected", JSON.stringify({ selected, jobs }));
-                sessionStorage.setItem("ship.selected", JSON.stringify({ selected, jobs }));
               } catch {}
-
-              // Pass via location.state too
-              navigate("/box-select", {
-                state: {
-                  selectedJobs,              // array of full job objects
-                  selectedIds: selected,     // array of orderId strings
-                  jobsSnapshot: jobs         // full jobs array for mapping if needed
-                }
-              });
+              navigate("/box-select", { state: { selectedJobs } });
             }}
             style={{
               padding: "12px 18px",
@@ -1261,9 +1279,9 @@ export default function Ship() {
               boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
               cursor: "pointer"
             }}
-            title="Choose boxes, then get live rates"
+            title="Choose boxes, then get live UPS rates"
           >
-            Choose Boxes & Get Rates →
+            Ship UPS →
           </button>
         </div>
       )}

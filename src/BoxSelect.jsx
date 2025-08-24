@@ -3,11 +3,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 // One-row box choices (click to add to cart)
 const BOX_CHOICES = [
+  { label: "14×7×5",   L: 14, W: 7,  H: 5,  PackagingType: "02", Weight: 4  },
   { label: "10×10×10", L: 10, W: 10, H: 10, PackagingType: "02", Weight: 7  },
   { label: "13×13×13", L: 13, W: 13, H: 13, PackagingType: "02", Weight: 12 },
   { label: "17×17×17", L: 17, W: 17, H: 17, PackagingType: "02", Weight: 24 },
   { label: "17×20×20", L: 17, W: 20, H: 20, PackagingType: "02", Weight: 32 },
-  { label: "14×7×5",   L: 14, W: 7,  H: 5,  PackagingType: "02", Weight: 4  },
 ];
 
 // Try to rebuild selection from many sources
@@ -147,19 +147,24 @@ export default function BoxSelect() {
       ))}
 
       {/* One-row box buttons */}
-      <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem", flexWrap: "nowrap", overflowX: "auto", paddingBottom: "0.5rem" }}>
-        {BOX_CHOICES.map((b) => (
+      const sortedChoices = React.useMemo(
+        () => [...BOX_CHOICES].sort((a, b) => (a.L * a.W * a.H) - (b.L * b.W * b.H)),
+        []
+      );
+
+      // …render buttons in one row, sorted smallest → largest
+      <div style={{ display: "flex", gap: 12, flexWrap: "nowrap", overflowX: "auto" }}>
+        {sortedChoices.map((b) => (
           <button
             key={b.label}
             onClick={() => addBox(b)}
             style={{
-              padding: "10px 14px",
-              borderRadius: 8,
               border: "1px solid #333",
-              background: "#eee",
+              borderRadius: 8,
+              padding: "10px 12px",
+              background: "#f7f7f7",
               cursor: "pointer",
-              whiteSpace: "nowrap",
-              minWidth: 110
+              whiteSpace: "nowrap"
             }}
             title={`Add ${b.label} to cart`}
           >
