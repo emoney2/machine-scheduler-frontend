@@ -822,27 +822,37 @@ export default function Ship() {
       return;
     }
 
-    // 6) Post to the known route with the shape it expects: { recipient: { name, ... }, shipper: {...}, packages: [...] }
+    // 6) Post to the known route with the shape it expects; ensure .name fields; fallback on 400 'name'
     const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
     const ratesUrl =
       (process.env.REACT_APP_RATES_URL && process.env.REACT_APP_RATES_URL.trim()) ||
       `${API_BASE}/api/rate`;
 
-    // Build lowercase, FLAT party objects for backend (name at recipient.name)
-    const toFlatParty = (p) => ({
-      name: p.Name,
-      attentionName: p.AttentionName,
-      phone: p.Phone,
-      addressLine1: p.Address.AddressLine1,
-      addressLine2: p.Address.AddressLine2,
-      city: p.Address.City,
-      state: p.Address.StateProvinceCode,
-      postalCode: p.Address.PostalCode,
-      countryCode: p.Address.CountryCode,
+    // Build lowercase, FLAT party objects for backend (with guaranteed .name)
+    const toFlatParty = (p, fallbackName = "Unknown") => ({
+      name: (p && p.Name) ? String(p.Name).trim() : String(fallbackName).trim(),
+      attentionName: p?.AttentionName || "",
+      phone: p?.Phone || "",
+      addressLine1: p?.Address?.AddressLine1 || "",
+      addressLine2: p?.Address?.AddressLine2 || "",
+      city: p?.Address?.City || "",
+      state: p?.Address?.StateProvinceCode || "",
+      postalCode: p?.Address?.PostalCode || "",
+      countryCode: p?.Address?.CountryCode || "US",
     });
 
-    const recipientFlat = toFlatParty(recipient);
-    const shipperFlat   = toFlatParty(shipper);
+    // Fallback names if missing
+    const fallbackRecipientName =
+      (recipient?.Name && String(recipient.Name).trim()) ||
+      (jobToShip?.["Company Name"] && String(jobToShip["Company Name"]).trim()) ||
+      (jobToShip?.Company && String(jobToShip.Company).trim()) ||
+      "Unknown";
+
+    const fallbackShipperName =
+      (shipper?.Name && String(shipper.Name).trim()) || "JR & Co.";
+
+    const recipientFlat = toFlatParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
+    const shipperFlat   = toFlatParty({ ...shipper, Name: fallbackShipperName }, fallbackShipperName);
 
     // Flat packages (units explicit)
     const packagesFlat = (boxesToUse || []).map((pkg) => {
@@ -861,25 +871,38 @@ export default function Ship() {
       };
     });
 
-    const payload = {
+    const primaryPayload = {
       shipper:   shipperFlat,
-      recipient: recipientFlat, // <-- contains .name (this was the server’s complaint)
+      recipient: recipientFlat, // must contain .name
       packages:  packagesFlat,
     };
 
-    console.log("🔎 UPS rates POST →", { url: ratesUrl, payload });
+    console.log("🔎 UPS rates POST →", { url: ratesUrl, payload: primaryPayload });
 
-    try {
-      const res = await fetch(ratesUrl, {
+    // Helper to POST and parse
+    const postAndParse = async (url, payload) => {
+      const res = await fetch(url, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       const raw = await res.text();
       let body = null;
       try { body = JSON.parse(raw); } catch { /* keep raw string */ }
+      return { res, raw, body };
+    };
+
+    try {
+      // First attempt: { shipper, recipient, packages }
+      let { res, raw, body } = await postAndParse(ratesUrl, primaryPayload);
+
+      // If 400 and contains `'name'`, try fallback shape: { from, to, packages }
+      if (res.status === 400 && typeof raw === "string" && /'name'/.test(raw)) {
+        console.warn("⚠️  400 'name' — retrying with { from, to, packages }");
+        const altPayload = { from: shipperFlat, to: recipientFlat, packages: packagesFlat };
+        ({ res, raw, body } = await postAndParse(ratesUrl, altPayload));
+      }
 
       if (!res.ok) {
         const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${res.status}`;
@@ -898,8 +921,6 @@ export default function Ship() {
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
-
-
     console.log("✅ UPS rates response ←", options);
     setShippingOptions(options);
   };
