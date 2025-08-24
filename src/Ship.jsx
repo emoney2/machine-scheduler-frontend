@@ -822,39 +822,13 @@ export default function Ship() {
       return;
     }
 
-    // 6) Post to the known route; if 400 mentions 'name' or 'addr1', retry with legacy addr keys
+    // 6) Post with a mega-compatible payload; if 400, retry with minimal legacy shape
     const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
     const ratesUrl =
       (process.env.REACT_APP_RATES_URL && process.env.REACT_APP_RATES_URL.trim()) ||
       `${API_BASE}/api/rate`;
 
-    // Build lowercase, FLAT party objects (current style)
-    const toFlatParty = (p, fallbackName = "Unknown") => ({
-      name: (p?.Name ? String(p.Name).trim() : String(fallbackName).trim()),
-      attentionName: p?.AttentionName || "",
-      phone: p?.Phone || "",
-      addressLine1: p?.Address?.AddressLine1 || "",
-      addressLine2: p?.Address?.AddressLine2 || "",
-      city: p?.Address?.City || "",
-      state: p?.Address?.StateProvinceCode || "",
-      postalCode: p?.Address?.PostalCode || "",
-      countryCode: p?.Address?.CountryCode || "US",
-    });
-
-    // Legacy party (backend expects addr1/addr2/zip/country)
-    const toLegacyParty = (p, fallbackName = "Unknown") => ({
-      name: (p?.Name ? String(p.Name).trim() : String(fallbackName).trim()),
-      attention: p?.AttentionName || "",
-      phone: p?.Phone || "",
-      addr1: p?.Address?.AddressLine1 || "",
-      addr2: p?.Address?.AddressLine2 || "",
-      city: p?.Address?.City || "",
-      state: p?.Address?.StateProvinceCode || "",
-      zip: p?.Address?.PostalCode || "",
-      country: p?.Address?.CountryCode || "US",
-    });
-
-    // Ensure non-empty names
+    // Ensure non-empty names for both parties
     const fallbackRecipientName =
       (recipient?.Name && String(recipient.Name).trim()) ||
       (jobToShip?.["Company Name"] && String(jobToShip["Company Name"]).trim()) ||
@@ -863,33 +837,122 @@ export default function Ship() {
     const fallbackShipperName =
       (shipper?.Name && String(shipper.Name).trim()) || "JR & Co.";
 
-    const recipientFlat  = toFlatParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
-    const shipperFlat    = toFlatParty({ ...shipper,   Name: fallbackShipperName },   fallbackShipperName);
-    const recipientLegacy= toLegacyParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
-    const shipperLegacy  = toLegacyParty({ ...shipper,   Name: fallbackShipperName },   fallbackShipperName);
+    // Extract normalized address values once
+    const normParty = (p, fallbackName) => {
+      const Name = (p?.Name && String(p.Name).trim()) || fallbackName;
+      const AttentionName = p?.AttentionName || "";
+      const Phone = p?.Phone || "";
+      const A1 = p?.Address?.AddressLine1 || "";
+      const A2 = p?.Address?.AddressLine2 || "";
+      const City = p?.Address?.City || "";
+      const State = p?.Address?.StateProvinceCode || "";
+      const Zip = p?.Address?.PostalCode || "";
+      const Ctry = p?.Address?.CountryCode || "US";
+      return { Name, AttentionName, Phone, A1, A2, City, State, Zip, Ctry };
+    };
 
-    // Flat packages (units explicit)
-    const packagesFlat = (boxesToUse || []).map((pkg) => {
-      const w = Number(pkg.Weight) || 1;
-      const L = Number(pkg.Dimensions?.Length) || 1;
-      const W = Number(pkg.Dimensions?.Width) || 1;
-      const H = Number(pkg.Dimensions?.Height) || 1;
+    const recip = normParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
+    const shipr = normParty({ ...shipper,   Name: fallbackShipperName   }, fallbackShipperName);
+
+    // Build package variants with every field name the server might want
+    const packagesMega = (boxesToUse || []).map((pkg) => {
+      const Wt = Number(pkg.Weight) || 1;
+      const Lg = Number(pkg.Dimensions?.Length) || 1;
+      const Wd = Number(pkg.Dimensions?.Width) || 1;
+      const Hg = Number(pkg.Dimensions?.Height) || 1;
+      const PackType = pkg.PackagingType || "02";
       return {
-        packagingType: pkg.PackagingType || "02",
-        weight: w,
+        // Canonical UPS-style
+        PackagingType: PackType,
+        Weight: Wt,
+        Dimensions: {
+          Length: Lg,
+          Width: Wd,
+          Height: Hg,
+          // single-letter aliases (your backend complained about 'L')
+          L: Lg,
+          W: Wd,
+          H: Hg,
+          Unit: "IN",
+        },
+        // Flat + camel variants
+        packagingType: PackType,
+        weight: Wt,
         weightUnit: "LB",
-        length: L,
-        width: W,
-        height: H,
+        dimensions: {
+          length: Lg,
+          width: Wd,
+          height: Hg,
+          unit: "IN",
+          L: Lg,
+          W: Wd,
+          H: Hg,
+        },
+        // Also expose top-level L/W/H in case it expects root fields
+        Length: Lg,
+        Width: Wd,
+        Height: Hg,
+        L: Lg,
+        W: Wd,
+        H: Hg,
         dimUnit: "IN",
       };
     });
 
-    const primaryPayload = { shipper: shipperFlat, recipient: recipientFlat, packages: packagesFlat };
-    const legacyPayload  = { shipper: shipperLegacy, recipient: recipientLegacy, packages: packagesFlat };
-    const altFromTo      = { from: shipperLegacy, to: recipientLegacy, packages: packagesFlat };
+    // Party variants: include nested PascalCase, nested camel, and flat legacy keys
+    const partyVariants = ({ Name, AttentionName, Phone, A1, A2, City, State, Zip, Ctry }) => ({
+      // Nested PascalCase
+      Name,
+      AttentionName,
+      Phone,
+      Address: {
+        AddressLine1: A1,
+        AddressLine2: A2,
+        City,
+        StateProvinceCode: State,
+        PostalCode: Zip,
+        CountryCode: Ctry,
+      },
+      // Nested camel
+      name: Name,
+      attentionName: AttentionName,
+      phone: Phone,
+      address: {
+        addressLine1: A1,
+        addressLine2: A2,
+        city: City,
+        state: State,
+        postalCode: Zip,
+        countryCode: Ctry,
+      },
+      // Flat camel
+      addressLine1: A1,
+      addressLine2: A2,
+      city: City,
+      state: State,
+      postalCode: Zip,
+      countryCode: Ctry,
+      // Legacy flat
+      attention: AttentionName,
+      addr1: A1,
+      addr2: A2,
+      zip: Zip,
+      country: Ctry,
+    });
 
-    console.log("🔎 UPS rates POST →", { url: ratesUrl, payload: primaryPayload });
+    const recipientAll = partyVariants(recip);
+    const shipperAll   = partyVariants(shipr);
+
+    // Mega payload: include multiple shapes simultaneously so backend can pick what it needs
+    const megaPayload = {
+      shipper:   shipperAll,
+      recipient: recipientAll,
+      from:      shipperAll,
+      to:        recipientAll,
+      packages:  packagesMega,
+    };
+
+    console.log("🔎 UPS rates POST (mega) →", { url: ratesUrl, payload: megaPayload });
 
     // Helper to POST and parse
     const postAndParse = async (url, payload) => {
@@ -906,19 +969,56 @@ export default function Ship() {
     };
 
     try {
-      // 1) Try modern shape
-      let { res, raw, body } = await postAndParse(ratesUrl, primaryPayload);
+      // First attempt: mega payload (covers name/addr1/L/W/H/etc.)
+      let { res, raw, body } = await postAndParse(ratesUrl, megaPayload);
 
-      // 2) If 400 mentions 'name' or 'addr1', try legacy shipper/recipient keys
-      if (res.status === 400 && typeof raw === "string" && /'name'|'addr1'/.test(raw)) {
-        console.warn("⚠️  400 complaining about 'name' or 'addr1' — retrying with legacy { addr1, addr2, zip, country } keys");
-        ({ res, raw, body } = await postAndParse(ratesUrl, legacyPayload));
-      }
+      // If still a schema complaint, try a minimal legacy-only payload
+      if (res.status === 400) {
+        const legacyOnly = {
+          shipper: {
+            name: shipr.Name,
+            attention: shipr.AttentionName,
+            phone: shipr.Phone,
+            addr1: shipr.A1,
+            addr2: shipr.A2,
+            city: shipr.City,
+            state: shipr.State,
+            zip:   shipr.Zip,
+            country: shipr.Ctry,
+          },
+          recipient: {
+            name: recip.Name,
+            attention: recip.AttentionName,
+            phone: recip.Phone,
+            addr1: recip.A1,
+            addr2: recip.A2,
+            city: recip.City,
+            state: recip.State,
+            zip:   recip.Zip,
+            country: recip.Ctry,
+          },
+          packages: (boxesToUse || []).map((pkg) => {
+            const Wt = Number(pkg.Weight) || 1;
+            const Lg = Number(pkg.Dimensions?.Length) || 1;
+            const Wd = Number(pkg.Dimensions?.Width) || 1;
+            const Hg = Number(pkg.Dimensions?.Height) || 1;
+            return {
+              packagingType: pkg.PackagingType || "02",
+              weight: Wt,
+              length: Lg,
+              width: Wd,
+              height: Hg,
+              L: Lg,
+              W: Wd,
+              H: Hg,
+              dimUnit: "IN",
+              weightUnit: "LB",
+            };
+          }),
+        };
 
-      // 3) If still 400 about 'name' or 'addr1', try { from, to, packages } legacy flavor
-      if (res.status === 400 && typeof raw === "string" && /'name'|'addr1'/.test(raw)) {
-        console.warn("⚠️  Still 400 — retrying with { from, to, packages } using legacy keys");
-        ({ res, raw, body } = await postAndParse(ratesUrl, altFromTo));
+        console.warn("⚠️  400 on mega payload — retrying with minimal legacy-only payload");
+        ({ res, raw, body } = await postAndParse(ratesUrl, legacyOnly));
       }
 
       if (!res.ok) {
