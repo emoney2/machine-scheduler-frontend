@@ -1312,7 +1312,8 @@ const onDragEnd = async (result) => {
           { to: "/submit",            label: "Order Submission" },
           { to: "/inventory",         label: "Inventory" },
           { to: "/inventory-ordered", label: "Inventory Ordered" },
-          { to: "/ship",              label: "Ship" }
+          { to: "/ship",              label: "Ship" },
+          { to: "/box-select",        label: "Box Select" }   // ← added
         ].map(({ to, label }) => (
           <NavLink
             key={to}
@@ -1328,6 +1329,7 @@ const onDragEnd = async (result) => {
             {label}
           </NavLink>
         ))}
+
 
         {/* ← push this button as far right as possible */}
         <button
@@ -1388,7 +1390,8 @@ const onDragEnd = async (result) => {
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
         <Route path="/ship" element={<Ship />} />
-        <Route path="/reorder" element={<ReorderPage />} />  {/* ← this is new */}
+        <Route path="/box-select" element={<BoxSelect />} />   {/* ← added */}
+        <Route path="/reorder" element={<ReorderPage />} />
         <Route path="/order" element={<OrderSubmission />} />
         <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
         <Route path="/shipment-complete" element={<ShipmentComplete />} />
