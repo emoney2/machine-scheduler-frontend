@@ -1228,7 +1228,19 @@ export default function Ship() {
       {selected.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
           <button
-            onClick={goToBoxSelect}
+            onClick={() => {
+              // persist in a single, consistent shape
+              const selectedIds = selected.slice();
+              const jobsSnapshot = jobs;
+              try {
+                sessionStorage.setItem(
+                  "ship:selected",
+                  JSON.stringify({ selected: selectedIds, jobs: jobsSnapshot })
+                );
+              } catch {}
+              // send both keys the guard/BoxSelect accept
+              navigate("/box-select", { state: { selectedIds, selected: selectedIds, jobsSnapshot } });
+            }}
             style={{
               padding: "12px 18px",
               fontWeight: "bold",
