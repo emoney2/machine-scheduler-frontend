@@ -502,15 +502,23 @@ export default function Ship() {
             headers: { "Content-Type": "application/json" },
             credentials: "include",
             body: JSON.stringify({
-              order_ids: selected,
+              order_ids: selected.filter(id => {
+                const j = jobs.find(x => x.orderId.toString() === id);
+                const name = (j?.Product || "").trim();
+                return !/\s+Back$/i.test(name);
+              }),
               shipped_quantities: Object.fromEntries(
                 jobs
-                  .filter((j) => selected.includes(j.orderId.toString()))
+                  .filter((j) =>
+                    selected.includes(j.orderId.toString()) &&
+                    !/\s+Back$/i.test((j.Product || "").trim())
+                  )
                   .map((j) => [j.orderId, j.shipQty])
               ),
             }),
           }
         );
+
         const data = await response.json();
         if (!response.ok) {
           console.warn("prepare-shipment error:", data.error);
@@ -895,8 +903,12 @@ export default function Ship() {
       dimUnit: p.dimensions.unit || "IN",
     }));
 
-    // Candidate URLs (try original first)
+    // Allow override via env if your backend uses a custom path
+    const CONFIG_RATES_URL = (process.env.REACT_APP_RATES_URL || "").trim();
+
+    // Candidate URLs (try explicit override first if set)
     const candidateUrls = [
+      ...(CONFIG_RATES_URL ? [CONFIG_RATES_URL] : []),
       `${process.env.REACT_APP_API_ROOT}/rate`, // original
       `${API_BASE}/api/rate`,
       `${API_BASE}/api/ups/rates`,
