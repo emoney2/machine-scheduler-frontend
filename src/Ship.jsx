@@ -869,7 +869,7 @@ export default function Ship() {
           Length: Lg,
           Width: Wd,
           Height: Hg,
-          // single-letter aliases (your backend complained about 'L')
+          // single-letter aliases
           L: Lg,
           W: Wd,
           H: Hg,
@@ -888,7 +888,7 @@ export default function Ship() {
           W: Wd,
           H: Hg,
         },
-        // Also expose top-level L/W/H in case it expects root fields
+        // Top-level variants
         Length: Lg,
         Width: Wd,
         Height: Hg,
@@ -1029,9 +1029,17 @@ export default function Ship() {
         return;
       }
 
-      const options = Array.isArray(body) ? body : (body?.rates || []);
-      console.log("✅ UPS rates response ←", options);
-      setShippingOptions(options);
+      const optionsLocal = Array.isArray(body) ? body : (body?.rates || []);
+      console.log("✅ UPS rates response ←", optionsLocal);
+
+      if (!Array.isArray(optionsLocal) || optionsLocal.length === 0) {
+        notify("No live UPS rates returned; using manual shipping.");
+        setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
+        return;
+      }
+
+      setShippingOptions(optionsLocal);
+      return;
     } catch (err) {
       console.error("UPS rate error:", err);
       notify(`UPS rates error: ${(err && err.message) || String(err)}`);
