@@ -95,12 +95,25 @@ function QuickBooksRedirect() {
 function BoxSelectGuard() {
   const location = useLocation();
   const st = location.state || {};
-  const hasSelection =
-    (Array.isArray(st.selected) && st.selected.length > 0) ||
-    (Array.isArray(st.selectedIds) && st.selectedIds.length > 0);
+
+  // direct state from navigate()
+  const picked = Array.isArray(st.selected) ? st.selected
+               : Array.isArray(st.selectedIds) ? st.selectedIds
+               : null;
+
+  // fallback from sessionStorage (if route state got dropped)
+  let persisted = null;
+  try {
+    persisted = JSON.parse(sessionStorage.getItem("ship.selected") || "null");
+  } catch {}
+
+  const fromStore = Array.isArray(persisted?.selected) ? persisted.selected : null;
+
+  const hasSelection = (picked && picked.length > 0) || (fromStore && fromStore.length > 0);
 
   return hasSelection ? <BoxSelect /> : <Navigate to="/ship" replace />;
 }
+
 
 // send cookies on every API call so Flask session is preserved
 axios.defaults.withCredentials = true;
@@ -1322,20 +1335,15 @@ const onDragEnd = async (result) => {
           { to: "/submit",            label: "Order Submission" },
           { to: "/inventory",         label: "Inventory" },
           { to: "/inventory-ordered", label: "Inventory Ordered" },
-          { to: "/ship",              label: "Ship" },
-          { to: "/box-select",        label: "Box Select" }   // ← added
+          { to: "/ship",              label: "Ship" }
         ].map(({ to, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            style={({ isActive }) => ({
-              padding: '0.5rem 1rem',
-              textDecoration: 'none',
-              color: '#333',
-              fontWeight: isActive ? '600' : '400',
-              borderBottom: isActive ? '2px solid #333' : 'none'
-            })}
-          >
+          <NavLink key={to} to={to} style={({ isActive }) => ({
+            padding: '0.5rem 1rem',
+            textDecoration: 'none',
+            color: '#333',
+            fontWeight: isActive ? '600' : '400',
+            borderBottom: isActive ? '2px solid #333' : 'none'
+          })}>
             {label}
           </NavLink>
         ))}

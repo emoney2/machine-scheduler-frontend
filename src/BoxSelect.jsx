@@ -37,7 +37,25 @@ function dimsToWeight(L, W, H) {
 
 export default function BoxSelect() {
   const location = useLocation();
-  const navigate = useNavigate();
+  const st = location.state || {};
+
+  let selected = Array.isArray(st.selected) ? st.selected
+               : Array.isArray(st.selectedIds) ? st.selectedIds
+               : [];
+
+  let jobsSnapshot = Array.isArray(st.jobsSnapshot) ? st.jobsSnapshot : [];
+
+  // fallback to sessionStorage if state is empty (e.g., page refresh)
+  if (selected.length === 0 || jobsSnapshot.length === 0) {
+    try {
+      const persisted = JSON.parse(sessionStorage.getItem("ship.selected") || "null");
+      if (persisted) {
+        if (selected.length === 0 && Array.isArray(persisted.selected)) selected = persisted.selected;
+        if (jobsSnapshot.length === 0 && Array.isArray(persisted.jobs)) jobsSnapshot = persisted.jobs;
+      }
+    } catch {}
+  }
+
 
   // Expect navigation from Ship.jsx like: navigate("/box-select", { state: { selected, jobs } })
   const selectedIds = useMemo(() => {

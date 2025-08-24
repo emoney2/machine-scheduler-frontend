@@ -389,6 +389,17 @@ export default function Ship() {
     );
   };
 
+  const goToBoxSelect = () => {
+    try {
+      sessionStorage.setItem(
+        "ship.selected",
+        JSON.stringify({ selected, jobs })
+      );
+    } catch {}
+    navigate("/box-select", { state: { selected, jobsSnapshot: jobs } });
+  };
+
+
   const promptDimensionsForProduct = (product) => {
     return new Promise((resolve) => {
       const container = document.createElement("div");
@@ -1217,16 +1228,7 @@ export default function Ship() {
       {selected.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
           <button
-            onClick={() => {
-              const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
-              if (selectedJobs.length === 0) {
-                alert("Select at least one job.");
-                return;
-              }
-              // Persist for next page / refresh safety
-              sessionStorage.setItem("ship:selectedJobs", JSON.stringify(selectedJobs));
-              navigate("/box-select", { state: { selectedJobs } });
-            }}
+            onClick={goToBoxSelect}
             style={{
               padding: "12px 18px",
               fontWeight: "bold",
@@ -1243,7 +1245,6 @@ export default function Ship() {
           </button>
         </div>
       )}
-
     </div>
   );
 }
