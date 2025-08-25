@@ -17,6 +17,7 @@ import ReorderPage from "./ReorderPage";
 import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
+import Overview from "./Overview";
 
 console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
@@ -1331,6 +1332,7 @@ const onDragEnd = async (result) => {
         }}
       >
         {[
+          { to: "/Overview",          label: "Overview" },
           { to: "/",                  label: "Scheduler" },
           { to: "/submit",            label: "Order Submission" },
           { to: "/inventory",         label: "Inventory" },
@@ -1404,6 +1406,7 @@ const onDragEnd = async (result) => {
             />
           }
         />
+        <Route path="/overview" element={<Overview />} />
         <Route path="/submit" element={<OrderSubmission />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
