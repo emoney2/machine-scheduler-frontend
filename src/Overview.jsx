@@ -114,56 +114,54 @@ export default function Overview() {
   const [modalOpenForVendor, setModalOpenForVendor] = useState(null);
   const [modalSelections, setModalSelections] = useState({}); // key: `${vendor}:::${name}` -> { selected, qty, unit, type }
 
-  // Fetch Upcoming (Ship Date = next 7 days) — sorted server-side by Due Date, then Order #
+  // Fast path: one call for both upcoming + materials (server: /api/overview)
   useEffect(() => {
     let alive = true;
-    async function load() {
+
+    async function loadOverview() {
       try {
         setLoadingUpcoming(true);
-        const res = await axios.get(`${ROOT}/overview/upcoming?days=7`, { withCredentials: true });
-        if (!alive) return;
-        setUpcoming(res.data?.jobs || []);
-      } catch (e) {
-        console.error("Failed to load upcoming", e);
-      } finally {
-        if (alive) setLoadingUpcoming(false);
-      }
-    }
-    load();
-    const id = setInterval(load, 15000); // subtle refresh
-    return () => { alive = false; clearInterval(id); };
-  }, []);
-
-  // Fetch Materials Needed (already grouped by vendor in Summary Tab)
-  useEffect(() => {
-    let alive = true;
-    async function load() {
-      try {
         setLoadingMaterials(true);
-        const res = await axios.get(`${ROOT}/overview/materials-needed`, { withCredentials: true });
+
+        const res = await axios.get(`${ROOT}/overview`, { withCredentials: true });
         if (!alive) return;
-        const groups = res.data?.vendors || [];
+
+        const { upcoming, materials } = res.data || {};
+        const jobs = upcoming ?? [];
+        const groups = materials ?? [];
+
+        setUpcoming(jobs);
         setMaterials(groups);
 
         // prime selections (all pre-checked)
         const init = {};
         for (const g of groups) {
-          for (const it of g.items || []) {
+          for (const it of (g.items || [])) {
             const key = `${g.vendor}:::${it.name}`;
-            init[key] = { selected: true, qty: String(it.qty || ""), unit: it.unit || "", type: it.type || "Material" };
+            init[key] = {
+              selected: true,
+              qty: String(it.qty ?? ""),
+              unit: it.unit ?? "",
+              type: it.type ?? "Material",
+            };
           }
         }
         setModalSelections(init);
       } catch (e) {
-        console.error("Failed to load materials needed", e);
+        console.error("Failed to load overview", e);
       } finally {
-        if (alive) setLoadingMaterials(false);
+        if (alive) {
+          setLoadingUpcoming(false);
+          setLoadingMaterials(false);
+        }
       }
     }
-    load();
-    const id = setInterval(load, 30000);
+
+    loadOverview();
+    const id = setInterval(loadOverview, 45000); // fewer polls = faster app
     return () => { alive = false; clearInterval(id); };
   }, []);
+
 
   // Build rows for modal
   const modalRows = useMemo(() => {
