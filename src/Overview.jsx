@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
+const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+
 // ——— Helpers ——————————————————————————————————————————————
 function parseDate(s) {
   if (!s) return null;
@@ -118,7 +120,7 @@ export default function Overview() {
     async function load() {
       try {
         setLoadingUpcoming(true);
-        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/api/overview/upcoming?days=7`, { withCredentials: true });
+        const res = await axios.get(`${ROOT}/overview/upcoming?days=7`, { withCredentials: true });
         if (!alive) return;
         setUpcoming(res.data?.jobs || []);
       } catch (e) {
@@ -138,7 +140,7 @@ export default function Overview() {
     async function load() {
       try {
         setLoadingMaterials(true);
-        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/api/overview/materials-needed`, { withCredentials: true });
+        const res = await axios.get(`${ROOT}/overview/materials-needed`, { withCredentials: true });
         if (!alive) return;
         const groups = res.data?.vendors || [];
         setMaterials(groups);
@@ -199,10 +201,10 @@ export default function Overview() {
       }
 
       if (materialPayload.length) {
-        await axios.post(`${process.env.REACT_APP_API_ROOT}/materialInventory`, materialPayload, { withCredentials: true });
+        await axios.post(`${ROOT}/materialInventory`, materialPayload, { withCredentials: true });
       }
       if (threadPayload.length) {
-        await axios.post(`${process.env.REACT_APP_API_ROOT}/threadInventory`, threadPayload, { withCredentials: true });
+        await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
       alert("Order logged. (Action: Ordered)");
