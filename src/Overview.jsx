@@ -52,6 +52,19 @@ function fmtMMDD(s) {
   return `${mm}/${dd}`;
 }
 
+function showMMDDorRaw(v) {
+  const dt = parseDate(v);
+  return dt ? fmtMMDD(dt) : (v ?? "");
+}
+function pickHardSoft(job) {
+  return job["Hard Date/Soft Date"]
+      ?? job["Hard/Soft"]
+      ?? job["Hard Soft"]
+      ?? job["Hard/Soft Date"]
+      ?? job["Hard or Soft"]
+      ?? "";
+}
+
 function deriveThumb(link) {
   const s = String(link || "");
   let id = "";
@@ -324,7 +337,9 @@ export default function Overview() {
                 <div style={{ ...col(68, true), fontWeight: 700, color: ring }} title={String(job["Ship Date"] || "")}>
                   {fmtMMDD(job["Ship Date"])}
                 </div>
-                <div style={col(110, true)} title={String(job["Hard Date/Soft Date"] || "")}>{job["Hard Date/Soft Date"]}</div>
+                <div style={col(110, true)} title={String(pickHardSoft(job) || "")}>
+                  {showMMDDorRaw(pickHardSoft(job))}
+                </div>
               </div>
             );
           })}
