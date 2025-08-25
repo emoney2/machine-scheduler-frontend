@@ -118,7 +118,7 @@ export default function Overview() {
     async function load() {
       try {
         setLoadingUpcoming(true);
-        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/overview/upcoming?days=7`, { withCredentials: true });
+        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/api/overview/upcoming?days=7`, { withCredentials: true });
         if (!alive) return;
         setUpcoming(res.data?.jobs || []);
       } catch (e) {
@@ -138,7 +138,7 @@ export default function Overview() {
     async function load() {
       try {
         setLoadingMaterials(true);
-        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/overview/materials-needed`, { withCredentials: true });
+        const res = await axios.get(`${process.env.REACT_APP_API_ROOT}/api/overview/materials-needed`, { withCredentials: true });
         if (!alive) return;
         const groups = res.data?.vendors || [];
         setMaterials(groups);
