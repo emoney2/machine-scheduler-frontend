@@ -11,7 +11,7 @@ import InventoryOrdered from "./InventoryOrdered";
 import "./axios-setup";
 import Section9 from './Section9';
 import OrderSubmission from './OrderSubmission';
-import { parseDueDate, subWorkDays, fmtMMDD } from './helpers';
+import { subWorkDays, fmtMMDD } from './helpers';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import ReorderPage from "./ReorderPage";
 import throttle from 'lodash.throttle';
