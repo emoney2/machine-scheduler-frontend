@@ -483,19 +483,37 @@ function parseEmbroideryStart(val) {
 
 
 function parseDueDate(d) {
-  if (!d) return null;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d);
-  const parts = d.split('/');
+  if (d === null || d === undefined || d === '') return null;
+
+  // Already a Date?
+  if (d instanceof Date) return isNaN(d) ? null : d;
+
+  // Google/Sheets serial date (number)
+  if (typeof d === 'number' && isFinite(d)) {
+    const base = new Date(1899, 11, 30); // Excel/Sheets epoch
+    const dt = new Date(base.getTime() + d * 24 * 60 * 60 * 1000);
+    return isNaN(dt) ? null : dt;
+  }
+
+  const s = String(d).trim();
+  if (!s) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s);
+
+  const parts = s.split(/[\/\-]/);
   if (parts.length >= 2) {
-    const mo = +parts[0], da = +parts[1],
-          yr = parts.length === 3 ? +parts[2] : new Date().getFullYear();
+    const mo = +parts[0], da = +parts[1];
+    const yr = parts.length >= 3 ? +parts[2] : new Date().getFullYear();
     if (!isNaN(mo) && !isNaN(da) && !isNaN(yr)) {
-      return new Date(yr, mo - 1, da);
+      const dt = new Date(yr, mo - 1, da);
+      return isNaN(dt) ? null : dt;
     }
   }
-  const dt = new Date(d);
+
+  const dt = new Date(s);
   return isNaN(dt) ? null : dt;
 }
+
 
 function addWorkDays(start, days) {
   let d = new Date(start), added = 0;
