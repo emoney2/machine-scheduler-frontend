@@ -6,24 +6,29 @@ const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 
 // ——— Helpers ——————————————————————————————————————————————
 function parseDate(s) {
-  if (!s) return null;
+  if (s === null || s === undefined || s === "") return null;
   if (s instanceof Date) return isNaN(s) ? null : s;
+
+  // Sheets serial number (days since 1899-12-30)
+  if (typeof s === "number") {
+    const base = new Date(1899, 11, 30); // local
+    const dt = new Date(base.getTime() + s * 86400000);
+    return isNaN(dt) ? null : dt;
+  }
+
   const str = String(s).trim();
-  // Accept MM/DD, M/D, MM/DD/YYYY, YYYY-MM-DD
+  // ISO 2025-08-25 or 2025-08-25T...
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
     const [y, m, d] = str.split("T")[0].split("-").map(Number);
     const dt = new Date(y, (m || 1) - 1, d || 1);
     return isNaN(dt) ? null : dt;
   }
+  // MM/DD or MM/DD/YYYY
   const parts = str.split(/[\/\-]/).map(p => p.trim());
   if (parts.length >= 2) {
     let [m, d, y] = parts.map(p => Number(p));
-    if (!y) {
-      // assume current year if omitted
-      y = new Date().getFullYear();
-    } else if (y < 100) {
-      y += 2000;
-    }
+    if (!y) y = new Date().getFullYear();
+    else if (y < 100) y += 2000;
     const dt = new Date(y, (m || 1) - 1, d || 1);
     return isNaN(dt) ? null : dt;
   }
