@@ -3,6 +3,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+const [orderMethod, setOrderMethod] = useState("email");
+const [poNotes, setPoNotes] = useState("");
+const [requestBy, setRequestBy] = useState("");
+
 
 // ——— Helpers ——————————————————————————————————————————————
 function parseDate(s) {
@@ -223,21 +227,39 @@ export default function Overview() {
         return;
       }
 
+      // 1) Create PO (server will decide email/website using Vendors tab defaults)
+      const payload = {
+        vendor: modalOpenForVendor,
+        method: orderMethod,
+        notes: poNotes,
+        requestBy,
+        items: rows.map(r => ({
+          name: r.name,
+          qty: String(r.qty || "1"),
+          unit: r.unit || "",
+          type: r.type || "Material",
+        })),
+      };
+      const poRes = await axios.post(`${ROOT}/purchase-orders`, payload, { withCredentials: true });
+      const { poNumber, pdfUrl, emailed, mailtoUrl, website } = poRes.data || {};
+      if (orderMethod === "website" && website) {
+        window.open(website, "_blank", "noopener");
+      } else if (orderMethod === "email" && !emailed && mailtoUrl) {
+        // Fallback: open user's email client prefilled (server couldn't send directly)
+        window.open(mailtoUrl, "_blank");
+      }
+
+      // 2) Log "Ordered" into your existing logs (unchanged)
       const materialPayload = [];
       const threadPayload = [];
-
       for (const r of rows) {
-        const base = {
-          quantity: String(r.qty || "1"),
-          action: "Ordered",
-        };
+        const base = { quantity: String(r.qty || "1"), action: "Ordered" };
         if ((r.type || "Material") === "Thread") {
           threadPayload.push({ ...base, value: r.name });
         } else {
           materialPayload.push({ ...base, materialName: r.name, type: "Material" });
         }
       }
-
       if (materialPayload.length) {
         await axios.post(`${ROOT}/materialInventory`, materialPayload, { withCredentials: true });
       }
@@ -245,11 +267,13 @@ export default function Overview() {
         await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
-      alert("Order logged. (Action: Ordered)");
+      alert(`PO ${poNumber || ""} created${pdfUrl ? " ✓" : ""}`);
       setModalOpenForVendor(null);
+      setPoNotes("");
+      setRequestBy("");
     } catch (e) {
-      console.error("Failed to log order", e);
-      alert("Failed to log order. Check console.");
+      console.error("Failed to create PO / log order", e);
+      alert("Failed to create PO / log order. Check console.");
     }
   }
 
@@ -409,6 +433,29 @@ export default function Overview() {
               Order from {modalOpenForVendor}
             </div>
             <div style={{ fontSize:12, color:"#666", marginBottom:10 }}>All items are pre-selected. Unselect anything you don’t want to order.</div>
+            <div style={{ display:"grid", gridTemplateColumns:"140px 1fr 150px", gap:10, marginBottom:8 }}>
+              <select
+                value={orderMethod}
+                onChange={e => setOrderMethod(e.target.value)}
+                style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
+              >
+                <option value="email">Send PO by Email</option>
+                <option value="website">Order via Website</option>
+              </select>
+              <input
+                placeholder="PO notes (optional)"
+                value={poNotes}
+                onChange={e => setPoNotes(e.target.value)}
+                style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
+              />
+              <input
+                type="date"
+                value={requestBy}
+                onChange={e => setRequestBy(e.target.value)}
+                style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
+                title="Requested By date"
+              />
+            </div>
             <div>
               {modalRows.map((r, i) => (
                 <div key={i} style={{ display:"grid", gridTemplateColumns:"20px 1fr 120px 80px 110px", gap:10, alignItems:"center", padding:"6px 0", borderBottom:"1px solid #f1f1f1" }}>
