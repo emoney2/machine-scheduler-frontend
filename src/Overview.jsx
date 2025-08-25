@@ -106,7 +106,7 @@ const col = (w, center = false) => ({
 });
 
 const imgBox = {
-  width: 40,
+  width: 80,            // ⬅️ doubled from 40
   height: 40,
   border: "2px solid #ccc",
   borderRadius: 6,
@@ -116,6 +116,7 @@ const imgBox = {
   justifyContent: "center",
   background: "#fafafa",
 };
+
 
 
 // ——— Component ——————————————————————————————————————————————
@@ -253,9 +254,38 @@ export default function Overview() {
 
         {/* TR — Upcoming Jobs */}
         <div style={card}>
-          <div style={header}>Upcoming Jobs (Ship in next 7 days)</div>
+          {/* centered title */}
+          <div style={{ ...header, textAlign: "center" }}>Upcoming Jobs (Ship in next 7 days)</div>
+
+          {/* column header row */}
+          <div
+            style={{
+              ...rowCard,
+              padding: "4px 8px",
+              marginBottom: 8,
+              background: "#fafafa",
+              borderColor: "#eee",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#666",
+            }}
+          >
+            <div style={{ ...imgBox, border: "0", background: "transparent" }} />
+            <div style={{ width: 58 }}>Order #</div>
+            <div style={col(250)}>Company Name</div>
+            <div style={col(150)}>Design</div>
+            <div style={{ ...col(56, true) }}>Qty</div>
+            <div style={col(120)}>Product</div>
+            <div style={col(90)}>Stage</div>
+            <div style={{ ...col(64, true) }}>Due</div>
+            <div style={{ ...col(50, true) }}>Print</div>
+            <div style={{ ...col(68, true) }}>Ship</div>
+            <div style={{ ...col(110, true) }}>Hard/Soft</div>
+          </div>
+
           {loadingUpcoming && <div>Loading…</div>}
           {!loadingUpcoming && !upcoming.length && <div>No jobs in the next 7 days.</div>}
+
           {!loadingUpcoming && upcoming.map((job, idx) => {
             const ring = ringColorByShipDate(job["Ship Date"]);
             const imageUrl = job.image || deriveThumb(job["Preview"]);
@@ -274,9 +304,10 @@ export default function Overview() {
                 </div>
 
                 <div style={{ width: 58, fontWeight: 700, fontSize: 12 }} title={String(job["Order #"] || "")}>
-        {job["Order #"]}
+                  {job["Order #"]}
                 </div>
-                <div style={col(130)} title={String(job["Company Name"] || "")}>{job["Company Name"]}</div>
+                <div style={col(250
+)} title={String(job["Company Name"] || "")}>{job["Company Name"]}</div>
                 <div style={col(150)} title={String(job["Design"] || "")}>{job["Design"]}</div>
                 <div style={{ ...col(56, true), fontWeight: 600 }} title={String(job["Quantity"] || "")}>
                   {job["Quantity"]}
@@ -293,6 +324,7 @@ export default function Overview() {
             );
           })}
         </div>
+
 
         {/* BL — Department status (placeholders) */}
         <div style={card}>
