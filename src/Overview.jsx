@@ -47,6 +47,14 @@ function fmtMMDD(s) {
   return `${mm}/${dd}`;
 }
 
+function deriveThumb(link) {
+  const s = String(link || "");
+  let id = "";
+  if (s.includes("id=")) id = s.split("id=")[1].split("&")[0];
+  else if (s.includes("/file/d/")) id = s.split("/file/d/")[1].split("/")[0];
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w160` : "";
+}
+
 function ringColorByShipDate(shipDate) {
   const d = daysUntil(shipDate);
   if (d === null) return "#999";
@@ -68,22 +76,22 @@ const grid = {
 const card = {
   background: "#fff",
   border: "1px solid #e5e7eb",
-  borderRadius: 12,
+  borderRadius: 10,
   boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-  padding: 16,
+  padding: 12,
   overflow: "hidden",
 };
 
-const header = { fontSize: 18, fontWeight: 700, marginBottom: 12 };
+const header = { fontSize: 16, fontWeight: 700, marginBottom: 10 };
 
 const rowCard = {
   display: "flex",
   alignItems: "center",
-  gap: 10,
+  gap: 8,
   border: "1px solid #eee",
   borderRadius: 8,
-  padding: "8px 10px",
-  marginBottom: 8,
+  padding: "6px 8px",
+  marginBottom: 6,
 };
 
 const col = (w, center = false) => ({
@@ -93,9 +101,22 @@ const col = (w, center = false) => ({
   overflow: "hidden",
   textOverflow: "ellipsis",
   whiteSpace: "nowrap",
+  fontSize: 12,
+  lineHeight: "16px",
 });
 
-const imgBox = { width: 56, height: 56, border: "1px solid #999", borderRadius: 6, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" };
+const imgBox = {
+  width: 40,
+  height: 40,
+  border: "2px solid #ccc",
+  borderRadius: 6,
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#fafafa",
+};
+
 
 // ——— Component ——————————————————————————————————————————————
 export default function Overview() {
@@ -237,21 +258,37 @@ export default function Overview() {
           {!loadingUpcoming && !upcoming.length && <div>No jobs in the next 7 days.</div>}
           {!loadingUpcoming && upcoming.map((job, idx) => {
             const ring = ringColorByShipDate(job["Ship Date"]);
+            const imageUrl = job.image || deriveThumb(job["Preview"]);
             return (
               <div key={idx} style={rowCard}>
                 <div style={{ ...imgBox, borderColor: ring }}>
-                  {job.image ? <img src={job.image} alt="" style={{ maxWidth:"100%", maxHeight:"100%" }}/> : <div style={{fontSize:12,color:"#999"}}>No img</div>}
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 10, color: "#999" }}>No img</div>
+                  )}
                 </div>
-                <div style={{ width: 70, fontWeight: 700 }}>{job["Order #"]}</div>
-                <div style={col(160)}>{job["Company Name"]}</div>
-                <div style={col(180)}>{job["Design"]}</div>
-                <div style={col(70, true)}>{job["Quantity"]}</div>
-                <div style={col(140)}>{job["Product"]}</div>
-                <div style={col(100)}>{job["Stage"]}</div>
-                <div style={col(80, true)}>{fmtMMDD(job["Due Date"])}</div>
-                <div style={col(60, true)}>{job["Print"]}</div>
-                <div style={{ ...col(80, true), fontWeight:600, color:ring }}>{fmtMMDD(job["Ship Date"])}</div>
-                <div style={col(120, true)}>{job["Hard Date/Soft Date"]}</div>
+
+                <div style={{ width: 58, fontWeight: 700, fontSize: 12 }} title={String(job["Order #"] || "")}>
+        {job["Order #"]}
+                </div>
+                <div style={col(130)} title={String(job["Company Name"] || "")}>{job["Company Name"]}</div>
+                <div style={col(150)} title={String(job["Design"] || "")}>{job["Design"]}</div>
+                <div style={{ ...col(56, true), fontWeight: 600 }} title={String(job["Quantity"] || "")}>
+                  {job["Quantity"]}
+                </div>
+                <div style={col(120)} title={String(job["Product"] || "")}>{job["Product"]}</div>
+                <div style={col(90)} title={String(job["Stage"] || "")}>{job["Stage"]}</div>
+                <div style={col(64, true)} title={String(job["Due Date"] || "")}>{fmtMMDD(job["Due Date"])}</div>
+                <div style={col(50, true)} title={String(job["Print"] || "")}>{job["Print"]}</div>
+                <div style={{ ...col(68, true), fontWeight: 700, color: ring }} title={String(job["Ship Date"] || "")}>
+                  {fmtMMDD(job["Ship Date"])}
+                </div>
+                <div style={col(110, true)} title={String(job["Hard Date/Soft Date"] || "")}>{job["Hard Date/Soft Date"]}</div>
               </div>
             );
           })}
@@ -279,18 +316,29 @@ export default function Overview() {
           {!loadingMaterials && materials.map((grp, idx) => (
             <div key={idx} style={{ border:"1px solid #eee", borderRadius:10, padding:10, marginBottom:10 }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <div style={{ fontWeight:700 }}>{grp.vendor || "Unknown Vendor"}</div>
-                <button onClick={() => setModalOpenForVendor(grp.vendor)} style={{ padding:"6px 10px", borderRadius:8, border:"1px solid #ccc", cursor:"pointer" }}>
+                <div style={{ fontWeight:700, fontSize: 13 }}>{grp.vendor || "Unknown Vendor"}</div>
+                <button
+                  onClick={() => setModalOpenForVendor(grp.vendor)}
+                  style={{ padding:"5px 8px", fontSize:12, borderRadius:8, border:"1px solid #ccc", cursor:"pointer" }}
+                >
                   Order Material
                 </button>
               </div>
-              <div style={{ marginTop:8 }}>
+              <div style={{ marginTop:6 }}>
                 {(grp.items || []).map((it, j) => (
-                  <div key={j} style={{ display:"flex", gap:12, fontSize:14, padding:"4px 0" }}>
-                    <div style={{ width: 260, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{it.name}</div>
-                    <div style={{ width: 80, textAlign:"right" }}>{it.qty}</div>
-                    <div style={{ width: 70 }}>{it.unit || ""}</div>
-                    <div style={{ width: 90, color:"#666" }}>{it.type || "Material"}</div>
+                  <div
+                    key={j}
+                    style={{ display:"flex", gap:10, fontSize:12, lineHeight:"16px", padding:"2px 0" }}
+                  >
+                    <div
+                      style={{ width: 240, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}
+                      title={it.name}
+                    >
+                      {it.name}
+                    </div>
+                    <div style={{ width: 70, textAlign:"right" }} title={String(it.qty ?? "")}>{it.qty}</div>
+                    <div style={{ width: 60 }} title={it.unit || ""}>{it.unit || ""}</div>
+                    <div style={{ width: 80, color:"#666" }} title={it.type || "Material"}>{it.type || "Material"}</div>
                   </div>
                 ))}
               </div>
