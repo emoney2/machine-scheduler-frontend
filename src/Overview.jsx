@@ -3,30 +3,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
-const [orderMethod, setOrderMethod] = useState("email");
-const [poNotes, setPoNotes] = useState("");
-const [requestBy, setRequestBy] = useState("");
-const [vendorDir, setVendorDir] = useState({});
 
-// Load once on mount
-useEffect(() => {
-  let alive = true;
-  (async () => {
-    try {
-      const res = await axios.get(`${ROOT}/vendors`, { withCredentials: true });
-      if (!alive) return;
-      const map = {};
-      for (const v of res.data?.vendors || []) {
-        map[v.vendor] = v; // {method,email,cc,website}
-      }
-      setVendorDir(map);
-    } catch (e) {
-      console.error("Failed to load vendor directory", e);
-    }
-  })();
-  return () => { alive = false; };
-}, []);
-
+// ——— Helpers (no hooks here) ——————————————————————————————————————
 function openMailto(url) {
   const w = window.open(url, "_blank");
   if (!w) window.location.href = url;
@@ -39,31 +17,23 @@ function buildMailto(to, cc, subject, body) {
   return url;
 }
 
-
-
-// ——— Helpers ——————————————————————————————————————————————
 function parseDate(s) {
   if (s === null || s === undefined || s === "") return null;
   if (s instanceof Date) return isNaN(s) ? null : s;
-
-  // Sheets serial number (days since 1899-12-30)
   if (typeof s === "number") {
-    const base = new Date(1899, 11, 30); // local
+    const base = new Date(1899, 11, 30); // Google Sheets epoch
     const dt = new Date(base.getTime() + s * 86400000);
     return isNaN(dt) ? null : dt;
   }
-
   const str = String(s).trim();
-  // ISO 2025-08-25 or 2025-08-25T...
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
     const [y, m, d] = str.split("T")[0].split("-").map(Number);
     const dt = new Date(y, (m || 1) - 1, d || 1);
     return isNaN(dt) ? null : dt;
   }
-  // MM/DD or MM/DD/YYYY
   const parts = str.split(/[\/\-]/).map(p => p.trim());
   if (parts.length >= 2) {
-    let [m, d, y] = parts.map(p => Number(p));
+    let [m, d, y] = parts.map(Number);
     if (!y) y = new Date().getFullYear();
     else if (y < 100) y += 2000;
     const dt = new Date(y, (m || 1) - 1, d || 1);
@@ -71,24 +41,21 @@ function parseDate(s) {
   }
   return null;
 }
-
 function daysUntil(dateLike) {
   const dt = parseDate(dateLike);
   if (!dt) return null;
   const today = new Date();
   const a = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const b = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-  return Math.round((b - a) / (1000 * 60 * 60 * 24));
+  return Math.round((b - a) / 86400000);
 }
-
-function fmtMMDD(s) {
-  const dt = parseDate(s);
+function fmtMMDD(d) {
+  const dt = parseDate(d);
   if (!dt) return "";
-  const mm = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  return `${mm}/${dd}`;
+  const mo = String(dt.getMonth() + 1).padStart(2, "0");
+  const da = String(dt.getDate()).padStart(2, "0");
+  return `${mo}/${da}`;
 }
-
 function showMMDDorRaw(v) {
   const dt = parseDate(v);
   return dt ? fmtMMDD(dt) : (v ?? "");
@@ -101,7 +68,6 @@ function pickHardSoft(job) {
       ?? job["Hard or Soft"]
       ?? "";
 }
-
 function deriveThumb(link) {
   const s = String(link || "");
   let id = "";
@@ -109,17 +75,16 @@ function deriveThumb(link) {
   else if (s.includes("/file/d/")) id = s.split("/file/d/")[1].split("/")[0];
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w160` : "";
 }
-
 function ringColorByShipDate(shipDate) {
   const d = daysUntil(shipDate);
   if (d === null) return "#999";
-  if (d <= 0) return "#e74c3c";     // due/past due
-  if (d <= 3) return "#f39c12";     // urgent
-  if (d <= 7) return "#2ecc71";     // within window
+  if (d <= 0) return "#e74c3c";
+  if (d <= 3) return "#f39c12";
+  if (d <= 7) return "#2ecc71";
   return "#999";
 }
 
-// ——— UI Bits ——————————————————————————————————————————————
+// ——— Styles ——————————————————————————————————————————————
 const grid = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
@@ -127,7 +92,6 @@ const grid = {
   gap: 16,
   padding: 16,
 };
-
 const card = {
   background: "#fff",
   border: "1px solid #e5e7eb",
@@ -136,9 +100,7 @@ const card = {
   padding: 12,
   overflow: "hidden",
 };
-
 const header = { fontSize: 16, fontWeight: 700, marginBottom: 10 };
-
 const rowCard = {
   display: "flex",
   alignItems: "center",
@@ -148,7 +110,6 @@ const rowCard = {
   padding: "6px 8px",
   marginBottom: 6,
 };
-
 const col = (w, center = false) => ({
   width: w,
   flex: `0 0 ${w}`,
@@ -159,9 +120,8 @@ const col = (w, center = false) => ({
   fontSize: 12,
   lineHeight: "16px",
 });
-
 const imgBox = {
-  width: 80,            // ⬅️ doubled from 40
+  width: 80,
   height: 40,
   border: "2px solid #ccc",
   borderRadius: 6,
@@ -172,41 +132,40 @@ const imgBox = {
   background: "#fafafa",
 };
 
-
-
 // ——— Component ——————————————————————————————————————————————
 export default function Overview() {
-  // upcoming jobs
+  // Upcoming jobs
   const [upcoming, setUpcoming] = useState([]);
   const [loadingUpcoming, setLoadingUpcoming] = useState(true);
 
-  // summary materials (grouped by vendor)
-  const [materials, setMaterials] = useState([]); // [{vendor, items:[{name, qty, unit, type}], note?}]
+  // Materials (grouped by vendor)
+  const [materials, setMaterials] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
 
-  // departments (placeholders)
-  const departments = ["Digitizing", "Fur", "Cut", "Print", "Embroidery", "Sewing"];
-
-  // order modal
+  // Order modal
   const [modalOpenForVendor, setModalOpenForVendor] = useState(null);
   const [modalSelections, setModalSelections] = useState({}); // key: `${vendor}:::${name}` -> { selected, qty, unit, type }
 
-  // Fast path: one call for both upcoming + materials (server: /api/overview)
+  // Vendor directory (from Material Inventory!K:O)
+  const [vendorDir, setVendorDir] = useState({});
+
+  // Optional UI fields
+  const [orderMethod, setOrderMethod] = useState("email"); // "email" or "website"
+  const [poNotes, setPoNotes] = useState("");
+  const [requestBy, setRequestBy] = useState("");
+
+  // Load combined overview (upcoming + materials)
   useEffect(() => {
     let alive = true;
-
     async function loadOverview() {
       try {
         setLoadingUpcoming(true);
         setLoadingMaterials(true);
-
         const res = await axios.get(`${ROOT}/overview`, { withCredentials: true });
         if (!alive) return;
-
         const { upcoming, materials } = res.data || {};
         const jobs = upcoming ?? [];
         const groups = materials ?? [];
-
         setUpcoming(jobs);
         setMaterials(groups);
 
@@ -233,14 +192,31 @@ export default function Overview() {
         }
       }
     }
-
     loadOverview();
-    const id = setInterval(loadOverview, 45000); // fewer polls = faster app
+    const id = setInterval(loadOverview, 45000);
     return () => { alive = false; clearInterval(id); };
   }, []);
 
+  // Load vendor directory once
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await axios.get(`${ROOT}/vendors`, { withCredentials: true });
+        if (!alive) return;
+        const map = {};
+        for (const v of res.data?.vendors || []) {
+          map[v.vendor] = v; // {method,email,cc,website}
+        }
+        setVendorDir(map);
+      } catch (e) {
+        console.error("Failed to load vendor directory", e);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  // Build rows for modal
+  // Modal rows
   const modalRows = useMemo(() => {
     if (!modalOpenForVendor) return [];
     const grp = materials.find(g => g.vendor === modalOpenForVendor);
@@ -251,7 +227,7 @@ export default function Overview() {
     });
   }, [modalOpenForVendor, modalSelections, materials]);
 
-  // Submit Order → write “Ordered” to Material Log / Thread Log using the same endpoints as Inventory
+  // Submit order: email (or open website) + log to inventory
   async function submitOrder() {
     try {
       const rows = modalRows.filter(r => r.selected);
@@ -260,29 +236,31 @@ export default function Overview() {
         return;
       }
 
-      // Build plain text lines
+      // Build plain text email
       const lines = rows.map(i => `- ${i.qty || ""} ${i.unit || ""} ${i.name}`);
       const today = new Date();
-      const subject = `Material Order – ${modalOpenForVendor} – ${String(today.getMonth()+1).padStart(2,"0")}/${String(today.getDate()).padStart(2,"0")}/  ${today.getFullYear()}`;
-      const body = `Hello ${modalOpenForVendor},\n\nPlease place the following order:\n\n${lines.join("\n")}\n\nThank you!\n`;
+      const subject = `Material Order – ${modalOpenForVendor} – ${String(today.getMonth()+1).padStart(2,"0")}/${String(today.getDate()).padStart(2,"0")}/${today.getFullYear()}`;
+      const noteBlock = poNotes ? `\nNotes: ${poNotes}\n` : "";
+      const reqBlock = requestBy ? `\nRequested By: ${requestBy}\n` : "";
+      const body = `Hello ${modalOpenForVendor},\n\nPlease place the following order:\n\n${lines.join("\n")}${noteBlock}${reqBlock}\nThank you!\n`;
 
-      // Look up vendor info from the sheet directory
+      // Vendor info from directory
       const v = vendorDir[modalOpenForVendor] || {};
-      const method  = (v.method || "").toLowerCase();   // "email", "online" (or blank)
-      const to      = v.email || "";
-      const cc      = v.cc || "";
+      const vMethod = (v.method || "").toLowerCase();
+      const defaultMethod = (vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email";
+      const effectiveMethod = orderMethod || defaultMethod;
+      const to = v.email || "";
+      const cc = v.cc || "";
       const website = v.website || "";
 
-      // If method == online/website and we have a URL → open it
-      if ((method.includes("online") || method.includes("website")) && website) {
+      if (effectiveMethod === "website" && website) {
         window.open(website, "_blank", "noopener");
       } else {
-        // Otherwise prefer email via mailto (even if to is blank, user can fill it)
         const mailto = buildMailto(to, cc, subject, body);
         openMailto(mailto);
       }
 
-      // Log "Ordered" just like before
+      // Log "Ordered" to your existing logs
       const materialPayload = [];
       const threadPayload = [];
       for (const r of rows) {
@@ -302,12 +280,16 @@ export default function Overview() {
 
       alert("Email/Website opened. Order logged.");
       setModalOpenForVendor(null);
+      setPoNotes("");
+      setRequestBy("");
     } catch (e) {
       console.error("Failed to email/log order", e);
       alert("Failed to email/log order. Check console.");
     }
   }
 
+  // Departments (placeholder)
+  const departments = ["Digitizing", "Fur", "Cut", "Print", "Embroidery", "Sewing"];
 
   return (
     <div style={{ padding: 12 }}>
@@ -316,7 +298,7 @@ export default function Overview() {
         <div style={card}>
           <div style={header}>Company Performance</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-            {[ "On-Time Ship %", "Avg Lead Time", "Throughput (pcs/day)", "Digitizing SLA", "Embroidery Hours", "WIP Count" ].map((t,i) => (
+            {["On-Time Ship %","Avg Lead Time","Throughput (pcs/day)","Digitizing SLA","Embroidery Hours","WIP Count"].map((t,i) => (
               <div key={i} style={{ border:"1px solid #eee", borderRadius:10, padding:10 }}>
                 <div style={{ fontSize:12, color:"#666" }}>{t}</div>
                 <div style={{ fontSize:22, fontWeight:700 }}>—</div>
@@ -328,10 +310,9 @@ export default function Overview() {
 
         {/* TR — Upcoming Jobs */}
         <div style={card}>
-          {/* centered title */}
           <div style={{ ...header, textAlign: "center" }}>Upcoming Jobs (Ship in next 7 days)</div>
 
-          {/* column header row */}
+          {/* column headers */}
           <div
             style={{
               ...rowCard,
@@ -380,8 +361,7 @@ export default function Overview() {
                 <div style={{ width: 58, fontWeight: 700, fontSize: 12 }} title={String(job["Order #"] || "")}>
                   {job["Order #"]}
                 </div>
-                <div style={col(250
-)} title={String(job["Company Name"] || "")}>{job["Company Name"]}</div>
+                <div style={col(250)} title={String(job["Company Name"] || "")}>{job["Company Name"]}</div>
                 <div style={col(150)} title={String(job["Design"] || "")}>{job["Design"]}</div>
                 <div style={{ ...col(56, true), fontWeight: 600 }} title={String(job["Quantity"] || "")}>
                   {job["Quantity"]}
@@ -401,12 +381,11 @@ export default function Overview() {
           })}
         </div>
 
-
         {/* BL — Department status (placeholders) */}
         <div style={card}>
           <div style={header}>Department Status</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:10 }}>
-            {departments.map((d,i) => (
+            {["Digitizing","Fur","Cut","Print","Embroidery","Sewing"].map((d,i) => (
               <div key={i} style={{ border:"1px solid #eee", borderRadius:10, padding:10, minHeight:72 }}>
                 <div style={{ fontSize:12, color:"#666" }}>{d}</div>
                 <div style={{ fontSize:22, fontWeight:700 }}>—</div>
@@ -416,7 +395,7 @@ export default function Overview() {
           </div>
         </div>
 
-        {/* BR — Materials to order (from Summary Tab) */}
+        {/* BR — Materials to order */}
         <div style={card}>
           <div style={header}>Materials To Order (Grouped by Vendor)</div>
           {loadingMaterials && <div>Loading…</div>}
@@ -426,7 +405,12 @@ export default function Overview() {
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div style={{ fontWeight:700, fontSize: 13 }}>{grp.vendor || "Unknown Vendor"}</div>
                 <button
-                  onClick={() => setModalOpenForVendor(grp.vendor)}
+                  onClick={() => {
+                    const v = vendorDir[grp.vendor] || {};
+                    const vMethod = (v.method || "").toLowerCase();
+                    setOrderMethod((vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email");
+                    setModalOpenForVendor(grp.vendor);
+                  }}
                   style={{ padding:"5px 8px", fontSize:12, borderRadius:8, border:"1px solid #ccc", cursor:"pointer" }}
                 >
                   Order Material
@@ -465,17 +449,18 @@ export default function Overview() {
               Order from {modalOpenForVendor}
             </div>
             <div style={{ fontSize:12, color:"#666", marginBottom:10 }}>All items are pre-selected. Unselect anything you don’t want to order.</div>
+
             <div style={{ display:"grid", gridTemplateColumns:"140px 1fr 150px", gap:10, marginBottom:8 }}>
               <select
                 value={orderMethod}
                 onChange={e => setOrderMethod(e.target.value)}
                 style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
               >
-                <option value="email">Send PO by Email</option>
+                <option value="email">Send by Email</option>
                 <option value="website">Order via Website</option>
               </select>
               <input
-                placeholder="PO notes (optional)"
+                placeholder="Notes (optional)"
                 value={poNotes}
                 onChange={e => setPoNotes(e.target.value)}
                 style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
@@ -488,6 +473,7 @@ export default function Overview() {
                 title="Requested By date"
               />
             </div>
+
             <div>
               {modalRows.map((r, i) => (
                 <div key={i} style={{ display:"grid", gridTemplateColumns:"20px 1fr 120px 80px 110px", gap:10, alignItems:"center", padding:"6px 0", borderBottom:"1px solid #f1f1f1" }}>
