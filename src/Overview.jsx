@@ -5,10 +5,18 @@ import axios from "axios";
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
-function openUrl(url) {
-  const w = window.open(url, "_blank", "noopener");
-  if (!w) window.location.href = url;
+function openUrlReturn(url) {
+  const w = window.open(url, "_blank", "noopener,width=980,height=720");
+  // Try to refocus your app so you’re back on Overview
+  setTimeout(() => { try { window.focus(); } catch {} }, 300);
+  if (!w) {
+    // fallback: same-tab navigation (you can hit Back)
+    window.location.href = url;
+    return null;
+  }
+  return w;
 }
+
 function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
   const base = "https://mail.google.com/mail/";
   const p = new URLSearchParams({ view: "cm", fs: "1" });
@@ -204,6 +212,8 @@ export default function Overview() {
   const [poNotes, setPoNotes] = useState("");
   const [requestBy, setRequestBy] = useState("");
 
+  const [gmailPopup, setGmailPopup] = useState(null);
+
   // Load combined overview (upcoming + materials)
   useEffect(() => {
     let alive = true;
@@ -267,6 +277,15 @@ export default function Overview() {
     return () => { alive = false; };
   }, []);
 
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (gmailPopup && gmailPopup.closed) {
+        setGmailPopup(null);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [gmailPopup]);
+
   // Modal rows
   const modalRows = useMemo(() => {
     if (!modalOpenForVendor) return [];
@@ -308,7 +327,8 @@ export default function Overview() {
         window.open(v.website, "_blank", "noopener");
       } else {
         const gmailUrl = buildGmailCompose({ to, cc, subject, body, authUser });
-        openUrl(gmailUrl);
+        const win = openUrlReturn(gmailUrl);
+        setGmailPopup(win);
       }
 
       // Log "Ordered" just like before
@@ -333,6 +353,7 @@ export default function Overview() {
       setModalOpenForVendor(null);
       setPoNotes("");
       setRequestBy("");
+      setGmailPopup(null);
     } catch (e) {
       console.error("Failed to email/log order", e);
       alert("Failed to email/log order. Check console.");
@@ -492,20 +513,46 @@ export default function Overview() {
 
       {/* Order modal */}
       {modalOpenForVendor && (
-        <div style={{
-          position:"fixed", inset:0, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000
-        }}>
-          <div style={{ background:"#fff", borderRadius:12, padding:16, minWidth:600, maxHeight:"80vh", overflow:"auto" }}>
-            <div style={{ fontSize:18, fontWeight:700, marginBottom:10 }}>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              padding: 16,
+              minWidth: 600,
+              maxHeight: "80vh",
+              overflow: "auto",
+            }}
+          >
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>
               Order from {modalOpenForVendor}
             </div>
-            <div style={{ fontSize:12, color:"#666", marginBottom:10 }}>All items are pre-selected. Unselect anything you don’t want to order.</div>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
+              All items are pre-selected. Unselect anything you don’t want to order.
+            </div>
 
-            <div style={{ display:"grid", gridTemplateColumns:"140px 1fr 150px", gap:10, marginBottom:8 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "140px 1fr 150px",
+                gap: 10,
+                marginBottom: 8,
+              }}
+            >
               <select
                 value={orderMethod}
-                onChange={e => setOrderMethod(e.target.value)}
-                style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
+                onChange={(e) => setOrderMethod(e.target.value)}
+                style={{ padding: 6, border: "1px solid #ccc", borderRadius: 6, fontSize: 12 }}
               >
                 <option value="email">Send by Email</option>
                 <option value="website">Order via Website</option>
@@ -513,44 +560,70 @@ export default function Overview() {
               <input
                 placeholder="Notes (optional)"
                 value={poNotes}
-                onChange={e => setPoNotes(e.target.value)}
-                style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
+                onChange={(e) => setPoNotes(e.target.value)}
+                style={{ padding: 6, border: "1px solid #ccc", borderRadius: 6, fontSize: 12 }}
               />
               <input
                 type="date"
                 value={requestBy}
-                onChange={e => setRequestBy(e.target.value)}
-                style={{ padding:6, border:"1px solid #ccc", borderRadius:6, fontSize:12 }}
+                onChange={(e) => setRequestBy(e.target.value)}
+                style={{ padding: 6, border: "1px solid #ccc", borderRadius: 6, fontSize: 12 }}
                 title="Requested By date"
               />
             </div>
 
             <div>
               {modalRows.map((r, i) => (
-                <div key={i} style={{ display:"grid", gridTemplateColumns:"20px 1fr 120px 80px 110px", gap:10, alignItems:"center", padding:"6px 0", borderBottom:"1px solid #f1f1f1" }}>
+                <div
+                  key={i}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "20px 1fr 120px 80px 110px",
+                    gap: 10,
+                    alignItems: "center",
+                    padding: "6px 0",
+                    borderBottom: "1px solid #f1f1f1",
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={!!r.selected}
-                    onChange={e => setModalSelections(s => ({ ...s, [r.key]: { ...s[r.key], selected: e.target.checked } }))}
+                    onChange={(e) =>
+                      setModalSelections((s) => ({
+                        ...s,
+                        [r.key]: { ...s[r.key], selected: e.target.checked },
+                      }))
+                    }
                   />
-                  <div title={r.name} style={{ overflow:"hidden", whiteSpace:"nowrap", textOverflow:"ellipsis" }}>{r.name}</div>
+                  <div
+                    title={r.name}
+                    style={{ overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}
+                  >
+                    {r.name}
+                  </div>
                   <input
                     type="number"
                     min="0"
                     value={r.qty || ""}
-                    onChange={e => setModalSelections(s => ({ ...s, [r.key]: { ...s[r.key], qty: e.target.value } }))}
-                    style={{ width:"100%", padding:6, border:"1px solid #ccc", borderRadius:6 }}
+                    onChange={(e) =>
+                      setModalSelections((s) => ({ ...s, [r.key]: { ...s[r.key], qty: e.target.value } }))
+                    }
+                    style={{ width: "100%", padding: 6, border: "1px solid #ccc", borderRadius: 6 }}
                   />
                   <input
                     value={r.unit || ""}
-                    onChange={e => setModalSelections(s => ({ ...s, [r.key]: { ...s[r.key], unit: e.target.value } }))}
+                    onChange={(e) =>
+                      setModalSelections((s) => ({ ...s, [r.key]: { ...s[r.key], unit: e.target.value } }))
+                    }
                     placeholder="Unit"
-                    style={{ width:"100%", padding:6, border:"1px solid #ccc", borderRadius:6 }}
+                    style={{ width: "100%", padding: 6, border: "1px solid #ccc", borderRadius: 6 }}
                   />
                   <select
                     value={r.type || "Material"}
-                    onChange={e => setModalSelections(s => ({ ...s, [r.key]: { ...s[r.key], type: e.target.value } }))}
-                    style={{ width:"100%", padding:6, border:"1px solid #ccc", borderRadius:6 }}
+                    onChange={(e) =>
+                      setModalSelections((s) => ({ ...s, [r.key]: { ...s[r.key], type: e.target.value } }))
+                    }
+                    style={{ width: "100%", padding: 6, border: "1px solid #ccc", borderRadius: 6 }}
                   >
                     <option>Material</option>
                     <option>Thread</option>
@@ -559,13 +632,71 @@ export default function Overview() {
               ))}
             </div>
 
-            <div style={{ display:"flex", justifyContent:"flex-end", gap:10, marginTop:12 }}>
-              <button onClick={() => setModalOpenForVendor(null)} style={{ padding:"8px 12px", border:"1px solid #ccc", borderRadius:8 }}>Cancel</button>
-              <button onClick={submitOrder} style={{ padding:"8px 12px", border:"1px solid #0a7", background:"#0a7", color:"#fff", borderRadius:8 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
+              <button
+                onClick={() => {
+                  setModalOpenForVendor(null);
+                  setGmailPopup(null);
+                }}
+                style={{ padding: "8px 12px", border: "1px solid #ccc", borderRadius: 8 }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitOrder}
+                style={{
+                  padding: "8px 12px",
+                  border: "1px solid #0a7",
+                  background: "#0a7",
+                  color: "#fff",
+                  borderRadius: 8,
+                }}
+              >
                 Order & Log
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Gmail popup banner */}
+      {gmailPopup && !gmailPopup.closed && (
+        <div
+          style={{
+            position: "fixed",
+            right: 16,
+            bottom: 16,
+            background: "#111",
+            color: "#fff",
+            padding: "10px 12px",
+            borderRadius: 10,
+            boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            zIndex: 2000,
+          }}
+        >
+          <div style={{ fontSize: 12 }}>
+            Gmail compose is open. After you send, you can close it.
+          </div>
+          <button
+            onClick={() => {
+              try { gmailPopup.close(); } catch {}
+              setGmailPopup(null);
+            }}
+            style={{
+              fontSize: 12,
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: "1px solid #fff",
+              background: "transparent",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Close Gmail
+          </button>
         </div>
       )}
     </div>
