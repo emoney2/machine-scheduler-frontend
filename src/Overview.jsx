@@ -9,7 +9,6 @@ function openUrl(url) {
   const w = window.open(url, "_blank", "noopener");
   if (!w) window.location.href = url;
 }
-
 function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
   const base = "https://mail.google.com/mail/";
   const p = new URLSearchParams({ view: "cm", fs: "1" });
@@ -18,9 +17,39 @@ function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = ""
   if (bcc) p.set("bcc", bcc);
   if (subject) p.set("su", subject);
   if (body) p.set("body", body);
-  if (authUser !== undefined) p.set("authuser", String(authUser)); // pick Google account index if needed
+  if (authUser !== undefined && authUser !== "") p.set("authuser", String(authUser));
   return `${base}?${p.toString()}`;
 }
+// Normalize comma/semicolon lists from the sheet → "a@x.com,b@y.com"
+function normList(s) {
+  return (s || "")
+    .split(/[;,]/)
+    .map(x => x.trim())
+    .filter(Boolean)
+    .join(",");
+}
+// EDIT ME: email subject/body template
+function buildEmailText(vendor, rows, { notes, requestBy } = {}) {
+  const today = new Date();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+  const yyyy = today.getFullYear();
+  const subject = `Material Order – ${vendor} – ${mm}/${dd}/${yyyy}`;
+  const lines = rows.map(i => `• ${i.qty || ""} ${i.unit || ""} ${i.name}`);
+  const parts = [
+    `Hello ${vendor},`,
+    "",
+    "Please place the following order:",
+    "",
+    ...lines,
+  ];
+  if (requestBy) parts.push("", `Requested By: ${requestBy}`);
+  if (notes) parts.push("", `Notes: ${notes}`);
+  parts.push("", "Thank you!");
+  const body = parts.join("\n");
+  return { subject, body };
+}
+
 
 
 function parseDate(s) {
@@ -242,32 +271,31 @@ export default function Overview() {
         return;
       }
 
-      // Build plain text email
-      const lines = rows.map(i => `- ${i.qty || ""} ${i.unit || ""} ${i.name}`);
-      const today = new Date();
-      const subject = `Material Order – ${modalOpenForVendor} – ${String(today.getMonth()+1).padStart(2,"0")}/${String(today.getDate()).padStart(2,"0")}/${today.getFullYear()}`;
-      const noteBlock = poNotes ? `\nNotes: ${poNotes}\n` : "";
-      const reqBlock = requestBy ? `\nRequested By: ${requestBy}\n` : "";
-      const body = `Hello ${modalOpenForVendor},\n\nPlease place the following order:\n\n${lines.join("\n")}${noteBlock}${reqBlock}\nThank you!\n`;
-
       // Vendor info from directory
       const v = vendorDir[modalOpenForVendor] || {};
       const vMethod = (v.method || "").toLowerCase();
       const defaultMethod = (vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email";
       const effectiveMethod = orderMethod || defaultMethod;
-      const to = v.email || "";
-      const cc = v.cc || "";
-      const website = v.website || "";
 
-      if (effectiveMethod === "website" && website) {
-        window.open(website, "_blank", "noopener");
+      // Build subject/body using your template
+      const { subject, body } = buildEmailText(modalOpenForVendor, rows, {
+        notes: poNotes,
+        requestBy,
+      });
+
+      // Recipients from sheet (Email → To, CC → cc)
+      const to = normList(v.email);
+      const cc = normList(v.cc);
+      const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
+
+      if (effectiveMethod === "website" && v.website) {
+        window.open(v.website, "_blank", "noopener");
       } else {
-        const gmailUrl = buildGmailCompose({ to, cc, subject, body });
-        // tip: if you have multiple Google accounts, pass authUser: 0/1/2
+        const gmailUrl = buildGmailCompose({ to, cc, subject, body, authUser });
         openUrl(gmailUrl);
       }
 
-      // Log "Ordered" to your existing logs
+      // Log "Ordered" just like before
       const materialPayload = [];
       const threadPayload = [];
       for (const r of rows) {
@@ -285,7 +313,7 @@ export default function Overview() {
         await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
-      alert("Email/Website opened. Order logged.");
+      alert("Gmail compose opened / Website opened. Order logged.");
       setModalOpenForVendor(null);
       setPoNotes("");
       setRequestBy("");
