@@ -459,38 +459,22 @@ function fmtDT(dtLike) {
 
 // Parse "Embroidery Start Time" from the sheet into a reliable ISO string
 function parseEmbroideryStart(val) {
-  if (!val) return '';
-  const s = String(val).trim();
+  if (val == null || val === '') return '';
 
   // Already ISO?
+  const s = String(val).trim();
   if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s;
 
-  // M/D/YYYY H:MM AM/PM
-  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (m) {
-    let [_, mo, da, yr, hh, mm, ap] = m;
-    mo=+mo; da=+da; yr=+yr; hh=+hh; mm=+mm;
-    if (/pm/i.test(ap) && hh < 12) hh += 12;
-    if (/am/i.test(ap) && hh === 12) hh = 0;
-    const dt = new Date(yr, mo - 1, da, hh, mm, 0, 0);
-    return isNaN(dt) ? '' : dt.toISOString();
+  // If Sheets gave us a number (UNFORMATTED_VALUE date serial), convert it
+  if (typeof val === 'number') {
+    // Excel/Sheets epoch: 1899-12-30 → 25569 days to 1970-01-01
+    const ms = Math.round((val - 25569) * 86400000);
+    return new Date(ms).toISOString();
   }
 
-  // M/D H:MM AM/PM  (assume current year)
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (m) {
-    let [_, mo, da, hh, mm, ap] = m;
-    const yr = new Date().getFullYear();
-    mo=+mo; da=+da; hh=+hh; mm=+mm;
-    if (/pm/i.test(ap) && hh < 12) hh += 12;
-    if (/am/i.test(ap) && hh === 12) hh = 0;
-    const dt = new Date(yr, mo - 1, da, hh, mm, 0, 0);
-    return isNaN(dt) ? '' : dt.toISOString();
-  }
-
-  // Fallback
-  const dt = new Date(s);
-  return isNaN(dt) ? '' : dt.toISOString();
+  // Try parsing an ET display string like "8/25/2025 11:25 AM"
+  const iso = etDisplayToISO(s);
+  return iso || '';
 }
 
 
