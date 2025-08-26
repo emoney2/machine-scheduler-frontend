@@ -6,16 +6,22 @@ const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
 function openUrlReturn(url) {
-  const w = window.open(url, "_blank", "noopener,width=980,height=720");
-  // Try to refocus your app so you’re back on Overview
-  setTimeout(() => { try { window.focus(); } catch {} }, 300);
-  if (!w) {
-    // fallback: same-tab navigation (you can hit Back)
-    window.location.href = url;
-    return null;
-  }
-  return w;
+  try {
+    // Open a blank popup first to avoid some blockers, then set location.
+    const w = window.open("", "_blank", "noopener,noreferrer,width=980,height=720");
+    if (w) {
+      try { w.opener = null; } catch {}
+      w.location.href = url;
+      // Refocus your app so you stay on Overview
+      setTimeout(() => { try { window.focus(); } catch {} }, 0);
+      return w;
+    }
+  } catch {}
+  // Popup blocked: DO NOT navigate this tab; just inform the user.
+  alert("Popup was blocked. Please allow pop-ups for this site and click Order again.");
+  return null;
 }
+
 
 function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
   const base = "https://mail.google.com/mail/";
