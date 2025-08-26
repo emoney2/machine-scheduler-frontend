@@ -5,17 +5,23 @@ import axios from "axios";
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
-function openMailto(url) {
-  const w = window.open(url, "_blank");
+function openUrl(url) {
+  const w = window.open(url, "_blank", "noopener");
   if (!w) window.location.href = url;
 }
 
-function buildMailto(to, cc, subject, body) {
-  const enc = encodeURIComponent;
-  let url = `mailto:${enc(to || "")}?subject=${enc(subject || "")}&body=${enc(body || "")}`;
-  if (cc) url += `&cc=${enc(cc)}`;
-  return url;
+function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
+  const base = "https://mail.google.com/mail/";
+  const p = new URLSearchParams({ view: "cm", fs: "1" });
+  if (to) p.set("to", to);
+  if (cc) p.set("cc", cc);
+  if (bcc) p.set("bcc", bcc);
+  if (subject) p.set("su", subject);
+  if (body) p.set("body", body);
+  if (authUser !== undefined) p.set("authuser", String(authUser)); // pick Google account index if needed
+  return `${base}?${p.toString()}`;
 }
+
 
 function parseDate(s) {
   if (s === null || s === undefined || s === "") return null;
@@ -256,8 +262,9 @@ export default function Overview() {
       if (effectiveMethod === "website" && website) {
         window.open(website, "_blank", "noopener");
       } else {
-        const mailto = buildMailto(to, cc, subject, body);
-        openMailto(mailto);
+        const gmailUrl = buildGmailCompose({ to, cc, subject, body });
+        // tip: if you have multiple Google accounts, pass authUser: 0/1/2
+        openUrl(gmailUrl);
       }
 
       // Log "Ordered" to your existing logs
