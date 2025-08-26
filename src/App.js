@@ -465,18 +465,30 @@ function parseEmbroideryStart(val) {
   // Already ISO?
   if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s;
 
-  // Common "M/D/YYYY H:MM AM/PM"
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  // M/D/YYYY H:MM AM/PM
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (m) {
     let [_, mo, da, yr, hh, mm, ap] = m;
-    mo = +mo; da = +da; yr = +yr; hh = +hh; mm = +mm;
+    mo=+mo; da=+da; yr=+yr; hh=+hh; mm=+mm;
     if (/pm/i.test(ap) && hh < 12) hh += 12;
     if (/am/i.test(ap) && hh === 12) hh = 0;
     const dt = new Date(yr, mo - 1, da, hh, mm, 0, 0);
     return isNaN(dt) ? '' : dt.toISOString();
   }
 
-  // Fallback: Date.parse
+  // M/D H:MM AM/PM  (assume current year)
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (m) {
+    let [_, mo, da, hh, mm, ap] = m;
+    const yr = new Date().getFullYear();
+    mo=+mo; da=+da; hh=+hh; mm=+mm;
+    if (/pm/i.test(ap) && hh < 12) hh += 12;
+    if (/am/i.test(ap) && hh === 12) hh = 0;
+    const dt = new Date(yr, mo - 1, da, hh, mm, 0, 0);
+    return isNaN(dt) ? '' : dt.toISOString();
+  }
+
+  // Fallback
   const dt = new Date(s);
   return isNaN(dt) ? '' : dt.toISOString();
 }
@@ -671,8 +683,8 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     // 4) Assign computed times to job (overwrite existing values)
     job._rawStart = start;
     job._rawEnd   = end;
-    job.start     = fmtDT(start);
-    job.end       = fmtDT(end);
+    job.start     = fmtET(start);
+    job.end       = fmtET(end);
     job.delivery  = fmtMMDD(addWorkDays(end, 6));
     job.isLate = cutoff instanceof Date && !isNaN(cutoff) && end > cutoff;
 
@@ -986,49 +998,29 @@ const fetchManualStateCore = async (previousCols) => {
 
 // ─── Section 5E: Always ensure top jobs have a start time (no clamp) ───
 useEffect(() => {
-  const ensureTopHasStart = async (machineKey) => {
-    try {
-      const jobs = (columns?.[machineKey]?.jobs) || [];
-      const top = jobs[0];
-      if (!top) return;
+  const maybeBump = (top, ref) => {
+    // If no top job, clear the tracker and bail
+    if (!top?.id) { ref.current = null; return; }
 
-      // Skip placeholders and completed rows
-      if (String(top.id || '').startsWith('ph-')) return;
-      if (String(top.status || '').toLowerCase() === 'complete') return;
+    // Does this top job already have a parseable start?
+    const hasStart = !!normalizeStart(top.embroidery_start);
 
-      // Robust check: treat "", null, and non-parseable values as empty
-      const hasStart = !!(top.embroidery_start && normalizeStart(top.embroidery_start));
-      if (hasStart) return;
-
-      // Write start time now (actual moment, no clamp)
-      const isoStamp = new Date().toISOString();
-
-      await axios.post(API_ROOT + '/updateStartTime', {
-        id: top.id,
-        startTime: isoStamp,
-      });
-
-      // Optimistically patch local state so UI reflects immediately
-      setColumns((cols) => ({
-        ...cols,
-        [machineKey]: {
-          ...cols[machineKey],
-          jobs: cols[machineKey].jobs.map((j) =>
-            j.id === top.id
-              ? { ...j, embroidery_start: isoStamp, start_date: isoStamp }
-              : j
-          ),
-        },
-      }));
-    } catch (err) {
-      console.error(`❌ ensureTopHasStart(${machineKey}) failed:`, err);
+    // If it doesn't, and we haven't bumped this job before this session, do it.
+    if (!hasStart && !bumpedJobs.current.has(top.id)) {
+      console.log("⏱️ Setting embroidery start time for top job:", top.id);
+      bumpedJobs.current.add(top.id);
+      bumpJobStartTime(top.id); // posts /updateStartTime and patches UI optimistically
     }
+
+    // Track the current top id (in case you need it elsewhere)
+    ref.current = top.id;
   };
 
-  // Check both machines on initial load + every poll
-  ensureTopHasStart('machine1');
-  ensureTopHasStart('machine2');
+  // Check both machines each time the lists change
+  maybeBump(columns?.machine1?.jobs?.[0], prevM1Top);
+  maybeBump(columns?.machine2?.jobs?.[0], prevM2Top);
 }, [columns?.machine1?.jobs, columns?.machine2?.jobs]);
+
 
 
 // === Section 6: Placeholder Management ===
