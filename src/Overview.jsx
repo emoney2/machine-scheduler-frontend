@@ -6,6 +6,39 @@ const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 const [orderMethod, setOrderMethod] = useState("email");
 const [poNotes, setPoNotes] = useState("");
 const [requestBy, setRequestBy] = useState("");
+const [vendorDir, setVendorDir] = useState({});
+
+// Load once on mount
+useEffect(() => {
+  let alive = true;
+  (async () => {
+    try {
+      const res = await axios.get(`${ROOT}/vendors`, { withCredentials: true });
+      if (!alive) return;
+      const map = {};
+      for (const v of res.data?.vendors || []) {
+        map[v.vendor] = v; // {method,email,cc,website}
+      }
+      setVendorDir(map);
+    } catch (e) {
+      console.error("Failed to load vendor directory", e);
+    }
+  })();
+  return () => { alive = false; };
+}, []);
+
+function openMailto(url) {
+  const w = window.open(url, "_blank");
+  if (!w) window.location.href = url;
+}
+
+function buildMailto(to, cc, subject, body) {
+  const enc = encodeURIComponent;
+  let url = `mailto:${enc(to || "")}?subject=${enc(subject || "")}&body=${enc(body || "")}`;
+  if (cc) url += `&cc=${enc(cc)}`;
+  return url;
+}
+
 
 
 // ——— Helpers ——————————————————————————————————————————————
@@ -227,29 +260,29 @@ export default function Overview() {
         return;
       }
 
-      // 1) Create PO (server will decide email/website using Vendors tab defaults)
-      const payload = {
-        vendor: modalOpenForVendor,
-        method: orderMethod,
-        notes: poNotes,
-        requestBy,
-        items: rows.map(r => ({
-          name: r.name,
-          qty: String(r.qty || "1"),
-          unit: r.unit || "",
-          type: r.type || "Material",
-        })),
-      };
-      const poRes = await axios.post(`${ROOT}/purchase-orders`, payload, { withCredentials: true });
-      const { poNumber, pdfUrl, emailed, mailtoUrl, website } = poRes.data || {};
-      if (orderMethod === "website" && website) {
+      // Build plain text lines
+      const lines = rows.map(i => `- ${i.qty || ""} ${i.unit || ""} ${i.name}`);
+      const today = new Date();
+      const subject = `Material Order – ${modalOpenForVendor} – ${String(today.getMonth()+1).padStart(2,"0")}/${String(today.getDate()).padStart(2,"0")}/  ${today.getFullYear()}`;
+      const body = `Hello ${modalOpenForVendor},\n\nPlease place the following order:\n\n${lines.join("\n")}\n\nThank you!\n`;
+
+      // Look up vendor info from the sheet directory
+      const v = vendorDir[modalOpenForVendor] || {};
+      const method  = (v.method || "").toLowerCase();   // "email", "online" (or blank)
+      const to      = v.email || "";
+      const cc      = v.cc || "";
+      const website = v.website || "";
+
+      // If method == online/website and we have a URL → open it
+      if ((method.includes("online") || method.includes("website")) && website) {
         window.open(website, "_blank", "noopener");
-      } else if (orderMethod === "email" && !emailed && mailtoUrl) {
-        // Fallback: open user's email client prefilled (server couldn't send directly)
-        window.open(mailtoUrl, "_blank");
+      } else {
+        // Otherwise prefer email via mailto (even if to is blank, user can fill it)
+        const mailto = buildMailto(to, cc, subject, body);
+        openMailto(mailto);
       }
 
-      // 2) Log "Ordered" into your existing logs (unchanged)
+      // Log "Ordered" just like before
       const materialPayload = [];
       const threadPayload = [];
       for (const r of rows) {
@@ -267,15 +300,14 @@ export default function Overview() {
         await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
-      alert(`PO ${poNumber || ""} created${pdfUrl ? " ✓" : ""}`);
+      alert("Email/Website opened. Order logged.");
       setModalOpenForVendor(null);
-      setPoNotes("");
-      setRequestBy("");
     } catch (e) {
-      console.error("Failed to create PO / log order", e);
-      alert("Failed to create PO / log order. Check console.");
+      console.error("Failed to email/log order", e);
+      alert("Failed to email/log order. Check console.");
     }
   }
+
 
   return (
     <div style={{ padding: 12 }}>
