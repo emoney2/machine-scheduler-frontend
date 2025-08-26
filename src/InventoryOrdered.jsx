@@ -2,6 +2,23 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
+// Google Sheets serial date → JS Date
+const SHEETS_EPOCH_MS = new Date(1899, 11, 30).getTime();
+const toDate = (v) => {
+  if (v == null || v === "") return null;
+  if (typeof v === "number") return new Date(SHEETS_EPOCH_MS + v * 86400000);
+  const d = new Date(v);
+  return isNaN(d) ? null : d;
+};
+const fmtMMDDYYYY = (d) => {
+  if (!(d instanceof Date) || isNaN(d)) return "";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${mm}/${dd}/${yyyy}`;
+};
+
+
 export default function InventoryOrdered() {
   const [entries, setEntries]       = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: "date", direction: "asc" });
@@ -34,8 +51,8 @@ export default function InventoryOrdered() {
     sorted.sort((a, b) => {
       // If sorting by date, parse strings into timestamps
       if (sortConfig.key === "date") {
-        const aTime = Date.parse(a.date) || 0;
-        const bTime = Date.parse(b.date) || 0;
+        const aTime = toDate(a.date)?.getTime() ?? 0;
+        const bTime = toDate(b.date)?.getTime() ?? 0;
         return sortConfig.direction === "asc" ? aTime - bTime : bTime - aTime;
       }
 
@@ -125,7 +142,7 @@ export default function InventoryOrdered() {
               backgroundColor: i % 2 === 0 ? "#fafafa" : "transparent"
             }}>
               <td style={{ padding: "0.4rem", textAlign: "center", fontSize: "0.85rem" }}>
-                {e.date}
+                {fmtMMDDYYYY(toDate(e.date))}
               </td>
               <td style={{ padding: "0.4rem", textAlign: "center", fontSize: "0.85rem" }}>
                 {e.type}

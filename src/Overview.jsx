@@ -230,7 +230,10 @@ export default function Overview() {
         const res = await axios.get(`${ROOT}/overview`, { withCredentials: true });
         if (!alive) return;
         const { upcoming, materials } = res.data || {};
-        const jobs = upcoming ?? [];
+        const jobs = (upcoming ?? []).filter(j => {
+          const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
+          return stage !== "COMPLETE" && stage !== "COMPLETED";
+        });
         const groups = materials ?? [];
         setUpcoming(jobs);
         setMaterials(groups);

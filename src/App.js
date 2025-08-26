@@ -251,8 +251,9 @@ export default function App() {
         return;
       }
   
-      // Write the real moment (no clamp) as ISO UTC
-      const iso = new Date().toISOString();
+      // Clamp to work window: if now is between 4:30 PM and 8:30 AM,
+      // snap to *next* 8:30 AM local (uses existing clampToWorkHours)
+      const iso = clampToWorkHours(new Date()).toISOString();
       await axios.post(API_ROOT + '/updateStartTime', {
         id: jobId,
         startTime: iso,
