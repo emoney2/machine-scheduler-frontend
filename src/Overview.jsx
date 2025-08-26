@@ -34,23 +34,38 @@ function buildEmailText(vendor, rows, { notes, requestBy } = {}) {
   const mm = String(today.getMonth() + 1).padStart(2, "0");
   const dd = String(today.getDate()).padStart(2, "0");
   const yyyy = today.getFullYear();
+
   const subject = `Material Order – ${vendor} – ${mm}/${dd}/${yyyy}`;
-  const lines = rows.map(i => `• ${i.qty || ""} ${i.unit || ""} ${i.name}`);
+
+  const lines = rows.map(i => `- ${i.name}${i.qty ? ` (${i.qty}${i.unit ? " " + i.unit : ""})` : ""}`);
+
   const parts = [
-    `Hello ${vendor},`,
+    `Hi ${vendor} team,`,
     "",
-    "Please place the following order:",
+    "I would like to place an order for the following:",
     "",
     ...lines,
   ];
-  if (requestBy) parts.push("", `Requested By: ${requestBy}`);
-  if (notes) parts.push("", `Notes: ${notes}`);
-  parts.push("", "Thank you!");
+
+  if (requestBy) {
+    parts.push("", `Requested By: ${requestBy}`);
+  }
+  if (notes) {
+    parts.push("", `Notes: ${notes}`);
+  }
+
+  parts.push(
+    "",
+    "If you have any questions, please feel free to reach out to me.",
+    "",
+    "Thanks!",
+    "Justin Eckard",
+    "678.294.5350"
+  );
+
   const body = parts.join("\n");
   return { subject, body };
 }
-
-
 
 function parseDate(s) {
   if (s === null || s === undefined || s === "") return null;
@@ -241,7 +256,8 @@ export default function Overview() {
         if (!alive) return;
         const map = {};
         for (const v of res.data?.vendors || []) {
-          map[v.vendor] = v; // {method,email,cc,website}
+          const key = (v.vendor || "").trim().toLowerCase();
+          map[key] = v; // {vendor, method, email, cc, website}
         }
         setVendorDir(map);
       } catch (e) {
@@ -272,7 +288,7 @@ export default function Overview() {
       }
 
       // Vendor info from directory
-      const v = vendorDir[modalOpenForVendor] || {};
+      const v = vendorDir[(modalOpenForVendor || "").trim().toLowerCase()] || {};
       const vMethod = (v.method || "").toLowerCase();
       const defaultMethod = (vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email";
       const effectiveMethod = orderMethod || defaultMethod;
@@ -441,7 +457,7 @@ export default function Overview() {
                 <div style={{ fontWeight:700, fontSize: 13 }}>{grp.vendor || "Unknown Vendor"}</div>
                 <button
                   onClick={() => {
-                    const v = vendorDir[grp.vendor] || {};
+                    const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
                     const vMethod = (v.method || "").toLowerCase();
                     setOrderMethod((vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email");
                     setModalOpenForVendor(grp.vendor);
