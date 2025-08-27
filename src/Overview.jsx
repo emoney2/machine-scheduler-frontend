@@ -332,7 +332,7 @@ export default function Overview() {
       const cc = normList(v.cc);
       const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
 
-      // ────────── WEBSITE path: Madeira special handling ──────────
+      // WEBSITE path — Madeira (special)
       if (effectiveMethod === "website" && (modalOpenForVendor || "").toLowerCase().includes("madeira")) {
         // Only send thread items for Madeira
         const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
@@ -342,13 +342,13 @@ export default function Overview() {
         }
 
         try {
-          // Ask the server to add them to the cart (it resolves Madeira URL from Thread Inventory “Madeira SKU” if needed)
+          // Ask the server to add them to the Madeira cart
           const resp = await axios.post(`${ROOT}/order/madeira`, {
             threads: threadRows.map(r => ({ name: r.name, qty: Number(r.qty || 1) }))
           }, { withCredentials: true });
 
+          // Open the cart only after success (fallback to the common cart URL)
           const cartUrl = resp?.data?.cart || "https://www.madeirausa.com/shoppingcart.aspx";
-          // Open the cart only after the server reports success
           window.open(cartUrl, "_blank", "noopener");
         } catch (err) {
           console.error("Madeira web order failed:", err);
@@ -357,21 +357,20 @@ export default function Overview() {
           return; // don't log inventory if order failed
         }
       }
-      // ────────── WEBSITE path: other vendors just open their website if configured ──────────
+      // WEBSITE path — other vendors: open configured website if present
       else if (effectiveMethod === "website" && v.website) {
         window.open(v.website, "_blank", "noopener");
       }
-      // ────────── EMAIL path ──────────
+      // EMAIL path
       else {
         const gmailUrl = buildGmailCompose({ to, cc, subject, body, authUser });
         const win = openUrlReturn(gmailUrl);
         setGmailPopup(win);
       }
 
-      // ────────── Log "Ordered" just like before ──────────
+      // Log "Ordered" just like before
       const materialPayload = [];
       const threadPayload = [];
-  
       for (const r of rows) {
         const base = { quantity: String(r.qty || "1"), action: "Ordered" };
         if ((r.type || "Material").toLowerCase() === "thread") {
