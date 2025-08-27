@@ -321,54 +321,66 @@ export default function Overview() {
       const defaultMethod = (vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email";
       const effectiveMethod = orderMethod || defaultMethod;
 
-      // Build subject/body using your template
+      // Build subject/body (used for email path)
       const { subject, body } = buildEmailText(modalOpenForVendor, rows, {
         notes: poNotes,
         requestBy,
       });
 
-      // Recipients from sheet (Email → To, CC → cc)
+      // Recipients for email path
       const to = normList(v.email);
       const cc = normList(v.cc);
       const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
 
+      // ────────── WEBSITE path: Madeira special handling ──────────
       if (effectiveMethod === "website" && (modalOpenForVendor || "").toLowerCase().includes("madeira")) {
-        // Send selected THREAD rows to our server; it resolves URL from Thread Inventory ("Madeira SKU") and adds to cart
+        // Only send thread items for Madeira
         const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
         if (!threadRows.length) {
           alert("No thread items selected for Madeira.");
           return;
         }
+
         try {
-          await axios.post(`${ROOT}/order/madeira`, {
-            threads: threadRows.map(r => ({ name: r.name, qty: r.qty || 1 }))
+          // Ask the server to add them to the cart (it resolves Madeira URL from Thread Inventory “Madeira SKU” if needed)
+          const resp = await axios.post(`${ROOT}/order/madeira`, {
+            threads: threadRows.map(r => ({ name: r.name, qty: Number(r.qty || 1) }))
           }, { withCredentials: true });
-          // Open cart so user can review
-          window.open("https://www.madeirausa.com/shoppingcart.aspx", "_blank", "noopener");
+
+          const cartUrl = resp?.data?.cart || "https://www.madeirausa.com/shoppingcart.aspx";
+          // Open the cart only after the server reports success
+          window.open(cartUrl, "_blank", "noopener");
         } catch (err) {
           console.error("Madeira web order failed:", err);
-          alert("Failed to add to Madeira cart.");
-          return;
+          const msg = err?.response?.data?.details || err?.message || "Unknown error";
+          alert("Failed to add to Madeira cart. " + msg);
+          return; // don't log inventory if order failed
         }
-      } else if (effectiveMethod === "website" && v.website) {
+      }
+      // ────────── WEBSITE path: other vendors just open their website if configured ──────────
+      else if (effectiveMethod === "website" && v.website) {
         window.open(v.website, "_blank", "noopener");
-      } else {
+      }
+      // ────────── EMAIL path ──────────
+      else {
         const gmailUrl = buildGmailCompose({ to, cc, subject, body, authUser });
         const win = openUrlReturn(gmailUrl);
         setGmailPopup(win);
       }
 
-      // Log "Ordered" just like before
+      // ────────── Log "Ordered" just like before ──────────
       const materialPayload = [];
       const threadPayload = [];
+  
       for (const r of rows) {
         const base = { quantity: String(r.qty || "1"), action: "Ordered" };
-        if ((r.type || "Material") === "Thread") {
+        if ((r.type || "Material").toLowerCase() === "thread") {
           threadPayload.push({ ...base, value: r.name });
         } else {
           materialPayload.push({ ...base, materialName: r.name, type: "Material" });
         }
       }
+
       if (materialPayload.length) {
         await axios.post(`${ROOT}/materialInventory`, materialPayload, { withCredentials: true });
       }
@@ -376,14 +388,14 @@ export default function Overview() {
         await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
-      alert("Gmail compose opened / Website opened. Order logged.");
+      alert((effectiveMethod === "website" ? "Website opened." : "Gmail compose opened.") + " Order logged.");
       setModalOpenForVendor(null);
       setPoNotes("");
       setRequestBy("");
       setGmailPopup(null);
     } catch (e) {
-      console.error("Failed to email/log order", e);
-      alert("Failed to email/log order. Check console.");
+      console.error("Failed to order/log", e);
+      alert("Failed to order/log. Check console.");
     }
   }
 
