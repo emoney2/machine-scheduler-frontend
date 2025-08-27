@@ -58,11 +58,20 @@ export default function InventoryOrdered() {
         const bTime = toDate(b.date)?.getTime() ?? 0;
         return dir * (aTime - bTime);
       }
+      // Normalize undefineds
       const av = (a[sortConfig.key] ?? "").toString().toLowerCase();
       const bv = (b[sortConfig.key] ?? "").toString().toLowerCase();
-      if (av < bv) return -1 * dir;
-      if (av > bv) return  1 * dir;
-      return 0;
+
+      // Quantity: numeric-aware compare
+      if (sortConfig.key === "quantity") {
+        const numA = parseFloat(av) || 0;
+        const numB = parseFloat(bv) || 0;
+        return dir * (numA - numB);
+      }
+
+      // Type/Name/Vendor: localeCompare for nice alpha sort
+      const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
+      return dir * cmp;
     });
     return copy;
   }, [entries, sortConfig]);
@@ -126,6 +135,7 @@ export default function InventoryOrdered() {
             <th style={th} onClick={() => requestSort("date")}>Date</th>
             <th style={th} onClick={() => requestSort("type")}>Type</th>
             <th style={th} onClick={() => requestSort("name")}>Name</th>
+            <th style={th} onClick={() => requestSort("vendor")}>Vendor</th>
             <th style={th} onClick={() => requestSort("quantity")}>Quantity</th>
             <th style={thPlain}>Unit</th>
             <th style={thPlain}>Action</th>
@@ -142,6 +152,7 @@ export default function InventoryOrdered() {
                 <td style={td}>{fmtMMDDYYYY(toDate(e.date))}</td>
                 <td style={td}>{e.type}</td>
                 <td style={{ ...td, textAlign: "left" }}>{e.name}</td>
+                <td style={{ ...td, textAlign: "left" }}>{e.vendor ?? ""}</td>
 
                 {/* Quantity cell: inline edit for Materials only */}
                 <td style={td}>
@@ -188,7 +199,7 @@ export default function InventoryOrdered() {
           })}
           {sortedEntries.length === 0 && (
             <tr>
-              <td colSpan={6} style={{ padding: "0.8rem", textAlign: "center", color: "#777" }}>
+              <td colSpan={7} style={{ padding: "0.8rem", textAlign: "center", color: "#777" }}>
                 No ordered items
               </td>
             </tr>
