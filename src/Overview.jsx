@@ -332,7 +332,25 @@ export default function Overview() {
       const cc = normList(v.cc);
       const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
 
-      if (effectiveMethod === "website" && v.website) {
+      if (effectiveMethod === "website" && (modalOpenForVendor || "").toLowerCase().includes("madeira")) {
+        // Send selected THREAD rows to our server; it resolves URL from Thread Inventory ("Madeira SKU") and adds to cart
+        const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
+        if (!threadRows.length) {
+          alert("No thread items selected for Madeira.");
+          return;
+        }
+        try {
+          await axios.post(`${ROOT}/order/madeira`, {
+            threads: threadRows.map(r => ({ name: r.name, qty: r.qty || 1 }))
+          }, { withCredentials: true });
+          // Open cart so user can review
+          window.open("https://www.madeirausa.com/shoppingcart.aspx", "_blank", "noopener");
+        } catch (err) {
+          console.error("Madeira web order failed:", err);
+          alert("Failed to add to Madeira cart.");
+          return;
+        }
+      } else if (effectiveMethod === "website" && v.website) {
         window.open(v.website, "_blank", "noopener");
       } else {
         const gmailUrl = buildGmailCompose({ to, cc, subject, body, authUser });
