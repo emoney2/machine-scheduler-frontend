@@ -23,12 +23,17 @@ const fmtMMDDYYYY = (d) => {
 export default function InventoryOrdered() {
   const [entries, setEntries] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: "date", direction: "asc" });
-  const [editingKey, setEditingKey] = useState(null);      // `${type}-${row}`
+  const [editingKey, setEditingKey] = useState(null);   // `${type}-${row}`
   const [draftQty, setDraftQty] = useState("");
 
   const load = async () => {
-    const res = await axios.get(`${API}/inventoryOrdered`);
-    setEntries(res.data || []);
+    try {
+      const res = await axios.get(`${API}/inventoryOrdered`);
+      setEntries(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to load inventoryOrdered:", err);
+      setEntries([]);
+    }
   };
 
   useEffect(() => {
@@ -62,16 +67,27 @@ export default function InventoryOrdered() {
     return copy;
   }, [entries, sortConfig]);
 
-  const beginEdit = (e) => {
-    setEditingKey(`${e.type}-${e.row}`);
-    setDraftQty(e.quantity ?? "");
+  const displayQty = (e) => e?.quantity ?? "";
+
+  const handleReceiveRow = async (e) => {
+    try {
+      await axios.put(`${API}/inventoryOrdered`, { type: e.type, row: e.row });
+      await load();
+    } catch (err) {
+      console.error("Receive failed:", err);
+      alert("Failed to mark as received.");
+    }
   };
 
+  // Inline edit controls (Materials only)
+  const beginEdit = (e) => {
+    setEditingKey(`${e.type}-${e.row}`);
+    setDraftQty(String(e.quantity ?? ""));
+  };
   const cancelEdit = () => {
     setEditingKey(null);
     setDraftQty("");
   };
-
   const saveEdit = async (e) => {
     try {
       await axios.patch(`${API}/inventoryOrdered/quantity`, {
@@ -85,16 +101,6 @@ export default function InventoryOrdered() {
     } catch (err) {
       console.error("Save quantity failed:", err);
       alert("Failed to update quantity.");
-    }
-  };
-
-  const onReceive = async (e) => {
-    try {
-      await axios.put(`${API}/inventoryOrdered`, { type: e.type, row: e.row });
-      await load();
-    } catch (err) {
-      console.error("Receive failed:", err);
-      alert("Failed to mark as received.");
     }
   };
 
@@ -129,7 +135,7 @@ export default function InventoryOrdered() {
           {sortedEntries.map((e, i) => {
             const key = `${e.type}-${e.row}`;
             const editing = key === editingKey;
-            const isMaterial = (e.type || "").toLowerCase() === "material";
+            const isMaterial = String(e.type || "").toLowerCase() === "material";
 
             return (
               <tr key={key} style={{ backgroundColor: i % 2 === 0 ? "#fafafa" : "transparent" }}>
@@ -140,7 +146,7 @@ export default function InventoryOrdered() {
                 {/* Quantity cell: inline edit for Materials only */}
                 <td style={td}>
                   {editing ? (
-                    <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+                    <div style={{ display: "inline-flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
                       <input
                         style={{ width: "7rem", padding: "0.25rem" }}
                         value={draftQty}
@@ -151,8 +157,8 @@ export default function InventoryOrdered() {
                       <button style={btn} onClick={cancelEdit}>Cancel</button>
                     </div>
                   ) : (
-                    <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
-                      <span>{e.quantity}</span>
+                    <div style={{ display: "inline-flex", gap: 8, alignItems: "center", justifyContent: "center" }}>
+                      <span>{displayQty(e)}</span>
                       {isMaterial && (
                         <button style={btn} onClick={() => beginEdit(e)}>Edit</button>
                       )}
@@ -164,7 +170,7 @@ export default function InventoryOrdered() {
 
                 <td style={td}>
                   <button
-                    onClick={() => onReceive(e)}
+                    onClick={() => handleReceiveRow(e)}
                     style={{
                       padding: "0.25rem 0.6rem",
                       borderRadius: 6,
@@ -180,6 +186,13 @@ export default function InventoryOrdered() {
               </tr>
             );
           })}
+          {sortedEntries.length === 0 && (
+            <tr>
+              <td colSpan={6} style={{ padding: "0.8rem", textAlign: "center", color: "#777" }}>
+                No ordered items
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
