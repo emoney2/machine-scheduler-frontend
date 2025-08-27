@@ -58,18 +58,15 @@ export default function InventoryOrdered() {
         const bTime = toDate(b.date)?.getTime() ?? 0;
         return dir * (aTime - bTime);
       }
-      // Normalize undefineds
       const av = (a[sortConfig.key] ?? "").toString().toLowerCase();
       const bv = (b[sortConfig.key] ?? "").toString().toLowerCase();
 
-      // Quantity: numeric-aware compare
       if (sortConfig.key === "quantity") {
         const numA = parseFloat(av) || 0;
         const numB = parseFloat(bv) || 0;
         return dir * (numA - numB);
       }
 
-      // Type/Name/Vendor: localeCompare for nice alpha sort
       const cmp = av.localeCompare(bv, undefined, { numeric: true, sensitivity: "base" });
       return dir * cmp;
     });
@@ -113,10 +110,28 @@ export default function InventoryOrdered() {
     }
   };
 
-  // ——— styles to match your original look ———
-  const th = { padding: "0.5rem", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" };
-  const thPlain = { padding: "0.5rem", fontWeight: 700, fontSize: "0.85rem" };
-  const td = { padding: "0.4rem", textAlign: "center", fontSize: "0.85rem" };
+  // ——— centered styles ———
+  const th = {
+    padding: "0.5rem",
+    fontWeight: 700,
+    fontSize: "0.85rem",
+    cursor: "pointer",
+    textAlign: "center",
+    verticalAlign: "middle"
+  };
+  const thPlain = {
+    padding: "0.5rem",
+    fontWeight: 700,
+    fontSize: "0.85rem",
+    textAlign: "center",
+    verticalAlign: "middle"
+  };
+  const td = {
+    padding: "0.4rem",
+    textAlign: "center",
+    fontSize: "0.85rem",
+    verticalAlign: "middle"
+  };
   const btn = {
     padding: "0.25rem 0.6rem",
     borderRadius: 6,
@@ -151,8 +166,8 @@ export default function InventoryOrdered() {
               <tr key={key} style={{ backgroundColor: i % 2 === 0 ? "#fafafa" : "transparent" }}>
                 <td style={td}>{fmtMMDDYYYY(toDate(e.date))}</td>
                 <td style={td}>{e.type}</td>
-                <td style={{ ...td, textAlign: "left" }}>{e.name}</td>
-                <td style={{ ...td, textAlign: "left" }}>{e.vendor ?? ""}</td>
+                <td style={td}>{e.name}</td>
+                <td style={td}>{e.vendor ?? ""}</td>
 
                 {/* Quantity cell: inline edit for Materials only */}
                 <td style={td}>
