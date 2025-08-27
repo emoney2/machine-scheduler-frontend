@@ -9,50 +9,74 @@ const BOX_DIMENSIONS = {
   Large:  "20×20×20"
 };
 
-function parseDateFromString(dateStr) {
-  if (!dateStr) return null;
+// Replace your existing parseDateFromString + formatDateMMDD with this:
 
-  const parts = dateStr.includes("-")
-    ? dateStr.split("-")
-    : dateStr.includes("/")
-    ? dateStr.split("/")
-    : [];
+// Convert Google/Excel serial date numbers to a JS Date (treat as days since 1899-12-30)
+function fromSheetSerial(n) {
+  if (typeof n !== "number" || !isFinite(n)) return null;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  // Excel/Sheets serial day 1 is 1899-12-31; but Google Sheets aligns with 1899-12-30 for JS calc
+  const base = Date.UTC(1899, 11, 30);
+  return new Date(base + n * msPerDay);
+}
+
+// Robust parse: accepts number (serial), Date, or string "MM/DD", "YYYY-MM-DD", etc.
+function parseDateFromString(val) {
+  if (!val && val !== 0) return null;
+
+  if (val instanceof Date) return isNaN(val) ? null : val;
+  if (typeof val === "number") return fromSheetSerial(val);
+
+  const s = String(val).trim();
+  if (!s) return null;
+
+  const parts = s.includes("-") ? s.split("-")
+              : s.includes("/") ? s.split("/")
+              : [];
 
   if (parts.length === 2) {
-    // Format is MM/DD or M/D (assume current year)
-    const [mm, dd] = parts;
+    // M/D or MM/DD (assume current year)
+    const [mm, dd] = parts.map(x => parseInt(x, 10));
+    if (!mm || !dd) return null;
     const now = new Date();
-    return new Date(now.getFullYear(), parseInt(mm) - 1, parseInt(dd));
+    return new Date(now.getFullYear(), mm - 1, dd);
   }
 
   if (parts.length === 3) {
-    let [year, month, day] = parts;
-    if (parts[0].length <= 2 && parts[2].length === 4) {
-      [month, day, year] = parts;
+    // YYYY-MM-DD or MM-DD-YYYY or MM/DD/YYYY
+    let [a, b, c] = parts;
+    if (s.includes("-")) {
+      // Could be YYYY-MM-DD or MM-DD-YYYY
+      if (a.length === 4) {
+        const year = parseInt(a, 10), month = parseInt(b, 10), day = parseInt(c, 10);
+        if (!year || !month || !day) return null;
+        return new Date(`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
+      } else if (c.length === 4) {
+        const year = parseInt(c, 10), month = parseInt(a, 10), day = parseInt(b, 10);
+        if (!year || !month || !day) return null;
+        return new Date(`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
+      }
+    } else {
+      // MM/DD/YYYY
+      const month = parseInt(a, 10), day = parseInt(b, 10), year = parseInt(c, 10);
+      if (!year || !month || !day) return null;
+      return new Date(`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`);
     }
-    return new Date(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`);
   }
 
-  return null;
+  // Fallback: let JS try
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
 }
 
-function formatDateMMDD(dateStr) {
-  if (!dateStr) return "";
-  const parts = dateStr.includes("-")
-    ? dateStr.split("-")
-    : dateStr.includes("/")
-    ? dateStr.split("/")
-    : [];
-
-  if (parts.length !== 3) return dateStr;
-
-  const [a, b, c] = parts.map(p => parseInt(p));
-  if (dateStr.includes("-")) {
-    return `${b.toString().padStart(2, "0")}/${c.toString().padStart(2, "0")}`;
-  } else {
-    return `${a.toString().padStart(2, "0")}/${b.toString().padStart(2, "0")}`;
-  }
+function formatDateMMDD(val) {
+  const d = parseDateFromString(val);
+  if (!d) return "";
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd}`;
 }
+
 
 function getButtonColor(deliveryDateStr, selectedJobs, allJobs) {
   if (!deliveryDateStr || selectedJobs.length === 0) return "#ccc";
