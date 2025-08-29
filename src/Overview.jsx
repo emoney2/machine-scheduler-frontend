@@ -148,6 +148,58 @@ function ringColorByShipDate(shipDate) {
   return "#999";
 }
 
+// Parse a Drive file id from a link (works for .../file/d/<id>/... or ?id=<id>)
+function parseDriveId(s) {
+  const str = String(s || "");
+  if (str.includes("id=")) return str.split("id=")[1].split("&")[0];
+  if (str.includes("/file/d/")) return str.split("/file/d/")[1].split("/")[0];
+  return "";
+}
+
+// Build your fast, cached proxy URL (server adds ETag + max-age)
+function proxyThumb(id, size = "w96") {
+  if (!id) return "";
+  const root = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+  return `${root}/drive/proxy/${id}?sz=${size}`;
+}
+
+// Map some common color words → hex; fallback to a stable hue if unknown
+const COLOR_LOOKUP = {
+  black: "#111111", white: "#f5f5f5", grey: "#9ca3af", gray: "#9ca3af",
+  red: "#e11d48", burgundy: "#701a36", maroon: "#7f1d1d", pink: "#ec4899",
+  orange: "#f97316", peach: "#fb923c", gold: "#d4a017", yellow: "#eab308",
+  green: "#22c55e", kelly: "#15a34a", lime: "#84cc16", teal: "#14b8a6",
+  aqua: "#22d3ee", cyan: "#06b6d4", blue: "#3b82f6", navy: "#1e3a8a",
+  royal: "#3b5fcc", purple: "#8b5cf6", violet: "#7c3aed", brown: "#8b5e34",
+  tan: "#d1b699", beige: "#d6c0a6"
+};
+function colorFromName(name) {
+  const n = String(name || "").toLowerCase();
+  // try exact words
+  for (const key of Object.keys(COLOR_LOOKUP)) {
+    if (n.includes(key)) return COLOR_LOOKUP[key];
+  }
+  // stable hash → hue fallback
+  let h = 0;
+  for (let i = 0; i < n.length; i++) h = (h * 31 + n.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue}, 70%, 55%)`;
+}
+
+// Decide thumbnail for an item:
+// 1) If it has a Drive link in known fields, use cached proxy image
+// 2) Else return null (caller will render a color chip)
+function getThreadThumbUrl(it) {
+  // look for any field that might carry a Drive link
+  const candidates = [it.image, it.preview, it.link, it.url];
+  for (const c of candidates) {
+    const id = parseDriveId(c);
+    if (id) return proxyThumb(id, "w96");
+  }
+  return null;
+}
+
+
 // ——— Styles ——————————————————————————————————————————————
 const grid = {
   display: "grid",
@@ -527,22 +579,53 @@ export default function Overview() {
                 </button>
               </div>
               <div style={{ marginTop:6 }}>
-                {(grp.items || []).map((it, j) => (
-                  <div
-                    key={j}
-                    style={{ display:"flex", gap:10, fontSize:12, lineHeight:"16px", padding:"2px 0" }}
-                  >
+                {(grp.items || []).map((it, j) => {
+                  const isThread = String(it.type || "Material").toLowerCase() === "thread";
+                  const thumbUrl = isThread ? getThreadThumbUrl(it) : null;
+                  const swatch = isThread ? colorFromName(it.name) : null;
+
+                  return (
                     <div
-                      style={{ width: 240, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}
-                      title={it.name}
+                      key={j}
+                      style={{ display:"flex", alignItems:"center", gap:10, fontSize:12, lineHeight:"16px", padding:"2px 0" }}
                     >
-                      {it.name}
+                      {/* Thumbnail or swatch (fixed size; avoids reflow) */}
+                      <div
+                        style={{
+                          width: 36, height: 24, borderRadius: 4, border: "1px solid #ddd",
+                          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+                          background: "#fafafa", flex: "0 0 36px"
+                        }}
+                        aria-label={isThread ? "Thread color preview" : undefined}
+                        title={isThread ? it.name : undefined}
+                      >
+                        {isThread && thumbUrl ? (
+                          <img
+                            src={thumbUrl}
+                            alt=""
+                            loading="lazy"
+                            style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
+                          />
+                        ) : isThread ? (
+                          <div style={{ width:"100%", height:"100%", background: swatch }} />
+                        ) : null}
+                      </div>
+
+                      {/* Name */}
+                      <div
+                        style={{ width: 240, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}
+                        title={it.name}
+                      >
+                        {it.name}
+                      </div>
+
+                      {/* Qty / Unit / Type */}
+                      <div style={{ width: 70, textAlign:"right" }} title={String(it.qty ?? "")}>{it.qty}</div>
+                      <div style={{ width: 60 }} title={it.unit || ""}>{it.unit || ""}</div>
+                      <div style={{ width: 80, color:"#666" }} title={it.type || "Material"}>{it.type || "Material"}</div>
                     </div>
-                    <div style={{ width: 70, textAlign:"right" }} title={String(it.qty ?? "")}>{it.qty}</div>
-                    <div style={{ width: 60 }} title={it.unit || ""}>{it.unit || ""}</div>
-                    <div style={{ width: 80, color:"#666" }} title={it.type || "Material"}>{it.type || "Material"}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
