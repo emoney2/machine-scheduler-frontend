@@ -3,6 +3,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+const THREAD_IMG_BASE =
+  process.env.REACT_APP_THREAD_IMG_BASE || `${ROOT}/thread-images`;
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
 function openUrlReturn(url) {
