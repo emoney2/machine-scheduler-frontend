@@ -3,8 +3,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+const BACKEND_ROOT = ROOT.replace(/\/api$/, "");
 const THREAD_IMG_BASE =
-  process.env.REACT_APP_THREAD_IMG_BASE || `${ROOT}/thread-images`;
+  process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
+
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
 function openUrlReturn(url) {
@@ -481,7 +483,7 @@ export default function Overview() {
 
   return (
     <div style={{ padding: 12 }}>
-      <div style={grid}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "auto auto", gap: 16, padding: 16 }}>
         {/* TL — Performance / Goals (placeholder metrics) */}
         <div style={card}>
           <div style={header}>Company Performance</div>
