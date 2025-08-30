@@ -9,9 +9,8 @@ const THREAD_IMG_BASE =
 
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
-function openUrlReturn(url, { fallbackMailto } = {}) {
+function openUrlReturn(url) {
   try {
-    // Open the final URL directly — avoids about:blank issues
     const w = window.open(url, "_blank", "noopener,width=980,height=720");
     if (w) {
       try { w.opener = null; } catch {}
@@ -19,16 +18,11 @@ function openUrlReturn(url, { fallbackMailto } = {}) {
       return w;
     }
   } catch {}
-  // If blocked, try mailto (opens default mail client)
-  if (fallbackMailto) {
-    try {
-      window.location.href = fallbackMailto;
-      return null;
-    } catch {}
-  }
+  // No mailto fallback (prevents Outlook). Just let the user know.
   alert("Popup was blocked. Please allow pop-ups for this site and click Order again.");
   return null;
 }
+
 
 // Opens Gmail in compose mode with subject/body prefilled
 function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
@@ -526,16 +520,12 @@ export default function Overview() {
       else if (method === "website" && v.website) {
         window.open(v.website, "_blank", "noopener");
       }
-      // EMAIL path
+      // EMAIL path (no mailto fallback → avoids Outlook)
       else {
         const gmailUrl = buildGmailCompose({ to: emailTo, cc, subject, body, authUser });
-        const mailtoUrl = buildMailto({ to: emailTo, cc, subject, body });
-        const win = openUrlReturn(gmailUrl, { fallbackMailto: mailtoUrl });
+        const win = openUrlReturn(gmailUrl);
         setGmailPopup(win);
       }
-
-
-
       // Log "Ordered" just like before
       const materialPayload = [];
       const threadPayload = [];
