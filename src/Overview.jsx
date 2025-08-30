@@ -202,53 +202,77 @@ function getThreadThumbUrl(it) {
 }
 
 
-// ——— Styles ——————————————————————————————————————————————
-const grid = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gridTemplateRows: "auto auto",
-  gap: 16,
-  padding: 16,
+// === Private thread image helpers (Netlify → Render, with auth cookies) ===
+const isFourDigitThreadName = (name) => /^\d{4}$/.test(String(name || "").trim());
+
+const urlCandidatesForThreadImage = (name) => {
+  const n = String(name || "").trim();
+  if (!isFourDigitThreadName(n)) return [];
+  return [
+    `${THREAD_IMG_BASE}/${n}.jpg`,
+    `${THREAD_IMG_BASE}/${n}.png`,
+    `${THREAD_IMG_BASE}/${n}.webp`,
+  ];
 };
-const card = {
-  background: "#fff",
-  border: "1px solid #e5e7eb",
-  borderRadius: 10,
-  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-  padding: 12,
-  overflow: "hidden",
-};
-const header = { fontSize: 16, fontWeight: 700, marginBottom: 10 };
-const rowCard = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  border: "1px solid #eee",
-  borderRadius: 8,
-  padding: "6px 8px",
-  marginBottom: 6,
-};
-const col = (w, center = false) => ({
-  width: w,
-  flex: `0 0 ${w}`,
-  textAlign: center ? "center" : "left",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-  whiteSpace: "nowrap",
-  fontSize: 12,
-  lineHeight: "16px",
-});
-const imgBox = {
-  width: 80,
-  height: 40,
-  border: "2px solid #ccc",
-  borderRadius: 6,
-  overflow: "hidden",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "#fafafa",
-};
+
+// In-memory cache of blob URLs so repeated rows don’t refetch
+const _secureImgCache = new Map();
+
+/**
+ * SecureImage: fetch image with credentials (sends login cookie),
+ * convert to blob URL, then feed to <img>.
+ */
+function SecureImage({ candidates, style, alt = "" }) {
+  const [src, setSrc] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      for (const url of candidates) {
+        try {
+          if (_secureImgCache.has(url)) {
+            if (!cancelled) setSrc(_secureImgCache.get(url));
+            return;
+          }
+          const res = await fetch(url, { method: "GET", credentials: "include" });
+          if (!res.ok) continue;
+          const ct = (res.headers.get("content-type") || "").toLowerCase();
+          if (!ct.includes("image")) continue;
+
+          const blob = await res.blob();
+          const objUrl = URL.createObjectURL(blob);
+          _secureImgCache.set(url, objUrl);
+          if (!cancelled) setSrc(objUrl);
+          return;
+        } catch (_) {
+          // try next candidate
+        }
+      }
+      // none worked → leave null
+    })();
+    return () => { cancelled = true; };
+  }, [JSON.stringify(candidates)]);
+
+  if (!src) return null;
+  return <img src={src} alt={alt} loading="lazy" style={style} />;
+}
+
+/** ThreadThumb: tries private backend image first, shows color swatch as fallback layer */
+function ThreadThumb({ name, fallbackColor }) {
+  const candidates = React.useMemo(() => urlCandidatesForThreadImage(name), [name]);
+  return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      {/* Fallback color underneath */}
+      <div style={{ position: "absolute", inset: 0, background: fallbackColor || "#e5e7eb" }} />
+      {/* Image overlays when loaded */}
+      <SecureImage
+        candidates={candidates}
+        alt=""
+        style={{ position: "relative", width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+      />
+    </div>
+  );
+}
 
 // ——— Component ——————————————————————————————————————————————
 export default function Overview() {
@@ -583,7 +607,6 @@ export default function Overview() {
               <div style={{ marginTop:6 }}>
                 {(grp.items || []).map((it, j) => {
                   const isThread = String(it.type || "Material").toLowerCase() === "thread";
-                  const thumbUrl = isThread ? getThreadThumbUrl(it) : null;
                   const swatch = isThread ? colorFromName(it.name) : null;
 
                   return (
@@ -591,25 +614,18 @@ export default function Overview() {
                       key={j}
                       style={{ display:"flex", alignItems:"center", gap:10, fontSize:12, lineHeight:"16px", padding:"2px 0" }}
                     >
-                      {/* Thumbnail or swatch (fixed size; avoids reflow) */}
+                      {/* Thumbnail box: tries private backend image via fetch-with-credentials; swatch underlays */}
                       <div
                         style={{
                           width: 36, height: 24, borderRadius: 4, border: "1px solid #ddd",
                           overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
                           background: "#fafafa", flex: "0 0 36px"
                         }}
-                        aria-label={isThread ? "Thread color preview" : undefined}
+                        aria-label={isThread ? "Thread image" : undefined}
                         title={isThread ? it.name : undefined}
                       >
-                        {isThread && thumbUrl ? (
-                          <img
-                            src={thumbUrl}
-                            alt=""
-                            loading="lazy"
-                            style={{ width:"100%", height:"100%", objectFit:"cover", display:"block" }}
-                          />
-                        ) : isThread ? (
-                          <div style={{ width:"100%", height:"100%", background: swatch }} />
+                        {isThread ? (
+                          <ThreadThumb name={it.name} fallbackColor={swatch} />
                         ) : null}
                       </div>
 
