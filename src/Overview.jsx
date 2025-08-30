@@ -30,6 +30,20 @@ function openUrlReturn(url, { fallbackMailto } = {}) {
   return null;
 }
 
+// Opens Gmail in compose mode with subject/body prefilled
+function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
+  const base = "https://mail.google.com/mail/";
+  const p = new URLSearchParams({ view: "cm", fs: "1" });
+  if (to) p.set("to", to);
+  if (cc) p.set("cc", cc);
+  if (bcc) p.set("bcc", bcc);
+  if (subject) p.set("su", subject);
+  if (body) p.set("body", body);
+  if (authUser !== undefined && authUser !== null && String(authUser) !== "") {
+    p.set("authuser", String(authUser));
+  }
+  return `${base}?${p.toString()}`;
+}
 
 
 function buildMailto({ to = "", cc = "", subject = "", body = "" } = {}) {
