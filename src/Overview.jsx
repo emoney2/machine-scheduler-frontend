@@ -53,8 +53,35 @@ function buildEmailText(vendor, rows, { notes, requestBy } = {}) {
   const dd = String(today.getDate()).padStart(2, "0");
   const yyyy = today.getFullYear();
 
-  const subject = `Material Order – ${vendor} – ${mm}/${dd}/${yyyy}`;
+  const isMadeira = String(vendor || "").toLowerCase().includes("madeira");
 
+  if (isMadeira) {
+    // Madeira-specific wording for THREADS
+    const subject = `JR & Co. Thread Order - Madeira - ${mm}/${dd}/${yyyy}`;
+    const lines = rows.map(i => {
+      const qty = i.qty ? Number(i.qty) : 1;
+      return `${i.name} (Polyneon) - ${qty} Cones`;
+    });
+
+    const parts = [
+      "Madeira team,",
+      "",
+      "I would like to place an order for the following:",
+      "",
+      ...lines,
+      "",
+      "If you have any question about this order, please feel free to reach out.",
+      "",
+      "Thanks,",
+      "Justin Eckard",
+      "678.294.5350",
+    ];
+
+    return { subject, body: parts.join("\n") };
+  }
+
+  // Generic fallback (non-Madeira vendors): keep your old style
+  const subject = `Material Order – ${vendor} – ${mm}/${dd}/${yyyy}`;
   const lines = rows.map(i => `- ${i.name}${i.qty ? ` (${i.qty}${i.unit ? " " + i.unit : ""})` : ""}`);
 
   const parts = [
@@ -65,12 +92,8 @@ function buildEmailText(vendor, rows, { notes, requestBy } = {}) {
     ...lines,
   ];
 
-  if (requestBy) {
-    parts.push("", `Requested By: ${requestBy}`);
-  }
-  if (notes) {
-    parts.push("", `Notes: ${notes}`);
-  }
+  if (requestBy) parts.push("", `Requested by: ${requestBy}`);
+  if (notes) parts.push("", `Notes: ${notes}`);
 
   parts.push(
     "",
@@ -81,9 +104,9 @@ function buildEmailText(vendor, rows, { notes, requestBy } = {}) {
     "678.294.5350"
   );
 
-  const body = parts.join("\n");
-  return { subject, body };
+  return { subject, body: parts.join("\n") };
 }
+
 
 function parseDate(s) {
   if (s === null || s === undefined || s === "") return null;
@@ -433,18 +456,31 @@ export default function Overview() {
       const effectiveMethod = orderMethod || defaultMethod;
 
       // Build subject/body (used for email path)
-      const { subject, body } = buildEmailText(modalOpenForVendor, rows, {
+      let emailRows = rows;
+      let emailTo = normList(v.email);
+      const cc = normList(v.cc);
+      const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
+
+      // Madeira threads: email contactus@madeirausa.com and list only thread items
+      if ((modalOpenForVendor || "").toLowerCase().includes("madeira")) {
+        const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
+        if (threadRows.length) {
+          emailRows = threadRows;
+          emailTo = "contactus@madeirausa.com";
+        }
+      }
+
+      const { subject, body } = buildEmailText(modalOpenForVendor, emailRows, {
         notes: poNotes,
         requestBy,
       });
 
-      // Recipients for email path
-      const to = normList(v.email);
-      const cc = normList(v.cc);
-      const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
+      // If targeting Madeira via email, force email method (not website/cart)
+      const method = (emailTo === "contactus@madeirausa.com") ? "email" : (orderMethod || defaultMethod);
+
 
       // WEBSITE path — Madeira (special)
-      if (effectiveMethod === "website" && (modalOpenForVendor || "").toLowerCase().includes("madeira")) {
+      if (method === "website" && (modalOpenForVendor || "").toLowerCase().includes("madeira")) {
         // Only send thread items for Madeira
         const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
         if (!threadRows.length) {
@@ -469,12 +505,12 @@ export default function Overview() {
         }
       }
       // WEBSITE path — other vendors: open configured website if present
-      else if (effectiveMethod === "website" && v.website) {
+      else if (method === "website" && v.website) {
         window.open(v.website, "_blank", "noopener");
       }
       // EMAIL path
       else {
-        const gmailUrl = buildGmailCompose({ to, cc, subject, body, authUser });
+        const gmailUrl = buildGmailCompose({ to: emailTo, cc, subject, body, authUser });
         const win = openUrlReturn(gmailUrl);
         setGmailPopup(win);
       }
