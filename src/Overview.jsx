@@ -9,35 +9,39 @@ const THREAD_IMG_BASE =
 
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
-function openUrlReturn(url) {
+function openUrlReturn(url, { fallbackMailto } = {}) {
   try {
-    // Open a blank popup first to avoid some blockers, then set location.
-    const w = window.open("", "_blank", "noopener,noreferrer,width=980,height=720");
+    // Open the final URL directly — avoids about:blank issues
+    const w = window.open(url, "_blank", "noopener,width=980,height=720");
     if (w) {
       try { w.opener = null; } catch {}
-      w.location.href = url;
-      // Refocus your app so you stay on Overview
       setTimeout(() => { try { window.focus(); } catch {} }, 0);
       return w;
     }
   } catch {}
-  // Popup blocked: DO NOT navigate this tab; just inform the user.
+  // If blocked, try mailto (opens default mail client)
+  if (fallbackMailto) {
+    try {
+      window.location.href = fallbackMailto;
+      return null;
+    } catch {}
+  }
   alert("Popup was blocked. Please allow pop-ups for this site and click Order again.");
   return null;
 }
 
 
-function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
-  const base = "https://mail.google.com/mail/";
-  const p = new URLSearchParams({ view: "cm", fs: "1" });
-  if (to) p.set("to", to);
-  if (cc) p.set("cc", cc);
-  if (bcc) p.set("bcc", bcc);
-  if (subject) p.set("su", subject);
-  if (body) p.set("body", body);
-  if (authUser !== undefined && authUser !== "") p.set("authuser", String(authUser));
-  return `${base}?${p.toString()}`;
+
+function buildMailto({ to = "", cc = "", subject = "", body = "" } = {}) {
+  const esc = encodeURIComponent;
+  const params = [];
+  if (cc) params.push(`cc=${esc(cc)}`);
+  if (subject) params.push(`subject=${esc(subject)}`);
+  if (body) params.push(`body=${esc(body)}`);
+  const qs = params.length ? `?${params.join("&")}` : "";
+  return `mailto:${esc(to)}${qs}`;
 }
+
 // Normalize comma/semicolon lists from the sheet → "a@x.com,b@y.com"
 function normList(s) {
   return (s || "")
@@ -511,9 +515,12 @@ export default function Overview() {
       // EMAIL path
       else {
         const gmailUrl = buildGmailCompose({ to: emailTo, cc, subject, body, authUser });
-        const win = openUrlReturn(gmailUrl);
+        const mailtoUrl = buildMailto({ to: emailTo, cc, subject, body });
+        const win = openUrlReturn(gmailUrl, { fallbackMailto: mailtoUrl });
         setGmailPopup(win);
       }
+
+
 
       // Log "Ordered" just like before
       const materialPayload = [];
@@ -534,7 +541,7 @@ export default function Overview() {
         await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
-      alert((effectiveMethod === "website" ? "Website opened." : "Gmail compose opened.") + " Order logged.");
+      alert((method === "website" ? "Website opened." : "Gmail compose opened.") + " Order logged.");
       setModalOpenForVendor(null);
       setPoNotes("");
       setRequestBy("");
