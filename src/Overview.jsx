@@ -276,6 +276,37 @@ function ThreadThumb({ name, fallbackColor }) {
   );
 }
 
+// ——— Styles (added) ——————————————————————————————————————————————
+const header = { fontSize: 14, fontWeight: 700, marginBottom: 8 };
+
+const rowCard = {
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+  padding: "6px 8px",
+  border: "1px solid #eee",
+  borderRadius: 8,
+  marginBottom: 8,
+};
+
+const imgBox = {
+  width: 80,
+  height: 40,
+  border: "2px solid #ccc",
+  borderRadius: 6,
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#fafafa",
+};
+
+function col(width, center = false) {
+  const s = { width };
+  if (center) s.textAlign = "center";
+  return s;
+}
+
 // ——— Component ——————————————————————————————————————————————
 export default function Overview() {
   // Upcoming jobs
@@ -485,7 +516,7 @@ export default function Overview() {
     <div style={{ padding: 12 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "auto auto", gap: 16, padding: 16 }}>
         {/* TL — Performance / Goals (placeholder metrics) */}
-        <div style={card}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
           <div style={header}>Company Performance</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
             {["On-Time Ship %","Avg Lead Time","Throughput (pcs/day)","Digitizing SLA","Embroidery Hours","WIP Count"].map((t,i) => (
@@ -499,7 +530,7 @@ export default function Overview() {
         </div>
 
         {/* TR — Upcoming Jobs */}
-        <div style={card}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
           <div style={{ ...header, textAlign: "center" }}>Upcoming Jobs (Ship in next 7 days)</div>
 
           {/* column headers */}
@@ -572,7 +603,7 @@ export default function Overview() {
         </div>
 
         {/* BL — Department status (placeholders) */}
-        <div style={card}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
           <div style={header}>Department Status</div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:10 }}>
             {["Digitizing","Fur","Cut","Print","Embroidery","Sewing"].map((d,i) => (
@@ -586,7 +617,7 @@ export default function Overview() {
         </div>
 
         {/* BR — Materials to order */}
-        <div style={card}>
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
           <div style={header}>Materials To Order (Grouped by Vendor)</div>
           {loadingMaterials && <div>Loading…</div>}
           {!loadingMaterials && !materials.length && <div>No materials currently flagged.</div>}
