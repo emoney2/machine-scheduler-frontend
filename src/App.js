@@ -1200,21 +1200,16 @@ const onDragEnd = async (result) => {
 
   // 2) If reordering within the same column:
   if (srcCol === dstCol) {
-    // Reordering within the same column
-    // Clamp so a "bottom" drop truly appends (many DnD libs give index === length there)
-    let insertAt = Math.min(dstIdx, dstJobs.length);
-    dstJobs.splice(insertAt, 0, ...movedJobs);
-
-
+    // Insert the already-removed chain back into this same list at destination.index.
+    const insertAt = Math.min(dstIdx, newSrcJobs.length);
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
     const updatedJobs = srcCol === 'queue'
       ? sortQueue(newSrcJobs)
       : scheduleMachineJobs(
           newSrcJobs,
-          srcCol === 'machine1' ? 1 : 6   // pass a number to be unambiguous
+          srcCol === 'machine1' ? 'Machine 1 (1)' : 'Machine 2 (6)'
         );
-
 
     // 2a) Update local state
     setColumns(cols => ({
@@ -1228,38 +1223,28 @@ const onDragEnd = async (result) => {
       [srcCol]: { ...columns[srcCol], jobs: updatedJobs }
     };
 
-    // compare old top jobs with new top jobs
     const oldTop1 = columns.machine1.jobs[0]?.id || null;
     const oldTop2 = columns.machine2.jobs[0]?.id || null;
     const newTop1 = nextCols.machine1.jobs[0]?.id || null;
     const newTop2 = nextCols.machine2.jobs[0]?.id || null;
 
-    // clear prevTopRef if top job changed
     updatePrevTopRef(prevMachine1Top, oldTop1, newTop1);
     updatePrevTopRef(prevMachine2Top, oldTop2, newTop2);
-
-    // update refs
     prevMachine1Top.current = newTop1;
     prevMachine2Top.current = newTop2;
 
     const manualState = {
-      machine1:    nextCols.machine1.jobs.map(j => j.id),
-      machine2:    nextCols.machine2.jobs.map(j => j.id),
-      placeholders // ensure this is in scope
+      machine1: nextCols.machine1.jobs.map(j => j.id),
+      machine2: nextCols.machine2.jobs.map(j => j.id),
+      placeholders
     };
-    console.log('⏹ Persisting manualState (same-col) to server:', manualState);
     try {
       await axios.post(API_ROOT + '/manualState', manualState);
-      console.log('✅ manualState saved (same-col reorder)');
     } catch (err) {
       console.error('❌ manualState save failed (same-col reorder)', err);
     }
 
-    console.log('⏹ onDragEnd end (reorder same col), new columns:', nextCols);
-
-    // Trigger top-of-list start-time update effect
-    setManualReorder(true);   // ← ADD
-
+    setManualReorder(true);
     return;
   }
 
@@ -1274,14 +1259,12 @@ const onDragEnd = async (result) => {
       isLate: false, linkedTo: null
     })
   }));
-  let insertAt = dstIdx;
-  // When moving DOWN within the same list, destination.index is based on the pre-removal list.
-  // After we remove the chain, the target slot effectively shifts UP by chain length.
-  // Correct formula is: dstIdx - chainLen + 1 (then clamp to end).
-  if (dstIdx > srcIdx) insertAt = Math.min(dstIdx - chainJobs.length + 1, newSrcJobs.length);
 
-  newSrcJobs.splice(insertAt, 0, ...chainJobs);
+  // Insert into the destination list at the requested slot (append if bottom)
+  const insertAt = Math.min(dstIdx, dstJobs.length);
+  dstJobs.splice(insertAt, 0, ...movedJobs);
 
+  // (no insertion into newSrcJobs here — we already removed the chain from source)
 
 
   // 4) If dropping into queue, unlink the chain from links
