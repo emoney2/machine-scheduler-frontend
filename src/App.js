@@ -801,7 +801,7 @@ const fetchOrdersEmbroLinksCore = async () => {
       // Artwork link (from Production Orders → Image)
       const rawImageLink = o['Image'] || '';
       const fileId = extractDriveId(rawImageLink);
-      if (fileId) driveIdsToPublicize.push(fileId);;
+      if (fileId) driveIdsToPublicize.push(fileId);
 
       jobById[sid] = {
         id:               sid,
@@ -817,7 +817,8 @@ const fetchOrdersEmbroLinksCore = async () => {
         status:           o['Stage'] || '',
         threadColors:     o['Threads'] || '',
         imageLink:        rawImageLink,
-        artworkUrl,
+        imageFileId:      fileId || '',
+        // artworkUrl is set AFTER we fetch version tokens
         machineId:        'queue',
         linkedTo:         linksData[sid] || null
       };
@@ -867,7 +868,7 @@ const fetchOrdersEmbroLinksCore = async () => {
         job.machineId = 'Machine 1 (1)';
         newCols['machine1'].jobs.push(job);
       } else if (job.machineId === 'machine2') {
-        job.machineId = 'Machine 2';
+        job.machineId = 'Machine 2'; // (kept as-is per your current code)
         newCols['machine2'].jobs.push(job);
       } else {
         newCols.queue.jobs.push(job);
