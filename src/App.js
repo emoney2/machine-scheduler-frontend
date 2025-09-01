@@ -836,17 +836,18 @@ const fetchOrdersEmbroLinksCore = async () => {
       }
     }
 
-    // 5b) Pre-warm thumbnails on the server so client loads are instant
+    // 5b) Kick off server pre-warm, but DON'T await it
     try {
       const pairs = uniqueIds
         .map(id => ({ id, v: versionById[id] || '', sz: 'w240' }))
-        .filter(p => p.v); // only when we have a version
+        .filter(p => p.v);
       if (pairs.length) {
-        await axios.post(API_ROOT + '/drive/warmThumbnails', { pairs });
+        axios.post(API_ROOT + '/drive/warmThumbnails', { pairs }).catch(() => {});
       }
-    } catch (err) {
-      console.warn('warmThumbnails failed (continuing)', err);
+    } catch {
+      // ignore
     }
+
 
 
     // Fill artworkUrl now that we have versions
