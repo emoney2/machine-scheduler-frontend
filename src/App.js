@@ -598,16 +598,18 @@ function extractDriveId(url) {
 }
 
 // Use backend thumbnail proxy (thumb=1) with a slightly larger size for better clarity
-function toPreviewUrl(originalUrl) {
+function toPreviewUrl(originalUrl, v) {
   if (!originalUrl) return '';
   const id = extractDriveId(originalUrl);
   if (!id) {
     if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
     return '';
   }
-  // bump size to w=512 for a sharper card preview
-  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w240`;
+  let url = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w240`;
+  if (v) url += `&v=${encodeURIComponent(v)}`; // versioned → immutable cache
+  return url;
 }
+
 
 // Full-view URL (original quality / inline display)
 function toFullViewUrl(originalUrl) {
@@ -796,13 +798,10 @@ const fetchOrdersEmbroLinksCore = async () => {
       // Persisted start time (from Production Orders)
       const persistedStart = parseEmbroideryStart(o['Embroidery Start Time']);
 
-      // Artwork link (from Production Orders → Image) → thumbnailable URL
+      // Artwork link (from Production Orders → Image)
       const rawImageLink = o['Image'] || '';
-      const artworkUrl   = toPreviewUrl(rawImageLink);
-
-      // Collect Drive file IDs so we can make them public (non-blocking)
-      const maybeId = extractDriveId(rawImageLink);
-      if (maybeId) driveIdsToPublicize.push(maybeId);
+      const fileId = extractDriveId(rawImageLink);
+      if (fileId) driveIdsToPublicize.push(fileId);;
 
       jobById[sid] = {
         id:               sid,
@@ -822,6 +821,29 @@ const fetchOrdersEmbroLinksCore = async () => {
         machineId:        'queue',
         linkedTo:         linksData[sid] || null
       };
+    });
+
+    // 5) Fetch version tokens for unique Drive file IDs and set artworkUrl
+    let versionById = {};
+    const uniqueIds = Array.from(new Set(driveIdsToPublicize));
+    if (uniqueIds.length) {
+      try {
+        const { data } = await axios.post(API_ROOT + '/drive/metaBatch', { ids: uniqueIds });
+        versionById = data?.versions || {};
+      } catch (err) {
+        console.error('drive/metaBatch failed', err);
+      }
+    }
+
+    // Fill artworkUrl now that we have versions
+    Object.values(jobById).forEach(job => {
+      if (!job.imageFileId) {
+        // non-Drive link or empty
+        job.artworkUrl = toPreviewUrl(job.imageLink, '');
+      } else {
+        const v = versionById[job.imageFileId] || '';
+        job.artworkUrl = toPreviewUrl(job.imageLink, v);
+      }
     });
 
     // 6) Initialize newCols from current columns (retaining headCount)
