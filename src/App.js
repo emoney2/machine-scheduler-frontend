@@ -1204,12 +1204,22 @@ const onDragEnd = async (result) => {
     const insertAt = Math.min(dstIdx, newSrcJobs.length);
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
-    const updatedJobs = srcCol === 'queue'
+    // Remember the manual order you intended
+    const desiredOrder = newSrcJobs.map(j => j.id);
+
+    // Compute times (or any scheduling metadata), but DO NOT change the order
+    const scheduled = srcCol === 'queue'
       ? sortQueue(newSrcJobs)
       : scheduleMachineJobs(
           newSrcJobs,
           srcCol === 'machine1' ? 'Machine 1 (1)' : 'Machine 2 (6)'
         );
+
+    // 🔒 Preserve the manual order you just set
+    const indexOf = new Map(desiredOrder.map((id, i) => [id, i]));
+    const updatedJobs = [...scheduled].sort(
+      (a, b) => (indexOf.get(a.id) ?? 1e9) - (indexOf.get(b.id) ?? 1e9)
+    );
 
     // 2a) Update local state
     setColumns(cols => ({
@@ -1266,7 +1276,6 @@ const onDragEnd = async (result) => {
 
   // (no insertion into newSrcJobs here — we already removed the chain from source)
 
-
   // 4) If dropping into queue, unlink the chain from links
   if (dstCol === 'queue') {
     const pruned = { ...links };
@@ -1293,12 +1302,29 @@ const onDragEnd = async (result) => {
   prevMachine1Top.current = nextCols.machine1.jobs[0]?.id || null;
   prevMachine2Top.current = nextCols.machine2.jobs[0]?.id || null;
 
+  // Compute times (or any scheduling metadata)
   ['machine1', 'machine2'].forEach(machine => {
     nextCols[machine].jobs = scheduleMachineJobs(
       nextCols[machine].jobs,
       machineKeyLabels[machine]
     );
   });
+
+  // 🔒 Preserve manual order for machine columns after scheduling
+  if (srcCol !== 'queue') {
+    const srcDesired = newSrcJobs.map(j => j.id);
+    const srcIndex = new Map(srcDesired.map((id, i) => [id, i]));
+    nextCols[srcCol].jobs = [...nextCols[srcCol].jobs].sort(
+      (a, b) => (srcIndex.get(a.id) ?? 1e9) - (srcIndex.get(b.id) ?? 1e9)
+    );
+  }
+  if (dstCol !== 'queue') {
+    const dstDesired = dstJobs.map(j => j.id);
+    const dstIndex = new Map(dstDesired.map((id, i) => [id, i]));
+    nextCols[dstCol].jobs = [...nextCols[dstCol].jobs].sort(
+      (a, b) => (dstIndex.get(a.id) ?? 1e9) - (dstIndex.get(b.id) ?? 1e9)
+    );
+  }
 
   nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
 
