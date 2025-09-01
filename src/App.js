@@ -1201,10 +1201,10 @@ const onDragEnd = async (result) => {
   // 2) If reordering within the same column:
   if (srcCol === dstCol) {
     // Reordering within the same column
-    let insertAt = dstIdx;
-    // After removing the chain, indices below shift up by chain length.
-    // So when moving DOWN, adjust by the chain length (no +1).
-    if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length;
+    // Clamp so a "bottom" drop truly appends (many DnD libs give index === length there)
+    let insertAt = Math.min(dstIdx, dstJobs.length);
+    dstJobs.splice(insertAt, 0, ...movedJobs);
+
 
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
@@ -1275,12 +1275,13 @@ const onDragEnd = async (result) => {
     })
   }));
   let insertAt = dstIdx;
-  // If dropping into a machine column and aiming for the bottom,
-  // append after the last card instead of before it.
-  if ((dstCol === 'machine1' || dstCol === 'machine2') && insertAt >= dstJobs.length - 1) {
-    insertAt = dstJobs.length;
-  }
-  dstJobs.splice(insertAt, 0, ...movedJobs);
+  // When moving DOWN within the same list, destination.index is based on the pre-removal list.
+  // After we remove the chain, the target slot effectively shifts UP by chain length.
+  // Correct formula is: dstIdx - chainLen + 1 (then clamp to end).
+  if (dstIdx > srcIdx) insertAt = Math.min(dstIdx - chainJobs.length + 1, newSrcJobs.length);
+
+  newSrcJobs.splice(insertAt, 0, ...chainJobs);
+
 
 
   // 4) If dropping into queue, unlink the chain from links
