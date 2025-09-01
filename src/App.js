@@ -836,6 +836,19 @@ const fetchOrdersEmbroLinksCore = async () => {
       }
     }
 
+    // 5b) Pre-warm thumbnails on the server so client loads are instant
+    try {
+      const pairs = uniqueIds
+        .map(id => ({ id, v: versionById[id] || '', sz: 'w240' }))
+        .filter(p => p.v); // only when we have a version
+      if (pairs.length) {
+        await axios.post(API_ROOT + '/drive/warmThumbnails', { pairs });
+      }
+    } catch (err) {
+      console.warn('warmThumbnails failed (continuing)', err);
+    }
+
+
     // Fill artworkUrl now that we have versions
     Object.values(jobById).forEach(job => {
       if (!job.imageFileId) {
