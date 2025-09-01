@@ -1274,7 +1274,14 @@ const onDragEnd = async (result) => {
       isLate: false, linkedTo: null
     })
   }));
-  dstJobs.splice(dstIdx, 0, ...movedJobs);
+  let insertAt = dstIdx;
+  // If dropping into a machine column and aiming for the bottom,
+  // append after the last card instead of before it.
+  if ((dstCol === 'machine1' || dstCol === 'machine2') && insertAt >= dstJobs.length - 1) {
+    insertAt = dstJobs.length;
+  }
+  dstJobs.splice(insertAt, 0, ...movedJobs);
+
 
   // 4) If dropping into queue, unlink the chain from links
   if (dstCol === 'queue') {
