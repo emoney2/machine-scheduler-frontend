@@ -1200,9 +1200,14 @@ const onDragEnd = async (result) => {
 
   // 2) If reordering within the same column:
   if (srcCol === dstCol) {
+    // Reordering within the same column
     let insertAt = dstIdx;
-    if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length + 1;
+    // After removing the chain, indices below shift up by chain length.
+    // So when moving DOWN, adjust by the chain length (no +1).
+    if (dstIdx > srcIdx) insertAt = dstIdx - chainJobs.length;
+
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
+
     const updatedJobs = srcCol === 'queue'
       ? sortQueue(newSrcJobs)
       : scheduleMachineJobs(
