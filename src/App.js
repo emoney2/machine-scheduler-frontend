@@ -1175,6 +1175,23 @@ function updatePrevTopRef(prevRef, oldTop, newTop) {
   }
 }
 
+// Heuristic: jobs that should NOT be treated as draggables (adjust to your schema if needed)
+function isNonDraggable(job) {
+  return job?.placeholder === true || job?.isPlaceholder === true || job?.type === 'placeholder';
+}
+
+// Convert a react-beautiful-dnd visual index (counts only draggables) to an index in the full array
+function visualToActualIndex(fullList, visualIdx) {
+  let seen = 0;
+  for (let i = 0; i < fullList.length; i++) {
+    if (!isNonDraggable(fullList[i])) {
+      if (seen === visualIdx) return i;
+      seen++;
+    }
+  }
+  return fullList.length; // append if visualIdx is at/after the end
+}
+
 const onDragEnd = async (result) => {
   // 🔍 DEBUGGING INSTRUMENTATION
   console.log("🔍 DRAG-END result:", result);
@@ -1188,26 +1205,31 @@ const onDragEnd = async (result) => {
 
   const srcCol = source.droppableId;
   const dstCol = destination.droppableId;
-  const srcIdx = source.index;
-  const dstIdx = destination.index;
-  if (srcCol === dstCol && srcIdx === dstIdx) return;
+  const srcIdxVisual = source.index;       // visual index among draggables
+  const dstIdxVisual = destination.index;  // visual index among draggables
+
+  if (srcCol === dstCol && srcIdxVisual === dstIdxVisual) return;
 
   // 1) Extract the full chain from the source column
-  const srcJobs   = Array.from(columns[srcCol].jobs);
-  const chainIds  = getChain(srcJobs, draggableId);
+  const srcJobs = Array.from(columns[srcCol].jobs);
+  const chainIds = getChain(srcJobs, draggableId);
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
+
+  // Remove chain from source list (works against the full list incl. placeholders)
   const newSrcJobs = srcJobs.filter(j => !chainIds.includes(j.id));
 
   // 2) If reordering within the same column:
   if (srcCol === dstCol) {
-    // Insert the already-removed chain back into this same list at destination.index.
-    const insertAt = Math.min(dstIdx, newSrcJobs.length);
+    // Translate destination index from visual → actual within this list
+    const insertAt = visualToActualIndex(newSrcJobs, dstIdxVisual);
+
+    // Insert the already-removed chain back into this same list
     newSrcJobs.splice(insertAt, 0, ...chainJobs);
 
-    // Remember the manual order you intended
+    // Remember the manual order you intended (by IDs, in the full list order)
     const desiredOrder = newSrcJobs.map(j => j.id);
 
-    // Compute times (or any scheduling metadata), but DO NOT change the order
+    // Compute times/metadata, but **don’t** let scheduling change order
     const scheduled = srcCol === 'queue'
       ? sortQueue(newSrcJobs)
       : scheduleMachineJobs(
@@ -1270,11 +1292,9 @@ const onDragEnd = async (result) => {
     })
   }));
 
-  // Insert into the destination list at the requested slot (append if bottom)
-  const insertAt = Math.min(dstIdx, dstJobs.length);
+  // Translate visual destination index → actual array index in destination
+  const insertAt = visualToActualIndex(dstJobs, dstIdxVisual);
   dstJobs.splice(insertAt, 0, ...movedJobs);
-
-  // (no insertion into newSrcJobs here — we already removed the chain from source)
 
   // 4) If dropping into queue, unlink the chain from links
   if (dstCol === 'queue') {
@@ -1293,6 +1313,7 @@ const onDragEnd = async (result) => {
     [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
     [dstCol]: { ...columns[dstCol], jobs: dstJobs }
   };
+
   const machineKeyLabels = {
     machine1: 'Machine 1 (1)',
     machine2: 'Machine 2 (6)'
@@ -1326,6 +1347,7 @@ const onDragEnd = async (result) => {
     );
   }
 
+  // Always keep queue sorted by your rule
   nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
 
   // update state
@@ -1334,8 +1356,8 @@ const onDragEnd = async (result) => {
 
   // 6) Persist the shared manualState to backend **including placeholders**
   const manualState = {
-    machine1:    nextCols.machine1.jobs.map(j => j.id),
-    machine2:    nextCols.machine2.jobs.map(j => j.id),
+    machine1: nextCols.machine1.jobs.map(j => j.id),
+    machine2: nextCols.machine2.jobs.map(j => j.id),
     placeholders
   };
   console.log('⏹ Persisting manualState (cross-col) to server:', manualState);
@@ -1347,7 +1369,7 @@ const onDragEnd = async (result) => {
   }
 
   // Trigger top-of-list start-time update effect
-  setManualReorder(true);   // ← ADD
+  setManualReorder(true);
 };
 
 // === Section 9: Render via Section9.jsx ===
