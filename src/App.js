@@ -1413,6 +1413,13 @@ const onDragEnd = async (result) => {
   setManualReorder(true);
 };
 
+// Add debugging logs to inspect the state of the queue column
+useEffect(() => {
+  console.log("Queue column before sorting:", columns.queue.jobs);
+  const sortedQueue = sortQueue(columns.queue.jobs);
+  console.log("Queue column after sorting:", sortedQueue);
+}, [columns.queue.jobs]);
+
 // === Section 9: Render via Section9.jsx ===
 
   return (
