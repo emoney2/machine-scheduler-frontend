@@ -19,7 +19,7 @@ import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 
-console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
+// console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
 // Time helpers: normalize to ISO (UTC), display in Eastern
 
@@ -150,8 +150,8 @@ try {
     withCredentials: true
   });
 
-  socket.on("connect",       () => console.log("⚡ socket connected, id =", socket.id));
-  socket.on("disconnect",    (reason) => console.log("🛑 socket disconnected:", reason));
+  // socket.on("connect",       () => console.log("⚡ socket connected, id =", socket.id));
+  // socket.on("disconnect",    (reason) => console.log("🛑 socket disconnected:", reason));
   socket.on("connect_error", (err) => {
     console.warn("🟡 socket connect_error:", err?.message || err);
     window.__SOCKET_DOWN__ = true;
@@ -191,7 +191,7 @@ export default function App() {
 
   // Log once on mount (optional — keeps your existing console signal)
   useEffect(() => {
-    console.log("🔔 App component mounted");
+    // console.log("🔔 App component mounted");
   }, []);
 
   // Session check: if not logged in, bounce to backend /login and return here after
@@ -205,7 +205,7 @@ export default function App() {
         });
 
         if (res.status === 200) {
-          console.log("✅ /api/ping OK (session present)");
+          // console.log("✅ /api/ping OK (session present)");
           return;
         }
 
@@ -247,7 +247,7 @@ export default function App() {
 
       const existing = findJobById();
       if (existing && normalizeStart(existing.embroidery_start)) {
-        console.log(`⏭️ Job ${jobId} already has start time (${existing.embroidery_start}), skipping`);
+        // console.log(`⏭️ Job ${jobId} already has start time (${existing.embroidery_start}), skipping`);
         return;
       }
   
@@ -271,7 +271,7 @@ export default function App() {
         };
       });
 
-      console.log(`✅ Set start time for ${jobId}: ${fmtET(iso)} ET`);
+      // console.log(`✅ Set start time for ${jobId}: ${fmtET(iso)} ET`);
     } catch (err) {
       console.error('Failed to bump start time', err);
     }
@@ -326,19 +326,22 @@ export default function App() {
   // Real-time updates listener
   useEffect(() => {
     const handleUpdate = debounce(() => {
-      console.log("🛰️ remote update – re-fetching");
+      // console.log("🌐 remote update – re-fetching");
       fetchAllCombined();
     }, 1000);
 
-    socket.on("manualStateUpdated",   handleUpdate);
-    socket.on("linksUpdated",         handleUpdate);
-    socket.on("placeholdersUpdated",  handleUpdate);
+
+  socket.on("manualStateUpdated",   handleUpdate);
+  socket.on("linksUpdated",         handleUpdate);
+  socket.on("placeholdersUpdated",  handleUpdate);
+  socket.on("ordersUpdated",        handleUpdate);
 
     return () => {
-      socket.off("manualStateUpdated",   handleUpdate);
-      socket.off("linksUpdated",         handleUpdate);
-      socket.off("placeholdersUpdated",  handleUpdate);
-      handleUpdate.cancel();
+  socket.off("manualStateUpdated",   handleUpdate);
+  socket.off("linksUpdated",         handleUpdate);
+  socket.off("placeholdersUpdated",  handleUpdate);
+  socket.off("ordersUpdated",        handleUpdate);
+  handleUpdate.cancel();
     };
   }, []);
 
@@ -368,7 +371,7 @@ useEffect(() => {
 
   if (top1?.id !== prevM1Top.current) {
     if (top1?.id && !top1.embroidery_start) {
-      console.log("⏱️ Setting embroidery start time for Machine 1 top job:", top1.id);
+      // console.log("⏱️ Setting embroidery start time for Machine 1 top job:", top1.id);
       bumpJobStartTime(top1.id);
     }
     prevM1Top.current = top1?.id || null;
@@ -376,7 +379,7 @@ useEffect(() => {
 
   if (top2?.id !== prevM2Top.current) {
     if (top2?.id && !top2.embroidery_start) {
-      console.log("⏱️ Setting embroidery start time for Machine 2 top job:", top2.id);
+      // console.log("⏱️ Setting embroidery start time for Machine 2 top job:", top2.id);
       bumpJobStartTime(top2.id);
     }
     prevM2Top.current = top2?.id || null;
@@ -648,7 +651,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     headCount = 1;
   }
 
-  console.log(`🧵 Scheduling for ${machineKey} → ${headCount} heads`);
+  // console.log(`🧵 Scheduling for ${machineKey} → ${headCount} heads`);
   let prevEnd = null;
 
   return jobs.map((job, idx) => {
@@ -759,14 +762,15 @@ function getChain(jobs, id) {
 
 // ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
 const fetchOrdersEmbroLinksCore = async () => {
-  console.log('fetchOrdersEmbroLinksCore ▶ start');
+  // console.log('fetchOrdersEmbroLinksCore ▶ start');
   setIsLoading(true);
   setHasError(false);
 
   try {
     // 1) Fetch orders, embroideryList, and links in parallel
+
     const [ordersRes, embRes, linksRes] = await Promise.all([
-      axios.get(API_ROOT + '/orders'),
+      axios.get(API_ROOT + '/orders?active=true'),
       axios.get(API_ROOT + '/embroideryList'),
       axios.get(API_ROOT + '/links'),
     ]);
@@ -915,7 +919,7 @@ const fetchOrdersEmbroLinksCore = async () => {
 };
 // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
 const fetchManualStateCore = async (previousCols) => {
-  console.log('fetchManualStateCore ▶ start');
+  // console.log('fetchManualStateCore ▶ start');
   try {
     // 1) Fetch manualState from server (note no extra '/api' prefix)
     const { data: msData } = await axios.get(API_ROOT + '/manualState');
@@ -988,7 +992,7 @@ const fetchManualStateCore = async (previousCols) => {
       'Machine 2 (6)'
     );
 
-    console.log('fetchManualStateCore ▶ done');
+    // console.log('fetchManualStateCore ▶ done');
     return mergedCols;
 
   } catch (err) {
@@ -999,7 +1003,7 @@ const fetchManualStateCore = async (previousCols) => {
 
   // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
   const fetchAllCombined = async () => {
-    console.log('fetchAllCombined ▶ start');
+    // console.log('fetchAllCombined ▶ start');
     setIsLoading(true);
     setHasError(false);
 
@@ -1014,7 +1018,7 @@ const fetchManualStateCore = async (previousCols) => {
       setColumns(colsAfterManual);
 
       // 🔥 DO NOT manually re-patch embroidery_start — we only update that on drag/drop
-      console.log('fetchAllCombined ▶ done');
+      // console.log('fetchAllCombined ▶ done');
       setHasError(false);
       } catch (err) {
       console.error('❌ fetchAllCombined error', err);
@@ -1026,16 +1030,16 @@ const fetchManualStateCore = async (previousCols) => {
 
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
   useEffect(() => {
-    console.log("📡 Initial load: combined fetchAllCombined()");
+    // console.log("📡 Initial load: combined fetchAllCombined()");
 
     // 1) Run immediately on mount
     fetchAllCombined();
 
-    // 2) Set up the 15-second polling WITHOUT modifying start times
+    // 2) Set up the 5-minute polling WITHOUT modifying start times
     const handle = setInterval(() => {
-      console.log("⏳ Poll: combined fetchAllCombined()");
+      // console.log("⏳ Poll: combined fetchAllCombined()");
       fetchAllCombined();
-    }, 15000);
+    }, 300000); // 5 minutes
 
     return () => clearInterval(handle);
   }, []);
@@ -1058,7 +1062,7 @@ useEffect(() => {
 
     // If it doesn't, and we haven't bumped this job before this session, do it.
     if (!hasStart && !bumpedJobs.current.has(top.id)) {
-      console.log("⏱️ Setting embroidery start time for top job:", top.id);
+      // console.log("⏱️ Setting embroidery start time for top job:", top.id);
       bumpedJobs.current.add(top.id);
       bumpJobStartTime(top.id); // posts /updateStartTime and patches UI optimistically
     }
@@ -1231,12 +1235,12 @@ function visualToActualIndex(fullList, visualIdx) {
 
 const onDragEnd = async (result) => {
   // 🔍 DEBUGGING INSTRUMENTATION
-  console.log("🔍 DRAG-END result:", result);
-  console.log("🔍 BEFORE COLUMNS:", JSON.stringify(columns, null, 2));
+  // console.log("🔍 DRAG-END result:", result);
+  // console.log("🔍 BEFORE COLUMNS:", JSON.stringify(columns, null, 2));
 
   const { source, destination, draggableId } = result;
   if (!destination) {
-    console.log("→ No destination, aborting");
+    // console.log("→ No destination, aborting");
     return;
   }
 
@@ -1389,7 +1393,7 @@ const onDragEnd = async (result) => {
 
   // update state
   setColumns(nextCols);
-  console.log('⏹ onDragEnd end (cross-col), new columns:', nextCols);
+  // console.log('⏹ onDragEnd end (cross-col), new columns:', nextCols);
 
   // 6) Persist the shared manualState to backend **including placeholders**
   const manualState = {
@@ -1397,10 +1401,10 @@ const onDragEnd = async (result) => {
     machine2: nextCols.machine2.jobs.map(j => j.id),
     placeholders
   };
-  console.log('⏹ Persisting manualState (cross-col) to server:', manualState);
+  // console.log('⏹ Persisting manualState (cross-col) to server:', manualState);
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
-    console.log('✅ manualState saved (cross-col)');
+    // console.log('✅ manualState saved (cross-col)');
   } catch (err) {
     console.error('❌ manualState save failed (cross-col)', err);
   }

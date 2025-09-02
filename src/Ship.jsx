@@ -1216,7 +1216,7 @@ export default function Ship() {
             cursor: "pointer"
           }}
         >
-          <div style={{ width: 60 }}>{job.image && <img src={job.image} alt="Preview" style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "4px", border: "1px solid #999" }} />}</div>
+          <div style={{ width: 60 }}>{job.image && <img loading="lazy" src={job.image} alt="Preview" style={{ width: "50px", height: "50px", objectFit: "cover", borderRadius: "4px", border: "1px solid #999" }} />}</div>
           <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
           <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job["Date"])}</div>
           <div style={{ width: 200, textAlign: "center" }}>{job["Design"]}</div>
