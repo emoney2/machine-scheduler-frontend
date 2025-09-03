@@ -1,11 +1,21 @@
 // src/Overview.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { io } from "socket.io-client";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 const BACKEND_ROOT = ROOT.replace(/\/api$/, "");
 const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
+
+// 🔌 lightweight socket just for invalidations
+const socket = io(BACKEND_ROOT, {
+  path: "/socket.io",
+  transports: ["websocket"],
+  upgrade: false,
+  withCredentials: true,
+});
+
 
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
@@ -408,8 +418,29 @@ export default function Overview() {
       }
     }
     loadOverview();
-    const id = setInterval(loadOverview, 45000);
-    return () => { alive = false; clearInterval(id); };
+
+    // slow safety poll (5 minutes)
+    const id = setInterval(loadOverview, 300000);
+
+    // refresh when backend emits updates
+    const debounced = (() => {
+      let t;
+      return () => {
+        clearTimeout(t);
+        t = setTimeout(() => { if (alive) loadOverview(); }, 1000);
+      };
+    })();
+    socket.on("ordersUpdated", debounced);
+    socket.on("manualStateUpdated", debounced);
+    socket.on("placeholdersUpdated", debounced);
+
+    return () => {
+      alive = false;
+      clearInterval(id);
+      socket.off("ordersUpdated", debounced);
+      socket.off("manualStateUpdated", debounced);
+      socket.off("placeholdersUpdated", debounced);
+    };
   }, []);
 
   // Load vendor directory once

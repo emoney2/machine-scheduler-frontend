@@ -141,8 +141,9 @@ let socket = null;
 try {
   socket = io(SOCKET_ORIGIN, {
     path: SOCKET_PATH,
-    transports: ['polling','websocket'], // prefer polling first, then upgrade
-    timeout: 7000,
+    transports: ['websocket'], // force native WS
+    upgrade: false,            // skip polling->ws upgrade
+    timeout: 5000,
     reconnection: true,
     reconnectionAttempts: 8,
     reconnectionDelay: 800,
@@ -767,13 +768,12 @@ const fetchOrdersEmbroLinksCore = async () => {
   setHasError(false);
 
   try {
-    // 1) Fetch orders, embroideryList, and links in parallel
+    // 1) Fetch everything in a single round-trip
+    const combinedRes = await axios.get(API_ROOT + '/combined');
+    const ordersRes   = { data: combinedRes.data?.orders || [] };
+    const embRes      = { data: combinedRes.data?.embroideryList || [] };
+    const linksRes    = { data: combinedRes.data?.links || {} };
 
-    const [ordersRes, embRes, linksRes] = await Promise.all([
-      axios.get(API_ROOT + '/orders?active=true'),
-      axios.get(API_ROOT + '/embroideryList'),
-      axios.get(API_ROOT + '/links'),
-    ]);
 
     // 2) Prepare orders array, filter out completed
     let orders = (ordersRes.data || []).filter(
