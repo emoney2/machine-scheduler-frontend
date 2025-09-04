@@ -190,10 +190,14 @@ export default function App() {
   const BACKEND_ORIGIN = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
   const [manualReorder, setManualReorder] = useState(false);
 
+  // NEW: prevent overlapping combined fetches
+  const combinedInFlightRef = useRef(false);
+
   // Log once on mount (optional — keeps your existing console signal)
   useEffect(() => {
     // console.log("🔔 App component mounted");
   }, []);
+
 
   // Session check: if not logged in, bounce to backend /login and return here after
   useEffect(() => {
@@ -1003,6 +1007,13 @@ const fetchManualStateCore = async (previousCols) => {
 
   // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
   const fetchAllCombined = async () => {
+    // Prevent overlapping requests
+    if (combinedInFlightRef.current) {
+      // console.log('⏭️ fetchAllCombined skipped (in flight)');
+      return;
+    }
+    combinedInFlightRef.current = true;
+
     // console.log('fetchAllCombined ▶ start');
     setIsLoading(true);
     setHasError(false);
@@ -1020,13 +1031,15 @@ const fetchManualStateCore = async (previousCols) => {
       // 🔥 DO NOT manually re-patch embroidery_start — we only update that on drag/drop
       // console.log('fetchAllCombined ▶ done');
       setHasError(false);
-      } catch (err) {
+    } catch (err) {
       console.error('❌ fetchAllCombined error', err);
       setHasError(true);
     } finally {
       setIsLoading(false);
+      combinedInFlightRef.current = false;
     }
   };
+
 
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
   useEffect(() => {
