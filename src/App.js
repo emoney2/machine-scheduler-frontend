@@ -143,7 +143,7 @@ try {
     path: SOCKET_PATH,
     transports: ['websocket'], // force native WS
     upgrade: false,            // skip polling->ws upgrade
-    timeout: 5000,
+    timeout: 20000,
     reconnection: true,
     reconnectionAttempts: 8,
     reconnectionDelay: 800,
