@@ -856,6 +856,89 @@ const kickMetaWorker = () => {
   defer(run);
 };
 
+// One-at-a-time background worker for Drive meta versions
+const metaWorkerBusyRef = useRef(false);
+const pendingMetaIdsRef = useRef(new Set());
+const inflightMetaIdsRef = useRef(new Set()); // NEW: avoid re-requesting IDs already being fetched
+
+const kickMetaWorker = () => {
+  if (metaWorkerBusyRef.current) return;
+  metaWorkerBusyRef.current = true;
+
+  const run = async () => {
+    // Pull & clear the current queue
+    const ids = Array.from(pendingMetaIdsRef.current);
+    pendingMetaIdsRef.current.clear();
+    if (!ids.length) { metaWorkerBusyRef.current = false; return; }
+
+    // Fetch in small chunks
+    const versionsBatch = {};
+    const chunkSize = 20; // smaller chunks return faster/more reliably
+
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const batch = ids.slice(i, i + chunkSize);
+
+      // Mark these as inflight so we don't enqueue them again mid-flight
+      batch.forEach(id => inflightMetaIdsRef.current.add(id));
+
+      try {
+        const { data } = await axios.post(
+          API_ROOT + '/drive/metaBatch',
+          { ids: batch },
+          { timeout: 20000 } // client > server(4s) — no 10s client-side cancels
+        );
+        if (data && data.versions) Object.assign(versionsBatch, data.versions);
+      } catch (e) {
+        console.warn('metaBatch worker chunk skipped:', e?.message || e);
+      } finally {
+        // Always clear inflight markers for this chunk
+        batch.forEach(id => inflightMetaIdsRef.current.delete(id));
+      }
+    }
+
+    // Save any new versions locally
+    if (Object.keys(versionsBatch).length) {
+      Object.entries(versionsBatch).forEach(([id, v]) => {
+        if (v) metaVersionsRef.current[id] = v;
+      });
+      saveDriveVerCache();
+
+      // Upgrade artwork URLs in place
+      setColumns(prev => {
+        if (!prev) return prev;
+        const next = {
+          queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
+          machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
+          machine2: { ...prev.machine2, jobs: [...prev.machine2.jobs] },
+        };
+        const upgrade = (job) => {
+          if (!job?.imageFileId) return;
+          const v = metaVersionsRef.current[job.imageFileId];
+          if (!v) return;
+          const newUrl = toPreviewUrl(job.imageLink, v);
+          if (newUrl && newUrl !== job.artworkUrl) job.artworkUrl = newUrl;
+        };
+        next.queue.jobs.forEach(upgrade);
+        next.machine1.jobs.forEach(upgrade);
+        next.machine2.jobs.forEach(upgrade);
+        return next;
+      });
+    }
+
+    metaWorkerBusyRef.current = false;
+
+    // If new IDs arrived while we worked, run again after idle
+    if (pendingMetaIdsRef.current.size) {
+      const defer = window.requestIdleCallback || ((fn) => setTimeout(fn, 600));
+      defer(run);
+    }
+  };
+
+  const defer = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));
+  defer(run);
+};
+
+
 
 // ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
 const fetchOrdersEmbroLinksCore = async () => {
@@ -930,7 +1013,12 @@ const fetchOrdersEmbroLinksCore = async () => {
     });
 
     // 🔁 Fire-and-forget (SINGLE-FLIGHT): enqueue missing versions and let the worker handle them.
-    const idsToFetch = uniqueIds.filter(id => !metaVersionsRef.current[id]);
+    const idsToFetch = uniqueIds.filter(id =>
+      !metaVersionsRef.current[id] &&               // not already known
+      !inflightMetaIdsRef.current.has(id) &&        // not currently fetching
+      !pendingMetaIdsRef.current.has(id)            // not already queued
+    );
+
     if (idsToFetch.length) {
       idsToFetch.forEach(id => pendingMetaIdsRef.current.add(id));
       kickMetaWorker();
