@@ -854,8 +854,19 @@ const fetchOrdersEmbroLinksCore = async () => {
     if (uniqueIds.length) {
       (async () => {
         try {
-          const { data } = await axios.post(API_ROOT + '/drive/metaBatch', { ids: uniqueIds });
-          const versions = data?.versions || {};
+          // Chunk IDs to avoid gateway limits
+          const versions = {};
+          const chunkSize = 80; // 50–100 is fine
+          for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+            const batch = uniqueIds.slice(i, i + chunkSize);
+            try {
+              const { data } = await axios.post(API_ROOT + '/drive/metaBatch', { ids: batch }, { timeout: 6000 });
+              Object.assign(versions, data?.versions || {});
+            } catch (e) {
+              console.warn('metaBatch chunk failed', e?.message || e);
+            }
+          }
+
           // Update only changed jobs to avoid heavy recompute
           setColumns(prev => {
             if (!prev) return prev;
