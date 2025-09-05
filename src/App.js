@@ -783,6 +783,80 @@ const saveDriveVerCache = () => {
 const [isLoading, setIsLoading] = useState(false);
 const [hasError,   setHasError]   = useState(false);
 
+// One-at-a-time background worker for Drive meta versions
+const metaWorkerBusyRef = useRef(false);
+const pendingMetaIdsRef = useRef(new Set());
+
+const kickMetaWorker = () => {
+  if (metaWorkerBusyRef.current) return;
+  metaWorkerBusyRef.current = true;
+
+  const run = async () => {
+    // Pull & clear the current queue
+    const ids = Array.from(pendingMetaIdsRef.current);
+    pendingMetaIdsRef.current.clear();
+    if (!ids.length) { metaWorkerBusyRef.current = false; return; }
+
+    // Fetch in small chunks
+    const versionsBatch = {};
+    const chunkSize = 30;
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const batch = ids.slice(i, i + chunkSize);
+      try {
+        const { data } = await axios.post(
+          API_ROOT + '/drive/metaBatch',
+          { ids: batch },
+          { timeout: 10000 }
+        );
+        if (data && data.versions) Object.assign(versionsBatch, data.versions);
+      } catch (e) {
+        console.warn('metaBatch worker chunk skipped:', e?.message || e);
+      }
+    }
+
+    // Save any new versions locally
+    if (Object.keys(versionsBatch).length) {
+      Object.entries(versionsBatch).forEach(([id, v]) => {
+        if (v) metaVersionsRef.current[id] = v;
+      });
+      saveDriveVerCache();
+
+      // Upgrade artwork URLs in place
+      setColumns(prev => {
+        if (!prev) return prev;
+        const next = {
+          queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
+          machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
+          machine2: { ...prev.machine2, jobs: [...prev.machine2.jobs] },
+        };
+        const upgrade = (job) => {
+          if (!job?.imageFileId) return;
+          const v = metaVersionsRef.current[job.imageFileId];
+          if (!v) return;
+          const newUrl = toPreviewUrl(job.imageLink, v);
+          if (newUrl && newUrl !== job.artworkUrl) job.artworkUrl = newUrl;
+        };
+        next.queue.jobs.forEach(upgrade);
+        next.machine1.jobs.forEach(upgrade);
+        next.machine2.jobs.forEach(upgrade);
+        return next;
+      });
+    }
+
+    metaWorkerBusyRef.current = false;
+
+    // If new IDs arrived while we worked, run again after idle
+    if (pendingMetaIdsRef.current.size) {
+      const defer = window.requestIdleCallback || ((fn) => setTimeout(fn, 600));
+      defer(run);
+    }
+  };
+
+  const defer = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));
+  defer(run);
+};
+
+
 // ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
 const fetchOrdersEmbroLinksCore = async () => {
   setIsLoading(true);
@@ -855,68 +929,11 @@ const fetchOrdersEmbroLinksCore = async () => {
       job.artworkUrl = toPreviewUrl(job.imageLink, cachedV || '');
     });
 
-    // 🔁 Fire-and-forget (DEFERRED): fetch *missing* versions only, then upgrade artworkUrl.
+    // 🔁 Fire-and-forget (SINGLE-FLIGHT): enqueue missing versions and let the worker handle them.
     const idsToFetch = uniqueIds.filter(id => !metaVersionsRef.current[id]);
     if (idsToFetch.length) {
-      const defer = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
-      defer(() => {
-        (async () => {
-          try {
-            const versions = {};
-            const chunkSize = 30; // smaller chunks reduce cancels
-            for (let i = 0; i < idsToFetch.length; i += chunkSize) {
-              const batch = idsToFetch.slice(i, i + chunkSize);
-              try {
-                const { data } = await axios.post(
-                  API_ROOT + '/drive/metaBatch',
-                  { ids: batch },
-                  { timeout: 10000 } // client timeout > server 4s timeout
-                );
-                if (data && data.versions) {
-                  Object.assign(versions, data.versions);
-                }
-              } catch (e) {
-                console.warn('metaBatch chunk skipped:', e?.message || e);
-              }
-            }
-
-            // Persist newly learned versions to local cache
-            if (Object.keys(versions).length) {
-              Object.entries(versions).forEach(([id, v]) => {
-                if (v) metaVersionsRef.current[id] = v;
-              });
-              saveDriveVerCache();
-            }
-
-            // Upgrade only changed jobs to avoid heavy recompute
-            if (Object.keys(versions).length) {
-              setColumns(prev => {
-                if (!prev) return prev;
-                const next = {
-                  queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
-                  machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
-                  machine2: { ...prev.machine2, jobs: [...prev.machine2.jobs] },
-                };
-                const upgrade = (job) => {
-                  if (!job?.imageFileId) return;
-                  const v = versions[job.imageFileId] || metaVersionsRef.current[job.imageFileId] || '';
-                  if (!v) return;
-                  const newUrl = toPreviewUrl(job.imageLink, v);
-                  if (newUrl && newUrl !== job.artworkUrl) {
-                    job.artworkUrl = newUrl;
-                  }
-                };
-                next.queue.jobs.forEach(upgrade);
-                next.machine1.jobs.forEach(upgrade);
-                next.machine2.jobs.forEach(upgrade);
-                return next;
-              });
-            }
-          } catch {
-            /* ignore meta failures */
-          }
-        })();
-      });
+      idsToFetch.forEach(id => pendingMetaIdsRef.current.add(id));
+      kickMetaWorker();
     }
 
     // 6) Initialize newCols from current columns (retaining headCount)
