@@ -969,7 +969,7 @@ const fetchOrdersEmbroLinksCore = async () => {
         job.machineId = 'Machine 1 (1)';
         newCols['machine1'].jobs.push(job);
       } else if (job.machineId === 'machine2') {
-        job.machineId = 'Machine 2';
+        job.machineId = 'Machine 2 (6)'
         newCols['machine2'].jobs.push(job);
       } else {
         newCols.queue.jobs.push(job);
