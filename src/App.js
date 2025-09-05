@@ -836,42 +836,52 @@ const fetchOrdersEmbroLinksCore = async () => {
       };
     });
 
-    // 5) Fetch version tokens for unique Drive file IDs and set artworkUrl
+    // 5) Render immediately WITHOUT waiting for version tokens
     let versionById = {};
     const uniqueIds = Array.from(new Set(driveIdsToPublicize));
-    if (uniqueIds.length) {
-      try {
-        const { data } = await axios.post(API_ROOT + '/drive/metaBatch', { ids: uniqueIds });
-        versionById = data?.versions || {};
-      } catch (err) {
-        console.error('drive/metaBatch failed', err);
-      }
-    }
 
-    // 5b) Kick off server pre-warm, but DON'T await it
-  //try {
-  //  const pairs = uniqueIds
-  //    .map(id => ({ id, v: versionById[id] || '', sz: 'w240' }))
-  //    .filter(p => p.v);
-  //  if (pairs.length) {
-  //    axios.post(API_ROOT + '/drive/warmThumbnails', { pairs }).catch(() => {});
-  //  }
-  //} catch {
-      // ignore
-  //}
-
-
-
-    // Fill artworkUrl now that we have versions
+    // Fill artworkUrl optimistically (no version yet)
     Object.values(jobById).forEach(job => {
       if (!job.imageFileId) {
-        // non-Drive link or empty
         job.artworkUrl = toPreviewUrl(job.imageLink, '');
       } else {
-        const v = versionById[job.imageFileId] || '';
-        job.artworkUrl = toPreviewUrl(job.imageLink, v);
+        // no version yet — will be upgraded in background
+        job.artworkUrl = toPreviewUrl(job.imageLink, '');
       }
     });
+
+    // 🔁 Fire-and-forget: fetch versions in the background and then upgrade artworkUrl
+    if (uniqueIds.length) {
+      (async () => {
+        try {
+          const { data } = await axios.post(API_ROOT + '/drive/metaBatch', { ids: uniqueIds });
+          const versions = data?.versions || {};
+          // Update only changed jobs to avoid heavy recompute
+          setColumns(prev => {
+            if (!prev) return prev;
+            // shallow clone of columns
+            const next = {
+              queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
+              machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
+              machine2: { ...prev.machine2, jobs: [...prev.machine2.jobs] },
+            };
+            const upgrade = (job) => {
+              if (!job?.imageFileId) return;
+              const v = versions[job.imageFileId] || '';
+              const newUrl = toPreviewUrl(job.imageLink, v);
+              if (newUrl && newUrl !== job.artworkUrl) {
+                job.artworkUrl = newUrl;
+              }
+            };
+            next.queue.jobs.forEach(upgrade);
+            next.machine1.jobs.forEach(upgrade);
+            next.machine2.jobs.forEach(upgrade);
+            return next;
+          });
+        } catch { /* ignore meta failures */ }
+      })();
+    }
+
 
     // 6) Initialize newCols from current columns (retaining headCount)
     const newCols = {
