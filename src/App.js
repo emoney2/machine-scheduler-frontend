@@ -940,7 +940,7 @@ const fetchManualStateCore = async (previousCols) => {
   // console.log('fetchManualStateCore ▶ start');
   try {
     // 1) Fetch manualState from server (note no extra '/api' prefix)
-    const { data: msData } = await axios.get(API_ROOT + '/manualState');
+    const { data: msData } = await axios.get(API_ROOT + '/manualState', { timeout: 6500 });
     //    msData = { machineColumns: [ [...], [...] ], placeholders: [...] }
 
     // 2) Overwrite local placeholders state
@@ -1036,11 +1036,19 @@ const fetchManualStateCore = async (previousCols) => {
       // 1) First, build new columns from orders/embroidery/links only
       const colsAfterOrders = await fetchOrdersEmbroLinksCore();
 
-      // 2) Then, apply manualState on top of that to enforce placeholders & machine1/machine2 order
-      const colsAfterManual = await fetchManualStateCore(colsAfterOrders);
+      // 2) Show orders immediately — do NOT block on manualState
+      setColumns(colsAfterOrders);
 
-      // 3) Finally, commit to React state
-      setColumns(colsAfterManual);
+      // 3) Apply manualState in the background; upgrade columns when it returns
+      (async () => {
+        try {
+          const colsAfterManual = await fetchManualStateCore(colsAfterOrders);
+          setColumns(colsAfterManual);
+        } catch (e) {
+          console.warn('manualState deferred fetch failed/skipped', e?.message || e);
+        }
+      })();
+
 
       // 🔥 DO NOT manually re-patch embroidery_start — we only update that on drag/drop
       // console.log('fetchAllCombined ▶ done');
