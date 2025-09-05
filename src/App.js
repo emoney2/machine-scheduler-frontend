@@ -19,6 +19,7 @@ import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 
+
 // console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
 
 // Time helpers: normalize to ISO (UTC), display in Eastern
@@ -761,6 +762,19 @@ function getChain(jobs, id) {
   return chain;
 }
 
+// Cache Drive versions client-side so we don't re-fetch them every refresh
+const metaVersionsRef = useRef(
+  (() => {
+    try { return JSON.parse(localStorage.getItem('driveVerCache') || '{}'); }
+    catch { return {}; }
+  })()
+);
+const saveDriveVerCache = () => {
+  try { localStorage.setItem('driveVerCache', JSON.stringify(metaVersionsRef.current)); }
+  catch {}
+};
+
+
 // ─── Section 5: Fetch Helpers + Combined Fetch Each 20 Seconds ─────────────────
 
 // Two flags (for the top status bar if you have one):
@@ -771,7 +785,6 @@ const [hasError,   setHasError]   = useState(false);
 
 // ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
 const fetchOrdersEmbroLinksCore = async () => {
-  // console.log('fetchOrdersEmbroLinksCore ▶ start');
   setIsLoading(true);
   setHasError(false);
 
@@ -829,37 +842,30 @@ const fetchOrdersEmbroLinksCore = async () => {
         threadColors:     o['Threads'] || '',
         imageLink:        rawImageLink,
         imageFileId:      fileId || '',
-        // artworkUrl is set AFTER we fetch version tokens
+        // artworkUrl is set AFTER we fetch (or recall) version tokens
         machineId:        'queue',
         linkedTo:         linksData[sid] || null
       };
     });
 
-    // 5) Render immediately WITHOUT waiting for version tokens
-    let versionById = {};
+    // 5) Render immediately, using any locally cached versions (no blocking)
     const uniqueIds = Array.from(new Set(driveIdsToPublicize));
-
-    // Fill artworkUrl optimistically (no version yet)
     Object.values(jobById).forEach(job => {
-      if (!job.imageFileId) {
-        job.artworkUrl = toPreviewUrl(job.imageLink, '');
-      } else {
-        // no version yet — will be upgraded in background
-        job.artworkUrl = toPreviewUrl(job.imageLink, '');
-      }
+      const cachedV = job.imageFileId ? metaVersionsRef.current[job.imageFileId] : '';
+      job.artworkUrl = toPreviewUrl(job.imageLink, cachedV || '');
     });
 
-    // 🔁 Fire-and-forget (DEFERRED): fetch versions later and upgrade artworkUrl.
-    // Deferring avoids competing with first paint; smaller chunks + longer timeout reduce cancels.
-    if (uniqueIds.length) {
+    // 🔁 Fire-and-forget (DEFERRED): fetch *missing* versions only, then upgrade artworkUrl.
+    const idsToFetch = uniqueIds.filter(id => !metaVersionsRef.current[id]);
+    if (idsToFetch.length) {
       const defer = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
       defer(() => {
         (async () => {
           try {
             const versions = {};
-            const chunkSize = 40;
-            for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-              const batch = uniqueIds.slice(i, i + chunkSize);
+            const chunkSize = 30; // smaller chunks reduce cancels
+            for (let i = 0; i < idsToFetch.length; i += chunkSize) {
+              const batch = idsToFetch.slice(i, i + chunkSize);
               try {
                 const { data } = await axios.post(
                   API_ROOT + '/drive/metaBatch',
@@ -874,11 +880,18 @@ const fetchOrdersEmbroLinksCore = async () => {
               }
             }
 
-            // Update only changed jobs to avoid heavy recompute
+            // Persist newly learned versions to local cache
+            if (Object.keys(versions).length) {
+              Object.entries(versions).forEach(([id, v]) => {
+                if (v) metaVersionsRef.current[id] = v;
+              });
+              saveDriveVerCache();
+            }
+
+            // Upgrade only changed jobs to avoid heavy recompute
             if (Object.keys(versions).length) {
               setColumns(prev => {
                 if (!prev) return prev;
-                // shallow clone of columns
                 const next = {
                   queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
                   machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
@@ -886,7 +899,7 @@ const fetchOrdersEmbroLinksCore = async () => {
                 };
                 const upgrade = (job) => {
                   if (!job?.imageFileId) return;
-                  const v = versions[job.imageFileId] || '';
+                  const v = versions[job.imageFileId] || metaVersionsRef.current[job.imageFileId] || '';
                   if (!v) return;
                   const newUrl = toPreviewUrl(job.imageLink, v);
                   if (newUrl && newUrl !== job.artworkUrl) {
@@ -927,7 +940,7 @@ const fetchOrdersEmbroLinksCore = async () => {
         job.machineId = 'Machine 1 (1)';
         newCols['machine1'].jobs.push(job);
       } else if (job.machineId === 'machine2') {
-        job.machineId = 'Machine 2'; // (kept as-is per your current code)
+        job.machineId = 'Machine 2';
         newCols['machine2'].jobs.push(job);
       } else {
         newCols.queue.jobs.push(job);
