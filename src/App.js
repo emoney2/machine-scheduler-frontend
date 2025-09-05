@@ -940,7 +940,7 @@ const fetchManualStateCore = async (previousCols) => {
   // console.log('fetchManualStateCore ▶ start');
   try {
     // 1) Fetch manualState from server (note no extra '/api' prefix)
-    const { data: msData } = await axios.get(API_ROOT + '/manualState', { timeout: 6500 });
+    const { data: msData } = await axios.get(API_ROOT + '/manualState', { timeout: 8000 });
     //    msData = { machineColumns: [ [...], [...] ], placeholders: [...] }
 
     // 2) Overwrite local placeholders state
