@@ -619,18 +619,22 @@ function toPreviewUrl(originalUrl, v) {
 }
 
 
-// Full-view URL (original quality / inline display)
-function toFullViewUrl(originalUrl) {
+// Full-view URL (original quality / inline display), versioned for immutable cache
+function toFullViewUrl(originalUrl, v) {
   if (!originalUrl) return '';
   const id = extractDriveId(originalUrl);
-  return id ? `${API_ROOT}/drive/proxy/${id}?thumb=0` : originalUrl;
+  if (!id) return originalUrl;
+  let url = `${API_ROOT}/drive/proxy/${id}?thumb=0`;
+  if (v) url += `&v=${encodeURIComponent(v)}`;
+  return url;
 }
 
-// Click handler to open full-view in a new tab
-function openArtwork(originalUrl) {
-  const url = toFullViewUrl(originalUrl);
+
+function openArtwork(originalUrl, v) {
+  const url = toFullViewUrl(originalUrl, v);
   if (url) window.open(url, '_blank', 'noopener,noreferrer');
 }
+
 
 
 function sortQueue(arr) {
@@ -845,16 +849,16 @@ const fetchOrdersEmbroLinksCore = async () => {
     }
 
     // 5b) Kick off server pre-warm, but DON'T await it
-    try {
-      const pairs = uniqueIds
-        .map(id => ({ id, v: versionById[id] || '', sz: 'w240' }))
-        .filter(p => p.v);
-      if (pairs.length) {
-        axios.post(API_ROOT + '/drive/warmThumbnails', { pairs }).catch(() => {});
-      }
-    } catch {
+  //try {
+  //  const pairs = uniqueIds
+  //    .map(id => ({ id, v: versionById[id] || '', sz: 'w240' }))
+  //    .filter(p => p.v);
+  //  if (pairs.length) {
+  //    axios.post(API_ROOT + '/drive/warmThumbnails', { pairs }).catch(() => {});
+  //  }
+  //} catch {
       // ignore
-    }
+  //}
 
 
 
