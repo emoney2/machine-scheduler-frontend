@@ -761,13 +761,13 @@ function getChain(jobs, id) {
   return chain;
 }
 
-  // ─── Section 5: Fetch Helpers + Combined Fetch Each 20 Seconds ─────────────────
+// ─── Section 5: Fetch Helpers + Combined Fetch Each 20 Seconds ─────────────────
 
-  // Two flags (for the top status bar if you have one):
-  // • isLoading = true whenever any fetch is in flight
-  // • hasError   = true if the most recent fetch attempt failed
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError,   setHasError]   = useState(false);
+// Two flags (for the top status bar if you have one):
+// • isLoading = true whenever any fetch is in flight
+// • hasError   = true if the most recent fetch attempt failed
+const [isLoading, setIsLoading] = useState(false);
+const [hasError,   setHasError]   = useState(false);
 
 // ─── Step 5A: “Core” fetchOrdersEmbroLinks – build columns based on latest orders/embroidery/links
 const fetchOrdersEmbroLinksCore = async () => {
@@ -781,7 +781,6 @@ const fetchOrdersEmbroLinksCore = async () => {
     const ordersRes   = { data: combinedRes.data?.orders || [] };
     const embRes      = { data: combinedRes.data?.embroideryList || [] };
     const linksRes    = { data: combinedRes.data?.links || {} };
-
 
     // 2) Prepare orders array, filter out completed
     let orders = (ordersRes.data || []).filter(
@@ -850,49 +849,62 @@ const fetchOrdersEmbroLinksCore = async () => {
       }
     });
 
-    // 🔁 Fire-and-forget: fetch versions in the background and then upgrade artworkUrl
+    // 🔁 Fire-and-forget (DEFERRED): fetch versions later and upgrade artworkUrl.
+    // Deferring avoids competing with first paint; smaller chunks + longer timeout reduce cancels.
     if (uniqueIds.length) {
-      (async () => {
-        try {
-          // Chunk IDs to avoid gateway limits
-          const versions = {};
-          const chunkSize = 80; // 50–100 is fine
-          for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-            const batch = uniqueIds.slice(i, i + chunkSize);
-            try {
-              const { data } = await axios.post(API_ROOT + '/drive/metaBatch', { ids: batch }, { timeout: 6000 });
-              Object.assign(versions, data?.versions || {});
-            } catch (e) {
-              console.warn('metaBatch chunk failed', e?.message || e);
-            }
-          }
-
-          // Update only changed jobs to avoid heavy recompute
-          setColumns(prev => {
-            if (!prev) return prev;
-            // shallow clone of columns
-            const next = {
-              queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
-              machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
-              machine2: { ...prev.machine2, jobs: [...prev.machine2.jobs] },
-            };
-            const upgrade = (job) => {
-              if (!job?.imageFileId) return;
-              const v = versions[job.imageFileId] || '';
-              const newUrl = toPreviewUrl(job.imageLink, v);
-              if (newUrl && newUrl !== job.artworkUrl) {
-                job.artworkUrl = newUrl;
+      const defer = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
+      defer(() => {
+        (async () => {
+          try {
+            const versions = {};
+            const chunkSize = 40;
+            for (let i = 0; i < uniqueIds.length; i += chunkSize) {
+              const batch = uniqueIds.slice(i, i + chunkSize);
+              try {
+                const { data } = await axios.post(
+                  API_ROOT + '/drive/metaBatch',
+                  { ids: batch },
+                  { timeout: 10000 } // client timeout > server 4s timeout
+                );
+                if (data && data.versions) {
+                  Object.assign(versions, data.versions);
+                }
+              } catch (e) {
+                console.warn('metaBatch chunk skipped:', e?.message || e);
               }
-            };
-            next.queue.jobs.forEach(upgrade);
-            next.machine1.jobs.forEach(upgrade);
-            next.machine2.jobs.forEach(upgrade);
-            return next;
-          });
-        } catch { /* ignore meta failures */ }
-      })();
-    }
+            }
 
+            // Update only changed jobs to avoid heavy recompute
+            if (Object.keys(versions).length) {
+              setColumns(prev => {
+                if (!prev) return prev;
+                // shallow clone of columns
+                const next = {
+                  queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
+                  machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
+                  machine2: { ...prev.machine2, jobs: [...prev.machine2.jobs] },
+                };
+                const upgrade = (job) => {
+                  if (!job?.imageFileId) return;
+                  const v = versions[job.imageFileId] || '';
+                  if (!v) return;
+                  const newUrl = toPreviewUrl(job.imageLink, v);
+                  if (newUrl && newUrl !== job.artworkUrl) {
+                    job.artworkUrl = newUrl;
+                  }
+                };
+                next.queue.jobs.forEach(upgrade);
+                next.machine1.jobs.forEach(upgrade);
+                next.machine2.jobs.forEach(upgrade);
+                return next;
+              });
+            }
+          } catch {
+            /* ignore meta failures */
+          }
+        })();
+      });
+    }
 
     // 6) Initialize newCols from current columns (retaining headCount)
     const newCols = {
