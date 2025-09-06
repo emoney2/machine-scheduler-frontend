@@ -393,6 +393,37 @@ useEffect(() => {
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 
 
+// --- Copilot: Socket.IO connection for live updates ---
+import { io } from 'socket.io-client';
+
+const SOCKET_URL = 'https://machine-scheduler-backend.onrender.com';
+
+function useSocketIO(reloadData) {
+  React.useEffect(() => {
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      path: '/socket.io',
+      reconnection: true,
+      reconnectionAttempts: 5,
+      timeout: 20000,
+    });
+    socket.on('connect', () => {
+      console.log('Socket.IO connected');
+    });
+    socket.on('sheet_updated', (data) => {
+      console.log('Sheet updated:', data);
+      if (typeof reloadData === 'function') reloadData();
+    });
+    socket.on('disconnect', () => {
+      console.log('Socket.IO disconnected');
+    });
+    return () => {
+      socket.disconnect();
+    };
+  }, [reloadData]);
+}
+
+
 // === Section 2: Helpers ===
 function isHoliday(dt) {
   return dt instanceof Date &&
