@@ -1637,3 +1637,6 @@ useEffect(() => {
     </>
   );
 }
+
+// --- Copilot: Live update test ---
+// This comment ensures a change for commit & push
