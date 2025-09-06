@@ -134,7 +134,9 @@ axios.interceptors.response.use(
 );
 
 // CONFIGURATION
-const API_ROOT      = process.env.REACT_APP_API_ROOT;           // e.g. https://machine-scheduler-backend.onrender.com/api
+// Provide a safe default to avoid crashes if REACT_APP_API_ROOT isn't set in Netlify.
+const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
+const API_ROOT      = RAW_API_ROOT || 'https://machine-scheduler-backend.onrender.com/api';
 const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');           // → https://machine-scheduler-backend.onrender.com
 const SOCKET_PATH   = '/socket.io';
 
@@ -188,7 +190,7 @@ const BUBBLE_DELIV  = '#c8e6c9';
 
 export default function App() {
   // Derive backend origin (no /api) for login redirects
-  const BACKEND_ORIGIN = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+  const BACKEND_ORIGIN = API_ROOT.replace(/\/api$/, "");
   const [manualReorder, setManualReorder] = useState(false);
 
   // NEW: prevent overlapping combined fetches
@@ -393,35 +395,7 @@ useEffect(() => {
 }, [columns.machine1.jobs, columns.machine2.jobs]);
 
 
-// --- Copilot: Socket.IO connection for live updates ---
-import { io } from 'socket.io-client';
-
-const SOCKET_URL = 'https://machine-scheduler-backend.onrender.com';
-
-function useSocketIO(reloadData) {
-  React.useEffect(() => {
-    const socket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      path: '/socket.io',
-      reconnection: true,
-      reconnectionAttempts: 5,
-      timeout: 20000,
-    });
-    socket.on('connect', () => {
-      console.log('Socket.IO connected');
-    });
-    socket.on('sheet_updated', (data) => {
-      console.log('Sheet updated:', data);
-      if (typeof reloadData === 'function') reloadData();
-    });
-    socket.on('disconnect', () => {
-      console.log('Socket.IO disconnected');
-    });
-    return () => {
-      socket.disconnect();
-    };
-  }, [reloadData]);
-}
+// ... Copilot mid-file Socket.IO hook removed (duplicate import). Using the top-level socket instance above.
 
 
 // === Section 2: Helpers ===
@@ -590,40 +564,7 @@ function addWorkDays(start, days) {
   return d;
 }
 
-function subWorkDays(start, days) {
-  let d = new Date(start), removed = 0;
-  while (removed < days) {
-    d.setDate(d.getDate() - 1);
-    if (isWorkday(d)) removed++;
-  }
-  return d;
-}
-
-function fmtMMDD(d) {
-  const dt = new Date(d);
-  const mo = String(dt.getMonth() + 1).padStart(2, '0');
-  const da = String(dt.getDate()).padStart(2, '0');
-  return mo + '/' + da;
-}
-
-function fmtMMDD(d) {
-  const dt = new Date(d);
-  const mo = String(dt.getMonth() + 1).padStart(2, '0');
-  const da = String(dt.getDate()).padStart(2, '0');
-  return mo + '/' + da;
-}
-
-// === Artwork / Image Helpers ===
-function extractDriveId(url) {
-  if (!url) return '';
-  try {
-    const m1 = url.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-    if (m1) return m1[1];
-    const idParam = new URL(url).searchParams.get('id');
-    if (idParam) return idParam;
-  } catch (_) {}
-  return '';
-}
+// fmtMMDD and subWorkDays are imported from './helpers' — remove local duplicates.
 
 // === Artwork / Image Helpers ===
 function extractDriveId(url) {
