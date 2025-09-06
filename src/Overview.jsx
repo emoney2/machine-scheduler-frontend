@@ -19,6 +19,17 @@ const socket = io(BACKEND_ROOT, {
 
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
+def invalidate_overview_cache():
+    global _overview_cache, _overview_ts
+    _overview_cache = None
+    _overview_ts = 0
+
+def invalidate_combined_cache():
+    global _combined_cache, _combined_ts
+    _combined_cache = None
+    _combined_ts = 0
+
+
 function openUrlReturn(url) {
   try {
     const w = window.open(url, "_blank", "noopener,width=980,height=720");
@@ -383,7 +394,20 @@ export default function Overview() {
       try {
         setLoadingUpcoming(true);
         setLoadingMaterials(true);
-        const res = await axios.get(`${ROOT}/overview`, { withCredentials: true });
+        const ctrl = new AbortController();
+        try {
+          const res = await axios.get(`${ROOT}/overview`, {
+            withCredentials: true,
+            signal: ctrl.signal,
+            timeout: 8000 // fail fast; server cache will make the next call instant
+          });
+          // (your existing success handling stays the same below)
+        } catch (e) {
+          console.error("Failed to load overview", e?.message || e);
+        } finally {
+          // nothing to do
+        }
+
         if (!alive) return;
         const { upcoming, materials } = res.data || {};
         const jobs = (upcoming ?? []).filter(j => {
