@@ -137,12 +137,6 @@ axios.interceptors.response.use(
 // CONFIGURATION
 // Provide a safe default to avoid crashes if REACT_APP_API_ROOT isn't set in Netlify.
 
-
-const location = useLocation();
-const isScheduler = location.pathname.startsWith("/scheduler");
-
-
-
 const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
 const API_ROOT      = RAW_API_ROOT || 'https://machine-scheduler-backend.onrender.com/api';
 const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');           // → https://machine-scheduler-backend.onrender.com
@@ -245,6 +239,10 @@ export default function App() {
   const prevMachine2Top = useRef({ id: null, ts: 0 });
   const bumpedJobs = useRef(new Set());
 
+  // Which route are we on? (Scheduler is at "/")
+  const location = useLocation();
+  const isScheduler = location.pathname === "/";
+
   const prevM1Top = useRef(null);
   const prevM2Top = useRef(null);
 
@@ -341,25 +339,18 @@ export default function App() {
 
   // Real-time updates listener
   useEffect(() => {
-    const handleUpdate = debounce(() => {
-      // console.log("🌐 remote update – re-fetching");
+    if (!isScheduler) return;
+
+    fetchAllCombined();
+
+    const handle = setInterval(() => {
       fetchAllCombined();
-    }, 1000);
+    }, 300000);
+
+    return () => clearInterval(handle);
+  }, [isScheduler]);
 
 
-  socket.on("manualStateUpdated",   handleUpdate);
-  socket.on("linksUpdated",         handleUpdate);
-  socket.on("placeholdersUpdated",  handleUpdate);
-  socket.on("ordersUpdated",        handleUpdate);
-
-    return () => {
-  socket.off("manualStateUpdated",   handleUpdate);
-  socket.off("linksUpdated",         handleUpdate);
-  socket.off("placeholdersUpdated",  handleUpdate);
-  socket.off("ordersUpdated",        handleUpdate);
-  handleUpdate.cancel();
-    };
-  }, []);
 
 // Listen for just-startTime updates, splice machine1 only
 useEffect(() => {
@@ -1133,28 +1124,21 @@ const fetchManualStateCore = async (previousCols) => {
 
 // ─── Section 5E: Always ensure top jobs have a start time (no clamp) ───
 useEffect(() => {
+  if (!isScheduler) return;
+
   const maybeBump = (top, ref) => {
-    // If no top job, clear the tracker and bail
     if (!top?.id) { ref.current = null; return; }
-
-    // Does this top job already have a parseable start?
     const hasStart = !!normalizeStart(top.embroidery_start);
-
-    // If it doesn't, and we haven't bumped this job before this session, do it.
     if (!hasStart && !bumpedJobs.current.has(top.id)) {
-      // console.log("⏱️ Setting embroidery start time for top job:", top.id);
       bumpedJobs.current.add(top.id);
-      bumpJobStartTime(top.id); // posts /updateStartTime and patches UI optimistically
+      bumpJobStartTime(top.id);
     }
-
-    // Track the current top id (in case you need it elsewhere)
     ref.current = top.id;
   };
 
-  // Check both machines each time the lists change
   maybeBump(columns?.machine1?.jobs?.[0], prevM1Top);
   maybeBump(columns?.machine2?.jobs?.[0], prevM2Top);
-}, [columns?.machine1?.jobs, columns?.machine2?.jobs]);
+}, [isScheduler, columns?.machine1?.jobs, columns?.machine2?.jobs]);
 
 
 
@@ -1495,10 +1479,12 @@ const onDragEnd = async (result) => {
 
 // Add debugging logs to inspect the state of the queue column
 useEffect(() => {
+  if (!isScheduler) return;
   console.log("Queue column before sorting:", columns.queue.jobs);
   const sortedQueue = sortQueue(columns.queue.jobs);
   console.log("Queue column after sorting:", sortedQueue);
-}, [columns.queue.jobs]);
+}, [isScheduler, columns.queue.jobs]);
+
 
 // === Section 9: Render via Section9.jsx ===
 
