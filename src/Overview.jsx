@@ -19,6 +19,25 @@ const socket = io(BACKEND_ROOT, {
 
 
 // ——— Helpers (no hooks here) ——————————————————————————————————————
+
+function firstFourDigitCode(s) {
+  const m = String(s || "").match(/\b(\d{4})\b/);
+  return m ? m[1] : null;
+}
+
+function threadImgUrl(root, name) {
+  const code = firstFourDigitCode(name);
+  if (!code) return null;
+  return `${root}/thread-images/${code}.jpg`;
+}
+
+function materialImgUrl(root, vendor, name) {
+  // Builds /material-image?vendor=...&name=...
+  const v = encodeURIComponent(vendor || "");
+  const n = encodeURIComponent(name || "");
+  return `${root}/material-image?vendor=${v}&name=${n}`;
+}
+
 function openUrlReturn(url) {
   try {
     const w = window.open(url, "_blank", "noopener,width=980,height=720");
@@ -650,7 +669,8 @@ export default function Overview() {
 
           {!loadingUpcoming && upcoming.map((job, idx) => {
             const ring = ringColorByShipDate(job["Ship Date"]);
-            const imageUrl = job.image || deriveThumb(job["Preview"]);
+            const driveId = parseDriveId(job.image || job["Preview"]);
+            const imageUrl = proxyThumb(driveId, "w160");
             return (
               <div key={idx} style={rowCard}>
                 <div style={{ ...imgBox, borderColor: ring }}>
@@ -740,14 +760,20 @@ export default function Overview() {
                           overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
                           background: "#fafafa", flex: "0 0 36px"
                         }}
-                        aria-label={isThread ? "Thread image" : undefined}
-                        title={isThread ? it.name : undefined}
+                        aria-label={isThread ? "Thread image" : "Material image"}
+                        title={it.name}
                       >
                         {isThread ? (
                           <ThreadThumb name={it.name} fallbackColor={swatch} />
-                        ) : null}
+                        ) : (
+                          // Try vendor + name via backend; SecureImage fetches with credentials and caches blobs
+                          <SecureImage
+                            candidates={[materialImgUrl(ROOT, grp.vendor, it.name)]}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                          />
+                        )}
                       </div>
-
                       {/* Name */}
                       <div
                         style={{ width: 240, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}
