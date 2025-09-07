@@ -387,7 +387,7 @@ export default function Overview() {
       try {
         const res = await axios.get(`${ROOT}/overview`, {
           withCredentials: true,
-          timeout: 8000, // fail fast; server cache makes next call instant
+          timeout: 20000, // fail fast; server cache makes next call instant
         });
         data = res?.data || {};
       } catch (e) {
