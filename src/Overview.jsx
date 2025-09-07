@@ -381,6 +381,8 @@ export default function Overview() {
   const [materials, setMaterials] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
 
+  const overviewCtrlRef = useRef(null);
+
   // Order modal
   const [modalOpenForVendor, setModalOpenForVendor] = useState(null);
   const [modalSelections, setModalSelections] = useState({}); // key: `${vendor}:::${name}` -> { selected, qty, unit, type }
@@ -398,7 +400,15 @@ export default function Overview() {
   // Load combined overview (upcoming + materials)
   useEffect(() => {
     let alive = true;
+
     async function loadOverview() {
+      // If a previous request is still running, cancel it
+      if (overviewCtrlRef.current) {
+        try { overviewCtrlRef.current.abort(); } catch (_) {}
+      }
+      const ctrl = new AbortController();
+      overviewCtrlRef.current = ctrl;
+
       setLoadingUpcoming(true);
       setLoadingMaterials(true);
 
@@ -406,48 +416,58 @@ export default function Overview() {
       try {
         const res = await axios.get(`${ROOT}/overview`, {
           withCredentials: true,
-          timeout: 20000, // fail fast; server cache makes next call instant
+          signal: ctrl.signal,
+          timeout: 12000, // 12s fail-fast; next call should hit server cache
         });
         data = res?.data || {};
       } catch (e) {
-        console.error("Failed to load overview", e?.message || e);
-        data = {}; // safe fallback so UI logic below still runs
+        // If we aborted on purpose, stay quiet; otherwise log
+        if (e?.name !== "CanceledError" && e?.message !== "canceled") {
+          console.error("Failed to load overview", e?.message || e);
+        }
+        data = {};
       } finally {
         if (!alive) return;
+        // Only finish if this call is still the latest controller
+        if (overviewCtrlRef.current === ctrl) {
+          const { upcoming, materials } = data;
+          const jobs = (upcoming ?? []).filter(j => {
+            const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
+            return stage !== "COMPLETE" && stage !== "COMPLETED";
+          });
+          const groups = materials ?? [];
+          setUpcoming(jobs);
+          setMaterials(groups);
 
-        const { upcoming, materials } = data;
-        const jobs = (upcoming ?? []).filter(j => {
-          const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
-          return stage !== "COMPLETE" && stage !== "COMPLETED";
-        });
-        const groups = materials ?? [];
-        setUpcoming(jobs);
-        setMaterials(groups);
-
-        // prime selections (all pre-checked)
-        const init = {};
-        for (const g of groups) {
-          for (const it of (g.items || [])) {
-            const key = `${g.vendor}:::${it.name}`;
-            init[key] = {
-              selected: true,
-              qty: String(it.qty ?? ""),
-              unit: it.unit ?? "",
-              type: it.type ?? "Material",
-            };
+          // prime selections
+          const init = {};
+          for (const g of groups) {
+            for (const it of (g.items || [])) {
+              const key = `${g.vendor}:::${it.name}`;
+              init[key] = {
+                selected: true,
+                qty: String(it.qty ?? ""),
+                unit: it.unit ?? "",
+                type: it.type ?? "Material",
+              };
+            }
           }
-        }
-        setModalSelections(init);
+          setModalSelections(init);
 
-        setLoadingUpcoming(false);
-        setLoadingMaterials(false);
+          setLoadingUpcoming(false);
+          setLoadingMaterials(false);
+
+          // clear controller
+          overviewCtrlRef.current = null;
+        }
       }
     }
 
+    // initial load
     loadOverview();
 
-    // slow safety poll (5 minutes)
-    const id = setInterval(loadOverview, 300000);
+    // slow safety poll (5 minutes) — but don’t overlap; we abort before each new call
+    const poll = setInterval(loadOverview, 300000);
 
     // refresh when backend emits updates (debounced 1s)
     const debounced = (() => {
@@ -463,12 +483,17 @@ export default function Overview() {
 
     return () => {
       alive = false;
-      clearInterval(id);
+      clearInterval(poll);
       socket.off("ordersUpdated", debounced);
       socket.off("manualStateUpdated", debounced);
       socket.off("placeholdersUpdated", debounced);
+      // abort any in-flight request on unmount
+      if (overviewCtrlRef.current) {
+        try { overviewCtrlRef.current.abort(); } catch (_) {}
+        overviewCtrlRef.current = null;
+      }
     };
-  }, []);
+  }, [ROOT]);
 
   // Load vendor directory once
   useEffect(() => {
