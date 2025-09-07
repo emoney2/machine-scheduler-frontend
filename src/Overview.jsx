@@ -380,25 +380,23 @@ export default function Overview() {
   useEffect(() => {
     let alive = true;
     async function loadOverview() {
-      try {
-        setLoadingUpcoming(true);
-        setLoadingMaterials(true);
-        const ctrl = new AbortController();
-        try {
-          const res = await axios.get(`${ROOT}/overview`, {
-            withCredentials: true,
-            signal: ctrl.signal,
-            timeout: 8000 // fail fast; server cache will make the next call instant
-          });
-          // (your existing success handling stays the same below)
-        } catch (e) {
-          console.error("Failed to load overview", e?.message || e);
-        } finally {
-          // nothing to do
-        }
+      setLoadingUpcoming(true);
+      setLoadingMaterials(true);
 
+      let data = null;
+      try {
+        const res = await axios.get(`${ROOT}/overview`, {
+          withCredentials: true,
+          timeout: 8000, // fail fast; server cache makes next call instant
+        });
+        data = res?.data || {};
+      } catch (e) {
+        console.error("Failed to load overview", e?.message || e);
+        data = {}; // safe fallback so UI logic below still runs
+      } finally {
         if (!alive) return;
-        const { upcoming, materials } = res.data || {};
+
+        const { upcoming, materials } = data;
         const jobs = (upcoming ?? []).filter(j => {
           const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
           return stage !== "COMPLETE" && stage !== "COMPLETED";
@@ -421,21 +419,18 @@ export default function Overview() {
           }
         }
         setModalSelections(init);
-      } catch (e) {
-        console.error("Failed to load overview", e);
-      } finally {
-        if (alive) {
-          setLoadingUpcoming(false);
-          setLoadingMaterials(false);
-        }
+
+        setLoadingUpcoming(false);
+        setLoadingMaterials(false);
       }
     }
+
     loadOverview();
 
     // slow safety poll (5 minutes)
     const id = setInterval(loadOverview, 300000);
 
-    // refresh when backend emits updates
+    // refresh when backend emits updates (debounced 1s)
     const debounced = (() => {
       let t;
       return () => {

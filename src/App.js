@@ -18,6 +18,7 @@ import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
+import { useLocation } from "react-router-dom";
 
 
 // console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
@@ -135,6 +136,13 @@ axios.interceptors.response.use(
 
 // CONFIGURATION
 // Provide a safe default to avoid crashes if REACT_APP_API_ROOT isn't set in Netlify.
+
+
+const location = useLocation();
+const isScheduler = location.pathname.startsWith("/scheduler");
+
+
+
 const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
 const API_ROOT      = RAW_API_ROOT || 'https://machine-scheduler-backend.onrender.com/api';
 const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');           // → https://machine-scheduler-backend.onrender.com
