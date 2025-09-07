@@ -131,15 +131,31 @@ export default function OrderSubmission() {
   };
 
 
-  const extractDriveThumbnail = (link) => {
-    let fileId = "";
-    if (link.includes("id=")) {
-      fileId = link.split("id=")[1].split("&")[0];
-    } else if (link.includes("/file/d/")) {
-      fileId = link.split("/file/d/")[1].split("/")[0];
-    }
-    return fileId ? `https://drive.google.com/thumbnail?id=${fileId}` : "";
+  // Extract the Drive fileId (works for ?id=... or /file/d/<id>/...)
+  const extractDriveFileId = (link) => {
+    if (!link) return "";
+    try {
+      if (link.includes("id=")) return link.split("id=")[1].split("&")[0];
+      if (link.includes("/file/d/")) return link.split("/file/d/")[1].split("/")[0];
+    } catch {}
+    return "";
   };
+
+  // Build the exact formula you like for the Preview cell (still renders a thumbnail)
+  const buildPreviewFormulaFromId = (fileId) => {
+    if (!fileId) return "";
+    // Your current formula pattern, but we fill the id directly:
+    // =IFNA(IMAGE("https://drive.google.com/uc?export=view&id=" & <id>), "No preview available")
+    // Since we’re sending a single cell value, we inline the id string (no & needed).
+    return `=IFNA(IMAGE("https://drive.google.com/uc?export=view&id=${fileId}"), "No preview available")`;
+  };
+
+  // If you already have a full thumbnail URL (drive.google.com/thumbnail?...), you can still IMAGE() it:
+  const buildPreviewFormulaFromUrl = (url) => {
+    if (!url) return "";
+    return `=IFNA(IMAGE("${url}"), "No preview available")`;
+  };
+
 
   const loadExistingOrder = async () => {
     if (!reorderData.previousOrder) return;
@@ -653,6 +669,32 @@ const submitForm = async () => {
     }
   }
 
+  // ▶️ Build Preview formula (so the cell shows a thumbnail immediately)
+  // Priority:
+  // 1) If this is a reorder and we have reorderData.previewUrl → use it
+  // 2) Else if you store any Google Drive link in a form field (e.g. form.prodLink) → use it
+  //    (Add your own field name if you have one)
+  let previewFormula = "";
+
+  if (form.isReorder && reorderData.previewUrl) {
+    const id = extractDriveFileId(reorderData.previewUrl);
+    previewFormula = id
+      ? buildPreviewFormulaFromId(id)
+      : buildPreviewFormulaFromUrl(reorderData.previewUrl);
+  } else if (form.prodLink) {
+    const id = extractDriveFileId(form.prodLink);
+    previewFormula = id
+      ? buildPreviewFormulaFromId(id)
+      : buildPreviewFormulaFromUrl(form.prodLink);
+  }
+
+  // If we built a formula, include it in the submission. The backend should write this
+  // into the "Preview" column for the new row verbatim (Sheets will render the image).
+  if (previewFormula) {
+    fd.append("previewFormula", previewFormula);
+  }
+
+
   if (!fd.has("prodFiles")) {
     console.error("❌ No prodFiles in FormData");
   }
@@ -673,7 +715,23 @@ const submitForm = async () => {
       }
     };
 
-    await axios.post(submitUrl, fd, config);
+    // ⬇️ keep the response so we can use any returned IDs/fields
+    const { data } = await axios.post(submitUrl, fd, config);
+
+    // ⬇️ If backend returns a Drive fileId for the primary production file,
+    // write the Preview cell formula immediately (so the sheet shows the thumbnail now).
+    if (data?.primaryFileId && data?.orderNumber) {
+      const f = buildPreviewFormulaFromId(data.primaryFileId);
+      try {
+        await axios.post(
+          `${API_ROOT}/orders/${data.orderNumber}/preview`,
+          { previewFormula: f },
+          { withCredentials: true }
+        );
+      } catch (err) {
+        console.warn("Could not set Preview formula via API:", err);
+      }
+    }
 
     setIsSubmittingOverlay(false);
     setShowSuccessOverlay(true);
