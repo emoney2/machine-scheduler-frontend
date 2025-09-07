@@ -411,7 +411,7 @@ export default function Overview() {
         const res = await axios.get(`${ROOT}/overview`, {
           withCredentials: true,
           signal: ctrl.signal,
-          timeout: 12000, // give the first call a bit more time; subsequent calls will be cached
+          timeout: 20000, // give the first call a bit more time; subsequent calls will be cached
         });
         data = res?.data || {};
       } catch (e) {
