@@ -34,23 +34,18 @@ function extractFileIdFromFormulaOrUrl(v) {
 }
 
 function getJobThumbUrl(job, ROOT) {
-  // Try common fields your rows may have
   const fields = [
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
     job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl
   ];
   for (const f of fields) {
     const id = extractFileIdFromFormulaOrUrl(f);
-    if (id) return `${ROOT.replace(/\/api$/, "")}/drive/proxy/${id}?sz=w160`;
+    if (id) return `${ROOT}/drive/proxy/${id}?sz=w160`; // ROOT ends with /api, so this is /api/drive/proxy
   }
-  // If your backend already gives a thumb url, use it as a last resort
-  if (job.imageUrl) return job.imageUrl;
-  return null; // no image
+  if (job.imageUrl) return job.imageUrl; // server-provided absolute URL
+  return null;
 }
 
-function fmt(val) {
-  return (val ?? "").toString().trim();
-}
 
 
 
