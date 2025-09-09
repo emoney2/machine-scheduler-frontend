@@ -11,7 +11,7 @@ const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
 
 const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
-const [daysWindow, setDaysWindow] = useState("7");
+
 
 // --- Upcoming Jobs: helpers for thumbnails + formatting ---
 function extractFileIdFromFormulaOrUrl(v) {
@@ -442,7 +442,7 @@ export default function Overview() {
   const [loadingMaterials, setLoadingMaterials] = useState(true);
 
   const [selections, setSelections] = useState({});
-
+  const [daysWindow, setDaysWindow] = useState("7");
   const overviewCtrlRef = useRef(null);
 
   // Order modal
@@ -757,7 +757,8 @@ export default function Overview() {
             Upcoming Jobs (Ship in next {daysWindow} days)
           </div>
           {loadingUpcoming && <div>Loading…</div>}
-          {!loadingUpcoming && !upcoming.length && <div>No jobs in the next 7 days.</div>}
+          {!loadingUpcoming && !upcoming.length && <div>No jobs in the next {daysWindow} days.</div>}
+
 
           {!loadingUpcoming && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
