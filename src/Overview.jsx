@@ -11,6 +11,7 @@ const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
 
 const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
+const [daysWindow, setDaysWindow] = useState("7");
 
 // --- Upcoming Jobs: helpers for thumbnails + formatting ---
 function extractFileIdFromFormulaOrUrl(v) {
@@ -505,13 +506,15 @@ export default function Overview() {
         const data = res?.data || {};
         saveOverviewCache(data);
 
-        const { upcoming, materials } = data;
+        const { upcoming, materials, daysWindow: dw } = data;
         const jobs = (upcoming ?? []).filter(j => {
           const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
           return stage !== "COMPLETE" && stage !== "COMPLETED";
         });
         setUpcoming(jobs);
         setMaterials(materials ?? []);
+        if (dw) setDaysWindow(String(dw));
+
         const init = {};
         for (const g of (materials ?? [])) {
           for (const it of (g.items || [])) {
@@ -525,6 +528,7 @@ export default function Overview() {
           }
         }
         setSelections(init);
+
       } catch (e) {
         if (e?.name !== "CanceledError" && e?.message !== "canceled") {
           console.error("Failed to load overview", e?.message || e);
@@ -749,8 +753,9 @@ export default function Overview() {
 
         {/* TR — Upcoming Jobs */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
-          <div style={{ ...header, textAlign: "center" }}>Upcoming Jobs (Ship in next 7 days)</div>
-
+          <div style={{ ...header, textAlign: "center" }}>
+            Upcoming Jobs (Ship in next {daysWindow} days)
+          </div>
           {loadingUpcoming && <div>Loading…</div>}
           {!loadingUpcoming && !upcoming.length && <div>No jobs in the next 7 days.</div>}
 
@@ -811,30 +816,43 @@ export default function Overview() {
 
                     {/* Details */}
                     <div style={{ padding: 10, display: "grid", gap: 4 }}>
+                      {/* Design name */}
                       <div
                         title={String(job["Design"] || "")}
-                        style={{ fontSize: 14, fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
+                        style={{ fontSize: 15, fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
                       >
                         {job["Design"] || "Untitled"}
                       </div>
-                      <div style={{ fontSize: 12, color: "#374151" }}>
-                        <span style={{ color: "#6b7280" }}>Order #:</span> {job["Order #"] || "—"}
+
+                      {/* Order # */}
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
+                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Order #:</span> {job["Order #"] || "—"}
                       </div>
-                      <div style={{ fontSize: 12, color: "#374151" }}>
-                        <span style={{ color: "#6b7280" }}>Qty:</span> {job["Quantity"] || "—"} &nbsp;•&nbsp; {job["Product"] || "—"}
+
+                      {/* Quantity & Product */}
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
+                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Qty:</span> {job["Quantity"] || "—"} &nbsp;•&nbsp; {job["Product"] || "—"}
                       </div>
-                      <div style={{ fontSize: 12, color: "#374151" }}>
-                        <span style={{ color: "#6b7280" }}>Company:</span> {job["Company Name"] || "—"}
+
+                      {/* Company */}
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
+                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Company:</span> {job["Company Name"] || "—"}
                       </div>
-                      <div style={{ fontSize: 12, color: "#374151" }}>
-                        <span style={{ color: "#6b7280" }}>Stage:</span> {job["Stage"] || "—"}
+
+                      {/* Stage */}
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
+                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Stage:</span> {job["Stage"] || "—"}
                       </div>
-                      <div style={{ fontSize: 12, color: "#374151" }}>
-                        <span style={{ color: "#6b7280" }}>Due:</span> {fmtMMDD(job["Due Date"])} &nbsp;•&nbsp; Ship:{" "}
+
+                      {/* Due / Ship */}
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
+                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Due:</span> {fmtMMDD(job["Due Date"])} &nbsp;•&nbsp; Ship:{" "}
                         <span style={{ fontWeight: 600, color: ring }}>{fmtMMDD(job["Ship Date"])}</span>
                       </div>
-                      <div style={{ fontSize: 12, color: "#374151" }}>
-                        <span style={{ color: "#6b7280" }}>Hard/Soft:</span> {showMMDDorRaw(pickHardSoft(job))}
+
+                      {/* Hard/Soft */}
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
+                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Hard/Soft:</span> {showMMDDorRaw(pickHardSoft(job))}
                       </div>
                     </div>
                   </div>
