@@ -687,6 +687,10 @@ export default function Overview() {
                     <img
                       src={imageUrl}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
+                      width={160}
+                      height={80}
                       style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
                     />
                   ) : (
