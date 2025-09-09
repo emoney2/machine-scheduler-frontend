@@ -13,6 +13,8 @@ const THREAD_IMG_BASE =
 const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 
 
+
+
 // --- Upcoming Jobs: helpers for thumbnails + formatting ---
 function extractFileIdFromFormulaOrUrl(v) {
   // Handles either =IMAGE("https://...id=FILEID") or a raw Drive URL/formula string
@@ -39,7 +41,7 @@ function getJobThumbUrl(job, ROOT) {
   ];
   for (const f of fields) {
     const id = extractFileIdFromFormulaOrUrl(f);
-    if (id) return `${ROOT.replace(/\/api$/, "")}/drive/proxy/${id}?sz=w240`;
+    if (id) return `${ROOT.replace(/\/api$/, "")}/drive/proxy/${id}?sz=w160`;
   }
   // If your backend already gives a thumb url, use it as a last resort
   if (job.imageUrl) return job.imageUrl;
@@ -788,8 +790,7 @@ export default function Overview() {
 
           {!loadingUpcoming && upcoming.map((job, idx) => {
             const ring = ringColorByShipDate(job["Ship Date"]);
-            const driveId = parseDriveId(job.image || job["Preview"]);
-            const imageUrl = proxyThumb(driveId, "w160");
+            const imageUrl = getJobThumbUrl(job, ROOT);
 
             return (
               <div key={idx} style={rowCard}>
