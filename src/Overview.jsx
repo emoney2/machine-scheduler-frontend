@@ -3,10 +3,15 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
+
+
 const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 const BACKEND_ROOT = ROOT.replace(/\/api$/, "");
 const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
+
+const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
+
 
 // 🔌 lightweight socket just for invalidations
 const socket = io(BACKEND_ROOT, {
@@ -15,6 +20,22 @@ const socket = io(BACKEND_ROOT, {
   upgrade: false,
   withCredentials: true,
 });
+
+const LS_OVERVIEW_KEY = "jrco.overview.cache.v1";
+
+function saveOverviewCache(data) {
+  try { localStorage.setItem(LS_OVERVIEW_KEY, JSON.stringify({ t: Date.now(), data })); } catch {}
+}
+function loadOverviewCache(maxAgeMs = 5 * 60 * 1000) { // 5 min
+  try {
+    const raw = localStorage.getItem(LS_OVERVIEW_KEY);
+    if (!raw) return null;
+    const { t, data } = JSON.parse(raw);
+    if (!t || (Date.now() - t) > maxAgeMs) return null;
+    return data;
+  } catch { return null; }
+}
+
 
 
 
@@ -401,40 +422,58 @@ export default function Overview() {
   useEffect(() => {
     let alive = true;
 
-    async function loadOverview() {
-      setLoadingUpcoming(true);
-      setLoadingMaterials(true);
+    // 1) Hydrate instantly from cache (if any)
+    const cached = loadOverviewCache();
+    if (cached) {
+      const { upcoming = [], materials = [] } = cached;
+      const jobs = (upcoming ?? []).filter(j => {
+        const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
+        return stage !== "COMPLETE" && stage !== "COMPLETED";
+      });
+      setUpcoming(jobs);
+      setMaterials(materials ?? []);
+      // Prime selections
+      const init = {};
+      for (const g of (materials ?? [])) {
+        for (const it of (g.items || [])) {
+          const key = `${g.vendor}:::${it.name}`;
+          init[key] = {
+            selected: true,
+            qty: String(it.qty ?? ""),
+            unit: it.unit ?? "",
+            type: it.type ?? "Material",
+          };
+        }
+      }
+      setSelections(init);
+      setLoadingUpcoming(false);
+      setLoadingMaterials(false);
+    }
 
-      let data = null;
+    // 2) Fetch fresh in background (stale-while-revalidate)
+    async function loadFresh() {
+      setLoadingUpcoming(!cached);
+      setLoadingMaterials(!cached);
       const ctrl = new AbortController();
       try {
         const res = await axios.get(`${ROOT}/overview`, {
           withCredentials: true,
           signal: ctrl.signal,
-          timeout: 20000, // give the first call a bit more time; subsequent calls will be cached
+          timeout: 20000,
         });
-        data = res?.data || {};
-      } catch (e) {
-        // Swallow timeouts or cancellations gracefully; log other errors
-        if (e?.name !== "CanceledError" && e?.message !== "canceled") {
-          console.error("Failed to load overview", e?.message || e);
-        }
-        data = {}; // safe fallback so UI logic still runs
-      } finally {
         if (!alive) return;
+        const data = res?.data || {};
+        saveOverviewCache(data);
 
         const { upcoming, materials } = data;
         const jobs = (upcoming ?? []).filter(j => {
           const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
           return stage !== "COMPLETE" && stage !== "COMPLETED";
         });
-        const groups = materials ?? [];
         setUpcoming(jobs);
-        setMaterials(groups);
-
-        // prime selections (all pre-checked)
+        setMaterials(materials ?? []);
         const init = {};
-        for (const g of groups) {
+        for (const g of (materials ?? [])) {
           for (const it of (g.items || [])) {
             const key = `${g.vendor}:::${it.name}`;
             init[key] = {
@@ -445,25 +484,29 @@ export default function Overview() {
             };
           }
         }
-        setModalSelections(init);
-
+        setSelections(init);
+      } catch (e) {
+        if (e?.name !== "CanceledError" && e?.message !== "canceled") {
+          console.error("Failed to load overview", e?.message || e);
+        }
+      } finally {
+        if (!alive) return;
         setLoadingUpcoming(false);
         setLoadingMaterials(false);
       }
     }
 
-    // initial load
-    loadOverview();
+    loadFresh();
 
     // slow safety poll (5 minutes)
-    const id = setInterval(loadOverview, 300000);
+    const id = setInterval(loadFresh, 300000);
 
     // refresh when backend emits updates (debounced 1s)
     const debounced = (() => {
       let t;
       return () => {
         clearTimeout(t);
-        t = setTimeout(() => { if (alive) loadOverview(); }, 1000);
+        t = setTimeout(() => { if (alive) loadFresh(); }, 1000);
       };
     })();
     socket.on("ordersUpdated", debounced);
@@ -482,22 +525,43 @@ export default function Overview() {
   // Load vendor directory once
   useEffect(() => {
     let alive = true;
+
+    // 1) Hydrate instantly from localStorage (if present)
+    try {
+      const raw = localStorage.getItem(LS_VENDORS_KEY);
+      if (raw) {
+        const map = JSON.parse(raw);
+        if (map && typeof map === "object") {
+          setVendorDir(map);
+        }
+      }
+    } catch {}
+
+    // 2) Fetch fresh in background and update cache + state
     (async () => {
       try {
-        const res = await axios.get(`${ROOT}/vendors`, { withCredentials: true });
+        const res = await axios.get(`${ROOT}/vendors`, {
+          withCredentials: true,
+          timeout: 20000,
+        });
         if (!alive) return;
+
         const map = {};
         for (const v of res.data?.vendors || []) {
           const key = (v.vendor || "").trim().toLowerCase();
           map[key] = v; // {vendor, method, email, cc, website}
         }
+
         setVendorDir(map);
+        try { localStorage.setItem(LS_VENDORS_KEY, JSON.stringify(map)); } catch {}
       } catch (e) {
         console.error("Failed to load vendor directory", e);
       }
     })();
+
     return () => { alive = false; };
   }, []);
+
 
   useEffect(() => {
     const id = setInterval(() => {
