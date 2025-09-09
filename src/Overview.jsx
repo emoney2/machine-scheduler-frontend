@@ -756,112 +756,96 @@ export default function Overview() {
           <div style={{ ...header, textAlign: "center" }}>
             Upcoming Jobs (Ship in next {daysWindow} days)
           </div>
+
+          {/* column headers */}
+          <div
+            style={{
+              ...rowCard,
+              padding: "4px 8px",
+              marginBottom: 8,
+              background: "#fafafa",
+              borderColor: "#eee",
+              fontSize: 11,
+              fontWeight: 600,
+              color: "#666",
+            }}
+          >
+            <div style={{ ...imgBox, border: "0", background: "transparent" }} />
+            <div style={{ width: 58 }}>Order #</div>
+            <div style={col(250)}>Company Name</div>
+            <div style={col(150)}>Design</div>
+            <div style={{ ...col(56, true) }}>Qty</div>
+            <div style={col(120)}>Product</div>
+            <div style={col(90)}>Stage</div>
+            <div style={{ ...col(64, true) }}>Due</div>
+            <div style={{ ...col(50, true) }}>Print</div>
+            <div style={{ ...col(68, true) }}>Ship</div>
+            <div style={{ ...col(110, true) }}>Hard/Soft</div>
+          </div>
+
           {loadingUpcoming && <div>Loading…</div>}
           {!loadingUpcoming && !upcoming.length && <div>No jobs in the next {daysWindow} days.</div>}
 
+          {!loadingUpcoming && upcoming.map((job, idx) => {
+            const ring = ringColorByShipDate(job["Ship Date"]);
+            const driveId = parseDriveId(job.image || job["Preview"]);
+            const imageUrl = proxyThumb(driveId, "w160");
 
-          {!loadingUpcoming && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-              {upcoming.map((job, idx) => {
-                const ring = ringColorByShipDate(job["Ship Date"]);
-                const driveId = parseDriveId(job.image || job["Preview"]);
-                const imageUrl = proxyThumb(driveId, "w240");
+            return (
+              <div key={idx} style={rowCard}>
+                <div style={{ ...imgBox, borderColor: ring }}>
+                  {imageUrl ? (
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      width={160}
+                      height={80}
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 13, color: "#999" }}>No img</div>
+                  )}
+                </div>
 
-                return (
-                  <div
-                    key={idx}
-                    style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 12,
-                      overflow: "hidden",
-                      background: "#fff",
-                      display: "flex",
-                      flexDirection: "column",
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-                    }}
-                  >
-                    {/* Image band */}
-                    <div style={{ position: "relative", paddingTop: "50%", background: "#f9fafb", borderBottom: `3px solid ${ring}` }}>
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                            display: "block",
-                          }}
-                          onError={(e) => (e.currentTarget.style.display = "none")}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#9ca3af",
-                            fontSize: 12,
-                          }}
-                        >
-                          No preview
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Details */}
-                    <div style={{ padding: 10, display: "grid", gap: 4 }}>
-                      {/* Design name */}
-                      <div
-                        title={String(job["Design"] || "")}
-                        style={{ fontSize: 15, fontWeight: 600, color: "#111827", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}
-                      >
-                        {job["Design"] || "Untitled"}
-                      </div>
-
-                      {/* Order # */}
-                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
-                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Order #:</span> {job["Order #"] || "—"}
-                      </div>
-
-                      {/* Quantity & Product */}
-                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
-                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Qty:</span> {job["Quantity"] || "—"} &nbsp;•&nbsp; {job["Product"] || "—"}
-                      </div>
-
-                      {/* Company */}
-                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
-                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Company:</span> {job["Company Name"] || "—"}
-                      </div>
-
-                      {/* Stage */}
-                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
-                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Stage:</span> {job["Stage"] || "—"}
-                      </div>
-
-                      {/* Due / Ship */}
-                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
-                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Due:</span> {fmtMMDD(job["Due Date"])} &nbsp;•&nbsp; Ship:{" "}
-                        <span style={{ fontWeight: 600, color: ring }}>{fmtMMDD(job["Ship Date"])}</span>
-                      </div>
-
-                      {/* Hard/Soft */}
-                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 500 }}>
-                        <span style={{ color: "#6b7280", fontWeight: 400 }}>Hard/Soft:</span> {showMMDDorRaw(pickHardSoft(job))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                {/* Uniform 13px fonts; key values slightly bolder */}
+                <div style={{ width: 58, fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Order #"] || "")}>
+                  {job["Order #"]}
+                </div>
+                <div style={{ ...col(250), fontSize: 13, color: "#374151" }} title={String(job["Company Name"] || "")}>
+                  {job["Company Name"]}
+                </div>
+                <div style={{ ...col(150), fontSize: 13, color: "#374151" }} title={String(job["Design"] || "")}>
+                  {job["Design"]}
+                </div>
+                <div style={{ ...col(56, true), fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Quantity"] || "")}>
+                  {job["Quantity"]}
+                </div>
+                <div style={{ ...col(120), fontSize: 13, color: "#374151" }} title={String(job["Product"] || "")}>
+                  {job["Product"]}
+                </div>
+                <div style={{ ...col(90), fontSize: 13, color: "#374151" }} title={String(job["Stage"] || "")}>
+                  {job["Stage"]}
+                </div>
+                <div style={{ ...col(64, true), fontSize: 13, color: "#374151" }} title={String(job["Due Date"] || "")}>
+                  {fmtMMDD(job["Due Date"])}
+                </div>
+                <div style={{ ...col(50, true), fontSize: 13, color: "#374151" }} title={String(job["Print"] || "")}>
+                  {job["Print"]}
+                </div>
+                <div style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }} title={String(job["Ship Date"] || "")}>
+                  {fmtMMDD(job["Ship Date"])}
+                </div>
+                <div style={{ ...col(110, true), fontSize: 13, color: "#374151" }} title={String(pickHardSoft(job) || "")}>
+                  {showMMDDorRaw(pickHardSoft(job))}
+                </div>
+              </div>
+            );
+          })}
         </div>
+
 
 
         {/* BL — Department status (placeholders) */}
