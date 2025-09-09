@@ -402,6 +402,8 @@ export default function Overview() {
   const [materials, setMaterials] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
 
+  const [selections, setSelections] = useState({});
+
   const overviewCtrlRef = useRef(null);
 
   // Order modal
