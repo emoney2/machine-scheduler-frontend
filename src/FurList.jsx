@@ -5,7 +5,6 @@ import axios from "axios";
 function toDate(v) {
   if (v == null) return null;
   if (typeof v === "number" && isFinite(v)) {
-    // Excel serial days since 1899-12-30
     const base = new Date(Date.UTC(1899, 11, 30));
     const ms = v * 24 * 60 * 60 * 1000;
     return new Date(base.getTime() + ms);
@@ -23,19 +22,19 @@ function fmtMMDD(d) {
   return `${mm}/${dd}`;
 }
 
-// Choose first present field from a list
+// Pick first present field from a list
 function firstField(obj, names) {
   for (const n of names) {
-    if (obj && obj[n] != null && obj[n] !== "") return obj[n];
+    const val = obj?.[n];
+    if (val !== undefined && val !== null && String(val).trim() !== "") return val;
   }
   return null;
 }
 
-// Stage bucket priority per your spec:
-// Sewing → Embroidery → Print → Cut → Fur → Ordered
+// Stage bucket priority per your spec: Sewing → Embroidery → Print → Cut → Fur → Ordered
 function stageBucket(order) {
   const stage = String(order["Stage"] || "").toLowerCase();
-  if (stage.includes("sew"))        return 0; // "sew", "sewing"
+  if (stage.includes("sew"))        return 0; // sewing
   if (stage.includes("embroidery")) return 1;
   if (stage.includes("print"))      return 2;
   if (stage.includes("cut"))        return 3;
@@ -100,6 +99,81 @@ function priorityPartition(rows, key) {
     (v === target ? yes : no).push(r);
   }
   return [...yes, ...no];
+}
+
+// Try to resolve a thumbnail URL using several common keys
+function getThumb(order) {
+  // Ship.jsx commonly uses `image`. Also try other likely keys.
+  const candidates = [
+    "image", "thumbnail", "thumb", "preview", "Preview",
+    "imageUrl", "imageURL", "thumbnailUrl", "Thumbnail URL",
+    "Image URL", "ImageURL"
+  ];
+  const val = firstField(order, candidates);
+  // If the "Preview" cell contains a Sheets formula like =IMAGE(...), your backend must resolve it.
+  // Here we only display direct URLs.
+  if (!val) return null;
+  const s = String(val);
+  // Basic sanity: must look like a URL
+  if (/^https?:\/\//i.test(s)) return s;
+  return null;
+}
+
+// Map common color names/phrases → hex (fallback: try the raw string)
+function colorFromFurName(nameRaw) {
+  if (!nameRaw) return null;
+  const s = String(nameRaw).trim().toLowerCase();
+
+  // quick direct matches & contains
+  const table = [
+    { k: ["light grey","light gray","lt grey","lt gray"], v: "#D3D3D3" },
+    { k: ["grey","gray"], v: "#BEBEBE" },
+    { k: ["dark grey","dark gray"], v: "#A9A9A9" },
+    { k: ["black"], v: "#111111" },
+    { k: ["white"], v: "#FFFFFF" },
+    { k: ["navy"], v: "#001F3F" },
+    { k: ["blue"], v: "#1E90FF" },
+    { k: ["red"], v: "#D9534F" },
+    { k: ["green"], v: "#28A745" },
+    { k: ["yellow"], v: "#FFD34D" },
+    { k: ["orange"], v: "#FF9F40" },
+    { k: ["brown","chocolate","coffee"], v: "#7B4B26" },
+    { k: ["tan","khaki","beige","sand"], v: "#D2B48C" },
+    { k: ["cream","ivory","off white","off-white"], v: "#F5F1E6" },
+    { k: ["maroon","burgundy","wine"], v: "#800020" },
+    { k: ["purple","violet"], v: "#7D4AA6" },
+    { k: ["teal","cyan","aqua"], v: "#3AB7BF" },
+    { k: ["pink","rose"], v: "#FF6FA6" },
+    { k: ["gold"], v: "#D4AF37" },
+    { k: ["silver"], v: "#C0C0C0" },
+    // Try pulling a simple base color token if two-word branded names (e.g., "Wow Navy")
+  ];
+
+  for (const row of table) {
+    if (row.k.some(k => s.includes(k))) return row.v;
+  }
+
+  // Try last word as a base color (e.g., "Wow Navy" → "navy")
+  const last = s.split(/\s+/).pop();
+  for (const row of table) {
+    if (row.k.includes(last)) return row.v;
+  }
+
+  // As a last resort, return the raw string (browser may know it)
+  return nameRaw;
+}
+
+// Compute readable text color against a background
+function textColorFor(bg) {
+  // Expect hex like #rrggbb; if not hex, default to dark text
+  if (typeof bg !== "string" || !/^#?[0-9a-f]{6}$/i.test(bg.replace("#",""))) return "#111";
+  const hex = bg.replace("#","");
+  const r = parseInt(hex.slice(0,2),16);
+  const g = parseInt(hex.slice(2,4),16);
+  const b = parseInt(hex.slice(4,6),16);
+  // luminance
+  const lum = (0.2126*r + 0.7152*g + 0.0722*b)/255;
+  return lum > 0.6 ? "#111" : "#fff";
 }
 
 function Toast({ kind = "success", message, onClose }) {
@@ -207,7 +281,6 @@ export default function FurList() {
         { withCredentials: true }
       );
       if (resp.data?.ok) {
-        // remove from current list immediately
         setOrders(prev => prev.filter(o => String(o["Order #"]) !== String(orderId)));
         showToast("Saved to Fur List", "success");
       } else {
@@ -224,17 +297,17 @@ export default function FurList() {
     }
   }
 
-  // Shared grid definition (tight columns, single-line cells)
+  // Tight grid + centered content
   const gridTemplate = "72px 64px 170px 200px 72px 150px 120px 84px 84px 120px 90px 120px 110px";
   const cellBase = {
     whiteSpace: "nowrap",
     overflow: "hidden",
-    textOverflow: "ellipsis"
+    textOverflow: "ellipsis",
+    textAlign: "center"
   };
 
   return (
     <div style={{ padding: 12, fontSize: 12, lineHeight: 1.2 }}>
-      {/* tiny CSS for spinner */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .spin { animation: spin 0.9s linear infinite; }
@@ -306,10 +379,12 @@ export default function FurList() {
           const ship    = toDate(order["Ship Date"]);
           const hardSoft= order["Hard Date/Soft Date"] || "";
 
-          // Match Ship.jsx: it uses `job.image`
-          const thumb = order["image"];
-
+          const thumb = getThumb(order);
           const isSaving = !!saving[orderId];
+
+          // Background from Fur Color + readable text
+          const bg = colorFromFurName(color);
+          const fg = textColorFor(typeof bg === "string" ? bg : "#fff");
 
           return (
             <div
@@ -322,30 +397,33 @@ export default function FurList() {
                 padding: 8,
                 borderRadius: 12,
                 border: "1px solid #ddd",
-                background: "#fff",
+                background: bg || "#fff",
+                color: fg,
                 boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
               }}
             >
-              <div style={{ ...cellBase, fontWeight: 600 }}>{orderId}</div>
+              <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
 
               {/* Preview */}
-              <div style={{ width: 60, height: 40, overflow: "hidden", borderRadius: 6, border: "1px solid #eee" }}>
-                {thumb ? (
-                  <img
-                    loading="lazy"
-                    src={thumb}
-                    alt="preview"
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : (
-                  <div style={{
-                    width: "100%", height: "100%",
-                    display: "grid", placeItems: "center",
-                    fontSize: 11, color: "#888"
-                  }}>
-                    No Preview
-                  </div>
-                )}
+              <div style={{ display: "grid", placeItems: "center" }}>
+                <div style={{ width: 60, height: 40, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
+                  {thumb ? (
+                    <img
+                      loading="lazy"
+                      src={thumb}
+                      alt="preview"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: "100%", height: "100%",
+                      display: "grid", placeItems: "center",
+                      fontSize: 11, color: "#888"
+                    }}>
+                      No Preview
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div style={cellBase}>{company}</div>
@@ -367,15 +445,16 @@ export default function FurList() {
                   style={{
                     padding: "6px 10px",
                     borderRadius: 10,
-                    border: "1px solid #bbb",
-                    background: isSaving ? "#efefef" : "#f6f6f6",
+                    border: "1px solid rgba(0,0,0,0.25)",
+                    background: isSaving ? "rgba(255,255,255,0.8)" : "#ffffff",
                     cursor: isSaving ? "default" : "pointer",
-                    fontWeight: 700,
+                    fontWeight: 800,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 8,
-                    opacity: isSaving ? 0.85 : 1,
-                    fontSize: 12
+                    opacity: isSaving ? 0.9 : 1,
+                    fontSize: 12,
+                    color: "#222"
                   }}
                   title="Write Quantity to Fur List → Quantity Made, then hide"
                   aria-busy={isSaving ? "true" : "false"}
