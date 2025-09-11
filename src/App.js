@@ -2,6 +2,7 @@
 // File: frontend/src/App.js
 
 import Ship from "./Ship";
+import FurList from "./FurList";
 import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
 import { io } from 'socket.io-client';
@@ -1519,6 +1520,7 @@ useEffect(() => {
           { to: "/submit",            label: "Order Submission" },
           { to: "/inventory",         label: "Inventory" },
           { to: "/inventory-ordered", label: "Inventory Ordered" },
+          { to: "/fur",               label: "Fur List" }
           { to: "/ship",              label: "Ship" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
@@ -1593,6 +1595,7 @@ useEffect(() => {
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
         <Route path="/ship" element={<Ship />} />
+        <Route path="/fur" element={<FurList />} />
         {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
         <Route path="/box-select" element={<BoxSelectGuard />} />
         <Route path="/reorder" element={<ReorderPage />} />
