@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 
 // ---------- Config ----------
@@ -172,27 +172,29 @@ export default function FurList() {
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
+  // Reusable fetcher (first load sets isLoading; refreshes do not blank the UI)
+  const fetchOrders = useCallback(async (opts = { refresh: false }) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      if (!opts.refresh) setIsLoading(true);
+      const res = await axios.get(`${API_ROOT}/combined`, { withCredentials: true });
+      setOrders(res.data?.orders || []);
+    } catch {
+      // swallow; UI will show last-known data
+    } finally {
+      if (!opts.refresh) setIsLoading(false);
+      inFlight.current = false;
+    }
+  }, [API_ROOT]);
+
   // initial + polling
   useEffect(() => {
     let canceled = false;
-
-    const fetchOnce = () => {
-      if (inFlight.current) return;
-      inFlight.current = true;
-      axios.get(`${API_ROOT}/combined`, { withCredentials: true })
-        .then(res => {
-          if (canceled) return;
-          setOrders(res.data?.orders || []);
-          setIsLoading(false);
-        })
-        .catch(() => { if (!canceled) setIsLoading(false); })
-        .finally(() => { inFlight.current = false; });
-    };
-
-    fetchOnce();
-    const t = setInterval(fetchOnce, 60000);
+    (async () => { if (!canceled) await fetchOrders(); })();
+    const t = setInterval(() => { if (!canceled) fetchOrders({ refresh: true }); }, 60000);
     return () => { canceled = true; clearInterval(t); };
-  }, []);
+  }, [fetchOrders]);
 
   // Filter + sort (+partition)
   const cards = useMemo(() => {
@@ -215,12 +217,17 @@ export default function FurList() {
       const resp = await axios.post(`${API_ROOT}/fur/complete`,
         { orderId, quantity: qty }, { withCredentials: true });
       if (resp.data?.ok) {
+        // Quick optimistic removal to feel snappy
         setOrders(prev => prev.filter(o => String(o["Order #"]) !== orderId));
         setSelected(prev => { const n = { ...prev }; delete n[orderId]; return n; });
         showToast("Saved to Fur List", "success");
+
+        // Now re-fetch from Sheets so any downstream formulas/status changes are reflected
+        await fetchOrders({ refresh: true });
       } else {
         showToast(resp.data?.error || "Write failed", "error", 2600);
       }
+
     } catch {
       showToast("Error writing to Fur List", "error", 2600);
     } finally {
@@ -252,12 +259,17 @@ export default function FurList() {
       failCount += results.filter(x => x === "fail").length;
     }
 
+    // Optimistic removal
     setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
     setSelected({});
     setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
 
+    // Re-fetch from Sheets once to sync any formula-driven changes
+    await fetchOrders({ refresh: true });
+
     if (failCount === 0) showToast(`Completed ${okCount} orders`, "success");
     else showToast(`Completed ${okCount}, failed ${failCount}`, "error", 2600);
+
   }
 
   function toggleSelect(id, on = undefined) {
