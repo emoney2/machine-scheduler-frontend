@@ -19,21 +19,39 @@ const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 function extractFileIdFromFormulaOrUrl(v) {
   try {
     const s = String(v || "");
-
-    // id=XXXX on uc?export=view links
     let m = s.match(/id=([A-Za-z0-9_-]+)/);
     if (m) return m[1];
-
-    // /file/d/XXXX/ style
     m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
     if (m) return m[1];
-
-    // If it's an =IMAGE("..."), grab the inner string then re-run
     m = s.match(/IMAGE\("([^"]+)"/i);
     if (m) return extractFileIdFromFormulaOrUrl(m[1]);
-  } catch (_) {}
+  } catch {}
   return null;
 }
+
+function getJobThumbUrl(job, ROOT) {
+  // Try specific fields first
+  const fields = [job.preview, job.Preview, job.previewFormula, job.PreviewFormula, job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl];
+  for (const f of fields) {
+    const id = extractFileIdFromFormulaOrUrl(f);
+    if (id) {
+      const v = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
+      return `${ROOT}/drive/proxy/${id}?sz=w160&v=${v}`;
+    }
+    if (f && /^https?:\/\//i.test(String(f))) return f;
+  }
+  // Otherwise scan any field for a Drive link
+  for (const v of Object.values(job || {})) {
+    const s = String(v || "");
+    let m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    if (m) {
+      const ver = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
+      return `${ROOT}/drive/proxy/${m[1]}?sz=w160&v=${ver}`;
+    }
+  }
+  return null;
+}
+
 
 // Try common fields first, then scan the whole job row for any Drive link
 function getJobThumbUrl(job, ROOT) {

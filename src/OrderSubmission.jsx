@@ -4,7 +4,7 @@ import "./FileInput.css";
 import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
-const API_ROOT = process.env.REACT_APP_API_ROOT;
+const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
 export default function OrderSubmission() {
   const [form, setForm] = useState({
@@ -481,9 +481,9 @@ const furColorNames = furColors;
   };
 
 
-  const submitUrl =
-    process.env.REACT_APP_ORDER_SUBMIT_URL ||
-    `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
+  const baseForSubmit = API_ROOT.replace(/\/api$/, "");
+  const submitUrl = process.env.REACT_APP_ORDER_SUBMIT_URL || `${baseForSubmit}/submit`;
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -703,9 +703,9 @@ const submitForm = async () => {
   setIsSubmittingOverlay(true);
 
   try {
-    const submitUrl =
-      process.env.REACT_APP_ORDER_SUBMIT_URL ||
-      `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/submit`;
+    const baseForSubmit = API_ROOT.replace(/\/api$/, "");
+    const submitUrl = process.env.REACT_APP_ORDER_SUBMIT_URL || `${baseForSubmit}/submit`;
+
 
     const config = {
       headers: { "Content-Type": "multipart/form-data" },
@@ -723,11 +723,27 @@ const submitForm = async () => {
     if (data?.primaryFileId && data?.orderNumber) {
       const f = buildPreviewFormulaFromId(data.primaryFileId);
       try {
-        await axios.post(
-          `${API_ROOT}/orders/${data.orderNumber}/preview`,
-          { previewFormula: f },
-          { withCredentials: true }
-        );
+        try {
+          // Try to get the file id from the formula or from any provided link
+          const fromFormula = (f || "").match(/id=([A-Za-z0-9_-]+)/)?.[1]
+                          || (f || "").match(/\/file\/d\/([A-Za-z0-9_-]+)/)?.[1];
+
+          // If you have a prod link field, keep as a fallback:
+          const fromProdLink = form?.prodLink ? (form.prodLink.match(/id=([A-Za-z0-9_-]+)/)?.[1]
+                          || form.prodLink.match(/\/file\/d\/([A-Za-z0-9_-]+)/)?.[1]) : null;
+
+          const fileId = fromFormula || fromProdLink;
+          if (fileId) {
+            await axios.post(
+              `${API_ROOT}/drive/warmThumbnails`,
+              { pairs: [ { id: fileId, v: String(data.orderNumber), sz: "w160" } ] },
+              { withCredentials: true }
+            );
+          }
+        } catch (err) {
+          console.warn("Thumbnail warm failed (non-blocking):", err);
+        }
+
       } catch (err) {
         console.warn("Could not set Preview formula via API:", err);
       }
