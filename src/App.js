@@ -1520,7 +1520,7 @@ useEffect(() => {
           { to: "/submit",            label: "Order Submission" },
           { to: "/inventory",         label: "Inventory" },
           { to: "/inventory-ordered", label: "Inventory Ordered" },
-          { to: "/fur",               label: "Fur List" }
+          { to: "/fur",               label: "Fur List" },
           { to: "/ship",              label: "Ship" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
