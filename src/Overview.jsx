@@ -59,33 +59,6 @@ function getJobThumbUrl(job, ROOT) {
   return null;
 }
 
-
-// Try common fields first, then scan the whole job row for any Drive link
-function getJobThumbUrl(job, ROOT) {
-  const common = [
-    job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
-    job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl
-  ];
-
-  for (const f of common) {
-    const id = extractFileIdFromFormulaOrUrl(f);
-    if (id) return `${ROOT}/drive/proxy/${id}?sz=w160`;
-    if (f && /^https?:\/\//i.test(String(f))) return f; // already a full URL
-  }
-
-  // Fallback: scan *any* field for id=XXXX or /file/d/XXXX
-  for (const v of Object.values(job || {})) {
-    const s = String(v || "");
-    let m = s.match(/id=([A-Za-z0-9_-]+)/);
-    if (m) return `${ROOT}/drive/proxy/${m[1]}?sz=w160`;
-    m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m) return `${ROOT}/drive/proxy/${m[1]}?sz=w160`;
-  }
-
-  return null;
-}
-
-
 // 🔌 lightweight socket just for invalidations
 const socket = io(BACKEND_ROOT, {
   path: "/socket.io",
