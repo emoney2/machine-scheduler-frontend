@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 
+// ---------- Config ----------
+const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+
 // ---------- Utils ----------
 function toDate(v) {
   if (v == null) return null;
@@ -25,6 +28,32 @@ function firstField(obj, names) {
   return null;
 }
 
+// Extract Google Drive file ID from =IMAGE(...) or URL
+function extractFileIdFromFormulaOrUrl(v) {
+  try {
+    const s = String(v || "");
+    const m1 = s.match(/id=([A-Za-z0-9_-]+)/);
+    if (m1) return m1[1];
+    const m2 = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    if (m2) return m2[1];
+    const m3 = s.match(/IMAGE\("([^"]+)"/i);
+    if (m3) return extractFileIdFromFormulaOrUrl(m3[1]);
+  } catch {}
+  return null;
+}
+
+// Build thumbnail URL for an order row using Preview / known fields
+function orderThumbUrl(order) {
+  // If server already provided a resolved URL, prefer it
+  const serverUrl = firstField(order, ["imageUrl", "image", "thumbnail", "imageURL", "thumbnailUrl"]);
+  if (serverUrl && /^https?:\/\//i.test(String(serverUrl))) return serverUrl;
+
+  // Otherwise try Preview-like fields and route through backend proxy
+  const raw = firstField(order, ["Preview", "preview", "PreviewFormula", "previewFormula"]) || "";
+  const fid = extractFileIdFromFormulaOrUrl(raw);
+  return fid ? `${API_ROOT}/drive/proxy/${fid}?sz=w160` : null;
+}
+
 // Stage priority: Sewing → Embroidery → Print → Cut → Fur → Ordered
 function stageBucket(order) {
   const s = String(order["Stage"] || "").toLowerCase();
@@ -41,7 +70,7 @@ function makeComparator() {
     const ba = stageBucket(a), bb = stageBucket(b);
     if (ba !== bb) return ba - bb;
 
-    // Embroidery: "End Embroidery Time" if present
+    // Embroidery: prefer End Embroidery Time
     if (ba === 1) {
       const aEnd = toDate(firstField(a, [
         "End Embroidery Time","Embroidery End Time","Embroidery End","End Embroidery","End Time"
@@ -79,52 +108,6 @@ function priorityPartition(rows, key) {
   return [...yes, ...no];
 }
 
-function getThumb(order) {
-  const candidates = ["image","thumbnail","thumb","preview","Preview","imageUrl","imageURL","thumbnailUrl","Thumbnail URL","Image URL","ImageURL"];
-  const val = firstField(order, candidates);
-  if (!val) return null;
-  const s = String(val);
-  return /^https?:\/\//i.test(s) ? s : null;
-}
-
-function colorFromFurName(nameRaw) {
-  if (!nameRaw) return null;
-  const s = String(nameRaw).trim().toLowerCase();
-  const table = [
-    { k: ["light grey","light gray","lt grey","lt gray"], v: "#D3D3D3" },
-    { k: ["grey","gray"], v: "#BEBEBE" },
-    { k: ["dark grey","dark gray"], v: "#A9A9A9" },
-    { k: ["black"], v: "#111111" },
-    { k: ["white"], v: "#FFFFFF" },
-    { k: ["navy"], v: "#001F3F" },
-    { k: ["blue"], v: "#1E90FF" },
-    { k: ["red"], v: "#D9534F" },
-    { k: ["green"], v: "#28A745" },
-    { k: ["yellow"], v: "#FFD34D" },
-    { k: ["orange"], v: "#FF9F40" },
-    { k: ["brown","chocolate","coffee"], v: "#7B4B26" },
-    { k: ["tan","khaki","beige","sand"], v: "#D2B48C" },
-    { k: ["cream","ivory","off white","off-white"], v: "#F5F1E6" },
-    { k: ["maroon","burgundy","wine"], v: "#800020" },
-    { k: ["purple","violet"], v: "#7D4AA6" },
-    { k: ["teal","cyan","aqua"], v: "#3AB7BF" },
-    { k: ["pink","rose"], v: "#FF6FA6" },
-    { k: ["gold"], v: "#D4AF37" },
-    { k: ["silver"], v: "#C0C0C0" },
-  ];
-  for (const row of table) if (row.k.some(k => s.includes(k))) return row.v;
-  const last = s.split(/\s+/).pop();
-  for (const row of table) if (row.k.includes(last)) return row.v;
-  return nameRaw; // let browser try the raw color name
-}
-function textColorFor(bg) {
-  if (typeof bg !== "string" || !/^#?[0-9a-f]{6}$/i.test(bg.replace("#",""))) return "#111";
-  const hex = bg.replace("#","");
-  const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-  const lum = (0.2126*r + 0.7152*g + 0.0722*b)/255;
-  return lum > 0.6 ? "#111" : "#fff";
-}
-
 // ---------- Toast ----------
 function Toast({ kind = "success", message, onClose }) {
   if (!message) return null;
@@ -159,19 +142,17 @@ export default function FurList() {
   const [toastKind, setToastKind] = useState("success");
   const toastTimer = useRef(null);
 
-  // saving per order
-  const [saving, setSaving] = useState({}); // { [orderId]: true }
-  // selection for batch
+  const [saving, setSaving] = useState({});   // { [orderId]: true }
   const [selected, setSelected] = useState({}); // { [orderId]: true }
 
-  // responsive: compact when narrower than 1200px
+  // responsive compact mode for narrow screens
   const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
   useEffect(() => {
     function onResize() { setWw(window.innerWidth); }
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
-  const compact = ww < 1200; // hides low-priority columns
+  const compact = ww < 1200;
 
   function showToast(message, kind = "success", ms = 1800) {
     setToastMsg(message); setToastKind(kind);
@@ -187,7 +168,7 @@ export default function FurList() {
     const fetchOnce = () => {
       if (inFlight.current) return;
       inFlight.current = true;
-      axios.get(`${process.env.REACT_APP_API_ROOT}/combined`, { withCredentials: true })
+      axios.get(`${API_ROOT}/combined`, { withCredentials: true })
         .then(res => {
           if (canceled) return;
           setOrders(res.data?.orders || []);
@@ -202,9 +183,11 @@ export default function FurList() {
     return () => { canceled = true; clearInterval(t); };
   }, []);
 
-  // Filter + sort + partition
+  // Filter + sort (+partition)
   const cards = useMemo(() => {
-    const base = (orders || []).filter(o => String(o["Status"] || "").toUpperCase() !== "COMPLETE");
+    let base = (orders || []).filter(o => String(o["Status"] || "").toUpperCase() !== "COMPLETE");
+    // Also hide if Stage contains "complete"
+    base = base.filter(o => !String(o["Stage"] || "").toLowerCase().includes("complete"));
     const sorted = [...base].sort(makeComparator());
     if (mode === "Fur Color") return priorityPartition(sorted, "Fur Color");
     if (mode === "Product")   return priorityPartition(sorted, "Product");
@@ -213,15 +196,15 @@ export default function FurList() {
 
   // ---------- Actions ----------
   async function markComplete(order) {
-    const orderId = order["Order #"];
+    const orderId = String(order["Order #"] || "");
     const qty = order["Quantity"] || 0;
 
     setSaving(prev => ({ ...prev, [orderId]: true }));
     try {
-      const resp = await axios.post(`${process.env.REACT_APP_API_ROOT}/fur/complete`,
+      const resp = await axios.post(`${API_ROOT}/fur/complete`,
         { orderId, quantity: qty }, { withCredentials: true });
       if (resp.data?.ok) {
-        setOrders(prev => prev.filter(o => String(o["Order #"]) !== String(orderId)));
+        setOrders(prev => prev.filter(o => String(o["Order #"]) !== orderId));
         setSelected(prev => { const n = { ...prev }; delete n[orderId]; return n; });
         showToast("Saved to Fur List", "success");
       } else {
@@ -234,29 +217,22 @@ export default function FurList() {
     }
   }
 
-  // Batch complete using existing endpoint (parallel with soft throttle)
+  // Batch complete (parallel 8 at a time)
   async function completeSelected() {
     const ids = Object.keys(selected).filter(id => selected[id]);
     if (!ids.length) return;
 
-    // build payloads from current rows (to get Quantity)
     const items = cards.filter(o => ids.includes(String(o["Order #"])))
       .map(o => ({ orderId: String(o["Order #"]), quantity: o["Quantity"] || 0 }));
 
-    // mark all as saving
-    setSaving(prev => {
-      const n = { ...prev };
-      for (const it of items) n[it.orderId] = true;
-      return n;
-    });
+    setSaving(prev => { const n = { ...prev }; items.forEach(it => n[it.orderId] = true); return n; });
 
-    // simple throttle: run in groups of 8
     const chunk = 8;
     let okCount = 0, failCount = 0;
     for (let i = 0; i < items.length; i += chunk) {
       const slice = items.slice(i, i + chunk);
       const proms = slice.map(it =>
-        axios.post(`${process.env.REACT_APP_API_ROOT}/fur/complete`, it, { withCredentials: true })
+        axios.post(`${API_ROOT}/fur/complete`, it, { withCredentials: true })
           .then(r => (r.data?.ok ? "ok" : "fail"))
           .catch(() => "fail")
       );
@@ -265,14 +241,9 @@ export default function FurList() {
       failCount += results.filter(x => x === "fail").length;
     }
 
-    // clean up state
     setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
     setSelected({});
-    setSaving(prev => {
-      const n = { ...prev };
-      ids.forEach(id => delete n[id]);
-      return n;
-    });
+    setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
 
     if (failCount === 0) showToast(`Completed ${okCount} orders`, "success");
     else showToast(`Completed ${okCount}, failed ${failCount}`, "error", 2600);
@@ -295,24 +266,23 @@ export default function FurList() {
   }
 
   // ---------- Layout ----------
-  // Compact hides low-priority columns (Print + Hard/Soft) and shrinks widths.
-  const gridFull   = "28px 62px 56px 170px 190px 62px 120px 110px 78px 68px 100px 78px 110px 92px";
-  const gridCompact= "28px 62px 56px 160px 160px 60px 110px 100px 74px       96px 74px        92px"; // no 'Print', no 'Hard/Soft'
+  // Column order (compact hides Print + Hard/Soft):
+  // [Order#, Preview, Company, Design, Qty, Product, Stage, Due, (Print), Fur Color, Ship, (Hard/Soft), Complete, Select]
+  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 78px 68px 100px 78px 110px 92px 28px";
+  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 74px       96px 74px        92px 28px"; // no Print, no Hard/Soft
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const cellBase = {
     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center"
   };
 
-  // Sticky complete column (right side)
-  const stickyRightBase = (bg) => ({
-    position: "sticky", right: 0, textAlign: "right",
-    background: bg || "#fff",
-    // subtle shadow to separate sticky cell
-    boxShadow: "inset 8px 0 8px -8px rgba(0,0,0,0.12)"
+  // Sticky helpers (two right sticky columns: Complete, then Select)
+  const RIGHT_W_SELECT = 28;
+  const stickyRight = (offset, bg) => ({
+    position: "sticky", right: offset, zIndex: 2, background: bg || "#fff",
+    boxShadow: offset ? "-8px 0 8px -8px rgba(0,0,0,0.12)" : "inset 8px 0 8px -8px rgba(0,0,0,0.12)"
   });
 
-  // Determine if something is selected
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
   return (
@@ -358,11 +328,6 @@ export default function FurList() {
           background: "#fafafa", marginBottom: 6, position: "relative"
         }}
       >
-        {/* Select all */}
-        <div style={{ textAlign: "center" }}>
-          <input type="checkbox" onChange={toggleSelectAll}
-            checked={!!cards.length && cards.every(o => selected[String(o["Order #"])])} />
-        </div>
         <div style={cellBase}>Order #</div>
         <div style={cellBase}>Preview</div>
         <div style={cellBase}>Company Name</div>
@@ -375,9 +340,17 @@ export default function FurList() {
         <div style={cellBase}>Fur Color</div>
         <div style={cellBase}>Ship</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
-
-        {/* Sticky complete header */}
-        <div style={{ ...cellBase, ...stickyRightBase("#fafafa") }}>Complete</div>
+        {/* Complete (second-from-right) */}
+        <div style={{ ...cellBase, ...stickyRight(RIGHT_W_SELECT, "#fafafa"), textAlign: "right" }}>Complete</div>
+        {/* Select-all (far right) */}
+        <div style={{ ...stickyRight(0, "#fafafa"), textAlign: "center" }}>
+          <input
+            aria-label="Select all"
+            type="checkbox"
+            onChange={toggleSelectAll}
+            checked={!!cards.length && cards.every(o => selected[String(o["Order #"])])}
+          />
+        </div>
       </div>
 
       {/* Content */}
@@ -399,12 +372,48 @@ export default function FurList() {
             const color   = order["Fur Color"] || "";
             const ship    = toDate(order["Ship Date"]);
             const hardSoft= order["Hard Date/Soft Date"] || "";
-            const thumb   = getThumb(order);
+            const imageUrl= orderThumbUrl(order);
             const isSaving = !!saving[orderId];
             const sel = !!selected[orderId];
 
-            const bg = colorFromFurName(color) || "#fff";
-            const fg = textColorFor(typeof bg === "string" ? bg : "#fff");
+            // Card background from Fur Color (with readable text)
+            const bg = (() => {
+              const nameRaw = color || "";
+              const s = String(nameRaw).trim().toLowerCase();
+              const table = [
+                { k: ["light grey","light gray","lt grey","lt gray"], v: "#D3D3D3" },
+                { k: ["grey","gray"], v: "#BEBEBE" },
+                { k: ["dark grey","dark gray"], v: "#A9A9A9" },
+                { k: ["black"], v: "#111111" },
+                { k: ["white"], v: "#FFFFFF" },
+                { k: ["navy"], v: "#001F3F" },
+                { k: ["blue"], v: "#1E90FF" },
+                { k: ["red"], v: "#D9534F" },
+                { k: ["green"], v: "#28A745" },
+                { k: ["yellow"], v: "#FFD34D" },
+                { k: ["orange"], v: "#FF9F40" },
+                { k: ["brown","chocolate","coffee"], v: "#7B4B26" },
+                { k: ["tan","khaki","beige","sand"], v: "#D2B48C" },
+                { k: ["cream","ivory","off white","off-white"], v: "#F5F1E6" },
+                { k: ["maroon","burgundy","wine"], v: "#800020" },
+                { k: ["purple","violet"], v: "#7D4AA6" },
+                { k: ["teal","cyan","aqua"], v: "#3AB7BF" },
+                { k: ["pink","rose"], v: "#FF6FA6" },
+                { k: ["gold"], v: "#D4AF37" },
+                { k: ["silver"], v: "#C0C0C0" },
+              ];
+              for (const row of table) if (row.k.some(k => s.includes(k))) return row.v;
+              const last = s.split(/\s+/).pop();
+              for (const row of table) if (row.k.includes(last)) return row.v;
+              return nameRaw || "#fff";
+            })();
+            const fg = (() => {
+              const hex = String(bg).replace("#","");
+              if (!/^[0-9a-f]{6}$/i.test(hex)) return "#111";
+              const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+              const lum = (0.2126*r + 0.7152*g + 0.0722*b)/255;
+              return lum > 0.6 ? "#111" : "#fff";
+            })();
 
             return (
               <div
@@ -416,24 +425,14 @@ export default function FurList() {
                   boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)"
                 }}
               >
-                {/* Select */}
-                <div style={{ textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={sel}
-                    onChange={(e) => toggleSelect(orderId, e.target.checked)}
-                  />
-                </div>
-
-                <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center", fontWeight: 700 }}>
-                  {orderId}
-                </div>
+                <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
 
                 {/* Preview */}
                 <div style={{ display: "grid", placeItems: "center" }}>
                   <div style={{ width: 50, height: 34, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
-                    {thumb ? (
-                      <img loading="lazy" src={thumb} alt="preview"
+                    {imageUrl ? (
+                      <img loading="lazy" src={imageUrl} alt="preview"
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
                         style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : (
                       <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 11, color: "#666" }}>
@@ -454,8 +453,8 @@ export default function FurList() {
                 <div style={cellBase}>{fmtMMDD(ship)}</div>
                 {!compact && <div style={cellBase}>{hardSoft}</div>}
 
-                {/* Sticky Complete */}
-                <div style={stickyRightBase(bg)}>
+                {/* Complete (second from right, sticky with right offset = select col width) */}
+                <div style={{ ...stickyRight(RIGHT_W_SELECT, bg), textAlign: "right" }}>
                   <button
                     onClick={() => markComplete(order)}
                     disabled={isSaving}
@@ -474,6 +473,16 @@ export default function FurList() {
                     )}
                     {isSaving ? "Saving…" : "Complete"}
                   </button>
+                </div>
+
+                {/* Select (far right, sticky at right:0) */}
+                <div style={{ ...stickyRight(0, bg), textAlign: "center" }}>
+                  <input
+                    aria-label={`Select order ${orderId}`}
+                    type="checkbox"
+                    checked={sel}
+                    onChange={(e) => toggleSelect(orderId, e.target.checked)}
+                  />
                 </div>
               </div>
             );

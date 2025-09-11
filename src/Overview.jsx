@@ -5,7 +5,7 @@ import { io } from "socket.io-client";
 
 
 
-const ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 const BACKEND_ROOT = ROOT.replace(/\/api$/, "");
 const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
