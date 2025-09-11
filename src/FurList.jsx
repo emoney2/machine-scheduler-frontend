@@ -31,20 +31,22 @@ function firstField(obj, names) {
   return null;
 }
 
-// Stage bucket priority per your spec
+// Stage bucket priority per your spec:
+// Sewing → Embroidery → Print → Cut → Fur → Ordered
 function stageBucket(order) {
   const stage = String(order["Stage"] || "").toLowerCase();
-  if (stage.includes("embroidery")) return 0;
-  if (stage.includes("print"))      return 1;
-  if (stage.includes("cut"))        return 2;
-  if (stage.includes("fur"))        return 3;
-  if (stage.includes("ordered"))    return 4;
-  return 5;
+  if (stage.includes("sew"))        return 0; // "sew", "sewing"
+  if (stage.includes("embroidery")) return 1;
+  if (stage.includes("print"))      return 2;
+  if (stage.includes("cut"))        return 3;
+  if (stage.includes("fur"))        return 4;
+  if (stage.includes("ordered"))    return 5;
+  return 6;
 }
 
 // Comparator:
 // 1) by stage bucket priority
-// 2) within "Embroidery" by end embroidery time
+// 2) within Embroidery by end embroidery time
 // 3) otherwise by Due Date
 function makeComparator() {
   return (a, b) => {
@@ -52,14 +54,28 @@ function makeComparator() {
     const bb = stageBucket(b);
     if (ba !== bb) return ba - bb;
 
-    if (ba === 0) {
-      const aEnd = toDate(firstField(a, ["End Embroidery Time", "Embroidery End Time", "Embroidery End", "End Embroidery", "End Time"]));
-      const bEnd = toDate(firstField(b, ["End Embroidery Time", "Embroidery End Time", "Embroidery End", "End Embroidery", "End Time"]));
+    // Embroidery: sort by End Embroidery Time first
+    if (ba === 1) {
+      const aEnd = toDate(firstField(a, [
+        "End Embroidery Time",
+        "Embroidery End Time",
+        "Embroidery End",
+        "End Embroidery",
+        "End Time"
+      ]));
+      const bEnd = toDate(firstField(b, [
+        "End Embroidery Time",
+        "Embroidery End Time",
+        "Embroidery End",
+        "End Embroidery",
+        "End Time"
+      ]));
       const at = aEnd ? aEnd.getTime() : Infinity;
       const bt = bEnd ? bEnd.getTime() : Infinity;
       if (at !== bt) return at - bt;
     }
 
+    // Others: Due Date
     const aDue = toDate(a["Due Date"]);
     const bDue = toDate(b["Due Date"]);
     const at = aDue ? aDue.getTime() : Infinity;
@@ -137,7 +153,6 @@ export default function FurList() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastMsg(""), ms);
   }
-
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   // initial + polling every 60s (preserve keys to minimize flicker)
@@ -170,7 +185,7 @@ export default function FurList() {
     // 2) sort by your stage/dates rule
     const sorted = [...base].sort(makeComparator());
 
-    // 3) optional partition by mode
+    // 3) optional partition by mode (priority to top-card value)
     if (mode === "Fur Color") {
       return priorityPartition(sorted, "Fur Color");
     }
@@ -201,7 +216,6 @@ export default function FurList() {
     } catch (e) {
       showToast("Error writing to Fur List", "error", 2600);
     } finally {
-      // clear saving state (safe even if we removed the card)
       setSaving(prev => {
         const next = { ...prev };
         delete next[orderId];
@@ -210,27 +224,36 @@ export default function FurList() {
     }
   }
 
+  // Shared grid definition (tight columns, single-line cells)
+  const gridTemplate = "72px 64px 170px 200px 72px 150px 120px 84px 84px 120px 90px 120px 110px";
+  const cellBase = {
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis"
+  };
+
   return (
-    <div style={{ padding: 12 }}>
+    <div style={{ padding: 12, fontSize: 12, lineHeight: 1.2 }}>
       {/* tiny CSS for spinner */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        .spin {
-          animation: spin 0.9s linear infinite;
-        }
+        .spin { animation: spin 0.9s linear infinite; }
+        .hdr { font-size: 11px; font-weight: 700; color: #444; text-transform: uppercase; }
       `}</style>
 
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+      {/* Filter toggles */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         {["Main", "Fur Color", "Product"].map(m => (
           <button
             key={m}
             onClick={() => setMode(m)}
             style={{
-              padding: "6px 12px",
+              padding: "4px 10px",
               borderRadius: 8,
               border: "1px solid #ccc",
               background: mode === m ? "#eee" : "#fff",
-              cursor: "pointer"
+              cursor: "pointer",
+              fontSize: 12
             }}
           >
             {m}
@@ -238,7 +261,38 @@ export default function FurList() {
         ))}
       </div>
 
-      <div style={{ display: "grid", gap: 10 }}>
+      {/* Header row */}
+      <div
+        className="hdr"
+        style={{
+          display: "grid",
+          gridTemplateColumns: gridTemplate,
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 8px",
+          borderRadius: 10,
+          border: "1px solid #ddd",
+          background: "#fafafa",
+          marginBottom: 6
+        }}
+      >
+        <div style={cellBase}>Order #</div>
+        <div style={cellBase}>Preview</div>
+        <div style={cellBase}>Company Name</div>
+        <div style={cellBase}>Design</div>
+        <div style={cellBase}>Quantity</div>
+        <div style={cellBase}>Product</div>
+        <div style={cellBase}>Stage</div>
+        <div style={cellBase}>Due Date</div>
+        <div style={cellBase}>Print</div>
+        <div style={cellBase}>Fur Color</div>
+        <div style={cellBase}>Ship Date</div>
+        <div style={cellBase}>Hard Date/Soft Date</div>
+        <div style={{ ...cellBase, textAlign: "right" }}>Complete</div>
+      </div>
+
+      {/* Cards */}
+      <div style={{ display: "grid", gap: 8 }}>
         {cards.map(order => {
           const orderId = order["Order #"];
           const company = order["Company Name"] || "";
@@ -252,8 +306,8 @@ export default function FurList() {
           const ship    = toDate(order["Ship Date"]);
           const hardSoft= order["Hard Date/Soft Date"] || "";
 
-          // We reuse any existing thumbnail key if present on rows (e.g., from backend derivation).
-          const thumb = order["imageUrl"]; // fallback: undefined; page still renders fine
+          // Match Ship.jsx: it uses `job.image`
+          const thumb = order["image"];
 
           const isSaving = !!saving[orderId];
 
@@ -262,7 +316,7 @@ export default function FurList() {
               key={String(orderId)}
               style={{
                 display: "grid",
-                gridTemplateColumns: "80px 1fr 1fr 1fr 80px 1fr 1fr 100px 80px 120px 100px 140px 120px",
+                gridTemplateColumns: gridTemplate,
                 alignItems: "center",
                 gap: 8,
                 padding: 8,
@@ -272,30 +326,38 @@ export default function FurList() {
                 boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
               }}
             >
-              {/* Order # */}
-              <div style={{ fontWeight: 600 }}>{orderId}</div>
+              <div style={{ ...cellBase, fontWeight: 600 }}>{orderId}</div>
 
               {/* Preview */}
-              <div style={{ width: 72, height: 48, overflow: "hidden", borderRadius: 8, border: "1px solid #eee" }}>
+              <div style={{ width: 60, height: 40, overflow: "hidden", borderRadius: 6, border: "1px solid #eee" }}>
                 {thumb ? (
-                  <img src={thumb} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  <img
+                    loading="lazy"
+                    src={thumb}
+                    alt="preview"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
                 ) : (
-                  <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 12, color: "#888" }}>
+                  <div style={{
+                    width: "100%", height: "100%",
+                    display: "grid", placeItems: "center",
+                    fontSize: 11, color: "#888"
+                  }}>
                     No Preview
                   </div>
                 )}
               </div>
 
-              <div>{company}</div>
-              <div>{design}</div>
-              <div>{qty}</div>
-              <div>{product}</div>
-              <div>{stage}</div>
-              <div>{fmtMMDD(due)}</div>
-              <div>{print}</div>
-              <div>{color}</div>
-              <div>{fmtMMDD(ship)}</div>
-              <div>{hardSoft}</div>
+              <div style={cellBase}>{company}</div>
+              <div style={cellBase}>{design}</div>
+              <div style={cellBase}>{qty}</div>
+              <div style={cellBase}>{product}</div>
+              <div style={cellBase}>{stage}</div>
+              <div style={cellBase}>{fmtMMDD(due)}</div>
+              <div style={cellBase}>{print}</div>
+              <div style={cellBase}>{color}</div>
+              <div style={cellBase}>{fmtMMDD(ship)}</div>
+              <div style={cellBase}>{hardSoft}</div>
 
               {/* Complete */}
               <div style={{ textAlign: "right" }}>
@@ -303,16 +365,17 @@ export default function FurList() {
                   onClick={() => markComplete(order)}
                   disabled={isSaving}
                   style={{
-                    padding: "8px 12px",
+                    padding: "6px 10px",
                     borderRadius: 10,
                     border: "1px solid #bbb",
                     background: isSaving ? "#efefef" : "#f6f6f6",
                     cursor: isSaving ? "default" : "pointer",
-                    fontWeight: 600,
+                    fontWeight: 700,
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 8,
-                    opacity: isSaving ? 0.8 : 1
+                    opacity: isSaving ? 0.85 : 1,
+                    fontSize: 12
                   }}
                   title="Write Quantity to Fur List → Quantity Made, then hide"
                   aria-busy={isSaving ? "true" : "false"}
@@ -322,8 +385,8 @@ export default function FurList() {
                       className="spin"
                       aria-hidden="true"
                       style={{
-                        width: 14,
-                        height: 14,
+                        width: 12,
+                        height: 12,
                         border: "2px solid #999",
                         borderTopColor: "transparent",
                         borderRadius: "50%",
@@ -340,7 +403,7 @@ export default function FurList() {
       </div>
 
       {!cards.length && (
-        <div style={{ marginTop: 24, color: "#777" }}>No work items for Fur.</div>
+        <div style={{ marginTop: 18, color: "#777" }}>No work items for Fur.</div>
       )}
 
       <Toast
