@@ -15,38 +15,50 @@ const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 
 
 
-// --- Upcoming Jobs: helpers for thumbnails + formatting ---
+// Handles either =IMAGE("https://...id=FILEID") or raw Drive URL/formula
 function extractFileIdFromFormulaOrUrl(v) {
-  // Handles either =IMAGE("https://...id=FILEID") or a raw Drive URL/formula string
   try {
     const s = String(v || "");
-    // id=XXXX in a uc?export=view URL
-    const m1 = s.match(/id=([A-Za-z0-9_\-]+)/);
-    if (m1) return m1[1];
+
+    // id=XXXX on uc?export=view links
+    let m = s.match(/id=([A-Za-z0-9_-]+)/);
+    if (m) return m[1];
+
     // /file/d/XXXX/ style
-    const m2 = s.match(/\/file\/d\/([A-Za-z0-9_\-]+)/);
-    if (m2) return m2[1];
-    // If it's an "=IMAGE("formula")", strip until the URL then re-run
-    const m3 = s.match(/IMAGE\("([^"]+)"/i);
-    if (m3) return extractFileIdFromFormulaOrUrl(m3[1]);
+    m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    if (m) return m[1];
+
+    // If it's an =IMAGE("..."), grab the inner string then re-run
+    m = s.match(/IMAGE\("([^"]+)"/i);
+    if (m) return extractFileIdFromFormulaOrUrl(m[1]);
   } catch (_) {}
   return null;
 }
 
+// Try common fields first, then scan the whole job row for any Drive link
 function getJobThumbUrl(job, ROOT) {
-  const fields = [
+  const common = [
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
     job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl
   ];
-  for (const f of fields) {
+
+  for (const f of common) {
     const id = extractFileIdFromFormulaOrUrl(f);
-    if (id) return `${ROOT}/drive/proxy/${id}?sz=w160`; // ROOT ends with /api, so this is /api/drive/proxy
+    if (id) return `${ROOT}/drive/proxy/${id}?sz=w160`;
+    if (f && /^https?:\/\//i.test(String(f))) return f; // already a full URL
   }
-  if (job.imageUrl) return job.imageUrl; // server-provided absolute URL
+
+  // Fallback: scan *any* field for id=XXXX or /file/d/XXXX
+  for (const v of Object.values(job || {})) {
+    const s = String(v || "");
+    let m = s.match(/id=([A-Za-z0-9_-]+)/);
+    if (m) return `${ROOT}/drive/proxy/${m[1]}?sz=w160`;
+    m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    if (m) return `${ROOT}/drive/proxy/${m[1]}?sz=w160`;
+  }
+
   return null;
 }
-
-
 
 
 // 🔌 lightweight socket just for invalidations

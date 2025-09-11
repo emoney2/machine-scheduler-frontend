@@ -42,16 +42,33 @@ function extractFileIdFromFormulaOrUrl(v) {
   return null;
 }
 
-// Build thumbnail URL for an order row using Preview / known fields
+// Build thumbnail URL for an order row.
+// 1) Prefer server-provided absolute URL fields.
+// 2) Parse =IMAGE(...) formula if it contains a full URL.
+// 3) If the formula builds a URL from another cell (like REGEXEXTRACT(Y..)),
+//    scan ALL fields in the row for any Drive link and extract the file id.
 function orderThumbUrl(order) {
-  // If server already provided a resolved URL, prefer it
-  const serverUrl = firstField(order, ["imageUrl", "image", "thumbnail", "imageURL", "thumbnailUrl"]);
-  if (serverUrl && /^https?:\/\//i.test(String(serverUrl))) return serverUrl;
+  // 0) Prefer absolute URL fields (server already resolved)
+  const direct = firstField(order, ["imageUrl", "image", "thumbnail", "imageURL", "thumbnailUrl"]);
+  if (direct && /^https?:\/\//i.test(String(direct))) return direct;
 
-  // Otherwise try Preview-like fields and route through backend proxy
-  const raw = firstField(order, ["Preview", "preview", "PreviewFormula", "previewFormula"]) || "";
-  const fid = extractFileIdFromFormulaOrUrl(raw);
-  return fid ? `${API_ROOT}/drive/proxy/${fid}?sz=w160` : null;
+  // 1) If Preview/preview holds a straight URL or an =IMAGE("...") with a full URL
+  const previewLike = firstField(order, ["Preview", "preview", "PreviewFormula", "previewFormula"]) || "";
+  const fromPreviewId = extractFileIdFromFormulaOrUrl(previewLike);
+  if (fromPreviewId) return `${API_ROOT}/drive/proxy/${fromPreviewId}?sz=w160`;
+
+  // 2) Fallback: scan EVERY cell for a Drive link (supports your Y-column pattern)
+  for (const val of Object.values(order)) {
+    const s = String(val || "");
+    // id=XXXX on uc?export=view
+    const m1 = s.match(/id=([A-Za-z0-9_-]+)/);
+    if (m1) return `${API_ROOT}/drive/proxy/${m1[1]}?sz=w160`;
+    // /file/d/XXXX/
+    const m2 = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+    if (m2) return `${API_ROOT}/drive/proxy/${m2[1]}?sz=w160`;
+  }
+
+  return null;
 }
 
 // Stage priority: Sewing → Embroidery → Print → Cut → Fur → Ordered
