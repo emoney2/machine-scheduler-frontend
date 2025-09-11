@@ -15,7 +15,8 @@ const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 
 
 
-// Handles either =IMAGE("https://...id=FILEID") or raw Drive URL/formula
+// --- Image helpers (single source of truth) ---
+// Handles =IMAGE("..."), uc?export=view&id=..., and /file/d/<id>/ patterns
 function extractFileIdFromFormulaOrUrl(v) {
   try {
     const s = String(v || "");
@@ -23,30 +24,36 @@ function extractFileIdFromFormulaOrUrl(v) {
     if (m) return m[1];
     m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
     if (m) return m[1];
-    m = s.match(/IMAGE\("([^"]+)"/i);
+    m = s.match(/IMAGE\("([^"]+)"/i); // =IMAGE("...url...")
     if (m) return extractFileIdFromFormulaOrUrl(m[1]);
   } catch {}
   return null;
 }
 
+// Prefer common fields; if none, scan the whole row for any Drive link.
+// Always return the proxy URL with a stable version key (?v=Order#) so it hits the disk cache.
 function getJobThumbUrl(job, ROOT) {
-  // Try specific fields first
-  const fields = [job.preview, job.Preview, job.previewFormula, job.PreviewFormula, job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl];
+  const fields = [
+    job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
+    job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl
+  ];
+
   for (const f of fields) {
     const id = extractFileIdFromFormulaOrUrl(f);
     if (id) {
-      const v = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
-      return `${ROOT}/drive/proxy/${id}?sz=w160&v=${v}`;
+      const vkey = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
+      return `${ROOT}/drive/proxy/${id}?sz=w160&v=${vkey}`;
     }
-    if (f && /^https?:\/\//i.test(String(f))) return f;
+    if (f && /^https?:\/\//i.test(String(f))) return f; // already a direct URL
   }
-  // Otherwise scan any field for a Drive link
-  for (const v of Object.values(job || {})) {
-    const s = String(v || "");
+
+  // Fallback: scan every field in the row for a Drive link
+  for (const val of Object.values(job || {})) {
+    const s = String(val || "");
     let m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
     if (m) {
-      const ver = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
-      return `${ROOT}/drive/proxy/${m[1]}?sz=w160&v=${ver}`;
+      const vkey = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
+      return `${ROOT}/drive/proxy/${m[1]}?sz=w160&v=${vkey}`;
     }
   }
   return null;
