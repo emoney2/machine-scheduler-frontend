@@ -291,11 +291,10 @@ export default function CutList() {
   // New column order (as requested):
   // Order #, Preview, Company Name, Design, Quantity, Product, Stage, Price, Due Date, Print, Material1..5, Back Material, Ship Date, Notes, Hard/Soft, Cut Type, Complete, Select
   const gridFull =
-    "60px 44px 120px 120px 42px 96px 84px 52px 60px 60px 60px 60px 60px 90px 64px 64px 100px 92px 80px 72px 28px";
+    "60px 44px 120px 120px 42px 96px 84px 52px 60px 60px 60px 60px 60px 90px 64px 64px 100px 92px 80px 72px";
   const gridCompact = gridFull;
   const gridTemplate = compact ? gridCompact : gridFull;
 
-  const RIGHT_W_SELECT = 28;
   const stickyRight = (offset, bg) => ({
     position: "sticky", right: offset, zIndex: 2, background: bg || "#fff",
     boxShadow: "-8px 0 8px -8px rgba(0,0,0,0.12)"
@@ -324,6 +323,15 @@ export default function CutList() {
           style={{ background: selectedCount ? "#f6f6f6" : "#f0f0f0", opacity: selectedCount ? 1 : 0.6 }}
         >
           Complete Selected {selectedCount ? `(${selectedCount})` : ""}
+        </button>
+        <button
+          onClick={() => setSelected({})}
+          className="btn"
+          disabled={!selectedCount}
+          style={{ background: "#f8f8f8", opacity: selectedCount ? 1 : 0.6 }}
+          title="Clear all selections"
+        >
+          Clear
         </button>
       </div>
 
@@ -357,19 +365,7 @@ export default function CutList() {
         <div style={{ textAlign: "center" }}>Hard/Soft</div>
         <div style={{ textAlign: "center" }}>Cut Type</div>
         <div style={{ ...stickyRight(RIGHT_W_SELECT, "#fafafa"), textAlign: "right" }}>Complete</div>
-        <div style={{ ...stickyRight(0, "#fafafa"), textAlign: "center" }}>
-          <input
-            aria-label="Select all"
-            type="checkbox"
-            onChange={() => {
-              const all = cards.length && cards.every(o => selected[String(o["Order #"])]);
-              const next = {};
-              if (!all) for (const o of cards) next[String(o["Order #"])] = true;
-              setSelected(next);
-            }}
-            checked={!!cards.length && cards.every(o => selected[String(o["Order #"])])}
-          />
-        </div>
+        <div style={{ ...stickyRight(0, "#fafafa"), textAlign: "right" }}>Complete</div>
       </div>
 
       {/* Content */}
@@ -412,12 +408,19 @@ export default function CutList() {
             return (
               <div
                 key={orderId}
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleSelect(orderId)}
+                onKeyDown={(e) => {
+                  if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleSelect(orderId); }
+                }}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
                   gap: 6, padding: 6, borderRadius: 12,
                   border: urgent ? "2px solid #e11900" : "1px solid #ddd",
                   background: "#fff", color: "#111", position: "relative",
-                  boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)"
+                  boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)",
+                  cursor: "pointer", userSelect: "none", outline: "none"
                 }}
               >
 
@@ -456,10 +459,10 @@ export default function CutList() {
                 <div style={{ textAlign: "center" }}>{hardSoft}</div>
                 <div style={{ textAlign: "center" }}>{cutType}</div>
 
-                {/* Complete (second from right) */}
-                <div style={{ ...stickyRight(RIGHT_W_SELECT, "#fff"), textAlign: "right" }}>
+                {/* Complete (final sticky cell). Stop click from toggling selection */}
+                <div style={{ ...stickyRight(0, "#fff"), textAlign: "right" }}>
                   <button
-                    onClick={() => markComplete(order)}
+                    onClick={(e) => { e.stopPropagation(); markComplete(order); }}
                     disabled={isSaving}
                     className="btn"
                     style={{
@@ -476,16 +479,6 @@ export default function CutList() {
                     )}
                     {isSaving ? "Saving…" : "Complete"}
                   </button>
-                </div>
-
-                {/* Select (far right) */}
-                <div style={{ ...stickyRight(0, "#fff"), textAlign: "center" }}>
-                  <input
-                    aria-label={`Select order ${orderId}`}
-                    type="checkbox"
-                    checked={sel}
-                    onChange={(e) => toggleSelect(orderId, e.target.checked)}
-                  />
                 </div>
               </div>
             );
