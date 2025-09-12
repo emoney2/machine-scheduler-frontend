@@ -28,6 +28,22 @@ function firstField(obj, names) {
   return null;
 }
 
+function businessDaysUntil(target) {
+  if (!target) return null;
+  const t = new Date(target); t.setHours(0,0,0,0);
+  const today = new Date();   today.setHours(0,0,0,0);
+
+  // If already past due, treat as 0 to force highlight
+  if (t <= today) return 0;
+
+  let count = 0;
+  for (let d = new Date(today); d < t; d.setDate(d.getDate() + 1)) {
+    const day = d.getDay(); // 0 Sun, 6 Sat
+    if (day !== 0 && day !== 6) count += 1;
+  }
+  return count;
+}
+
 // Extract Google Drive file ID from =IMAGE(...) or URL
 function extractFileIdFromFormulaOrUrl(v) {
   try {
@@ -452,12 +468,30 @@ export default function FurList() {
               return lum > 0.6 ? "#111" : "#fff";
             })();
 
+            // 🚨 Urgency: within 7 business days of Ship Date (or overdue)
+            const daysToShip = (() => {
+              if (!ship) return null;
+              const target = new Date(ship); target.setHours(0,0,0,0);
+              const today  = new Date();     today.setHours(0,0,0,0);
+              if (target <= today) return 0;
+              let count = 0;
+              const d = new Date(today);
+              while (d < target) {
+                const day = d.getDay(); // 0 Sun, 6 Sat
+                if (day !== 0 && day !== 6) count++;
+                d.setDate(d.getDate() + 1);
+              }
+              return count;
+            })();
+            const urgent = daysToShip !== null && daysToShip <= 7;
+
             return (
               <div
                 key={orderId}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
-                  gap: 8, padding: 8, borderRadius: 12, border: "1px solid #ddd",
+                  gap: 8, padding: 8, borderRadius: 12,
+                  border: urgent ? "2px solid #e11900" : "1px solid #ddd",
                   background: bg, color: fg, position: "relative",
                   boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)"
                 }}
