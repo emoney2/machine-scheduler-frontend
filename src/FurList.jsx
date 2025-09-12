@@ -198,23 +198,30 @@ export default function FurList() {
   }, [fetchOrders]);
 
   // Filter + sort (+partition)
-  // Filter + sort (+partition)
   const cards = useMemo(() => {
-    // Ignore jobs that are COMPLETE from either source:
-    // - Status (Fur List tab)
-    // - Stage  (Production Orders)
-    const base = (orders || []).filter(o => {
+    // 1) Ignore COMPLETE from either source
+    let base = (orders || []).filter(o => {
       const status = String(o["Status"] || "").trim().toUpperCase();
       const stage  = String(o["Stage"]  || "").trim().toUpperCase();
       return status !== "COMPLETE" && stage !== "COMPLETE";
     });
 
+    // 2) Exclude products containing pocket / towel / back (case-insensitive)
+    base = base.filter(o => {
+      const prod = String(o["Product"] || "").toLowerCase();
+      return !(
+        prod.includes("pocket") ||
+        prod.includes("towel")  ||
+        prod.includes("back")
+      );
+    });
+
+    // 3) Sort and (optionally) partition
     const sorted = [...base].sort(makeComparator());
     if (mode === "Fur Color") return priorityPartition(sorted, "Fur Color");
     if (mode === "Product")   return priorityPartition(sorted, "Product");
     return sorted;
   }, [orders, mode]);
-
 
   // ---------- Actions ----------
   async function markComplete(order) {
