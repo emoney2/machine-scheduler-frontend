@@ -364,7 +364,6 @@ export default function CutList() {
         <div style={{ textAlign: "center" }}>Notes</div>
         <div style={{ textAlign: "center" }}>Hard/Soft</div>
         <div style={{ textAlign: "center" }}>Cut Type</div>
-        <div style={{ ...stickyRight(RIGHT_W_SELECT, "#fafafa"), textAlign: "right" }}>Complete</div>
         <div style={{ ...stickyRight(0, "#fafafa"), textAlign: "right" }}>Complete</div>
       </div>
 
