@@ -250,33 +250,58 @@ export default function CutList() {
   async function completeSelected() {
     const ids = Object.keys(selected).filter(id => selected[id]);
     if (!ids.length) return;
-    const items = cards.filter(o => ids.includes(String(o["Order #"])))
+
+    const items = cards
+      .filter(o => ids.includes(String(o["Order #"])))
       .map(o => ({ orderId: String(o["Order #"]), quantity: o["Quantity"] || 0 }));
 
+    // mark all as saving
     setSaving(prev => { const n = { ...prev }; items.forEach(it => n[it.orderId] = true); return n; });
 
-    const chunk = 8;
-    let ok = 0, fail = 0;
-    for (let i = 0; i < items.length; i += chunk) {
-      const slice = items.slice(i, i + chunk);
-      const proms = slice.map(it =>
-        axios.post(`${API_ROOT}/cut/complete`, it, { withCredentials: true })
-          .then(r => (r.data?.ok ? "ok" : "fail"))
-          .catch(() => "fail")
+    try {
+      // One fast batch request
+      const { data } = await axios.post(
+        `${API_ROOT}/cut/completeBatch`,
+        { items },
+        { withCredentials: true, timeout: 30000 }
       );
-      const results = await Promise.all(proms);
-      ok += results.filter(x => x === "ok").length;
-      fail += results.filter(x => x === "fail").length;
+
+      // Optimistic prune + refresh once
+      setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
+      setSelected({});
+      await fetchOrders({ refresh: true });
+
+      if (data?.ok) {
+        const okCount = (items.length - (data?.missing?.length || 0));
+        showToast(`Completed ${okCount} orders`, "success");
+      } else {
+        showToast(data?.error || "Batch write failed", "error", 2600);
+      }
+
+    } catch (err) {
+      // Fallback: sequential single calls (more resilient to transient errors)
+      let ok = 0, fail = 0;
+      for (const it of items) {
+        try {
+          const r = await axios.post(`${API_ROOT}/cut/complete`, it, { withCredentials: true, timeout: 15000 });
+          if (r.data?.ok) ok++; else fail++;
+        } catch { fail++; }
+      }
+
+      // Refresh after fallback
+      setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
+      setSelected({});
+      await fetchOrders({ refresh: true });
+
+      showToast(fail ? `Completed ${ok}, failed ${fail}` : `Completed ${ok} orders`,
+        fail ? "error" : "success", fail ? 2600 : 1800);
+
+    } finally {
+      // clear saving flags
+      setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
     }
-
-    // optimistic prune + refresh once
-    setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
-    setSelected({});
-    setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
-    await fetchOrders({ refresh: true });
-
-    showToast(fail ? `Completed ${ok}, failed ${fail}` : `Completed ${ok} orders`, fail ? "error" : "success", fail ? 2600 : 1800);
   }
+
 
   function toggleSelect(id, on = undefined) {
     setSelected(prev => {
