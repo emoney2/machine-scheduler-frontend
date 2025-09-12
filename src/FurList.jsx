@@ -178,7 +178,8 @@ export default function FurList() {
     inFlight.current = true;
     try {
       if (!opts.refresh) setIsLoading(true);
-      const res = await axios.get(`${API_ROOT}/combined`, { withCredentials: true });
+      const url = `${API_ROOT}/combined${opts.refresh ? '?refresh=1' : ''}`;
+      const res = await axios.get(url, { withCredentials: true });
       setOrders(res.data?.orders || []);
     } catch {
       // swallow; UI will show last-known data
