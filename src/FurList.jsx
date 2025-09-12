@@ -307,8 +307,8 @@ export default function FurList() {
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
   // [Order#, Preview, Company, Design, Qty, Product, Stage, Due, (Print), Fur Color, Ship, (Hard/Soft), Complete, Select]
-  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 78px 68px 100px 78px 110px 92px 28px";
-  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 74px       96px 74px        92px 28px"; // no Print, no Hard/Soft
+  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 68px 100px 78px 78px 110px 92px 28px";
+  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 96px 74px 74px 92px 28px"; // compact: no Print, no Hard/Soft
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const cellBase = {
@@ -374,14 +374,12 @@ export default function FurList() {
         <div style={cellBase}>Qty</div>
         <div style={cellBase}>Product</div>
         <div style={cellBase}>Stage</div>
-        <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Print</div>}
         <div style={cellBase}>Fur Color</div>
         <div style={cellBase}>Ship</div>
+        <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
-        {/* Complete (second-from-right) */}
         <div style={{ ...cellBase, ...stickyRight(RIGHT_W_SELECT, "#fafafa"), textAlign: "right" }}>Complete</div>
-        {/* Select-all (far right) */}
         <div style={{ ...stickyRight(0, "#fafafa"), textAlign: "center" }}>
           <input
             aria-label="Select all"
@@ -486,11 +484,12 @@ export default function FurList() {
                 <div style={cellBase}>{qty}</div>
                 <div style={cellBase}>{product}</div>
                 <div style={cellBase}>{stage}</div>
-                <div style={cellBase}>{fmtMMDD(due)}</div>
                 {!compact && <div style={cellBase}>{print}</div>}
                 <div style={cellBase}>{color}</div>
                 <div style={cellBase}>{fmtMMDD(ship)}</div>
+                <div style={cellBase}>{fmtMMDD(due)}</div>
                 {!compact && <div style={cellBase}>{hardSoft}</div>}
+
 
                 {/* Complete (second from right, sticky with right offset = select col width) */}
                 <div style={{ ...stickyRight(RIGHT_W_SELECT, bg), textAlign: "right" }}>
