@@ -1,6 +1,7 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
 
+import CutList from "./CutList";
 import Ship from "./Ship";
 import FurList from "./FurList";
 import React, { useState, useEffect, useRef } from 'react';
@@ -1521,6 +1522,7 @@ useEffect(() => {
           { to: "/inventory",         label: "Inventory" },
           { to: "/inventory-ordered", label: "Inventory Ordered" },
           { to: "/fur",               label: "Fur List" },
+          { to: "/cut",               label: "Cut List" },  
           { to: "/ship",              label: "Ship" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
@@ -1594,6 +1596,7 @@ useEffect(() => {
         <Route path="/submit" element={<OrderSubmission />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-ordered" element={<InventoryOrdered />} />
+        <Route path="/cut" element={<CutList />} />
         <Route path="/ship" element={<Ship />} />
         <Route path="/fur" element={<FurList />} />
         {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
