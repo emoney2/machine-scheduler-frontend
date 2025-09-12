@@ -291,9 +291,8 @@ export default function CutList() {
   // New column order (as requested):
   // Order #, Preview, Company Name, Design, Quantity, Product, Stage, Price, Due Date, Print, Material1..5, Back Material, Ship Date, Notes, Hard/Soft, Cut Type, Complete, Select
   const gridFull =
-    "62px 56px 170px 190px 62px 120px 110px 80px 78px 68px 90px 90px 90px 90px 110px 78px 140px 110px 100px 92px 28px";
-  const gridCompact =
-    "62px 56px 160px 160px 60px 110px 100px 76px 74px  0px  90px  90px  90px  90px 110px 74px 120px 110px  90px 92px 28px";
+    "60px 44px 120px 120px 42px 96px 84px 52px 60px 60px 60px 60px 60px 90px 64px 64px 100px 92px 80px 72px 28px";
+  const gridCompact = gridFull;
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const RIGHT_W_SELECT = 28;
@@ -302,8 +301,10 @@ export default function CutList() {
     boxShadow: "-8px 0 8px -8px rgba(0,0,0,0.12)"
   });
 
+  const cellBase = { textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+
   return (
-    <div style={{ padding: 12, fontSize: 12, lineHeight: 1.2 }}>
+    <div style={{ padding: 10, fontSize: 11, lineHeight: 1.2 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         .spin { animation: spin 0.9s linear infinite; }
@@ -331,10 +332,11 @@ export default function CutList() {
         className="hdr"
         style={{
           display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
-          gap: 8, padding: "6px 8px", borderRadius: 10, border: "1px solid #ddd",
+          gap: 6, padding: "6px 6px", borderRadius: 10, border: "1px solid #ddd",
           background: "#fafafa", marginBottom: 6, position: "relative"
         }}
       >
+
         <div style={{ textAlign: "center" }}>Order #</div>
         <div style={{ textAlign: "center" }}>Preview</div>
         <div style={{ textAlign: "center" }}>Company Name</div>
@@ -342,8 +344,6 @@ export default function CutList() {
         <div style={{ textAlign: "center" }}>Qty</div>
         <div style={{ textAlign: "center" }}>Product</div>
         <div style={{ textAlign: "center" }}>Stage</div>
-        <div style={{ textAlign: "center" }}>Price</div>
-        <div style={{ textAlign: "center" }}>Due</div>
         <div style={{ textAlign: "center" }}>Print</div>
         <div style={{ textAlign: "center" }}>Material1</div>
         <div style={{ textAlign: "center" }}>Material2</div>
@@ -352,6 +352,7 @@ export default function CutList() {
         <div style={{ textAlign: "center" }}>Material5</div>
         <div style={{ textAlign: "center" }}>Back Material</div>
         <div style={{ textAlign: "center" }}>Ship</div>
+        <div style={{ textAlign: "center" }}>Due</div>
         <div style={{ textAlign: "center" }}>Notes</div>
         <div style={{ textAlign: "center" }}>Hard/Soft</div>
         <div style={{ textAlign: "center" }}>Cut Type</div>
@@ -413,12 +414,13 @@ export default function CutList() {
                 key={orderId}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
-                  gap: 8, padding: 8, borderRadius: 12,
+                  gap: 6, padding: 6, borderRadius: 12,
                   border: urgent ? "2px solid #e11900" : "1px solid #ddd",
                   background: "#fff", color: "#111", position: "relative",
                   boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)"
                 }}
               >
+
                 <div style={{ textAlign: "center", fontWeight: 700 }}>{orderId}</div>
 
                 {/* Preview */}
@@ -441,8 +443,6 @@ export default function CutList() {
                 <div style={{ textAlign: "center" }}>{qty}</div>
                 <div style={{ textAlign: "center" }}>{product}</div>
                 <div style={{ textAlign: "center" }}>{stage}</div>
-                <div style={{ textAlign: "center" }}>{price}</div>
-                <div style={{ textAlign: "center" }}>{fmtMMDD(due)}</div>
                 <div style={{ textAlign: "center" }}>{print}</div>
                 <div style={{ textAlign: "center" }}>{m1}</div>
                 <div style={{ textAlign: "center" }}>{m2}</div>
@@ -451,6 +451,7 @@ export default function CutList() {
                 <div style={{ textAlign: "center" }}>{m5}</div>
                 <div style={{ textAlign: "center" }}>{backMat}</div>
                 <div style={{ textAlign: "center" }}>{fmtMMDD(ship)}</div>
+                <div style={{ textAlign: "center" }}>{fmtMMDD(due)}</div>
                 <div style={{ textAlign: "center" }}>{notes}</div>
                 <div style={{ textAlign: "center" }}>{hardSoft}</div>
                 <div style={{ textAlign: "center" }}>{cutType}</div>
