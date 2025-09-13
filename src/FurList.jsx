@@ -322,21 +322,21 @@ export default function FurList() {
 
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
-  // [Order#, Preview, Company, Design, Qty, Product, Stage, Due, (Print), Fur Color, Ship, (Hard/Soft), Complete, Select]
-  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 68px 100px 78px 78px 110px 92px 28px";
-  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 96px 74px 74px 92px 28px"; // compact: no Print, no Hard/Soft
+  // [Order#, Preview, Company, Design, Qty, Product, Stage, Due, (Print), Fur Color, Ship, (Hard/Soft), Complete]
+  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 68px 100px 78px 78px 110px 92px";
+  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 96px 74px 74px 92px"; // compact: no Print, no Hard/Soft
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const cellBase = {
     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center"
   };
 
-  // Sticky helpers (two right sticky columns: Complete, then Select)
-  const RIGHT_W_SELECT = 28;
+  // Sticky helper (one right sticky column now: Complete)
   const stickyRight = (offset, bg) => ({
     position: "sticky", right: offset, zIndex: 2, background: bg || "#fff",
     boxShadow: offset ? "-8px 0 8px -8px rgba(0,0,0,0.12)" : "inset 8px 0 8px -8px rgba(0,0,0,0.12)"
   });
+
 
   const selectedCount = Object.values(selected).filter(Boolean).length;
 
@@ -372,6 +372,15 @@ export default function FurList() {
         >
           Complete Selected {selectedCount ? `(${selectedCount})` : ""}
         </button>
+        <button
+          onClick={() => setSelected({})}
+          className="btn"
+          disabled={!selectedCount}
+          style={{ background: "#f8f8f8", opacity: selectedCount ? 1 : 0.6 }}
+          title="Clear all selections"
+        >
+          Clear
+        </button>
       </div>
 
       {/* Header row */}
@@ -395,15 +404,7 @@ export default function FurList() {
         <div style={cellBase}>Ship</div>
         <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
-        <div style={{ ...cellBase, ...stickyRight(RIGHT_W_SELECT, "#fafafa"), textAlign: "right" }}>Complete</div>
-        <div style={{ ...stickyRight(0, "#fafafa"), textAlign: "center" }}>
-          <input
-            aria-label="Select all"
-            type="checkbox"
-            onChange={toggleSelectAll}
-            checked={!!cards.length && cards.every(o => selected[String(o["Order #"])])}
-          />
-        </div>
+        <div style={{ ...cellBase, ...stickyRight(0, "#fafafa"), textAlign: "right" }}>Complete</div>
       </div>
 
       {/* Content */}
@@ -488,12 +489,19 @@ export default function FurList() {
             return (
               <div
                 key={orderId}
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleSelect(orderId)}
+                onKeyDown={(e) => {
+                  if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleSelect(orderId); }
+                }}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
                   gap: 8, padding: 8, borderRadius: 12,
                   border: urgent ? "2px solid #e11900" : "1px solid #ddd",
                   background: bg, color: fg, position: "relative",
-                  boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)"
+                  boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)",
+                  cursor: "pointer", userSelect: "none", outline: "none"
                 }}
               >
                 <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
@@ -502,9 +510,11 @@ export default function FurList() {
                 <div style={{ display: "grid", placeItems: "center" }}>
                   <div style={{ width: 50, height: 34, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
                     {imageUrl ? (
-                      <img loading="lazy" src={imageUrl} alt="preview"
+                      <img
+                        loading="lazy" decoding="async" src={imageUrl} alt="preview"
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
                     ) : (
                       <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 11, color: "#666" }}>
                         No Preview
@@ -524,11 +534,10 @@ export default function FurList() {
                 <div style={cellBase}>{fmtMMDD(due)}</div>
                 {!compact && <div style={cellBase}>{hardSoft}</div>}
 
-
-                {/* Complete (second from right, sticky with right offset = select col width) */}
-                <div style={{ ...stickyRight(RIGHT_W_SELECT, bg), textAlign: "right" }}>
+                {/* Complete (final sticky cell). Stop click from toggling the card */}
+                <div style={{ ...stickyRight(0, bg), textAlign: "right" }}>
                   <button
-                    onClick={() => markComplete(order)}
+                    onClick={(e) => { e.stopPropagation(); markComplete(order); }}
                     disabled={isSaving}
                     className="btn"
                     style={{
@@ -540,21 +549,13 @@ export default function FurList() {
                     aria-busy={isSaving ? "true" : "false"}
                   >
                     {isSaving && (
-                      <span className="spin" aria-hidden="true"
-                        style={{ width: 12, height: 12, border: "2px solid #999", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }} />
+                      <span
+                        className="spin" aria-hidden="true"
+                        style={{ width: 12, height: 12, border: "2px solid #999", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }}
+                      />
                     )}
                     {isSaving ? "Saving…" : "Complete"}
                   </button>
-                </div>
-
-                {/* Select (far right, sticky at right:0) */}
-                <div style={{ ...stickyRight(0, bg), textAlign: "center" }}>
-                  <input
-                    aria-label={`Select order ${orderId}`}
-                    type="checkbox"
-                    checked={sel}
-                    onChange={(e) => toggleSelect(orderId, e.target.checked)}
-                  />
                 </div>
               </div>
             );
