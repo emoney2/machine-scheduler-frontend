@@ -1,6 +1,8 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
 
+
+import MaterialLog from "./MaterialLog";
 import CutList from "./CutList";
 import Ship from "./Ship";
 import FurList from "./FurList";
@@ -1523,7 +1525,8 @@ useEffect(() => {
           { to: "/inventory-ordered", label: "Inventory Ordered" },
           { to: "/fur",               label: "Fur List" },
           { to: "/cut",               label: "Cut List" },  
-          { to: "/ship",              label: "Ship" }
+          { to: "/ship",              label: "Ship" },
+          { to: "/material-log", label: "Material Log" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
             padding: '0.5rem 1rem',
@@ -1599,6 +1602,7 @@ useEffect(() => {
         <Route path="/cut" element={<CutList />} />
         <Route path="/ship" element={<Ship />} />
         <Route path="/fur" element={<FurList />} />
+        <Route path="/material-log" element={<MaterialLog />} />
         {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
         <Route path="/box-select" element={<BoxSelectGuard />} />
         <Route path="/reorder" element={<ReorderPage />} />
