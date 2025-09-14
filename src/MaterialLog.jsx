@@ -259,9 +259,10 @@ function RDForm() {
 
 function Recut() {
   const [orders, setOrders] = useState([]);
+  const [fetchErr, setFetchErr] = useState("");     // ← NEW
   const [filterOpenOnly, setFilterOpenOnly] = useState(true);
   const [sortKey, setSortKey] = useState("dueDate"); // 'dueDate' | 'order'
-  const [sortDir, setSortDir] = useState("asc"); // 'asc' | 'desc'
+  const [sortDir, setSortDir] = useState("asc");     // 'asc' | 'desc'
   const [query, setQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [recutQty, setRecutQty] = useState(1);
@@ -270,13 +271,33 @@ function Recut() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
 
+  function normalizeOrders(raw) {                    // ← NEW
+    // Accepts either [{...}] or [[hdr...], [row...], ...] and returns [{...}]
+    if (Array.isArray(raw) && raw.length && Array.isArray(raw[0])) {
+      const [hdr, ...rows] = raw;
+      const headers = hdr.map((h) => String(h || "").trim());
+      return rows.map((r) => {
+        const o = {};
+        headers.forEach((h, i) => { o[h] = r[i]; });
+        return o;
+      });
+    }
+    if (Array.isArray(raw)) return raw;
+    return [];
+  }
+
   useEffect(() => {
     (async () => {
       try {
+        setFetchErr("");
         const res = await axios.get(`${API_ROOT}/orders`, { withCredentials: true });
-        setOrders(Array.isArray(res.data) ? res.data : []);
+        const list = normalizeOrders(res?.data);
+        setOrders(Array.isArray(list) ? list : []);
+        if (!Array.isArray(list)) setFetchErr("Orders endpoint did not return a list.");
       } catch (e) {
         console.error(e);
+        setFetchErr(e?.response?.data?.error || `Failed to load orders (${e?.response?.status || "network"})`);
+        setOrders([]);
       }
     })();
   }, []);
@@ -407,6 +428,16 @@ function Recut() {
             </div>
           }
         >
+          {fetchErr && (
+            <div style={{ color: "#b00020", marginBottom: 8 }}>
+              {fetchErr}
+            </div>
+          )}
+          {filtered.length === 0 && !fetchErr && (
+            <div style={{ color: "#555", marginBottom: 8 }}>
+              No jobs found. Toggle to “Showing All” or adjust your search.
+            </div>
+          )}
           <div
             style={{
               display: "grid",
