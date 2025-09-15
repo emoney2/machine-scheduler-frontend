@@ -502,6 +502,7 @@ function Recut({ onExit }) {
                     <div>
                       {preview ? (
                         <img
+                          loading="lazy"
                           alt=""
                           src={preview}
                           onError={(e) => { e.currentTarget.style.display = "none"; }}
@@ -536,6 +537,7 @@ function Recut({ onExit }) {
                   const selPreview = getPreviewUrl(selectedOrder);
                   return selPreview ? (
                     <img
+                      loading="lazy"
                       alt=""
                       src={selPreview}
                       onError={(e) => { e.currentTarget.style.display = "none"; }}

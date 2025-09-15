@@ -150,7 +150,7 @@ export default function Ship() {
     async function loadJobsForCompany(company) {
       try {
         const res = await fetch(
-          `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
+          `${API_BASE}/api/company-list`,
           { credentials: "include" }
         );
         const data = await res.json();
@@ -202,10 +202,16 @@ export default function Ship() {
 
     const interval = setInterval(() => {
       fetch(
-        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
+        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
         { credentials: "include" }
       )
-        .then(res => res.json())
+        .then(res => {
+          if (res.status === 401) {
+            window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/login`;
+            throw new Error("unauthorized");
+          }
+          return res.json();
+        })
         .then(data => {
           if (data.jobs) {
             setJobs(prev => {
@@ -245,7 +251,7 @@ export default function Ship() {
         const parsed = JSON.parse(pending);
 
         const res = await fetch(
-          "https://machine-scheduler-backend.onrender.com/api/process-shipment",  // updated URL
+          `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/set-volume`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -253,6 +259,7 @@ export default function Ship() {
             body: JSON.stringify(parsed),
           }
         );
+
         const data = await res.json();
         if (res.ok) {
           const mainWindow = window;
@@ -359,7 +366,7 @@ export default function Ship() {
   async function fetchCompanyNames() {
     try {
       const res = await fetch(
-        "https://machine-scheduler-backend.onrender.com/api/company-list",
+        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/company-list`,
         { credentials: "include" }
       );
       const data = await res.json();
@@ -369,12 +376,17 @@ export default function Ship() {
     }
   }
 
+
   async function fetchJobs(company) {
     try {
       const res = await fetch(
-        `https://machine-scheduler-backend.onrender.com/api/jobs-for-company?company=${encodeURIComponent(company)}`,
+        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/jobs-for-company?company=${encodeURIComponent(company)}`,
         { credentials: "include" }
       );
+      if (res.status === 401) {
+        window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/login`;
+        return;
+      }
       const data = await res.json();
       if (res.ok) {
         // Initialize shipQty from the sheet's "Quantity" column
@@ -395,6 +407,7 @@ export default function Ship() {
       alert("Error loading jobs.");
     }
   }
+
 
   const handleSelectCompany = (e) => {
     const value = e.target.value;
@@ -464,12 +477,12 @@ export default function Ship() {
 
         try {
           const res = await fetch(
-            "https://machine-scheduler-backend.onrender.com/api/set-volume",
+            `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/process-shipment`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
-              body: JSON.stringify({ product, length, width, height }),
+              body: JSON.stringify(parsed),
             }
           );
           const data = await res.json();
