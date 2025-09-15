@@ -120,6 +120,30 @@ function getEarliestDueDate(selected, jobs) {
   return dueDates.length > 0 ? new Date(Math.min(...dueDates.map(d => d.getTime()))) : null;
 }
 
+function LoginModal({ open, onClose, onLogin }) {
+  if (!open) return null;
+  const backdropStyle = {
+    position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
+    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
+  };
+  const cardStyle = {
+    background: "#fff", borderRadius: 12, padding: 20, width: 360, boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
+  };
+  const rowStyle = { display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 16 };
+  return (
+    <div style={backdropStyle} role="dialog" aria-modal="true">
+      <div style={cardStyle}>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Session expired</div>
+        <div>Please log in to continue processing shipments.</div>
+        <div style={rowStyle}>
+          <button onClick={onClose}>Cancel</button>
+          <button onClick={onLogin}>Log in</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Ship() {
   // 📌 give this tab a name so we can re-focus it later
   useEffect(() => {
@@ -137,6 +161,10 @@ export default function Ship() {
   const [companyInput, setCompanyInput] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
   const [projectedBoxes, setProjectedBoxes] = useState([]);
+
+// Session/login modal + stable API base for redirects
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
 
   const query = new URLSearchParams(window.location.search);
   const defaultCompany = query.get("company");
@@ -207,11 +235,12 @@ export default function Ship() {
       )
         .then(res => {
           if (res.status === 401) {
-            window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/login`;
+            setShowLoginModal(true);
             throw new Error("unauthorized");
           }
           return res.json();
         })
+
         .then(data => {
           if (data.jobs) {
             setJobs(prev => {
@@ -384,9 +413,10 @@ export default function Ship() {
         { credentials: "include" }
       );
       if (res.status === 401) {
-        window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/login`;
+        setShowLoginModal(true);
         return;
       }
+
       const data = await res.json();
       if (res.ok) {
         // Initialize shipQty from the sheet's "Quantity" column
@@ -1317,6 +1347,14 @@ export default function Ship() {
           </button>
         </div>
       )}
+      <LoginModal
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLogin={() => {
+          // send them to backend login, then come back to this page
+          window.location.href = `${API_BASE}/login?next=${encodeURIComponent(window.location.href)}`;
+        }}
+      />
     </div>
   );
 }
