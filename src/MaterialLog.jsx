@@ -6,7 +6,6 @@ const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
 // ---------- small utils ----------
 function excelSerialToDate(n) {
-  // Excel/Sheets serial days: epoch = 1899-12-30
   const base = new Date(Date.UTC(1899, 11, 30));
   return new Date(base.getTime() + Number(n) * 86400000);
 }
@@ -23,6 +22,40 @@ function formatDueDate(raw) {
   const d = new Date(s);
   if (!isNaN(d)) return mmdd(d);
   return s;
+}
+
+// --- Thumbnail helpers ---
+function driveIdFromUrl(u) {
+  try {
+    const s = String(u || "");
+    const m1 = s.match(/\/d\/([^/]+)/);          // .../d/<ID>/...
+    if (m1) return m1[1];
+    const m2 = s.match(/[?&]id=([^&]+)/);        // ?id=<ID>
+    if (m2) return m2[1];
+  } catch {}
+  return "";
+}
+function extractUrlFromImageFormula(s) {
+  const m = String(s || "").match(/=IMAGE\(\s*"([^"]+)"/i);
+  return m ? m[1] : "";
+}
+function getPreviewUrl(obj) {
+  const keys = ["Preview", "Image", "Thumbnail", "Image URL", "Image Link", "Photo", "Img"];
+  let raw = "";
+  for (const k of keys) {
+    const v = obj?.[k];
+    if (v) { raw = String(v); break; }
+  }
+  if (!raw) return "";
+
+  const fromFormula = extractUrlFromImageFormula(raw);
+  let url = fromFormula || raw.trim();
+
+  if (/^https?:\/\/drive\.google\.com/i.test(url)) {
+    const id = driveIdFromUrl(url);
+    if (id) url = `https://drive.google.com/uc?export=view&id=${id}`;
+  }
+  return url;
 }
 
 const Tile = ({ onClick, children }) => (
@@ -254,17 +287,18 @@ function RDForm() {
 
 function Recut({ onExit }) {
   const [orders, setOrders] = useState([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loadingOrders, setLoadingOrders] = useState(true);     // NEW
   const [fetchErr, setFetchErr] = useState("");
   const [filterOpenOnly, setFilterOpenOnly] = useState(true);
-  const [sortKey, setSortKey] = useState("dueDate"); // 'dueDate' | 'order'
-  const [sortDir, setSortDir] = useState("asc"); // 'asc' | 'desc'
+  const [sortKey, setSortKey] = useState("dueDate");
+  const [sortDir, setSortDir] = useState("asc");
   const [query, setQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [originalUsage, setOriginalUsage] = useState([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);  // NEW
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-  const [qtyMap, setQtyMap] = useState({}); // per-material recut qty (whole numbers)
+  const [qtyMap, setQtyMap] = useState({}); // per-material recut qty
 
   function normalizeOrders(raw) {
     if (Array.isArray(raw) && raw.length && Array.isArray(raw[0])) {
@@ -284,7 +318,7 @@ function Recut({ onExit }) {
     (async () => {
       try {
         setFetchErr("");
-        setLoadingOrders(true);
+        setLoadingOrders(true);                                   // NEW
         const res = await axios.get(`${API_ROOT}/orders`, { withCredentials: true });
         const list = normalizeOrders(res?.data);
         setOrders(Array.isArray(list) ? list : []);
@@ -294,7 +328,7 @@ function Recut({ onExit }) {
         setFetchErr(e?.response?.data?.error || `Failed to load orders (${e?.response?.status || "network"})`);
         setOrders([]);
       } finally {
-        setLoadingOrders(false);
+        setLoadingOrders(false);                                   // NEW
       }
     })();
   }, []);
@@ -328,6 +362,7 @@ function Recut({ onExit }) {
   const onPickOrder = async (order) => {
     setSelectedOrder(order);
     setErr(""); setOk(""); setOriginalUsage([]); setQtyMap({});
+    setLoadingDetails(true);                                      // NEW
     try {
       const orderNum = order["Order #"];
       const res = await axios.get(`${API_ROOT}/material-log/original-usage`, {
@@ -338,13 +373,15 @@ function Recut({ onExit }) {
     } catch (e) {
       console.error(e);
       setErr(e?.response?.data?.error || "Failed to load usage for order");
+    } finally {
+      setLoadingDetails(false);                                    // NEW
     }
   };
 
   const setLineQty = (id, val) => {
     const n = Number(val);
     if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
-      setQtyMap((m) => ({ ...m, [id]: "" })); // keep blank when invalid
+      setQtyMap((m) => ({ ...m, [id]: "" }));
     } else {
       setQtyMap((m) => ({ ...m, [id]: String(n) }));
     }
@@ -354,7 +391,6 @@ function Recut({ onExit }) {
     setErr(""); setOk("");
     if (!selectedOrder) return setErr("Pick a job first");
 
-    // pick only lines with a whole-number qty > 0
     const chosen = (originalUsage || []).filter((it) => {
       const q = Number(qtyMap[it.id]);
       return Number.isInteger(q) && q > 0;
@@ -371,8 +407,8 @@ function Recut({ onExit }) {
           companyName: it.companyName,
           originalQuantity: it.quantity,
           originalUnits: it.qtyUnits,
-          unit: it.unit, // "Yards"|"Sqft"
-          recutQty: Number(qtyMap[it.id]), // per-material qty
+          unit: it.unit,
+          recutQty: Number(qtyMap[it.id]),
         })),
       };
       await axios.post(`${API_ROOT}/material-log/recut-append`, payload, { withCredentials: true });
@@ -384,13 +420,11 @@ function Recut({ onExit }) {
     }
   };
 
-  // ----- RENDER -----
   const backFromSelected = () => setSelectedOrder(null);
   const backFromList = () => onExit?.();
 
   return (
     <>
-      {/* top back button: one step back */}
       <div style={{ marginBottom: 12 }}>
         <button onClick={selectedOrder ? backFromSelected : backFromList}>Back</button>
       </div>
@@ -447,7 +481,7 @@ function Recut({ onExit }) {
               const product = (o["Product"] || "").toString();
               const company = (o["Company Name"] || "").toString();
               const due = formatDueDate(o["Due Date"]);
-              const preview = o["Preview"] || o["Image"];
+              const preview = getPreviewUrl(o);                           // NEW
               return (
                 <div
                   key={orderNo}
@@ -458,8 +492,9 @@ function Recut({ onExit }) {
                     <div>
                       {preview ? (
                         <img
-                          alt="preview"
+                          alt=""
                           src={preview}
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}  // NEW
                           style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
                         />
                       ) : (
@@ -487,13 +522,17 @@ function Recut({ onExit }) {
           <Section
             title={
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                { (selectedOrder["Preview"] || selectedOrder["Image"]) && (
-                  <img
-                    alt="preview"
-                    src={selectedOrder["Preview"] || selectedOrder["Image"]}
-                    style={{ width: 54, height: 54, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
-                  />
-                )}
+                {(() => {
+                  const selPreview = getPreviewUrl(selectedOrder);         // NEW
+                  return selPreview ? (
+                    <img
+                      alt=""
+                      src={selPreview}
+                      onError={(e) => { e.currentTarget.style.display = "none"; }} // NEW
+                      style={{ width: 54, height: 54, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
+                    />
+                  ) : null;
+                })()}
                 <span>
                   Recut #{selectedOrder["Order #"]} — {selectedOrder["Product"]}
                 </span>
@@ -501,60 +540,66 @@ function Recut({ onExit }) {
             }
             actions={<button onClick={() => setSelectedOrder(null)}>Clear all</button>}
           >
-            <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
-              Enter a recut Qty (whole number) for each material you are remaking.
-            </div>
+            {loadingDetails ? (
+              <div style={{ color: "#555" }}>Loading job details…</div>
+            ) : (
+              <>
+                <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+                  Enter a recut Qty (whole number) for each material you are remaking.
+                </div>
 
-            <div style={{ marginTop: 10 }}>
-              {(originalUsage || []).map((it) => {
-                const perPiece = Number(it.qtyUnits) / Math.max(1, Number(it.quantity));
-                const usedRounded = Number(it.qtyUnits || 0).toFixed(2);
-                const perRounded = Number(perPiece || 0).toFixed(2);
-                const unit = it.unit || "Units"; // "Yards" | "Sqft" (from backend)
-                return (
-                  <div
-                    key={it.id}
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "2fr 1.2fr 1.2fr auto",
-                      gap: 8,
-                      padding: 6,
-                      borderBottom: "1px solid #f0f0f0",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600 }}>{it.material}</div>
-                      <div style={{ fontSize: 12, color: "#666" }}>{it.shape}</div>
-                    </div>
-                    <div>Used ({unit}): {usedRounded}</div>
-                    <div>Per piece ({unit}): {perRounded}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <label htmlFor={`rq-${it.id}`} style={{ fontSize: 12 }}>Qty</label>
-                      <input
-                        id={`rq-${it.id}`}
-                        type="number"
-                        min="0"
-                        step="1"
-                        placeholder=""
-                        value={qtyMap[it.id] ?? ""}
-                        onChange={(e) => setLineQty(it.id, e.target.value)}
-                        style={{ width: 80 }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                <div style={{ marginTop: 10 }}>
+                  {(originalUsage || []).map((it) => {
+                    const perPiece = Number(it.qtyUnits) / Math.max(1, Number(it.quantity));
+                    const usedRounded = Number(it.qtyUnits || 0).toFixed(2);
+                    const perRounded = Number(perPiece || 0).toFixed(2);
+                    const unit = it.unit || "Units";
+                    return (
+                      <div
+                        key={it.id}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "2fr 1.2fr 1.2fr auto",
+                          gap: 8,
+                          padding: 6,
+                          borderBottom: "1px solid #f0f0f0",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600 }}>{it.material}</div>
+                          <div style={{ fontSize: 12, color: "#666" }}>{it.shape}</div>
+                        </div>
+                        <div>Used ({unit}): {usedRounded}</div>
+                        <div>Per piece ({unit}): {perRounded}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <label htmlFor={`rq-${it.id}`} style={{ fontSize: 12 }}>Qty</label>
+                          <input
+                            id={`rq-${it.id}`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            placeholder=""
+                            value={qtyMap[it.id] ?? ""}
+                            onChange={(e) => setLineQty(it.id, e.target.value)}
+                            style={{ width: 80 }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
 
-            {err && <div style={{ color: "#b00020", marginTop: 8 }}>{err}</div>}
-            {ok && <div style={{ color: "#0a0", marginTop: 8 }}>{ok}</div>}
+                {err && <div style={{ color: "#b00020", marginTop: 8 }}>{err}</div>}
+                {ok && <div style={{ color: "#0a0", marginTop: 8 }}>{ok}</div>}
 
-            <div style={{ marginTop: 12 }}>
-              <button onClick={submitRecut} style={{ padding: "8px 14px", fontWeight: 600 }}>
-                Submit
-              </button>
-            </div>
+                <div style={{ marginTop: 12 }}>
+                  <button onClick={submitRecut} style={{ padding: "8px 14px", fontWeight: 600 }}>
+                    Submit
+                  </button>
+                </div>
+              </>
+            )}
           </Section>
         </>
       )}
