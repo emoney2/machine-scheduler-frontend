@@ -4,6 +4,27 @@ import axios from "axios";
 
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
+// ---------- small utils ----------
+function excelSerialToDate(n) {
+  // Excel/Sheets serial days: epoch = 1899-12-30
+  const base = new Date(Date.UTC(1899, 11, 30));
+  return new Date(base.getTime() + Number(n) * 86400000);
+}
+function mmdd(d) {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${mm}/${dd}`;
+}
+function formatDueDate(raw) {
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw === "number") return mmdd(excelSerialToDate(raw));
+  const s = String(raw).trim();
+  if (/^\d+$/.test(s)) return mmdd(excelSerialToDate(Number(s)));
+  const d = new Date(s);
+  if (!isNaN(d)) return mmdd(d);
+  return s;
+}
+
 const Tile = ({ onClick, children }) => (
   <button
     onClick={onClick}
@@ -64,7 +85,7 @@ function useMaterialsAndProducts() {
   return { materials, products };
 }
 
-function Row({ idx, row, onChange, onRemove, materials, products }) {
+function Row({ idx, row, onChange, onRemove }) {
   const update = (patch) => onChange(idx, { ...row, ...patch });
   return (
     <div
@@ -76,7 +97,6 @@ function Row({ idx, row, onChange, onRemove, materials, products }) {
         marginBottom: 8,
       }}
     >
-      {/* Material (typeahead) */}
       <div>
         <input
           list="materials-list"
@@ -86,8 +106,6 @@ function Row({ idx, row, onChange, onRemove, materials, products }) {
           style={{ width: "100%" }}
         />
       </div>
-
-      {/* Product (optional) */}
       <div>
         <input
           list="products-list"
@@ -97,8 +115,6 @@ function Row({ idx, row, onChange, onRemove, materials, products }) {
           style={{ width: "100%" }}
         />
       </div>
-
-      {/* Width (in) */}
       <div>
         <input
           type="number"
@@ -110,8 +126,6 @@ function Row({ idx, row, onChange, onRemove, materials, products }) {
           style={{ width: "100%" }}
         />
       </div>
-
-      {/* Length (in) */}
       <div>
         <input
           type="number"
@@ -123,8 +137,6 @@ function Row({ idx, row, onChange, onRemove, materials, products }) {
           style={{ width: "100%" }}
         />
       </div>
-
-      {/* Qty (whole numbers) */}
       <div>
         <input
           type="number"
@@ -136,7 +148,6 @@ function Row({ idx, row, onChange, onRemove, materials, products }) {
           style={{ width: "100%" }}
         />
       </div>
-
       <div>
         <button onClick={() => onRemove(idx)} style={{ padding: "6px 10px" }}>
           Remove
@@ -155,8 +166,7 @@ function RDForm() {
   const [error, setError] = useState("");
   const [okMsg, setOkMsg] = useState("");
 
-  const addRow = () =>
-    setRows((r) => [...r, { material: "", product: "", w: "", l: "", qty: 1 }]);
+  const addRow = () => setRows((r) => [...r, { material: "", product: "", w: "", l: "", qty: 1 }]);
   const clearAll = () => {
     setRows(Array.from({ length: 5 }, () => ({ material: "", product: "", w: "", l: "", qty: 1 })));
     setError("");
@@ -169,7 +179,7 @@ function RDForm() {
   const validate = () => {
     for (const [i, r] of rows.entries()) {
       const hasAny = [r.material, r.product, r.w, r.l].some((v) => String(v || "").trim());
-      if (!hasAny) continue; // allow empty trailing rows
+      if (!hasAny) continue;
       if (!r.material.trim()) return `Row ${i + 1}: select the correct material`;
       const qty = Number(r.qty);
       if (!Number.isInteger(qty) || qty <= 0) return `Row ${i + 1}: quantity must be a whole number`;
@@ -184,10 +194,7 @@ function RDForm() {
     setError("");
     setOkMsg("");
     const err = validate();
-    if (err) {
-      setError(err);
-      return;
-    }
+    if (err) return setError(err);
     const payload = rows
       .filter((r) => [r.material, r.product, r.w, r.l].some((v) => String(v || "").trim()))
       .map((r) => ({
@@ -197,10 +204,7 @@ function RDForm() {
         lengthIn: r.l !== "" ? Number(r.l) : null,
         quantity: Number(r.qty),
       }));
-    if (!payload.length) {
-      setError("Nothing to submit");
-      return;
-    }
+    if (!payload.length) return setError("Nothing to submit");
     try {
       setSubmitting(true);
       await axios.post(`${API_ROOT}/material-log/rd-append`, { items: payload }, { withCredentials: true });
@@ -208,8 +212,7 @@ function RDForm() {
       clearAll();
     } catch (e) {
       console.error(e);
-      const msg = e?.response?.data?.error || "Failed to append";
-      setError(msg);
+      setError(e?.response?.data?.error || "Failed to append");
     } finally {
       setSubmitting(false);
     }
@@ -235,15 +238,7 @@ function RDForm() {
           number. Product wins if both are provided.
         </div>
         {rows.map((row, i) => (
-          <Row
-            key={i}
-            idx={i}
-            row={row}
-            onChange={onChange}
-            onRemove={onRemove}
-            materials={materials}
-            products={products}
-          />
+          <Row key={i} idx={i} row={row} onChange={onChange} onRemove={onRemove} />
         ))}
         {error && <div style={{ color: "#b00020", marginTop: 8 }}>{error}</div>}
         {okMsg && <div style={{ color: "#0a0", marginTop: 8 }}>{okMsg}</div>}
@@ -257,22 +252,21 @@ function RDForm() {
   );
 }
 
-function Recut() {
+function Recut({ onExit }) {
   const [orders, setOrders] = useState([]);
-  const [fetchErr, setFetchErr] = useState("");     // ← NEW
+  const [loadingOrders, setLoadingOrders] = useState(true);
+  const [fetchErr, setFetchErr] = useState("");
   const [filterOpenOnly, setFilterOpenOnly] = useState(true);
   const [sortKey, setSortKey] = useState("dueDate"); // 'dueDate' | 'order'
-  const [sortDir, setSortDir] = useState("asc");     // 'asc' | 'desc'
+  const [sortDir, setSortDir] = useState("asc"); // 'asc' | 'desc'
   const [query, setQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
-  const [recutQty, setRecutQty] = useState(1);
   const [originalUsage, setOriginalUsage] = useState([]);
-  const [checked, setChecked] = useState({});
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  const [qtyMap, setQtyMap] = useState({}); // per-material recut qty (whole numbers)
 
-  function normalizeOrders(raw) {                    // ← NEW
-    // Accepts either [{...}] or [[hdr...], [row...], ...] and returns [{...}]
+  function normalizeOrders(raw) {
     if (Array.isArray(raw) && raw.length && Array.isArray(raw[0])) {
       const [hdr, ...rows] = raw;
       const headers = hdr.map((h) => String(h || "").trim());
@@ -290,6 +284,7 @@ function Recut() {
     (async () => {
       try {
         setFetchErr("");
+        setLoadingOrders(true);
         const res = await axios.get(`${API_ROOT}/orders`, { withCredentials: true });
         const list = normalizeOrders(res?.data);
         setOrders(Array.isArray(list) ? list : []);
@@ -298,6 +293,8 @@ function Recut() {
         console.error(e);
         setFetchErr(e?.response?.data?.error || `Failed to load orders (${e?.response?.status || "network"})`);
         setOrders([]);
+      } finally {
+        setLoadingOrders(false);
       }
     })();
   }, []);
@@ -330,10 +327,7 @@ function Recut() {
 
   const onPickOrder = async (order) => {
     setSelectedOrder(order);
-    setErr("");
-    setOk("");
-    setChecked({});
-    setOriginalUsage([]);
+    setErr(""); setOk(""); setOriginalUsage([]); setQtyMap({});
     try {
       const orderNum = order["Order #"];
       const res = await axios.get(`${API_ROOT}/material-log/original-usage`, {
@@ -347,38 +341,29 @@ function Recut() {
     }
   };
 
-  const toggle = (id) => setChecked((c) => ({ ...c, [id]: !c[id] }));
-  const allOn = () => {
-    const map = {};
-    (originalUsage || []).forEach((it) => {
-      map[it.id] = true;
-    });
-    setChecked(map);
+  const setLineQty = (id, val) => {
+    const n = Number(val);
+    if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+      setQtyMap((m) => ({ ...m, [id]: "" })); // keep blank when invalid
+    } else {
+      setQtyMap((m) => ({ ...m, [id]: String(n) }));
+    }
   };
-  const allOff = () => setChecked({});
 
   const submitRecut = async () => {
-    setErr("");
-    setOk("");
-    const qty = Number(recutQty);
-    if (!selectedOrder) {
-      setErr("Pick a job first");
-      return;
-    }
-    if (!Number.isInteger(qty) || qty <= 0) {
-      setErr("Recut quantity must be a whole number");
-      return;
-    }
-    const chosen = (originalUsage || []).filter((it) => checked[it.id]);
-    if (!chosen.length) {
-      setErr("Select at least one item to recut");
-      return;
-    }
+    setErr(""); setOk("");
+    if (!selectedOrder) return setErr("Pick a job first");
+
+    // pick only lines with a whole-number qty > 0
+    const chosen = (originalUsage || []).filter((it) => {
+      const q = Number(qtyMap[it.id]);
+      return Number.isInteger(q) && q > 0;
+    });
+    if (!chosen.length) return setErr("Enter a recut Qty for at least one item");
 
     try {
       const payload = {
         orderNumber: selectedOrder["Order #"],
-        recutQty: qty,
         items: chosen.map((it) => ({
           id: it.id,
           material: it.material,
@@ -386,19 +371,30 @@ function Recut() {
           companyName: it.companyName,
           originalQuantity: it.quantity,
           originalUnits: it.qtyUnits,
+          unit: it.unit, // "Yards"|"Sqft"
+          recutQty: Number(qtyMap[it.id]), // per-material qty
         })),
       };
       await axios.post(`${API_ROOT}/material-log/recut-append`, payload, { withCredentials: true });
       setOk(`Logged ${chosen.length} recut row(s)`);
-      setChecked({});
+      setQtyMap({});
     } catch (e) {
       console.error(e);
       setErr(e?.response?.data?.error || "Failed to append recut rows");
     }
   };
 
+  // ----- RENDER -----
+  const backFromSelected = () => setSelectedOrder(null);
+  const backFromList = () => onExit?.();
+
   return (
     <>
+      {/* top back button: one step back */}
+      <div style={{ marginBottom: 12 }}>
+        <button onClick={selectedOrder ? backFromSelected : backFromList}>Back</button>
+      </div>
+
       {!selectedOrder && (
         <Section
           title="Pick job to recut"
@@ -428,45 +424,60 @@ function Recut() {
             </div>
           }
         >
-          {fetchErr && (
-            <div style={{ color: "#b00020", marginBottom: 8 }}>
-              {fetchErr}
-            </div>
+          {loadingOrders && <div style={{ color: "#555", marginBottom: 8 }}>Loading jobs…</div>}
+          {!loadingOrders && fetchErr && (
+            <div style={{ color: "#b00020", marginBottom: 8 }}>{fetchErr}</div>
           )}
-          {filtered.length === 0 && !fetchErr && (
+          {!loadingOrders && !fetchErr && filtered.length === 0 && (
             <div style={{ color: "#555", marginBottom: 8 }}>
               No jobs found. Toggle to “Showing All” or adjust your search.
             </div>
           )}
+
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
               gap: 12,
             }}
           >
-            {filtered.map((o) => (
-              <div
-                key={o["Order #"]}
-                onClick={() => onPickOrder(o)}
-                style={{ cursor: "pointer", border: "1px solid #eee", borderRadius: 12, padding: 10 }}
-              >
-                <div style={{ fontWeight: 700 }}>
-                  #{o["Order #"]} – {o["Product"]}
-                </div>
-                <div style={{ fontSize: 12, color: "#555" }}>{o["Company Name"]}</div>
-                <div style={{ fontSize: 12, color: "#555" }}>Due: {o["Due Date"]}</div>
-                {o["Preview"] && (
-                  <div style={{ marginTop: 6 }}>
-                    <img
-                      alt="preview"
-                      src={o["Preview"]}
-                      style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8 }}
-                    />
+            {filtered.map((o) => {
+              const orderNo = o["Order #"];
+              const design = (o["Design"] || "").toString();
+              const product = (o["Product"] || "").toString();
+              const company = (o["Company Name"] || "").toString();
+              const due = formatDueDate(o["Due Date"]);
+              const preview = o["Preview"] || o["Image"];
+              return (
+                <div
+                  key={orderNo}
+                  onClick={() => onPickOrder(o)}
+                  style={{ cursor: "pointer", border: "1px solid #eee", borderRadius: 12, padding: 10 }}
+                >
+                  <div style={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 10, alignItems: "center" }}>
+                    <div>
+                      {preview ? (
+                        <img
+                          alt="preview"
+                          src={preview}
+                          style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
+                        />
+                      ) : (
+                        <div style={{ width: 88, height: 88, borderRadius: 8, background: "#f0f0f0" }} />
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, marginBottom: 2 }}>
+                        #{orderNo} — {design || product}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#555" }}>{company}</div>
+                      {product && <div style={{ fontSize: 12, color: "#555" }}>{product}</div>}
+                      <div style={{ fontSize: 12, color: "#555" }}>Due: {due}</div>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         </Section>
       )}
@@ -474,59 +485,76 @@ function Recut() {
       {selectedOrder && (
         <>
           <Section
-            title={`Recut #${selectedOrder["Order #"]} — ${selectedOrder["Product"]}`}
+            title={
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                { (selectedOrder["Preview"] || selectedOrder["Image"]) && (
+                  <img
+                    alt="preview"
+                    src={selectedOrder["Preview"] || selectedOrder["Image"]}
+                    style={{ width: 54, height: 54, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
+                  />
+                )}
+                <span>
+                  Recut #{selectedOrder["Order #"]} — {selectedOrder["Product"]}
+                </span>
+              </div>
+            }
             actions={<button onClick={() => setSelectedOrder(null)}>Clear all</button>}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div>Recut quantity:</div>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={recutQty}
-                onChange={(e) => setRecutQty(e.target.value)}
-                style={{ width: 100 }}
-              />
-              <button onClick={submitRecut} style={{ marginLeft: "auto" }}>
-                Append recut rows
-              </button>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>
+              Enter a recut Qty (whole number) for each material you are remaking.
             </div>
-            <div style={{ fontSize: 12, color: "#666", marginTop: 8 }}>
-              These are the original usage rows (excluding any previously marked Recut). Check what you are remaking.
-            </div>
+
             <div style={{ marginTop: 10 }}>
-              <button onClick={allOn} style={{ marginRight: 8 }}>
-                Select all
-              </button>
-              <button onClick={allOff}>Clear all</button>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              {(originalUsage || []).map((it) => (
-                <label
-                  key={it.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "24px 2fr 2fr 1fr 1fr",
-                    gap: 8,
-                    padding: 6,
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                >
-                  <input type="checkbox" checked={!!checked[it.id]} onChange={() => toggle(it.id)} />
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{it.material}</div>
-                    <div style={{ fontSize: 12, color: "#666" }}>{it.shape}</div>
+              {(originalUsage || []).map((it) => {
+                const perPiece = Number(it.qtyUnits) / Math.max(1, Number(it.quantity));
+                const usedRounded = Number(it.qtyUnits || 0).toFixed(2);
+                const perRounded = Number(perPiece || 0).toFixed(2);
+                const unit = it.unit || "Units"; // "Yards" | "Sqft" (from backend)
+                return (
+                  <div
+                    key={it.id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "2fr 1.2fr 1.2fr auto",
+                      gap: 8,
+                      padding: 6,
+                      borderBottom: "1px solid #f0f0f0",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600 }}>{it.material}</div>
+                      <div style={{ fontSize: 12, color: "#666" }}>{it.shape}</div>
+                    </div>
+                    <div>Used ({unit}): {usedRounded}</div>
+                    <div>Per piece ({unit}): {perRounded}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <label htmlFor={`rq-${it.id}`} style={{ fontSize: 12 }}>Qty</label>
+                      <input
+                        id={`rq-${it.id}`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder=""
+                        value={qtyMap[it.id] ?? ""}
+                        onChange={(e) => setLineQty(it.id, e.target.value)}
+                        style={{ width: 80 }}
+                      />
+                    </div>
                   </div>
-                  <div>Original Qty (pieces): {it.quantity}</div>
-                  <div>Units used: {it.qtyUnits}</div>
-                  <div>
-                    Per piece: {(Number(it.qtyUnits) / Math.max(1, Number(it.quantity))).toFixed(4)}
-                  </div>
-                </label>
-              ))}
+                );
+              })}
             </div>
+
             {err && <div style={{ color: "#b00020", marginTop: 8 }}>{err}</div>}
             {ok && <div style={{ color: "#0a0", marginTop: 8 }}>{ok}</div>}
+
+            <div style={{ marginTop: 12 }}>
+              <button onClick={submitRecut} style={{ padding: "8px 14px", fontWeight: 600 }}>
+                Submit
+              </button>
+            </div>
           </Section>
         </>
       )}
@@ -556,10 +584,8 @@ export default function MaterialLog() {
 
       {mode === "RECUT" && (
         <>
-          <button onClick={() => setMode("")} style={{ marginBottom: 12 }}>
-            Back
-          </button>
-          <Recut />
+          {/* back is handled inside <Recut> so it can go one step back */}
+          <Recut onExit={() => setMode("")} />
         </>
       )}
     </div>
