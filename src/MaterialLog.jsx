@@ -24,14 +24,16 @@ function formatDueDate(raw) {
   return s;
 }
 
-// --- Thumbnail helpers ---
+// --- Thumbnail helpers (Drive + =IMAGE() + proxy) ---
 function driveIdFromUrl(u) {
   try {
     const s = String(u || "");
-    const m1 = s.match(/\/d\/([^/]+)/);          // .../d/<ID>/...
-    if (m1) return m1[1];
-    const m2 = s.match(/[?&]id=([^&]+)/);        // ?id=<ID>
-    if (m2) return m2[1];
+    let m = s.match(/\/d\/([^/]+)/);                 // .../d/<ID>/...
+    if (m) return m[1];
+    m = s.match(/[?&]id=([^&]+)/);                   // ?id=<ID>
+    if (m) return m[1];
+    m = s.match(/open\?usp=drive_[^&]*&id=([^&]+)/); // open?usp=...&id=<ID>
+    if (m) return m[1];
   } catch {}
   return "";
 }
@@ -40,7 +42,11 @@ function extractUrlFromImageFormula(s) {
   return m ? m[1] : "";
 }
 function getPreviewUrl(obj) {
-  const keys = ["Preview", "Image", "Thumbnail", "Image URL", "Image Link", "Photo", "Img"];
+  // Try likely columns from your Production Orders sheet:
+  const keys = [
+    "Preview", "Image", "Thumbnail", "Image URL", "Image Link",
+    "Photo", "Img", "Mockup", "Front Image", "Mockup Link"
+  ];
   let raw = "";
   for (const k of keys) {
     const v = obj?.[k];
@@ -48,13 +54,17 @@ function getPreviewUrl(obj) {
   }
   if (!raw) return "";
 
+  // If it's an =IMAGE("...") formula, extract the URL
   const fromFormula = extractUrlFromImageFormula(raw);
-  let url = fromFormula || raw.trim();
+  let url = (fromFormula || raw).trim();
 
-  if (/^https?:\/\/drive\.google\.com/i.test(url)) {
+  // If it's a Google Drive URL, use backend proxy (works even if file is private)
+  if (/^https?:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(url)) {
     const id = driveIdFromUrl(url);
-    if (id) url = `https://drive.google.com/uc?export=view&id=${id}`;
+    if (id) return `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(id)}`;
   }
+
+  // Otherwise use the URL directly
   return url;
 }
 
@@ -287,7 +297,7 @@ function RDForm() {
 
 function Recut({ onExit }) {
   const [orders, setOrders] = useState([]);
-  const [loadingOrders, setLoadingOrders] = useState(true);     // NEW
+  const [loadingOrders, setLoadingOrders] = useState(true);
   const [fetchErr, setFetchErr] = useState("");
   const [filterOpenOnly, setFilterOpenOnly] = useState(true);
   const [sortKey, setSortKey] = useState("dueDate");
@@ -295,10 +305,10 @@ function Recut({ onExit }) {
   const [query, setQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [originalUsage, setOriginalUsage] = useState([]);
-  const [loadingDetails, setLoadingDetails] = useState(false);  // NEW
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-  const [qtyMap, setQtyMap] = useState({}); // per-material recut qty
+  const [qtyMap, setQtyMap] = useState({});
 
   function normalizeOrders(raw) {
     if (Array.isArray(raw) && raw.length && Array.isArray(raw[0])) {
@@ -318,7 +328,7 @@ function Recut({ onExit }) {
     (async () => {
       try {
         setFetchErr("");
-        setLoadingOrders(true);                                   // NEW
+        setLoadingOrders(true);
         const res = await axios.get(`${API_ROOT}/orders`, { withCredentials: true });
         const list = normalizeOrders(res?.data);
         setOrders(Array.isArray(list) ? list : []);
@@ -328,7 +338,7 @@ function Recut({ onExit }) {
         setFetchErr(e?.response?.data?.error || `Failed to load orders (${e?.response?.status || "network"})`);
         setOrders([]);
       } finally {
-        setLoadingOrders(false);                                   // NEW
+        setLoadingOrders(false);
       }
     })();
   }, []);
@@ -362,7 +372,7 @@ function Recut({ onExit }) {
   const onPickOrder = async (order) => {
     setSelectedOrder(order);
     setErr(""); setOk(""); setOriginalUsage([]); setQtyMap({});
-    setLoadingDetails(true);                                      // NEW
+    setLoadingDetails(true);
     try {
       const orderNum = order["Order #"];
       const res = await axios.get(`${API_ROOT}/material-log/original-usage`, {
@@ -374,7 +384,7 @@ function Recut({ onExit }) {
       console.error(e);
       setErr(e?.response?.data?.error || "Failed to load usage for order");
     } finally {
-      setLoadingDetails(false);                                    // NEW
+      setLoadingDetails(false);
     }
   };
 
@@ -481,7 +491,7 @@ function Recut({ onExit }) {
               const product = (o["Product"] || "").toString();
               const company = (o["Company Name"] || "").toString();
               const due = formatDueDate(o["Due Date"]);
-              const preview = getPreviewUrl(o);                           // NEW
+              const preview = getPreviewUrl(o);
               return (
                 <div
                   key={orderNo}
@@ -494,7 +504,7 @@ function Recut({ onExit }) {
                         <img
                           alt=""
                           src={preview}
-                          onError={(e) => { e.currentTarget.style.display = "none"; }}  // NEW
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
                           style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
                         />
                       ) : (
@@ -523,12 +533,12 @@ function Recut({ onExit }) {
             title={
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {(() => {
-                  const selPreview = getPreviewUrl(selectedOrder);         // NEW
+                  const selPreview = getPreviewUrl(selectedOrder);
                   return selPreview ? (
                     <img
                       alt=""
                       src={selPreview}
-                      onError={(e) => { e.currentTarget.style.display = "none"; }} // NEW
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
                       style={{ width: 54, height: 54, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
                     />
                   ) : null;
@@ -629,7 +639,6 @@ export default function MaterialLog() {
 
       {mode === "RECUT" && (
         <>
-          {/* back is handled inside <Recut> so it can go one step back */}
           <Recut onExit={() => setMode("")} />
         </>
       )}
