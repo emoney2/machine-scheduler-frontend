@@ -445,11 +445,15 @@ function Recut({ onExit }) {
       // 2) Thread Data re-log (if Embroidery Qty provided)
       const qEmb = Number(embQty);
       if (Number.isInteger(qEmb) && qEmb > 0) {
+        const originalQuantity =
+          Number(selectedOrder?.Quantity ?? selectedOrder?.["Quantity"] ?? selectedOrder?.qty ?? selectedOrder?.["Qty"]);
         await axios.post(`${API_ROOT}/thread/relog`, {
           orderNumber: selectedOrder["Order #"],
           embroideryQty: qEmb,
+          originalQuantity: Number.isFinite(originalQuantity) && originalQuantity > 0 ? originalQuantity : undefined,
         }, { withCredentials: true });
       }
+
 
       setOk([
         chosen.length ? `Logged ${chosen.length} recut row(s)` : null,
