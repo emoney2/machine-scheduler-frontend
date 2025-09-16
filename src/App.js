@@ -979,8 +979,23 @@ const fetchOrdersEmbroLinksCore = async () => {
 const fetchManualStateCore = async (previousCols) => {
   // console.log('fetchManualStateCore ▶ start');
   try {
-    // 1) Fetch manualState from server (note no extra '/api' prefix)
-    const { data: msData } = await axios.get(API_ROOT + '/manualState', { timeout: 20000 });
+    // Robust fetch with one quick retry and longer timeout.
+    const attempt = (ms) => axios.get(API_ROOT + '/manualState', { timeout: ms });
+
+    let msData;
+    try {
+      ({ data: msData } = await attempt(25000));
+    } catch (e1) {
+      console.warn('manualState first attempt failed:', e1?.message || e1);
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        ({ data: msData } = await attempt(45000));
+      } catch (e2) {
+        console.error('manualState second attempt failed:', e2?.message || e2);
+        // Gracefully degrade: return previous columns unchanged
+        return previousCols;
+      }
+    }
     //    msData = { machineColumns: [ [...], [...] ], placeholders: [...] }
 
     // 2) Overwrite local placeholders state
