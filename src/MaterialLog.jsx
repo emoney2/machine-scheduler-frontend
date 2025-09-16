@@ -24,7 +24,7 @@ function formatDueDate(raw) {
   return s;
 }
 
-// --- Thumbnail helpers (Drive + =IMAGE() + proxy) ---
+// --- Thumbnail helpers (Drive + =IMAGE()/=HYPERLINK() + proxy) ---
 function driveIdFromUrl(u) {
   try {
     const s = String(u || "");
@@ -41,11 +41,17 @@ function extractUrlFromImageFormula(s) {
   const m = String(s || "").match(/=IMAGE\(\s*"([^"]+)"/i);
   return m ? m[1] : "";
 }
+function extractUrlFromHyperlinkFormula(s) {
+  const m = String(s || "").match(/=HYPERLINK\(\s*"([^"]+)"/i);
+  return m ? m[1] : "";
+}
 function getPreviewUrl(obj) {
   // Try likely columns from your Production Orders sheet:
   const keys = [
     "Preview", "Image", "Thumbnail", "Image URL", "Image Link",
-    "Photo", "Img", "Mockup", "Front Image", "Mockup Link"
+    "Photo", "Img", "Mockup", "Front Image", "Mockup Link",
+    // extra common names we’ve seen
+    "Artwork", "Art", "Picture", "Picture URL", "Artwork Link"
   ];
   let raw = "";
   for (const k of keys) {
@@ -54,9 +60,10 @@ function getPreviewUrl(obj) {
   }
   if (!raw) return "";
 
-  // If it's an =IMAGE("...") formula, extract the URL
-  const fromFormula = extractUrlFromImageFormula(raw);
-  let url = (fromFormula || raw).trim();
+  // Support =IMAGE("...") or =HYPERLINK("...") formulas
+  const fromImg = extractUrlFromImageFormula(raw);
+  const fromLnk = extractUrlFromHyperlinkFormula(raw);
+  let url = (fromImg || fromLnk || raw).trim();
 
   // If it's a Google Drive URL, use backend proxy (works even if file is private)
   if (/^https?:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(url)) {
@@ -67,6 +74,7 @@ function getPreviewUrl(obj) {
   // Otherwise use the URL directly
   return url;
 }
+
 
 const Tile = ({ onClick, children }) => (
   <button
@@ -401,6 +409,7 @@ function Recut({ onExit }) {
   };
 
   const submitRecut = async () => {
+    if (isRecutSubmitting) return;          // NEW: ignore double-clicks
     setErr(""); setOk("");
     if (!selectedOrder) return setErr("Pick a job first");
 
@@ -408,7 +417,8 @@ function Recut({ onExit }) {
       const q = Number(qtyMap[it.id]);
       return Number.isInteger(q) && q > 0;
     });
-    if (!chosen.length && !(Number(embQty) > 0)) {
+    const emb = Number(embQty);
+    if (!chosen.length && !(Number.isInteger(emb) && emb > 0)) {
       return setErr("Enter a recut Qty for at least one item or an Embroidery Qty");
     }
 
