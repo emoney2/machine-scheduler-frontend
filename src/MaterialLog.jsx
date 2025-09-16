@@ -309,6 +309,9 @@ function Recut({ onExit }) {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [qtyMap, setQtyMap] = useState({});
+  const [isRecutSubmitting, setIsRecutSubmitting] = useState(false);
+  const [showRecutSuccess, setShowRecutSuccess] = useState(false);
+  const [embQty, setEmbQty] = useState("");
 
   function normalizeOrders(raw) {
     if (Array.isArray(raw) && raw.length && Array.isArray(raw[0])) {
@@ -405,28 +408,52 @@ function Recut({ onExit }) {
       const q = Number(qtyMap[it.id]);
       return Number.isInteger(q) && q > 0;
     });
-    if (!chosen.length) return setErr("Enter a recut Qty for at least one item");
+    if (!chosen.length && !(Number(embQty) > 0)) {
+      return setErr("Enter a recut Qty for at least one item or an Embroidery Qty");
+    }
 
+    setIsRecutSubmitting(true);
     try {
-      const payload = {
-        orderNumber: selectedOrder["Order #"],
-        items: chosen.map((it) => ({
-          id: it.id,
-          material: it.material,
-          shape: it.shape,
-          companyName: it.companyName,
-          originalQuantity: it.quantity,
-          originalUnits: it.qtyUnits,
-          unit: it.unit,
-          recutQty: Number(qtyMap[it.id]),
-        })),
-      };
-      await axios.post(`${API_ROOT}/material-log/recut-append`, payload, { withCredentials: true });
-      setOk(`Logged ${chosen.length} recut row(s)`);
+      // 1) Material recut rows (if any)
+      if (chosen.length) {
+        const payload = {
+          orderNumber: selectedOrder["Order #"],
+          items: chosen.map((it) => ({
+            id: it.id,
+            material: it.material,
+            shape: it.shape,
+            companyName: it.companyName,
+            originalQuantity: it.quantity,
+            originalUnits: it.qtyUnits,
+            unit: it.unit,
+            recutQty: Number(qtyMap[it.id]),
+          })),
+        };
+        await axios.post(`${API_ROOT}/material-log/recut-append`, payload, { withCredentials: true });
+      }
+
+      // 2) Thread Data re-log (if Embroidery Qty provided)
+      const qEmb = Number(embQty);
+      if (Number.isInteger(qEmb) && qEmb > 0) {
+        await axios.post(`${API_ROOT}/thread/relog`, {
+          orderNumber: selectedOrder["Order #"],
+          embroideryQty: qEmb,
+        }, { withCredentials: true });
+      }
+
+      setOk([
+        chosen.length ? `Logged ${chosen.length} recut row(s)` : null,
+        (Number(embQty) > 0) ? `Re-logged thread for qty ${embQty}` : null,
+      ].filter(Boolean).join(" • "));
       setQtyMap({});
+      setEmbQty("");
+      setShowRecutSuccess(true);
+      setTimeout(() => setShowRecutSuccess(false), 1500);
     } catch (e) {
       console.error(e);
-      setErr(e?.response?.data?.error || "Failed to append recut rows");
+      setErr(e?.response?.data?.error || "Failed to submit");
+    } finally {
+      setIsRecutSubmitting(false);
     }
   };
 
@@ -435,9 +462,48 @@ function Recut({ onExit }) {
 
   return (
     <>
+      {/* NEW: yellow in-progress overlay */}
+      {isRecutSubmitting && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(255, 235, 59, 0.35)", // translucent yellow
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "2rem",
+          fontWeight: 800,
+          color: "#7a6b00",
+          textShadow: "0 1px 0 rgba(255,255,255,0.8)",
+        }}>
+          Reposting the Recut Material…
+        </div>
+      )}
+
+      {/* NEW: green success flash */}
+      {showRecutSuccess && !isRecutSubmitting && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(76, 175, 80, 0.25)",
+          zIndex: 9998,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "2rem",
+          fontWeight: 800,
+          color: "#0a3d0a",
+          textShadow: "0 1px 0 rgba(255,255,255,0.8)",
+        }}>
+          ✅ Recut posted!
+        </div>
+      )}
+
       <div style={{ marginBottom: 12 }}>
         <button onClick={selectedOrder ? backFromSelected : backFromList}>Back</button>
       </div>
+
 
       {!selectedOrder && (
         <Section
@@ -605,9 +671,34 @@ function Recut({ onExit }) {
                 {err && <div style={{ color: "#b00020", marginTop: 8 }}>{err}</div>}
                 {ok && <div style={{ color: "#0a0", marginTop: 8 }}>{ok}</div>}
 
+                {/* NEW: Embroidery re-log quantity */}
+                <div style={{ marginTop: 14, padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Embroidery</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <label htmlFor="embQty" style={{ minWidth: 150 }}>Embroidery Qty to re-log:</label>
+                    <input
+                      id="embQty"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={embQty}
+                      onChange={(e) => setEmbQty(e.target.value.replace(/[^\d]/g, ""))}
+                      style={{ width: 120, padding: "6px 8px" }}
+                      placeholder="0"
+                    />
+                    <span style={{ color: "#666", fontSize: 12 }}>
+                      (optional — logs thread usage for this order scaled to this qty)
+                    </span>
+                  </div>
+                </div>
+
                 <div style={{ marginTop: 12 }}>
-                  <button onClick={submitRecut} style={{ padding: "8px 14px", fontWeight: 600 }}>
-                    Submit
+                  <button
+                    onClick={submitRecut}
+                    disabled={isRecutSubmitting}
+                    style={{ padding: "8px 14px", fontWeight: 600, opacity: isRecutSubmitting ? 0.7 : 1 }}
+                  >
+                    {isRecutSubmitting ? "Submitting…" : "Submit"}
                   </button>
                 </div>
               </>
