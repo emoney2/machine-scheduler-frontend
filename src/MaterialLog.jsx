@@ -671,24 +671,45 @@ function Recut({ onExit }) {
                 {err && <div style={{ color: "#b00020", marginTop: 8 }}>{err}</div>}
                 {ok && <div style={{ color: "#0a0", marginTop: 8 }}>{ok}</div>}
 
-                {/* NEW: Embroidery re-log quantity */}
-                <div style={{ marginTop: 14, padding: "10px 12px", border: "1px solid #ddd", borderRadius: 8 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Embroidery</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <label htmlFor="embQty" style={{ minWidth: 150 }}>Embroidery Qty to re-log:</label>
+                {/* Embroidery as a row in the same 4-col grid */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "2fr 1.2fr 1.2fr auto",
+                    gap: 8,
+                    padding: 6,
+                    borderBottom: "1px solid #f0f0f0",
+                    alignItems: "center",
+                    marginTop: 10,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600 }}>Embroidery</div>
+                    <div style={{ fontSize: 12, color: "#666" }}>{selectedOrder?.Product || ""}</div>
+                  </div>
+                  {/* We don’t have per-piece ft here; show dashes to keep columns aligned */}
+                  <div>Used (ft): —</div>
+                  <div>Per piece (ft): —</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <label htmlFor="rq-emb" style={{ fontSize: 12 }}>Qty</label>
                     <input
-                      id="embQty"
+                      id="rq-emb"
                       type="number"
-                      min={0}
-                      step={1}
+                      min="0"
+                      step="1"
                       value={embQty}
-                      onChange={(e) => setEmbQty(e.target.value.replace(/[^\d]/g, ""))}
-                      style={{ width: 120, padding: "6px 8px" }}
-                      placeholder="0"
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        const n = Number(v);
+                        if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+                          setEmbQty("");
+                        } else {
+                          setEmbQty(String(n));
+                        }
+                      }}
+                      style={{ width: 80 }}
+                      placeholder=""
                     />
-                    <span style={{ color: "#666", fontSize: 12 }}>
-                      (optional — logs thread usage for this order scaled to this qty)
-                    </span>
                   </div>
                 </div>
 
