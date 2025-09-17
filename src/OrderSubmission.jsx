@@ -241,19 +241,20 @@ const handleCompanyInput = (e) => {
   const raw = e.target.value;
   const inputType = e.nativeEvent?.inputType;
 
-  // handle backspace/delete
+  // handle backspace/delete by just storing raw
   if (inputType?.startsWith("delete")) {
     setForm((prev) => ({ ...prev, company: raw }));
     return;
   }
 
-  // attempt inline completion
+  // attempt inline completion from the loaded names
   const match = companyNames.find((c) =>
     c.toLowerCase().startsWith(raw.toLowerCase())
   );
 
   if (match && raw !== match) {
     setForm((prev) => ({ ...prev, company: match }));
+    // highlight only the appended text
     setTimeout(() => {
       const input = companyInputRef.current;
       input?.setSelectionRange(raw.length, match.length);
