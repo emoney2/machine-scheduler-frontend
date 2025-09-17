@@ -27,18 +27,43 @@ function formatDueDate(raw) {
 }
 
 // --- Thumbnail helpers (Drive + =IMAGE()/=HYPERLINK() + proxy) ---
-function driveIdFromUrl(u) {
-  try {
-    const s = String(u || "");
-    let m = s.match(/\/d\/([^/]+)/);                 // .../d/<ID>/...
-    if (m) return m[1];
-    m = s.match(/[?&]id=([^&]+)/);                   // ?id=<ID>
-    if (m) return m[1];
-    m = s.match(/open\?usp=drive_[^&]*&id=([^&]+)/); // open?usp=...&id=<ID>
-    if (m) return m[1];
-  } catch {}
+function cleanDriveId(id) {
+  if (!id) return "";
+  // decode once, trim, strip any wrapping quotes
+  id = decodeURIComponent(String(id)).trim();
+  if ((id.startsWith('"') && id.endsWith('"')) || (id.startsWith("'") && id.endsWith("'"))) {
+    id = id.slice(1, -1).trim();
+  }
+  // only allow valid chars and require a sensible length
+  if (!/^[A-Za-z0-9_-]{10,}$/.test(id)) return "";
+  return id;
+}
+
+function driveIdFromUrl(url) {
+  if (!url) return "";
+  let m;
+
+  // ?id=XXXX
+  m = url.match(/[?&]id=([^&]+)/i);
+  if (m) {
+    const id = cleanDriveId(m[1]);
+    if (id) return id;
+  }
+
+  // /d/XXXX/
+  m = url.match(/\/d\/([^/?#]+)/i);
+  if (m) {
+    const id = cleanDriveId(m[1]);
+    if (id) return id;
+  }
+
+  // sometimes cells contain just the id with quotes/spaces
+  const lone = cleanDriveId(url);
+  if (lone) return lone;
+
   return "";
 }
+
 function extractUrlFromImageFormula(s) {
   const m = String(s || "").match(/=IMAGE\(\s*"([^"]+)"/i);
   return m ? m[1] : "";
@@ -96,115 +121,39 @@ function addCacheBuster(u) {
 }
 
 function resolvePreviewCandidates(obj, size = 200) {
-  const primary = getPreviewUrl(obj);
-  let fallback = "";
+  // Derive a URL from the row, then extract a *validated* id
+  const hinted = getPreviewUrl(obj);
+  const id = driveIdFromUrl(hinted);
 
-  // Extract id from whichever primary we’re using:
-  // - google public thumb: https://drive.google.com/thumbnail?id=...
-  // - backend endpoints:  /drive/thumbnail?fileId=...  or  /drive/proxy/:id
-  let id = "";
-
-  // google public
-  if (/https?:\/\/.*drive\.google\.com\/thumbnail\?/.test(primary)) {
-    const m = primary.match(/[?&]id=([^&]+)/i);
-    id = m ? decodeURIComponent(m[1]) : "";
-  }
-  // backend thumbnail
-  if (!id && /\/drive\/thumbnail\?fileId=/i.test(primary)) {
-    const m = primary.match(/fileId=([^&]+)/i);
-    id = m ? decodeURIComponent(m[1]) : "";
-  }
-  // backend proxy
   if (!id) {
-    const m = primary.match(/\/drive\/proxy\/([^?]+)/i);
-    id = m ? decodeURIComponent(m[1]) : "";
+    // nothing usable, return empties so the <img> can hide
+    return { primary: "", fallback: "" };
   }
 
-  // Fallback = backend proxy (best if cookies are available; otherwise the public primary will already work)
-  if (id) {
-    fallback = `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w${size}`;
-  }
+  // Primary: public Google thumbnail (no auth/cookies needed)
+  const primary = drivePublicThumbUrl(id, size);
+
+  // Fallback: your backend proxy (works when cookies are present)
+  const fallback = `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w${size}`;
+
   return { primary, fallback };
 }
 
 
-function PreviewImg({ obj, size = 240, style }) {
-  const [src, setSrc] = React.useState("");
-  const [err, setErr] = React.useState(false);
 
-  // build candidates using your existing helpers
-  const { primary } = resolvePreviewCandidates(obj, size);
+function PreviewImg({ obj, size = 88, style }) {
+  // Build primary (public Google thumb) and fallback (backend proxy) from a VALID Drive file id
+  const { primary, fallback } = resolvePreviewCandidates(obj, size);
 
-  // derive a Drive file id from whatever primary we got
-  const fileId = React.useMemo(() => {
-    if (!primary) return "";
-    // public google thumb: .../thumbnail?id=...
-    let m = primary.match(/[?&]id=([^&]+)/i);
-    if (m) return decodeURIComponent(m[1]);
-    // backend endpoints: /drive/thumbnail?fileId=... or /drive/proxy/:id
-    m = primary.match(/fileId=([^&]+)/i);
-    if (m) return decodeURIComponent(m[1]);
-    m = primary.match(/\/drive\/proxy\/([^?]+)/i);
-    if (m) return decodeURIComponent(m[1]);
-    // fall back: try to read from the sheet value directly
-    const raw = getPreviewUrl(obj);
-    if (!raw) return "";
-    m = raw.match(/[?&]id=([^&]+)/i) || raw.match(/\/d\/([^/]+)/i);
-    return m ? decodeURIComponent(m[1]) : "";
-  }, [primary, obj]);
+  // Start with primary; if it fails, we’ll swap to fallback once
+  const [src, setSrc] = React.useState(primary);
 
   React.useEffect(() => {
-    let revokedUrl = null;
-    let cancelled = false;
+    setSrc(primary);
+  }, [primary, size]);
 
-    async function load() {
-      setErr(false);
-      setSrc("");
-
-      // 1) Try cookie-authenticated proxy via XHR -> blob URL (works cross-site)
-      if (fileId) {
-        const proxyUrl = `${API_ROOT}/drive/proxy/${encodeURIComponent(fileId)}?sz=w${size}`;
-        try {
-          const res = await fetch(proxyUrl, { credentials: "include" });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const ctype = res.headers.get("content-type") || "";
-          if (!/^image\//i.test(ctype)) throw new Error(`Not an image: ${ctype}`);
-          const blob = await res.blob();
-          if (cancelled) return;
-          const url = URL.createObjectURL(blob);
-          revokedUrl = url;
-          setSrc(url);
-          return; // success
-        } catch (_) {
-          // fall through to public URL
-        }
-      }
-
-      // 2) Try PUBLIC Google thumbnail (no cookies). This will only work if the file is shareable.
-      if (fileId) {
-        const publicUrl = drivePublicThumbUrl(fileId, size);
-        if (!cancelled) setSrc(publicUrl);
-        return;
-      }
-
-      // 3) Nothing to show
-      setErr(true);
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-      if (revokedUrl) {
-        URL.revokeObjectURL(revokedUrl);
-      }
-    };
-  }, [fileId, size]);
-
-  if (!fileId || err) {
-    // hide entirely if nothing usable
-    return null;
-  }
+  // No valid Drive id → don't render anything
+  if (!primary) return null;
 
   return (
     <img
@@ -219,7 +168,11 @@ function PreviewImg({ obj, size = 240, style }) {
         background: "#eee",
         ...style,
       }}
-      onError={() => setErr(true)}
+      onError={() => {
+        // First failure: try fallback once; if that also fails, hide the image
+        if (fallback && src !== fallback) setSrc(fallback);
+        else setSrc(""); // hide
+      }}
     />
   );
 }
