@@ -1008,40 +1008,46 @@ const fetchManualStateCore = async (previousCols) => {
     const machine1Ids = cols[0] || [];
     const machine2Ids = cols[1] || [];
 
-    // 4) Start mergedCols from previousCols
+    // 4) Build a unified pool of all active, non-placeholder jobs
+    const pool = [
+      ...previousCols.queue.jobs,
+      ...previousCols.machine1.jobs,
+      ...previousCols.machine2.jobs,
+    ].filter(job =>
+      !msData.placeholders.some(p => p.id === job.id) &&
+      String(job.status || '').toLowerCase() !== 'complete'
+    );
+
+    // Fast lookup by id
+    const byId = new Map(pool.map(j => [j.id, { ...j, machineId: 'queue' }]));
+
+    // 5) Start fresh columns; everything begins in the queue
     const mergedCols = {
-      queue:    { ...previousCols.queue,    jobs: [...previousCols.queue.jobs] },
+      queue:    { ...previousCols.queue,    jobs: [] },
       machine1: { ...previousCols.machine1, jobs: [] },
       machine2: { ...previousCols.machine2, jobs: [] },
     };
 
-    // 5) Remove completed & placeholder jobs from machine1/machine2
-    ['machine1','machine2'].forEach(colId => {
-      mergedCols[colId].jobs = previousCols[colId].jobs.filter(job =>
-        !msData.placeholders.some(p => p.id === job.id) &&
-        String(job.status || '').toLowerCase() !== 'complete'
-      );
-    });
+    // Seed queue with all jobs initially (will be pulled out as we place them)
+    mergedCols.queue.jobs = Array.from(byId.values());
 
-    // 6) Re-inject placeholders into machine1 (in saved order)
-    machine1Ids.forEach(jobId => {
-      const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
+    // Helper to pull an id from queue into a target machine in saved order
+    function pullToMachine(id, machineKey) {
+      const idx = mergedCols.queue.jobs.findIndex(j => j.id === id);
       if (idx !== -1) {
         const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
-        mergedCols.machine1.jobs.push(jobObj);
+        jobObj.machineId = machineKey; // tag for clarity
+        mergedCols[machineKey].jobs.push(jobObj);
       }
-    });
+    }
 
-    // 7) Re-inject placeholders into machine2
-    machine2Ids.forEach(jobId => {
-      const idx = mergedCols.queue.jobs.findIndex(j => j.id === jobId);
-      if (idx !== -1) {
-        const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
-        mergedCols.machine2.jobs.push(jobObj);
-      }
-    });
+    // 6) Place machine1 ids in exact saved order
+    machine1Ids.forEach(id => pullToMachine(id, 'machine1'));
 
-    // 7.5) Re-inject any placeholders meant to stay in the queue
+    // 7) Place machine2 ids in exact saved order
+    machine2Ids.forEach(id => pullToMachine(id, 'machine2'));
+
+    // 7.5) Any placeholders that are not explicitly on a machine stay in queue
     msData.placeholders.forEach(ph => {
       const onM1 = machine1Ids.includes(ph.id);
       const onM2 = machine2Ids.includes(ph.id);
@@ -1050,24 +1056,17 @@ const fetchManualStateCore = async (previousCols) => {
       }
     });
 
-    // 7.6) Sort the queue by due date
+    // 7.6) Sort queue by due date for readability (machines keep saved order)
     mergedCols.queue.jobs.sort((a, b) => {
       const da = new Date(a.dueDate || a.delivery || 0);
       const db = new Date(b.dueDate || b.delivery || 0);
       return da - db;
     });
 
-    // 8) Re-run scheduling on machines using machineKey
-    mergedCols.machine1.jobs = scheduleMachineJobs(
-      mergedCols.machine1.jobs,
-      'Machine 1 (1)'
-    );
-    mergedCols.machine2.jobs = scheduleMachineJobs(
-      mergedCols.machine2.jobs,
-      'Machine 2 (6)'
-    );
+    // 8) Re-run scheduling on machines (timing only; order stays as placed)
+    mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs, 'Machine 1 (1)');
+    mergedCols.machine2.jobs = scheduleMachineJobs(mergedCols.machine2.jobs, 'Machine 2 (6)');
 
-    // console.log('fetchManualStateCore ▶ done');
     return mergedCols;
 
   } catch (err) {
