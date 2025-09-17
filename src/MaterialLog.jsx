@@ -65,18 +65,16 @@ function getPreviewUrl(obj) {
   const fromLnk = extractUrlFromHyperlinkFormula(raw);
   let url = (fromImg || fromLnk || raw).trim();
 
-  // If it's a Google Drive URL, prefer the disk-cached proxy endpoint.
+  // If it's a Google Drive URL, prefer the disk-cached proxy endpoint for <img src=...>
   if (/^https?:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(url)) {
     const id = driveIdFromUrl(url);
-    if (id) {
-      // Use proxy (serves cached .jpg or 302s to Google); works great in <img>.
-      return `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w240`;
-    }
+    if (id) return `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w240`;
   }
 
   // Otherwise use the URL directly
   return url;
 }
+
 
 
 // --- NEW: resilient preview helpers + component ---
@@ -100,7 +98,7 @@ function resolvePreviewCandidates(obj, size = 200) {
   const primary = getPreviewUrl(obj);
   let fallback = "";
 
-  // Handles either /drive/thumbnail?fileId=... or /drive/proxy/:id
+  // Handle either /drive/thumbnail?fileId=... or /drive/proxy/:id
   let id = "";
   if (/\/drive\/thumbnail\?fileId=/i.test(primary)) {
     const m = primary.match(/fileId=([^&]+)/i);
@@ -430,18 +428,36 @@ function Recut({ onExit }) {
         setFetchErr("");
         setLoadingOrders(true);
         const res = await axios.get(`${API_ROOT}/orders`, { withCredentials: true });
+
+        // Diagnose non-JSON/non-array responses (e.g., HTML redirect/login page)
+        const ctype = String(res?.headers?.["content-type"] || "").toLowerCase();
+        if (!ctype.includes("application/json")) {
+          const snippet = String(res?.data ?? "").slice(0, 200);
+          throw new Error(
+            `Unexpected content-type: ${ctype || "unknown"} from /orders. First 200 chars: ${snippet}`
+          );
+        }
+
         const list = normalizeOrders(res?.data);
         setOrders(Array.isArray(list) ? list : []);
         if (!Array.isArray(list)) setFetchErr("Orders endpoint did not return a list.");
       } catch (e) {
         console.error(e);
-        setFetchErr(e?.response?.data?.error || `Failed to load orders (${e?.response?.status || "network"})`);
+        // If we hit our explicit throw above, e.message will contain ctype + snippet
+        setFetchErr(
+          e?.response?.data?.error
+            ? String(e.response.data.error)
+            : e?.message
+              ? String(e.message)
+              : `Failed to load orders (${e?.response?.status || "network"})`
+        );
         setOrders([]);
       } finally {
         setLoadingOrders(false);
       }
     })();
   }, []);
+
 
   const filtered = useMemo(() => {
     let arr = orders.slice();
