@@ -2,6 +2,7 @@
 // File: frontend/src/App.js
 
 
+import Departments from "./Departments";
 import MaterialLog from "./MaterialLog";
 import CutList from "./CutList";
 import Ship from "./Ship";
@@ -1541,7 +1542,8 @@ useEffect(() => {
           { to: "/fur",               label: "Fur List" },
           { to: "/cut",               label: "Cut List" },  
           { to: "/ship",              label: "Ship" },
-          { to: "/material-log", label: "Material Log" }
+          { to: "/material-log", label: "Material Log" },
+          { to: "/departments",       label: "Departments" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
             padding: '0.5rem 1rem',
@@ -1618,6 +1620,7 @@ useEffect(() => {
         <Route path="/ship" element={<Ship />} />
         <Route path="/fur" element={<FurList />} />
         <Route path="/material-log" element={<MaterialLog />} />
+        <Route path="/departments" element={<Departments />} />
         {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
         <Route path="/box-select" element={<BoxSelectGuard />} />
         <Route path="/reorder" element={<ReorderPage />} />
