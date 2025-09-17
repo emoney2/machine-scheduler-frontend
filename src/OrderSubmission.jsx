@@ -236,93 +236,64 @@ export default function OrderSubmission() {
     setNewCompanyData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // when user types, update form.company and show inline suggestion
-  const handleCompanyInput = (e) => {
-    const raw = e.target.value;
-    const inputType = e.nativeEvent?.inputType;
+// when user types, update form.company and show inline suggestion
+const handleCompanyInput = (e) => {
+  const raw = e.target.value;
+  const inputType = e.nativeEvent?.inputType;
 
-  // when user types, update form.product and show inline suggestion
-  const handleProductInput = (e) => {
-    const raw = e.target.value;
-    const inputType = e.nativeEvent?.inputType;
+  // If the user is deleting, just store the raw value and bail out
+  if (inputType?.startsWith("delete")) {
+    setForm((prev) => ({ ...prev, company: raw }));
+    return;
+  }
 
-    // allow deletes/backspace
-    if (inputType?.startsWith("delete")) {
-      setForm((prev) => ({ ...prev, product: raw }));
-      return;
-    }
+  // Otherwise attempt inline completion
+  const match = companyNames.find((c) =>
+    c.toLowerCase().startsWith(raw.toLowerCase())
+  );
 
-    // attempt inline completion
-    const match = productNames.find((p) =>
-      p.toLowerCase().startsWith(raw.toLowerCase())
-    );
+  if (match && raw !== match) {
+    // put the full match into state so the input shows it
+    setForm((prev) => ({ ...prev, company: match }));
 
-    if (match && raw !== match) {
-      // show the full match
-      setForm((prev) => ({ ...prev, product: match }));
-      // select just the appended part after React updates
-      setTimeout(() => {
-        const input = productInputRef.current;
-        input.setSelectionRange(raw.length, match.length);
-      }, 0);
-    } else {
-      // no match or exact match: just store raw
-      setForm((prev) => ({ ...prev, product: raw }));
-    }
-  };
+    // then schedule selecting only the appended portion
+    setTimeout(() => {
+      const input = companyInputRef.current;
+      input?.setSelectionRange(raw.length, match.length);
+    }, 0);
+  } else {
+    // no suggestion or exact match: just store the raw input
+    setForm((prev) => ({ ...prev, company: raw }));
+  }
+};
 
-    // If the user is deleting, just store the raw value and bail out
-    if (inputType && inputType.startsWith("delete")) {
-      setForm((prev) => ({ ...prev, company: raw }));
-      return;
-    }
+// ─── PRODUCT inline‐typeahead (single definition) ──────────────
+const handleProductInput = (e) => {
+  const raw = e.target.value;
+  const inputType = e.nativeEvent?.inputType;
 
-    // Otherwise attempt inline completion
-    const match = companyNames.find((c) =>
-      c.toLowerCase().startsWith(raw.toLowerCase())
-    );
+  // handle backspace/delete just by storing raw
+  if (inputType?.startsWith("delete")) {
+    setForm((prev) => ({ ...prev, product: raw }));
+    return;
+  }
 
-    if (match && raw !== match) {
-      // put the full match into state so the input shows it
-      setForm((prev) => ({ ...prev, company: match }));
+  // otherwise try to autocomplete
+  const match = productNames.find((p) =>
+    p.toLowerCase().startsWith(raw.toLowerCase())
+  );
 
-      // then schedule selecting only the appended portion
-      setTimeout(() => {
-        const input = companyInputRef.current;
-        input.setSelectionRange(raw.length, match.length);
-      }, 0);
-    } else {
-      // no suggestion or exact match: just store the raw input
-      setForm((prev) => ({ ...prev, company: raw }));
-    }
-  };
-
-  // ─── PRODUCT inline‐typeahead ─────────────────────────────────
-  const handleProductInput = (e) => {
-    const raw = e.target.value;
-    const inputType = e.nativeEvent?.inputType;
-
-    // handle backspace/delete just by storing raw
-    if (inputType?.startsWith("delete")) {
-      setForm((prev) => ({ ...prev, product: raw }));
-      return;
-    }
-
-    // otherwise try to autocomplete
-    const match = productNames.find((p) =>
-      p.toLowerCase().startsWith(raw.toLowerCase())
-    );
-    if (match && raw !== match) {
-      setForm((prev) => ({ ...prev, product: match }));
-      // highlight only the appended text
-      setTimeout(() => {
-        const input = productInputRef.current;
-        input.setSelectionRange(raw.length, match.length);
-      }, 0);
-    } else {
-      setForm((prev) => ({ ...prev, product: raw }));
-    }
-  };
+  if (match && raw !== match) {
+    setForm((prev) => ({ ...prev, product: match }));
+    // highlight only the appended text
+    setTimeout(() => {
+      const input = productInputRef.current;
+      input?.setSelectionRange(raw.length, match.length);
+    }, 0);
+  } else {
+    setForm((prev) => ({ ...prev, product: raw }));
+  }
+};
 
 // ─── MATERIAL inline‐typeahead ─────────────────────────────────
 const handleMaterialInput = (i) => (e) => {
