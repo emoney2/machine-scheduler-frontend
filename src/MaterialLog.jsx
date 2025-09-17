@@ -75,6 +75,81 @@ function getPreviewUrl(obj) {
   return url;
 }
 
+// --- NEW: resilient preview helpers + component ---
+function drivePublicThumbUrl(id, size = 200) {
+  if (!id) return "";
+  return `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${size}`;
+}
+
+function addCacheBuster(u) {
+  if (!u) return u;
+  try {
+    const url = new URL(u, window.location.origin);
+    url.searchParams.set("_cb", String(Date.now()));
+    return url.toString();
+  } catch {
+    return u + (u.includes("?") ? "&" : "?") + `_cb=${Date.now()}`;
+  }
+}
+
+function resolvePreviewCandidates(obj, size = 200) {
+  const primary = getPreviewUrl(obj);
+  let fallback = "";
+  if (/\/drive\/thumbnail\?fileId=/i.test(primary)) {
+    const m = primary.match(/fileId=([^&]+)/i);
+    const id = m ? decodeURIComponent(m[1]) : "";
+    fallback = drivePublicThumbUrl(id, size);
+  }
+  return { primary, fallback };
+}
+
+function PreviewImg({ obj, size, showPlaceholder = false }) {
+  const { primary, fallback } = React.useMemo(
+    () => resolvePreviewCandidates(obj, size),
+    [obj, size]
+  );
+
+  const [src, setSrc] = React.useState(primary ? addCacheBuster(primary) : "");
+  const triedRef = React.useRef(false);
+  const fellBackRef = React.useRef(false);
+
+  // Reset when object/urls change
+  React.useEffect(() => {
+    triedRef.current = false;
+    fellBackRef.current = false;
+    setSrc(primary ? addCacheBuster(primary) : "");
+  }, [primary, fallback]);
+
+  const onErr = () => {
+    if (!triedRef.current) {
+      triedRef.current = true;                    // 1) retry once with cache-buster
+      setSrc((s) => addCacheBuster(s || primary));
+    } else if (!fellBackRef.current && fallback) {
+      fellBackRef.current = true;                 // 2) fall back to Google’s public thumb
+      setSrc(addCacheBuster(fallback));
+    } else {
+      setSrc("");                                 // 3) give up → hide/placeholder
+    }
+  };
+
+  if (!src) {
+    return showPlaceholder
+      ? <div style={{ width: size, height: size, borderRadius: 8, background: "#f0f0f0" }} />
+      : null;
+  }
+
+  return (
+    <img
+      loading="lazy"
+      alt=""
+      src={src}
+      onError={onErr}
+      style={{ width: size, height: size, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
+    />
+  );
+}
+
+
 
 const Tile = ({ onClick, children }) => (
   <button
@@ -580,17 +655,7 @@ function Recut({ onExit }) {
                 >
                   <div style={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 10, alignItems: "center" }}>
                     <div>
-                      {preview ? (
-                        <img
-                          loading="lazy"
-                          alt=""
-                          src={preview}
-                          onError={(e) => { e.currentTarget.style.display = "none"; }}
-                          style={{ width: 88, height: 88, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
-                        />
-                      ) : (
-                        <div style={{ width: 88, height: 88, borderRadius: 8, background: "#f0f0f0" }} />
-                      )}
+                      <PreviewImg obj={o} size={88} showPlaceholder />
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 2 }}>
@@ -613,18 +678,7 @@ function Recut({ onExit }) {
           <Section
             title={
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {(() => {
-                  const selPreview = getPreviewUrl(selectedOrder);
-                  return selPreview ? (
-                    <img
-                      loading="lazy"
-                      alt=""
-                      src={selPreview}
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
-                      style={{ width: 54, height: 54, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
-                    />
-                  ) : null;
-                })()}
+                <PreviewImg obj={selectedOrder} size={54} />
                 <span>
                   Recut #{selectedOrder["Order #"]} — {selectedOrder["Product"]}
                 </span>
