@@ -384,7 +384,7 @@ const handleBackMaterialInput = (e) => {
     axios
       .get(`${API_ROOT}/directory`, {
         withCredentials: true,
-        timeout: 15000,
+        timeout: 45000, // ↑ allow slower sheet
         validateStatus: s => s >= 200 && s < 400,
       })
       .then((res) => {
@@ -397,7 +397,7 @@ const handleBackMaterialInput = (e) => {
       })
       .catch((err) => {
         console.error("Failed to load companies:", err);
-        setCompanies([]); // keep state predictable
+        setCompanies([]);
       });
   }, []);
 
@@ -406,7 +406,7 @@ const handleBackMaterialInput = (e) => {
      axios
        .get(`${API_ROOT}/products`, {
          withCredentials: true,
-         timeout: 15000,
+         timeout: 45000, // ↑ allow slower sheet
          validateStatus: s => s >= 200 && s < 400,
        })
        .then((res) => {
@@ -419,6 +419,7 @@ const handleBackMaterialInput = (e) => {
          setProducts([]);
        });
    }, []);
+
 
   // ─── Fetch materials inventory from Sheet ──────────────────────
 useEffect(() => {
