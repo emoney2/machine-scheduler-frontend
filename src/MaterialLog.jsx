@@ -64,6 +64,37 @@ function driveIdFromUrl(url) {
   return "";
 }
 
+function findDriveIdAnywhere(obj) {
+  if (!obj) return "";
+  const vals = Object.values(obj).filter(v => v != null).map(v => String(v));
+
+  // 1) Look for full Drive URLs first
+  for (const s of vals) {
+    const m1 = s.match(/[?&]id=([^&]+)/i);
+    if (m1) {
+      const id = cleanDriveId(m1[1]);
+      if (id) return id;
+    }
+    const m2 = s.match(/\/d\/([^/?#]+)/i);
+    if (m2) {
+      const id = cleanDriveId(m2[1]);
+      if (id) return id;
+    }
+  }
+
+  // 2) If no URLs, look for a lone ID-like token anywhere in the strings
+  for (const s of vals) {
+    const m = s.match(/([A-Za-z0-9_-]{20,})/); // Drive IDs are usually 25+ chars, but 20+ catches most
+    if (m) {
+      const id = cleanDriveId(m[1]);
+      if (id) return id;
+    }
+  }
+
+  return "";
+}
+
+
 function extractUrlFromImageFormula(s) {
   const m = String(s || "").match(/=IMAGE\(\s*"([^"]+)"/i);
   return m ? m[1] : "";
@@ -121,13 +152,19 @@ function addCacheBuster(u) {
 }
 
 function resolvePreviewCandidates(obj, size = 200) {
-  // Derive a URL from the row, then extract a *validated* id
+  // First, try the dedicated preview fields (your existing logic)
   const hinted = getPreviewUrl(obj);
-  const id = driveIdFromUrl(hinted);
+  let id = driveIdFromUrl(hinted);
 
+  // If those fields are empty, scan the ENTIRE row for anything Drive-like
   if (!id) {
-    // nothing usable, return empties so the <img> can hide
-    return { primary: "", fallback: "" };
+    id = findDriveIdAnywhere(obj);
+    if (id) {
+      console.log("[PreviewImg] Recovered Drive ID from other fields:", id, obj);
+    } else {
+      console.log("[PreviewImg] No Drive ID found in row:", obj);
+      return { primary: "", fallback: "" };
+    }
   }
 
   // Primary: public Google thumbnail (no auth/cookies needed)
@@ -138,8 +175,6 @@ function resolvePreviewCandidates(obj, size = 200) {
 
   return { primary, fallback };
 }
-
-
 
 function PreviewImg({ obj, size = 88, style }) {
   const hintedUrl = getPreviewUrl(obj);
@@ -200,7 +235,11 @@ function PreviewImg({ obj, size = 88, style }) {
     };
   }, [fileId, size]);
 
-  if (!fileId || !src) return null;
+  if (!fileId || !src) {
+    // Uncomment if you want to see which specific rows end up without images:
+    // console.log("[PreviewImg] Hiding image: fileId or src missing", { fileId, obj });
+    return null;
+  }
 
   return (
     <img
