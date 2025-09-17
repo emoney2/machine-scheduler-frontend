@@ -65,15 +65,19 @@ function getPreviewUrl(obj) {
   const fromLnk = extractUrlFromHyperlinkFormula(raw);
   let url = (fromImg || fromLnk || raw).trim();
 
-  // If it's a Google Drive URL, use backend proxy (works even if file is private)
+  // If it's a Google Drive URL, prefer the disk-cached proxy endpoint.
   if (/^https?:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(url)) {
     const id = driveIdFromUrl(url);
-    if (id) return `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(id)}`;
+    if (id) {
+      // Use proxy (serves cached .jpg or 302s to Google); works great in <img>.
+      return `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w240`;
+    }
   }
 
   // Otherwise use the URL directly
   return url;
 }
+
 
 // --- NEW: resilient preview helpers + component ---
 function drivePublicThumbUrl(id, size = 200) {
@@ -95,13 +99,23 @@ function addCacheBuster(u) {
 function resolvePreviewCandidates(obj, size = 200) {
   const primary = getPreviewUrl(obj);
   let fallback = "";
+
+  // Handles either /drive/thumbnail?fileId=... or /drive/proxy/:id
+  let id = "";
   if (/\/drive\/thumbnail\?fileId=/i.test(primary)) {
     const m = primary.match(/fileId=([^&]+)/i);
-    const id = m ? decodeURIComponent(m[1]) : "";
+    id = m ? decodeURIComponent(m[1]) : "";
+  } else {
+    const m = primary.match(/\/drive\/proxy\/([^?]+)/i);
+    id = m ? decodeURIComponent(m[1]) : "";
+  }
+
+  if (id) {
     fallback = drivePublicThumbUrl(id, size);
   }
   return { primary, fallback };
 }
+
 
 function PreviewImg({ obj, size, showPlaceholder = false }) {
   const { primary, fallback } = React.useMemo(
