@@ -360,19 +360,17 @@ const handleBackMaterialInput = (e) => {
     const raw = e.target.value;
     const inputType = e.nativeEvent?.inputType;
 
-    // if empty, don't autocomplete
     if (!raw) {
       setForm(prev => ({ ...prev, furColor: "" }));
       return;
     }
 
-    // allow deletes/backspace
     if (inputType?.startsWith("delete")) {
       setForm(prev => ({ ...prev, furColor: raw }));
       return;
     }
- 
-    const match = materialNames.find(m =>
+
+    const match = furColorNames.find(m =>
       m.toLowerCase().startsWith(raw.toLowerCase())
     );
     if (match && raw !== match) {
@@ -385,6 +383,7 @@ const handleBackMaterialInput = (e) => {
       setForm(prev => ({ ...prev, furColor: raw }));
     }
   };
+
 
   useEffect(() => {
     axios
@@ -473,6 +472,7 @@ const furColorNames = furColors;
   };
 
 
+
   const handleMaterialChange = (i, val) => {
     setForm((prev) => {
       const m = [...prev.materials];
@@ -481,6 +481,7 @@ const furColorNames = furColors;
     });
   };
 
+
   const handleMaterialPercentChange = (i, val) => {
     setForm((prev) => {
       const newPercents = [...prev.materialPercents];
@@ -488,6 +489,7 @@ const furColorNames = furColors;
       return { ...prev, materialPercents: newPercents };
     });
   };
+
 
   const createPreviews = (files) =>
     files.map((f) => ({ url: URL.createObjectURL(f), type: f.type, name: f.name }));
