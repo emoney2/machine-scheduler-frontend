@@ -153,8 +153,8 @@ export default function Scan() {
         idleTimerRef.current = null;
       }
     };
-    // NOTE: only depend on dept so the effect doesn't resubscribe on every keystroke
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Disable rule generically to avoid missing-plugin error on Netlify
+    /* eslint-disable-next-line */
   }, [dept]);
 
   return (
@@ -205,7 +205,7 @@ export default function Scan() {
         <div className="mt-8">
           <button
             onClick={() => setShowManual(true)}
-            className="px-4 py-2 rounded bg-white text-black hover:bg-white/90"
+            className="px-4 py-2 rounded bg-white text-black hover:bg白/90"
           >
             Enter Order Manually
           </button>
