@@ -241,31 +241,28 @@ const handleCompanyInput = (e) => {
   const raw = e.target.value;
   const inputType = e.nativeEvent?.inputType;
 
-  // If the user is deleting, just store the raw value and bail out
+  // handle backspace/delete
   if (inputType?.startsWith("delete")) {
     setForm((prev) => ({ ...prev, company: raw }));
     return;
   }
 
-  // Otherwise attempt inline completion
+  // attempt inline completion
   const match = companyNames.find((c) =>
     c.toLowerCase().startsWith(raw.toLowerCase())
   );
 
   if (match && raw !== match) {
-    // put the full match into state so the input shows it
     setForm((prev) => ({ ...prev, company: match }));
-
-    // then schedule selecting only the appended portion
     setTimeout(() => {
       const input = companyInputRef.current;
       input?.setSelectionRange(raw.length, match.length);
     }, 0);
   } else {
-    // no suggestion or exact match: just store the raw input
     setForm((prev) => ({ ...prev, company: raw }));
   }
 };
+
 
 // ─── PRODUCT inline‐typeahead (single definition) ──────────────
 const handleProductInput = (e) => {
