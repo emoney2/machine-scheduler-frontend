@@ -2,7 +2,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || "";
+const API_ROOT      = (RAW_API_ROOT || "https://machine-scheduler-backend.onrender.com/api").replace(/\/$/, "");
+
 
 // ---------- small utils ----------
 function excelSerialToDate(n) {
@@ -65,16 +67,15 @@ function getPreviewUrl(obj) {
   const fromLnk = extractUrlFromHyperlinkFormula(raw);
   let url = (fromImg || fromLnk || raw).trim();
 
-  // If it's a Google Drive URL, prefer the disk-cached proxy endpoint for <img src=...>
+  // If it's a Google Drive URL, use the PUBLIC Google thumbnail (no auth needed) as primary.
   if (/^https?:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(url)) {
     const id = driveIdFromUrl(url);
-    if (id) return `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w240`;
+    if (id) return drivePublicThumbUrl(id, 240); // e.g., https://drive.google.com/thumbnail?id=...&sz=w240
   }
 
   // Otherwise use the URL directly
   return url;
 }
-
 
 
 // --- NEW: resilient preview helpers + component ---
@@ -98,18 +99,30 @@ function resolvePreviewCandidates(obj, size = 200) {
   const primary = getPreviewUrl(obj);
   let fallback = "";
 
-  // Handle either /drive/thumbnail?fileId=... or /drive/proxy/:id
+  // Extract id from whichever primary we’re using:
+  // - google public thumb: https://drive.google.com/thumbnail?id=...
+  // - backend endpoints:  /drive/thumbnail?fileId=...  or  /drive/proxy/:id
   let id = "";
-  if (/\/drive\/thumbnail\?fileId=/i.test(primary)) {
+
+  // google public
+  if (/https?:\/\/.*drive\.google\.com\/thumbnail\?/.test(primary)) {
+    const m = primary.match(/[?&]id=([^&]+)/i);
+    id = m ? decodeURIComponent(m[1]) : "";
+  }
+  // backend thumbnail
+  if (!id && /\/drive\/thumbnail\?fileId=/i.test(primary)) {
     const m = primary.match(/fileId=([^&]+)/i);
     id = m ? decodeURIComponent(m[1]) : "";
-  } else {
+  }
+  // backend proxy
+  if (!id) {
     const m = primary.match(/\/drive\/proxy\/([^?]+)/i);
     id = m ? decodeURIComponent(m[1]) : "";
   }
 
+  // Fallback = backend proxy (best if cookies are available; otherwise the public primary will already work)
   if (id) {
-    fallback = drivePublicThumbUrl(id, size);
+    fallback = `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w${size}`;
   }
   return { primary, fallback };
 }
