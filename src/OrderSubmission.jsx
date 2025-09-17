@@ -388,7 +388,7 @@ const handleBackMaterialInput = (e) => {
 
   useEffect(() => {
     axios
-      .get(`${process.env.REACT_APP_API_ROOT}/directory`)
+      .get(`${API_ROOT}/directory`)
       .then((res) => {
         console.log("Directory response:", res.data);
         const opts = res.data
@@ -401,10 +401,11 @@ const handleBackMaterialInput = (e) => {
       });
   }, []);
 
+
    // ─── Fetch products ────────────────────────────────────────────────
    useEffect(() => {
      axios
-       .get(`${process.env.REACT_APP_API_ROOT}/products`)
+       .get(`${API_ROOT}/products`)
        .then((res) => setProducts(res.data))
        .catch((err) => console.error("Failed to load products:", err));
    }, []);
@@ -412,18 +413,20 @@ const handleBackMaterialInput = (e) => {
   // ─── Fetch materials inventory from Sheet ──────────────────────
   useEffect(() => {
     axios
-      .get(`${process.env.REACT_APP_API_ROOT}/materials`)
+      .get(`${API_ROOT}/materials`)
       .then(res => setMaterialsInv(res.data))
       .catch(err => console.error("Failed to load materials:", err));
   }, []);
 
+
   // ─── Fetch fur colors from API ───────────────────────────────────
   useEffect(() => {
     axios
-      .get(`${process.env.REACT_APP_API_ROOT}/fur-colors`)
+      .get(`${API_ROOT}/fur-colors`)
       .then(res => setFurColors(res.data))
       .catch(err => console.error("Failed to load fur colors:", err));
   }, []);
+
 
 // make array of just the names for matching
 const furColorNames = furColors;
