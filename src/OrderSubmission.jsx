@@ -412,7 +412,6 @@ useEffect(() => {
     .catch(err => console.error("Failed to load materials:", err));
 }, []);
 
-
 // for matching
 const materialNames = materialsInv;
 
