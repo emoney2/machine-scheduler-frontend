@@ -270,20 +270,17 @@ const handleProductInput = (e) => {
   const raw = e.target.value;
   const inputType = e.nativeEvent?.inputType;
 
-  // handle backspace/delete just by storing raw
   if (inputType?.startsWith("delete")) {
     setForm((prev) => ({ ...prev, product: raw }));
     return;
   }
 
-  // otherwise try to autocomplete
   const match = productNames.find((p) =>
     p.toLowerCase().startsWith(raw.toLowerCase())
   );
 
   if (match && raw !== match) {
     setForm((prev) => ({ ...prev, product: match }));
-    // highlight only the appended text
     setTimeout(() => {
       const input = productInputRef.current;
       input?.setSelectionRange(raw.length, match.length);
@@ -292,6 +289,7 @@ const handleProductInput = (e) => {
     setForm((prev) => ({ ...prev, product: raw }));
   }
 };
+
 
 // ─── MATERIAL inline‐typeahead ─────────────────────────────────
 const handleMaterialInput = (i) => (e) => {
@@ -402,8 +400,8 @@ const handleBackMaterialInput = (e) => {
    // ─── Fetch products ────────────────────────────────────────────────
    useEffect(() => {
      axios
-       .get(`${API_ROOT}/products`)
-       .then((res) => setProducts(res.data))
+       .get(`${API_ROOT}/products`, { validateStatus: s => s >= 200 && s < 400 })
+       .then((res) => setProducts(Array.isArray(res.data) ? res.data : []))
        .catch((err) => console.error("Failed to load products:", err));
    }, []);
 
