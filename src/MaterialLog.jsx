@@ -128,54 +128,101 @@ function resolvePreviewCandidates(obj, size = 200) {
 }
 
 
-function PreviewImg({ obj, size, showPlaceholder = false }) {
-  const { primary, fallback } = React.useMemo(
-    () => resolvePreviewCandidates(obj, size),
-    [obj, size]
-  );
+function PreviewImg({ obj, size = 240, style }) {
+  const [src, setSrc] = React.useState("");
+  const [err, setErr] = React.useState(false);
 
-  const [src, setSrc] = React.useState(primary ? addCacheBuster(primary) : "");
-  const triedRef = React.useRef(false);
-  const fellBackRef = React.useRef(false);
+  // build candidates using your existing helpers
+  const { primary } = resolvePreviewCandidates(obj, size);
 
-  // Reset when object/urls change
+  // derive a Drive file id from whatever primary we got
+  const fileId = React.useMemo(() => {
+    if (!primary) return "";
+    // public google thumb: .../thumbnail?id=...
+    let m = primary.match(/[?&]id=([^&]+)/i);
+    if (m) return decodeURIComponent(m[1]);
+    // backend endpoints: /drive/thumbnail?fileId=... or /drive/proxy/:id
+    m = primary.match(/fileId=([^&]+)/i);
+    if (m) return decodeURIComponent(m[1]);
+    m = primary.match(/\/drive\/proxy\/([^?]+)/i);
+    if (m) return decodeURIComponent(m[1]);
+    // fall back: try to read from the sheet value directly
+    const raw = getPreviewUrl(obj);
+    if (!raw) return "";
+    m = raw.match(/[?&]id=([^&]+)/i) || raw.match(/\/d\/([^/]+)/i);
+    return m ? decodeURIComponent(m[1]) : "";
+  }, [primary, obj]);
+
   React.useEffect(() => {
-    triedRef.current = false;
-    fellBackRef.current = false;
-    setSrc(primary ? addCacheBuster(primary) : "");
-  }, [primary, fallback]);
+    let revokedUrl = null;
+    let cancelled = false;
 
-  const onErr = () => {
-    if (!triedRef.current) {
-      triedRef.current = true;                    // 1) retry once with cache-buster
-      setSrc((s) => addCacheBuster(s || primary));
-    } else if (!fellBackRef.current && fallback) {
-      fellBackRef.current = true;                 // 2) fall back to Google’s public thumb
-      setSrc(addCacheBuster(fallback));
-    } else {
-      setSrc("");                                 // 3) give up → hide/placeholder
+    async function load() {
+      setErr(false);
+      setSrc("");
+
+      // 1) Try cookie-authenticated proxy via XHR -> blob URL (works cross-site)
+      if (fileId) {
+        const proxyUrl = `${API_ROOT}/drive/proxy/${encodeURIComponent(fileId)}?sz=w${size}`;
+        try {
+          const res = await fetch(proxyUrl, { credentials: "include" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const ctype = res.headers.get("content-type") || "";
+          if (!/^image\//i.test(ctype)) throw new Error(`Not an image: ${ctype}`);
+          const blob = await res.blob();
+          if (cancelled) return;
+          const url = URL.createObjectURL(blob);
+          revokedUrl = url;
+          setSrc(url);
+          return; // success
+        } catch (_) {
+          // fall through to public URL
+        }
+      }
+
+      // 2) Try PUBLIC Google thumbnail (no cookies). This will only work if the file is shareable.
+      if (fileId) {
+        const publicUrl = drivePublicThumbUrl(fileId, size);
+        if (!cancelled) setSrc(publicUrl);
+        return;
+      }
+
+      // 3) Nothing to show
+      setErr(true);
     }
-  };
 
-  if (!src) {
-    return showPlaceholder
-      ? <div style={{ width: size, height: size, borderRadius: 8, background: "#f0f0f0" }} />
-      : null;
+    load();
+
+    return () => {
+      cancelled = true;
+      if (revokedUrl) {
+        URL.revokeObjectURL(revokedUrl);
+      }
+    };
+  }, [fileId, size]);
+
+  if (!fileId || err) {
+    // hide entirely if nothing usable
+    return null;
   }
 
   return (
     <img
-      loading="lazy"
-      alt=""
       src={src}
-      onError={onErr}
-      style={{ width: size, height: size, objectFit: "cover", borderRadius: 8, background: "#f7f7f7" }}
+      alt=""
+      loading="lazy"
+      style={{
+        width: size,
+        height: size,
+        objectFit: "cover",
+        borderRadius: 8,
+        background: "#eee",
+        ...style,
+      }}
+      onError={() => setErr(true)}
     />
   );
 }
-
-
-
 const Tile = ({ onClick, children }) => (
   <button
     onClick={onClick}
