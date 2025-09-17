@@ -54,7 +54,6 @@ export default function OrderSubmission() {
   // single ref for Back Material
   const backMaterialRef = useRef(null);
   // ─── FUR COLORS list + input ref ───────────────────────────────
-  const [furColors, setFurColors] = useState([]);
   const furColorRef = useRef(null);
 
   // ─── New-Material modal state & data ─────────────────────────
@@ -413,18 +412,8 @@ const handleBackMaterialInput = (e) => {
       .catch(err => console.error("Failed to load materials:", err));
   }, []);
 
-
-  // ─── Fetch fur colors from API ───────────────────────────────────
-  useEffect(() => {
-    axios
-      .get(`${API_ROOT}/fur-colors`)
-      .then(res => setFurColors(res.data))
-      .catch(err => console.error("Failed to load fur colors:", err));
-  }, []);
-
-
 // make array of just the names for matching
-const furColorNames = furColors;
+const furColorNames = materialNames;
 
   // for matching
   const materialNames = materialsInv;
@@ -1923,14 +1912,13 @@ const handleSaveNewCompany = async () => {
                   }}
                   onChange={handleCompanyInput}
                   value={form.company}
-                  list="company-list"
-                />
-              </label>
-              <datalist id="company-list">
-                {companyNames.map((c) => (
-                  <option key={c} value={c} />
-                ))}
-              </datalist>
+                    list="os-company-list"
+                  />
+                  <datalist id="os-company-list">
+                    {companyNames.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
             </div>
 
             <div>
@@ -1979,14 +1967,13 @@ const handleSaveNewCompany = async () => {
                   }}
                   onChange={handleProductInput}
                   value={form.product}
-                  list="product-list"
-                />
-              </label>
-              <datalist id="product-list">
-                {productNames.map((p) => (
-                  <option key={p} value={p} />
-                ))}
-              </datalist>
+                    list="os-product-list"
+                  />
+                  <datalist id="os-product-list">
+                    {productNames.map((p) => (
+                      <option key={p} value={p} />
+                    ))}
+                  </datalist>
             </div>
             <div>
               <label>
@@ -2078,7 +2065,7 @@ const handleSaveNewCompany = async () => {
                     placeholder={`Material ${i + 1}${i === 0 ? "*" : ""}`}
                     value={form.materials[i]}
                     onChange={handleMaterialInput(i)}
-                    list="material-list"
+                    list="os-material-list"
                     autoComplete="off"
                     required={i === 0}
                     style={{ flex: 1, padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
@@ -2186,11 +2173,12 @@ const handleSaveNewCompany = async () => {
           </div>
 
           {/* shared dropdown for type-ahead */}
-          <datalist id="material-list">
+          <datalist id="os-material-list">
             {materialNames.map((mat) => (
               <option key={mat} value={mat} />
             ))}
           </datalist>
+
         </fieldset>
         {/* Additional Info + Files */}
         <fieldset style={{ padding: "0.5rem" }}>
