@@ -1895,9 +1895,7 @@ const handleSaveNewCompany = async () => {
             <div style={{ marginBottom: "0.5rem", position: "relative" }}>
               <label style={{ display: "block" }}>
                 Company Name*
-                {companyInvalid && (
-                  <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>
-                )}
+                {companyInvalid && <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>}
                 <br />
                 <input
                   ref={companyInputRef}
@@ -1905,20 +1903,15 @@ const handleSaveNewCompany = async () => {
                   placeholder="Company Name*"
                   required
                   autoComplete="off"
-                  style={{
-                    width: "80%",
-                    fontSize: "0.85rem",
-                    padding: "0.25rem",
-                  }}
+                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                   onChange={handleCompanyInput}
                   value={form.company}
-                    list="os-company-list"
-                  />
-                  <datalist id="os-company-list">
-                    {companyNames.map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
+                  list="os-company-list"
+                />
+              </label>
+              <datalist id="os-company-list">
+                {companyNames.map((c) => <option key={c} value={c} />)}
+              </datalist>
             </div>
 
             <div>
@@ -1950,9 +1943,7 @@ const handleSaveNewCompany = async () => {
             <div style={{ marginBottom: "0.5rem", position: "relative" }}>
               <label style={{ display: "block" }}>
                 Product*
-                {productInvalid && (
-                  <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>
-                )}
+                {productInvalid && <span style={{ color: "red", marginLeft: "4px" }}>🚩</span>}
                 <br />
                 <input
                   ref={productInputRef}
@@ -1960,20 +1951,15 @@ const handleSaveNewCompany = async () => {
                   placeholder="Product*"
                   required
                   autoComplete="off"
-                  style={{
-                    width: "80%",
-                    fontSize: "0.85rem",
-                    padding: "0.25rem",
-                  }}
+                  style={{ width: "80%", fontSize: "0.85rem", padding: "0.25rem" }}
                   onChange={handleProductInput}
                   value={form.product}
-                    list="os-product-list"
-                  />
-                  <datalist id="os-product-list">
-                    {productNames.map((p) => (
-                      <option key={p} value={p} />
-                    ))}
-                  </datalist>
+                  list="os-product-list"
+                />
+              </label>
+              <datalist id="os-product-list">
+                {productNames.map((p) => <option key={p} value={p} />)}
+              </datalist>
             </div>
             <div>
               <label>
