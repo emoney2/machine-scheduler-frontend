@@ -1,7 +1,8 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
 
-
+import Scan from "./pages/Scan";
+import Material from "./pages/Material";
 import Departments from "./Departments";
 import MaterialLog from "./MaterialLog";
 import CutList from "./CutList";
@@ -1612,22 +1613,27 @@ useEffect(() => {
             />
           }
         />
-        <Route path="/overview" element={<Overview />} />
-        <Route path="/submit" element={<OrderSubmission />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/inventory-ordered" element={<InventoryOrdered />} />
-        <Route path="/cut" element={<CutList />} />
-        <Route path="/ship" element={<Ship />} />
-        <Route path="/fur" element={<FurList />} />
-        <Route path="/material-log" element={<MaterialLog />} />
-        <Route path="/departments" element={<Departments />} />
-        {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
-        <Route path="/box-select" element={<BoxSelectGuard />} />
-        <Route path="/reorder" element={<ReorderPage />} />
-        <Route path="/order" element={<OrderSubmission />} />
-        <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
-        <Route path="/shipment-complete" element={<ShipmentComplete />} />
-      </Routes>
+          <Route path="/overview" element={<Overview />} />
+          <Route path="/submit" element={<OrderSubmission />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/inventory-ordered" element={<InventoryOrdered />} />
+          <Route path="/cut" element={<CutList />} />
+          <Route path="/ship" element={<Ship />} />
+          <Route path="/fur" element={<FurList />} />
+          <Route path="/material-log" element={<MaterialLog />} />
+          <Route path="/departments" element={<Departments />} />
+
+          {/* 👇 New routes */}
+          <Route path="/scan" element={<Scan />} />
+          <Route path="/materials/:dept/:order" element={<Material />} />
+
+          {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
+          <Route path="/box-select" element={<BoxSelectGuard />} />
+          <Route path="/reorder" element={<ReorderPage />} />
+          <Route path="/order" element={<OrderSubmission />} />
+          <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
+          <Route path="/shipment-complete" element={<ShipmentComplete />} />
+        </Routes>
     </>
   );
 }
