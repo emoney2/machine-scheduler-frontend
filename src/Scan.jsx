@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-const API_ROOT = process.env.REACT_APP_API_ROOT || "";
+const API_ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 
 // Scanner-friendly: submit on Enter OR when keys go idle for a short time.
 // Tolerate slower cadence and ignore prefixes/suffixes around the digits.
@@ -84,9 +84,7 @@ export default function Scan() {
     setLoading(true);
     setErrMsg("");
     try {
-      const url = `${API_ROOT}/api/order-summary?dept=${encodeURIComponent(
-        dept
-      )}&order=${encodeURIComponent(orderId)}`;
+      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(orderId)}`;
 
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) {
