@@ -412,14 +412,15 @@ const handleBackMaterialInput = (e) => {
       .catch(err => console.error("Failed to load materials:", err));
   }, []);
 
+// for matching
+const materialNames = materialsInv;
+
 // make array of just the names for matching
 const furColorNames = materialNames;
 
-  // for matching
-  const materialNames = materialsInv;
+// prepare simple array of names
+const companyNames = companies.map((opt) => opt.value);
 
-  // prepare simple array of names
-  const companyNames = companies.map((opt) => opt.value);
 
   const productNames = products;
 
