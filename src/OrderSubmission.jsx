@@ -381,64 +381,79 @@ const handleBackMaterialInput = (e) => {
 
 
   useEffect(() => {
-    axios
-      .get(`${API_ROOT}/directory`, {
+    const fetchDirectory = async () => {
+      const cfg = {
         withCredentials: true,
-        timeout: 45000, // ↑ allow slower sheet
+        timeout: 90000, // ↑ allow slow sheets
         validateStatus: s => s >= 200 && s < 400,
-      })
-      .then((res) => {
-        const arr = Array.isArray(res.data) ? res.data : [];
-        console.log("[/directory] payload size:", arr.length);
-        const opts = arr
-          .map((c) => ({ value: c, label: c }))
-          .sort((a, b) => a.label.localeCompare(b.label));
-        setCompanies(opts);
-      })
-      .catch((err) => {
-        console.error("Failed to load companies:", err);
-        setCompanies([]);
-      });
+      };
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await axios.get(`${API_ROOT}/directory`, cfg);
+          const arr = Array.isArray(res.data) ? res.data : [];
+          console.log(`[/directory] payload size (attempt ${attempt}):`, arr.length);
+          const opts = arr
+            .map((c) => ({ value: c, label: c }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+          setCompanies(opts);
+          return;
+        } catch (err) {
+          console.error(`Directory attempt ${attempt} failed:`, err?.message || err);
+          if (attempt === 3) setCompanies([]);
+          else await new Promise(r => setTimeout(r, 1000 * attempt)); // 1s, 2s
+        }
+      }
+    };
+    fetchDirectory();
   }, []);
+
 
    // ─── Fetch products ────────────────────────────────────────────────
    useEffect(() => {
-     axios
-       .get(`${API_ROOT}/products`, {
+     const fetchProducts = async () => {
+       const cfg = {
          withCredentials: true,
-         timeout: 45000, // ↑ allow slower sheet
+         timeout: 90000,
          validateStatus: s => s >= 200 && s < 400,
-       })
-       .then((res) => {
-         const arr = Array.isArray(res.data) ? res.data : [];
-         console.log("[/products] payload size:", arr.length);
-         setProducts(arr);
-       })
-       .catch((err) => {
-         console.error("Failed to load products:", err);
-         setProducts([]);
-       });
+       };
+       for (let attempt = 1; attempt <= 3; attempt++) {
+         try {
+           const res = await axios.get(`${API_ROOT}/products`, cfg);
+           const arr = Array.isArray(res.data) ? res.data : [];
+           console.log(`[/products] payload size (attempt ${attempt}):`, arr.length);
+           setProducts(arr);
+           return;
+         } catch (err) {
+           console.error(`Products attempt ${attempt} failed:`, err?.message || err);
+           if (attempt === 3) setProducts([]);
+           else await new Promise(r => setTimeout(r, 1000 * attempt));
+         }
+       }
+     };
+     fetchProducts();
    }, []);
+
 
 
   // ─── Fetch materials inventory from Sheet ──────────────────────
 useEffect(() => {
-  axios
-    .get(`${API_ROOT}/materials`, {
-      withCredentials: true,
-      timeout: 15000,
-      validateStatus: s => s >= 200 && s < 400,
-    })
+  const cfg = {
+    withCredentials: true,
+    timeout: 45000, // ↑ was 15s
+    validateStatus: s => s >= 200 && s < 400,
+  };
+  axios.get(`${API_ROOT}/materials`, cfg)
     .then(res => {
       const arr = Array.isArray(res.data) ? res.data : [];
       console.log("[/materials] payload size:", arr.length);
       setMaterialsInv(arr);
     })
     .catch(err => {
-      console.error("Failed to load materials:", err);
+      console.error("Failed to load materials:", err?.message || err);
       setMaterialsInv([]);
     });
 }, []);
+
 
 
 // for matching
