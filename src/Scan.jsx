@@ -2,11 +2,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-// Accept only real scanner bursts (keyboard-wedge) and reject normal typing.
-const IDLE_TIMEOUT_MS = 400;           // end-of-scan if no Enter and quick burst stops
-const MAX_KEY_INTERVAL_MS = 35;        // keys must arrive fast
-const VALID_ORDER_REGEX = /^\d{1,10}$/; // digits only (e.g., 68, 120, grows over time)
+// Accept scanner bursts but tolerate slower cadence & messy prefixes/suffixes.
+const IDLE_TIMEOUT_MS = 400;             // end-of-scan if no Enter and quick burst stops
+const MAX_KEY_INTERVAL_MS = 75;          // tolerate slightly slower keyboard-wedge
+const VALID_ORDER_REGEX = /\d{1,10}/;    // allow anything that contains up to 10 digits
 const KIOSK_WINDOW_NAME = "JRCO_KioskWindow"; // named window (reused on every scan)
+
+// Helper: extract just the digits from a scan like "JR|FUR|006" -> "6"
+function extractOrderId(raw) {
+  const digits = (raw || "").replace(/\D+/g, ""); // keep only digits
+  // drop leading zeros but preserve "0" if it's literally the only char (unlikely)
+  const trimmed = digits.replace(/^0+/, "");
+  return trimmed || digits;
+}
+
 
 export default function Scan() {
   const [params] = useSearchParams();
@@ -43,19 +52,25 @@ export default function Scan() {
   }
 
   function handleSubmit(text, fromScan) {
-    const scanned = text.trim();
+    const raw = text.trim();
     setBuffer("");
     slowKeyDetectedRef.current = false;
 
     if (!deptValid) return flashError();
-    if (!VALID_ORDER_REGEX.test(scanned)) return flashError();
-    if (!fromScan) return flashError(); // only accept automatic submit from a scan
 
-    const url = `/materials/${dept}/${encodeURIComponent(scanned)}`;
+    // Pull out just the digits from whatever the scanner sent
+    const orderId = extractOrderId(raw);
+    if (!orderId || !/^\d{1,10}$/.test(orderId)) return flashError();
+
+    // Only accept automatic submit from a scan (Enter key or idle timer)
+    if (!fromScan) return flashError();
+
+    const url = `/materials/${dept}/${encodeURIComponent(orderId)}`;
     // Reuse a named window so it stays on your side monitor after you place it once.
     window.open(url, KIOSK_WINDOW_NAME, "noopener,noreferrer");
     flashOk();
   }
+
 
   function flashOk() { setFlash("ok"); setTimeout(() => setFlash("idle"), 250); }
   function flashError() { setFlash("error"); setTimeout(() => setFlash("idle"), 600); }
@@ -92,9 +107,11 @@ export default function Scan() {
   }
 
   function manualSubmit() {
-    const v = manualValue.trim();
-    if (VALID_ORDER_REGEX.test(v) && deptValid) {
-      const url = `/materials/${dept}/${encodeURIComponent(v)}`;
+    const raw = manualValue.trim();
+    const orderId = extractOrderId(raw);
+
+    if (deptValid && orderId && /^\d{1,10}$/.test(orderId)) {
+      const url = `/materials/${dept}/${encodeURIComponent(orderId)}`;
       window.open(url, KIOSK_WINDOW_NAME, "noopener,noreferrer");
       setShowManual(false);
       setManualValue("");
@@ -103,6 +120,7 @@ export default function Scan() {
       flashError();
     }
   }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-950 text-white">
