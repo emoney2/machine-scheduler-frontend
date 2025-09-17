@@ -382,35 +382,63 @@ const handleBackMaterialInput = (e) => {
 
   useEffect(() => {
     axios
-      .get(`${API_ROOT}/directory`)
+      .get(`${API_ROOT}/directory`, {
+        withCredentials: true,
+        timeout: 15000,
+        validateStatus: s => s >= 200 && s < 400,
+      })
       .then((res) => {
-        console.log("Directory response:", res.data);
-        const opts = res.data
+        const arr = Array.isArray(res.data) ? res.data : [];
+        console.log("[/directory] payload size:", arr.length);
+        const opts = arr
           .map((c) => ({ value: c, label: c }))
           .sort((a, b) => a.label.localeCompare(b.label));
         setCompanies(opts);
       })
       .catch((err) => {
         console.error("Failed to load companies:", err);
+        setCompanies([]); // keep state predictable
       });
   }, []);
-
 
    // ─── Fetch products ────────────────────────────────────────────────
    useEffect(() => {
      axios
-       .get(`${API_ROOT}/products`, { validateStatus: s => s >= 200 && s < 400 })
-       .then((res) => setProducts(Array.isArray(res.data) ? res.data : []))
-       .catch((err) => console.error("Failed to load products:", err));
+       .get(`${API_ROOT}/products`, {
+         withCredentials: true,
+         timeout: 15000,
+         validateStatus: s => s >= 200 && s < 400,
+       })
+       .then((res) => {
+         const arr = Array.isArray(res.data) ? res.data : [];
+         console.log("[/products] payload size:", arr.length);
+         setProducts(arr);
+       })
+       .catch((err) => {
+         console.error("Failed to load products:", err);
+         setProducts([]);
+       });
    }, []);
 
   // ─── Fetch materials inventory from Sheet ──────────────────────
 useEffect(() => {
   axios
-    .get(`${API_ROOT}/materials`, { validateStatus: s => s >= 200 && s < 400 })
-    .then(res => setMaterialsInv(Array.isArray(res.data) ? res.data : []))
-    .catch(err => console.error("Failed to load materials:", err));
+    .get(`${API_ROOT}/materials`, {
+      withCredentials: true,
+      timeout: 15000,
+      validateStatus: s => s >= 200 && s < 400,
+    })
+    .then(res => {
+      const arr = Array.isArray(res.data) ? res.data : [];
+      console.log("[/materials] payload size:", arr.length);
+      setMaterialsInv(arr);
+    })
+    .catch(err => {
+      console.error("Failed to load materials:", err);
+      setMaterialsInv([]);
+    });
 }, []);
+
 
 // for matching
 const materialNames = materialsInv;
@@ -1913,10 +1941,7 @@ const handleSaveNewCompany = async () => {
                   value={form.company}
                   list="os-company-list"
                 />
-              </label>
-              <datalist id="os-company-list">
-                {companyNames.map((c) => <option key={c} value={c} />)}
-              </datalist>
+                </label>
             </div>
 
             <div>
@@ -1961,10 +1986,8 @@ const handleSaveNewCompany = async () => {
                   value={form.product}
                   list="os-product-list"
                 />
-              </label>
-              <datalist id="os-product-list">
-                {productNames.map((p) => <option key={p} value={p} />)}
-              </datalist>
+                </label>
+                {/* datalist moved to global section at bottom */}
             </div>
             <div>
               <label>
@@ -2163,13 +2186,6 @@ const handleSaveNewCompany = async () => {
             </div>
           </div>
 
-          {/* shared dropdown for type-ahead */}
-          <datalist id="os-material-list">
-            {materialNames.map((mat) => (
-              <option key={mat} value={mat} />
-            ))}
-          </datalist>
-
         </fieldset>
         {/* Additional Info + Files */}
         <fieldset style={{ padding: "0.5rem" }}>
@@ -2321,7 +2337,19 @@ const handleSaveNewCompany = async () => {
           </fieldset>
         </div>
       </div>
+      {/* ───────────────── Global datalists (stable mount) ───────────────── */}
+      <datalist id="os-company-list">
+        {companyNames.map((c) => <option key={c} value={c} />)}
+      </datalist>
 
+      <datalist id="os-product-list">
+        {productNames.map((p) => <option key={p} value={p} />)}
+      </datalist>
+
+      <datalist id="os-material-list">
+        {materialNames.map((m) => <option key={m} value={m} />)}
+      </datalist>
+      {/* ─────────────────────────────────────────────────────────────────── */}
     </form>  
   </>      
 );               
