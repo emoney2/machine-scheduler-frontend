@@ -84,7 +84,9 @@ export default function Scan() {
     setLoading(true);
     setErrMsg("");
     try {
-      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(orderId)}`;
+      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
+        dept
+      )}&order=${encodeURIComponent(orderId)}`;
 
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) {
@@ -259,25 +261,27 @@ export default function Scan() {
         </div>
       )}
 
-      {/* Order info strip */}
+      {/* Order info BAR (compact card, 1–2 lines, wraps as needed) */}
       {orderData && (
-        <div className="px-5 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-8 gap-3 bg-neutral-900 border border-white/10 rounded-xl p-4">
-            <InfoCell label="Order #" value={orderData.order} />
-            <InfoCell label="Company Name" value={orderData.company || "—"} />
-            <InfoCell label="Design" value={orderData.title || "—"} />
-            <InfoCell label="Product" value={orderData.product || "—"} />
-            <InfoCell label="Stage" value={orderData.stage || "—"} />
-            <InfoCell label="Due Date" value={orderData.dueDate || "—"} />
-            <InfoCell label="Fur Color" value={orderData.furColor || "—"} />
-            <InfoCell label="Quantity" value={orderData.quantity ?? "—"} />
+        <div className="px-5 pt-3">
+          <div className="bg-neutral-900 border border-white/10 rounded-xl px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <BarItem label="Order #" value={orderData.order} />
+            <BarItem label="Company" value={orderData.company} maxCh={22} />
+            <BarItem label="Design" value={orderData.title} maxCh={22} />
+            <BarItem label="Product" value={orderData.product} maxCh={16} />
+            <BarItem label="Stage" value={orderData.stage} maxCh={14} />
+            <BarItem label="Due" value={orderData.dueDate} />
+            <BarItem label="Fur" value={orderData.furColor} maxCh={16} />
+            <BarItem label="Qty" value={orderData.quantity} />
           </div>
         </div>
       )}
 
-      {/* Quadrant image area */}
-      <div className="px-5 pb-6">
-        <Quadrant images={(orderData?.images || [])} />
+      {/* Centered quadrant */}
+      <div className="px-5 pb-6 flex justify-center">
+        <div className="w-full max-w-6xl flex justify-center">
+          <Quadrant images={(orderData?.images || [])} />
+        </div>
       </div>
 
       {/* Manual dialog */}
@@ -292,7 +296,7 @@ export default function Scan() {
               value={manualValue}
               onChange={e => setManualValue(e.target.value)}
               className="w-full bg-neutral-800 rounded px-3 py-2 outline-none mt-4"
-              placeholder="e.g., JR|FUR|0063 ? opens order 63"
+              placeholder="e.g., JR|FUR|0063 → opens order 63"
             />
             <div className="flex justify-end gap-2 mt-4">
               <button
@@ -315,11 +319,18 @@ export default function Scan() {
   );
 }
 
-function InfoCell({ label, value }) {
+function BarItem({ label, value, maxCh }) {
+  const max = maxCh ?? 18;
   return (
-    <div className="bg-neutral-800 rounded-lg p-3 border border-white/5">
-      <div className="text-[11px] uppercase tracking-wide opacity-60">{label}</div>
-      <div className="mt-1 text-sm">{clean(value)}</div>
+    <div className="flex items-baseline gap-1 min-w-0 whitespace-nowrap">
+      <span className="text-[11px] uppercase tracking-wide opacity-60">{label}:</span>
+      <span
+        className="font-medium truncate"
+        style={{ maxWidth: `${max}ch` }}
+        title={value || "—"}
+      >
+        {clean(value)}
+      </span>
     </div>
   );
 }
@@ -334,16 +345,16 @@ function Quadrant({ images }) {
   const imgs = Array.isArray(images) ? images.filter(Boolean) : [];
   if (imgs.length === 0) {
     return (
-      <div className="h-[58vh] rounded-xl border border-dashed border-white/15 flex items-center justify-center text-sm opacity-50">
+      <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl border border-dashed border-white/15 flex items-center justify-center text-sm opacity-50">
         No images
       </div>
     );
   }
 
-  // 1 ? centered; 2 ? side-by-side; 3–4 ? 2x2 grid
+  // 1 → centered; 2 → side-by-side; 3–4 → 2x2 grid
   if (imgs.length === 1) {
     return (
-      <div className="h-[58vh] rounded-xl bg-neutral-900 border border-white/10 flex items-center justify-center p-4">
+      <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl bg-neutral-900 border border-white/10 flex items-center justify-center p-4">
         <Img src={imgs[0]} className="max-h-full max-w-full object-contain" />
       </div>
     );
@@ -351,7 +362,7 @@ function Quadrant({ images }) {
 
   if (imgs.length === 2) {
     return (
-      <div className="h-[58vh] rounded-xl bg-neutral-900 border border-white/10 grid grid-cols-2 gap-3 p-3">
+      <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl bg-neutral-900 border border-white/10 grid grid-cols-2 gap-3 p-3">
         <div className="flex items-center justify-center bg-neutral-800 rounded-lg">
           <Img src={imgs[0]} className="max-h-full max-w-full object-contain" />
         </div>
@@ -364,7 +375,7 @@ function Quadrant({ images }) {
 
   const four = imgs.slice(0, 4);
   return (
-    <div className="h-[58vh] rounded-xl bg-neutral-900 border border-white/10 grid grid-cols-2 grid-rows-2 gap-3 p-3">
+    <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl bg-neutral-900 border border-white/10 grid grid-cols-2 grid-rows-2 gap-3 p-3">
       {four.map((src, i) => (
         <div key={i} className="flex items-center justify-center bg-neutral-800 rounded-lg">
           <Img src={src} className="max-h-full max-w-full object-contain" />
