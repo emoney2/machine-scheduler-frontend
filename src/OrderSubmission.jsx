@@ -405,12 +405,13 @@ const handleBackMaterialInput = (e) => {
    }, []);
 
   // ─── Fetch materials inventory from Sheet ──────────────────────
-  useEffect(() => {
-    axios
-      .get(`${API_ROOT}/materials`)
-      .then(res => setMaterialsInv(res.data))
-      .catch(err => console.error("Failed to load materials:", err));
-  }, []);
+useEffect(() => {
+  axios
+    .get(`${API_ROOT}/materials`, { validateStatus: s => s >= 200 && s < 400 })
+    .then(res => setMaterialsInv(Array.isArray(res.data) ? res.data : []))
+    .catch(err => console.error("Failed to load materials:", err));
+}, []);
+
 
 // for matching
 const materialNames = materialsInv;
@@ -487,7 +488,11 @@ const companyNames = companies.map((opt) => opt.value);
     // Do NOT touch form.designName — user will type it manually 
   };
 
-
+console.log({
+  companyNames: companyNames.slice(0, 5),
+  productNames: productNames.slice(0, 5),
+  materialNames: materialNames.slice(0, 5),
+});
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   console.log("🛎️ handleSubmit called");
@@ -2086,7 +2091,7 @@ const handleSaveNewCompany = async () => {
                     placeholder={`Material ${i + 1}`}
                     value={form.materials[i]}
                     onChange={handleMaterialInput(i)}
-                    list="material-list"
+                    list="os-material-list"
                     autoComplete="off"
                     style={{ flex: 1, padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
                   />
@@ -2117,7 +2122,7 @@ const handleSaveNewCompany = async () => {
                   placeholder={`Back Material${form.product.toLowerCase().includes("full") ? "*" : ""}`}
                   value={form.backMaterial}
                   onChange={handleBackMaterialInput}
-                  list="material-list"
+                  list="os-material-list"
                   autoComplete="off"
                   required={form.product.toLowerCase().includes("full")}
                   style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
@@ -2150,7 +2155,7 @@ const handleSaveNewCompany = async () => {
                   placeholder="Fur Color*"
                   value={form.furColor}
                   onChange={handleFurColorInput}
-                  list="material-list"
+                  list="os-material-list"
                   autoComplete="off"
                   required
                   style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
