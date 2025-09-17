@@ -1,8 +1,8 @@
 // === Section 1: Imports & Configuration ===
 // File: frontend/src/App.js
 
-import Scan from "./pages/Scan";
-import Material from "./pages/Material";
+import Scan from "./Scan";
+import Material from "./Material";
 import Departments from "./Departments";
 import MaterialLog from "./MaterialLog";
 import CutList from "./CutList";
