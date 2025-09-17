@@ -142,18 +142,61 @@ function resolvePreviewCandidates(obj, size = 200) {
 
 
 function PreviewImg({ obj, size = 88, style }) {
-  // Build primary (public Google thumb) and fallback (backend proxy) from a VALID Drive file id
-  const { primary, fallback } = resolvePreviewCandidates(obj, size);
+  // Get a clean Drive file id from the row (using your existing helpers)
+  const hintedUrl = getPreviewUrl(obj);
+  const fileId = React.useMemo(() => driveIdFromUrl(hintedUrl), [hintedUrl]);
 
-  // Start with primary; if it fails, we’ll swap to fallback once
-  const [src, setSrc] = React.useState(primary);
+  const [src, setSrc] = React.useState("");
+  const [triedPublic, setTriedPublic] = React.useState(false);
 
   React.useEffect(() => {
-    setSrc(primary);
-  }, [primary, size]);
+    let cancelled = false;
+    let objectUrl = "";
 
-  // No valid Drive id → don't render anything
-  if (!primary) return null;
+    async function load() {
+      setSrc("");
+      setTriedPublic(false);
+
+      // No usable ID → hide
+      if (!fileId) return;
+
+      // 1) Try authenticated proxy as an image blob (works cross-site with cookies)
+      try {
+        const proxyUrl = `${API_ROOT}/drive/proxy/${encodeURIComponent(fileId)}?sz=w${size}`;
+        const res = await fetch(proxyUrl, { credentials: "include" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const ctype = res.headers.get("content-type") || "";
+        if (!/^image\//i.test(ctype)) throw new Error(`Not an image: ${ctype}`);
+        const blob = await res.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+        return; // success, stop here
+      } catch (_) {
+        // fall through
+      }
+
+      // 2) Fallback to public Google thumbnail (no cookies)
+      try {
+        const publicUrl = drivePublicThumbUrl(fileId, size);
+        if (!cancelled) {
+          setTriedPublic(true);
+          setSrc(publicUrl);
+        }
+      } catch (_) {
+        // nothing else to try
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [fileId, size]);
+
+  if (!fileId || !src) return null;
 
   return (
     <img
@@ -169,13 +212,23 @@ function PreviewImg({ obj, size = 88, style }) {
         ...style,
       }}
       onError={() => {
-        // First failure: try fallback once; if that also fails, hide the image
-        if (fallback && src !== fallback) setSrc(fallback);
-        else setSrc(""); // hide
+        // If public fails after proxy failed, hide the image
+        if (triedPublic) setSrc("");
+        else {
+          // force a retry to public path if something odd happened
+          const publicUrl = fileId ? drivePublicThumbUrl(fileId, size) : "";
+          if (publicUrl) {
+            setTriedPublic(true);
+            setSrc(publicUrl);
+          } else {
+            setSrc("");
+          }
+        }
       }}
     />
   );
 }
+
 const Tile = ({ onClick, children }) => (
   <button
     onClick={onClick}
