@@ -1,4 +1,4 @@
-// src/pages/Scan.jsx
+// src/Scan.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -84,6 +84,7 @@ export default function Scan() {
     setLoading(true);
     setErrMsg("");
     try {
+      // IMPORTANT: API_ROOT already includes /api in your env, so don't add it again
       const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
         dept
       )}&order=${encodeURIComponent(orderId)}`;
