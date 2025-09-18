@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 const IDLE_TIMEOUT_MS = 600;
-const VALID_ORDER_REGEX = /\d{1,10}/;
 
 function extractOrderId(raw) {
   const digits = (raw || "").replace(/\D+/g, "");
@@ -24,11 +23,15 @@ export default function Scan() {
 
   const [buffer, setBuffer] = useState("");
   const bufferRef = useRef("");
+
   const [flash, setFlash] = useState("idle"); // idle | ok | error
   const [showManual, setShowManual] = useState(false);
   const [manualValue, setManualValue] = useState("");
+
   const [loading, setLoading] = useState(false);
+  const [pendingOrderId, setPendingOrderId] = useState(""); // <-- for overlay
   const [errMsg, setErrMsg] = useState("");
+
   const [orderData, setOrderData] = useState(null);
 
   const idleTimerRef = useRef(null);
@@ -53,7 +56,7 @@ export default function Scan() {
     };
   }, []);
 
-  console.log("[Scan] compact bar + centered quadrant v2 (white theme)");
+  console.log("[Scan] v3 white theme + chart bar + labeled quadrant + yellow loading overlay");
 
   function flashOk() {
     setFlash("ok");
@@ -67,19 +70,22 @@ export default function Scan() {
 
   async function fetchOrder(orderId) {
     if (!deptValid) return flashError("Invalid department");
+    setPendingOrderId(orderId);          // <-- show which order is loading
     setLoading(true);
     setErrMsg("");
+
     try {
-      // Your env already includes /api
       const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
         dept
       )}&order=${encodeURIComponent(orderId)}`;
+
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) {
         const j = await safeJson(r);
         throw new Error(j?.error || `HTTP ${r.status}`);
       }
       const data = await r.json();
+
       const normalized = {
         order: data.order ?? orderId,
         company: data.company ?? "—",
@@ -90,13 +96,15 @@ export default function Scan() {
         furColor: data.furColor ?? "",
         quantity: data.quantity ?? "—",
         thumbnailUrl: data.thumbnailUrl || null,
+        // Prefer labeled images; fall back to plain images; else to the thumbnail
         images:
           Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
-            ? data.imagesLabeled                                // already [{src,label}]
+            ? data.imagesLabeled
             : Array.isArray(data.images) && data.images.length > 0
               ? data.images.map(u => (typeof u === "string" ? { src: u, label: "" } : u))
               : (data.thumbnailUrl ? [{ src: data.thumbnailUrl, label: "" }] : []),
       };
+
       setOrderData(normalized);
       flashOk();
     } catch (e) {
@@ -105,6 +113,7 @@ export default function Scan() {
       flashError("Order not found or server error");
     } finally {
       setLoading(false);
+      setPendingOrderId("");
     }
   }
 
@@ -182,7 +191,12 @@ export default function Scan() {
         style={{ position: "absolute", opacity: 0, width: 1, height: 1, pointerEvents: "none" }}
       />
 
-      {/* subtle feedback overlay (tuned for white background) */}
+      {/* visual feedback styles (and spinner keyframes) */}
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+
+      {/* subtle success/error wash (kept) */}
       <div
         style={{
           position: "fixed",
@@ -190,9 +204,9 @@ export default function Scan() {
           pointerEvents: "none",
           boxShadow:
             flash === "ok"
-              ? "inset 0 0 0 9999px rgba(16,185,129,0.08)" // teal-500 @8%
+              ? "inset 0 0 0 9999px rgba(16,185,129,0.08)"
               : flash === "error"
-              ? "inset 0 0 0 9999px rgba(239,68,68,0.08)"  // red-500 @8%
+              ? "inset 0 0 0 9999px rgba(239,68,68,0.08)"
               : "none",
         }}
       />
@@ -234,15 +248,14 @@ export default function Scan() {
         </div>
       </div>
 
-      {/* error / loading */}
-      {(loading || errMsg) && (
+      {/* error / loading hint line (kept for debugging) */}
+      {(errMsg) && (
         <div style={{ padding: "8px 20px" }}>
-          {loading && <div style={{ fontSize: 14, color: "#6b7280" }}>Loading order…</div>}
-          {errMsg && <div style={{ fontSize: 14, color: "#b91c1c" }}>{errMsg}</div>}
+          <div style={{ fontSize: 14, color: "#b91c1c" }}>{errMsg}</div>
         </div>
       )}
 
-      {/* ORDER INFO CHART-STYLE BAR (labels above values, no truncation) */}
+      {/* ORDER INFO CHART-STYLE BAR */}
       {orderData && (
         <div style={{ padding: "12px 20px" }}>
           <div
@@ -281,7 +294,7 @@ export default function Scan() {
         </div>
       </div>
 
-      {/* manual dialog */}
+      {/* Manual dialog */}
       {showManual && (
         <div
           style={{
@@ -291,7 +304,7 @@ export default function Scan() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 20,
+            zIndex: 40,
           }}
         >
           <div
@@ -313,7 +326,7 @@ export default function Scan() {
             <input
               value={manualValue}
               onChange={(e) => setManualValue(e.target.value)}
-              placeholder="e.g., JR|FUR|0063 → opens order 63"
+              placeholder='e.g., JR|FUR|0063 → opens order 63'
               style={{
                 width: "100%",
                 background: "#f3f4f6",
@@ -351,6 +364,44 @@ export default function Scan() {
               >
                 Open
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* YELLOW LOADING OVERLAY */}
+      {loading && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "#fde047", // amber-300
+            color: "#111",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 60,
+          }}
+          role="alert"
+          aria-live="assertive"
+        >
+          <div style={{ textAlign: "center", padding: 16 }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                border: "4px solid rgba(0,0,0,0.15)",
+                borderTopColor: "#111",
+                borderRadius: "9999px",
+                margin: "0 auto",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
+            <div style={{ fontSize: 20, fontWeight: 800, marginTop: 12 }}>
+              Loading {pendingOrderId ? `order ${pendingOrderId}` : "order"}…
+            </div>
+            <div style={{ marginTop: 4, color: "#374151", fontSize: 14 }}>
+              Fetching details and images
             </div>
           </div>
         </div>
@@ -395,7 +446,7 @@ function clean(v) {
   return v;
 }
 
-// Helper: ensure images is always [{ src, label }]
+// --- Labeled Quadrant ---
 function toImgMeta(arr) {
   return (Array.isArray(arr) ? arr : [])
     .filter(Boolean)
@@ -498,24 +549,6 @@ function Quadrant({ images }) {
       {four.map((it, i) => (
         <Tile key={i} item={it} />
       ))}
-    </div>
-  );
-}
-
-
-function Cell({ children }) {
-  return (
-    <div
-      style={{
-        background: "#f3f4f6",
-        border: "1px solid #e5e7eb",
-        borderRadius: 10,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {children}
     </div>
   );
 }
