@@ -3,50 +3,37 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+const IDLE_TIMEOUT_MS = 600;
+const VALID_ORDER_REGEX = /\d{1,10}/;
 
-// Scanner-friendly: submit on Enter OR when keys go idle for a short time.
-// Tolerate slower cadence and ignore prefixes/suffixes around the digits.
-const IDLE_TIMEOUT_MS = 600;             // pause after last keystroke to submit
-const VALID_ORDER_REGEX = /\d{1,10}/;    // allow anything that contains up to 10 digits
-
-// Helper: from "JR|FUR|0063" -> "63"
 function extractOrderId(raw) {
   const digits = (raw || "").replace(/\D+/g, "");
   const trimmed = digits.replace(/^0+/, "");
-  return trimmed || digits; // keep at least "0" if that ever occurs
+  return trimmed || digits;
 }
 
 export default function Scan() {
-  console.log("[Scan] compact bar + centered quadrant v2");
   const [params] = useSearchParams();
   const dept = (params.get("dept") || "").toLowerCase();
 
-  // Departments you plan to support
   const allowedDepts = useMemo(
     () => new Set(["fur", "cut", "print", "embroidery", "sewing"]),
     []
   );
   const deptValid = allowedDepts.has(dept);
 
-  // Raw keystrokes buffer (what the scanner "types")
   const [buffer, setBuffer] = useState("");
   const bufferRef = useRef("");
-
-  // UI state
   const [flash, setFlash] = useState("idle"); // idle | ok | error
   const [showManual, setShowManual] = useState(false);
   const [manualValue, setManualValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [errMsg, setErrMsg] = useState("");
-
-  // Loaded order data
   const [orderData, setOrderData] = useState(null);
-  // { order, company, title, product, stage, dueDate, furColor, quantity, thumbnailUrl, images?[] }
 
   const idleTimerRef = useRef(null);
-  const focusRef = useRef(null); // hidden autofocus input
+  const focusRef = useRef(null);
 
-  // Keep keyboard focus on the page so scanner keystrokes land here.
   useEffect(() => {
     const focusInput = () => {
       try {
@@ -55,7 +42,6 @@ export default function Scan() {
       } catch {}
     };
     focusInput();
-
     const onVis = () => {
       if (document.visibilityState === "visible") focusInput();
     };
@@ -66,6 +52,8 @@ export default function Scan() {
       window.removeEventListener("focus", focusInput);
     };
   }, []);
+
+  console.log("[Scan] compact bar + centered quadrant v2");
 
   function flashOk() {
     setFlash("ok");
@@ -78,26 +66,20 @@ export default function Scan() {
   }
 
   async function fetchOrder(orderId) {
-    if (!deptValid) {
-      flashError("Invalid department");
-      return;
-    }
+    if (!deptValid) return flashError("Invalid department");
     setLoading(true);
     setErrMsg("");
     try {
-      // IMPORTANT: API_ROOT already includes /api in your env, so don't add it again
+      // IMPORTANT: your env already includes /api
       const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
         dept
       )}&order=${encodeURIComponent(orderId)}`;
-
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) {
         const j = await safeJson(r);
         throw new Error(j?.error || `HTTP ${r.status}`);
       }
       const data = await r.json();
-
-      // Normalize fields and images
       const normalized = {
         order: data.order ?? orderId,
         company: data.company ?? "—",
@@ -108,11 +90,13 @@ export default function Scan() {
         furColor: data.furColor ?? "",
         quantity: data.quantity ?? "—",
         thumbnailUrl: data.thumbnailUrl || null,
-        images: Array.isArray(data.images) && data.images.length > 0
-          ? data.images
-          : (data.thumbnailUrl ? [data.thumbnailUrl] : []),
+        images:
+          Array.isArray(data.images) && data.images.length > 0
+            ? data.images
+            : data.thumbnailUrl
+            ? [data.thumbnailUrl]
+            : [],
       };
-
       setOrderData(normalized);
       flashOk();
     } catch (e) {
@@ -124,28 +108,19 @@ export default function Scan() {
     }
   }
 
-  // Submit handler for scans: uses buffered full string; extracts digits; fetches order
   function handleSubmit(text, fromScan) {
     const raw = (text || "").trim();
-
-    // Only auto-submit for scans (Enter or idle timer)
     if (!fromScan) return flashError();
-
     const orderId = extractOrderId(raw);
     if (!orderId || !/^\d{1,10}$/.test(orderId)) return flashError("Invalid order #");
-
-    // Clear AFTER capturing raw
     setBuffer("");
     bufferRef.current = "";
-
     fetchOrder(orderId);
   }
 
-  // Manual dialog "Open" button
   function manualSubmit() {
     const raw = (manualValue || "").trim();
     const orderId = extractOrderId(raw);
-
     if (deptValid && orderId && /^\d{1,10}$/.test(orderId)) {
       setShowManual(false);
       setManualValue("");
@@ -155,25 +130,18 @@ export default function Scan() {
     }
   }
 
-  // Global keydown listener: accumulate characters, submit on Enter or after idle pause
   useEffect(() => {
     function scheduleIdleSubmit() {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         const full = bufferRef.current;
-        if (full && full.length > 0) {
-          handleSubmit(full, /* fromScan */ true);
-        }
+        if (full && full.length > 0) handleSubmit(full, true);
       }, IDLE_TIMEOUT_MS);
     }
-
     function onKeyDown(e) {
-      // Ignore modifier-only keys and function keys except Enter
       if (e.key.length > 1 && e.key !== "Enter") return;
-
-      // Printable char?
       if (e.key.length === 1) {
-        setBuffer(prev => {
+        setBuffer((prev) => {
           const next = prev + e.key;
           bufferRef.current = next;
           return next;
@@ -181,8 +149,6 @@ export default function Scan() {
         scheduleIdleSubmit();
         return;
       }
-
-      // Enter submits immediately
       if (e.key === "Enter") {
         e.preventDefault();
         if (idleTimerRef.current) {
@@ -190,12 +156,9 @@ export default function Scan() {
           idleTimerRef.current = null;
         }
         const full = bufferRef.current;
-        if (full && full.length > 0) {
-          handleSubmit(full, /* fromScan */ true);
-        }
+        if (full && full.length > 0) handleSubmit(full, true);
       }
     }
-
     window.addEventListener("keydown", onKeyDown);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
@@ -208,107 +171,165 @@ export default function Scan() {
   }, [dept]);
 
   return (
-    <div className="min-h-screen w-full bg-neutral-950 text-white">
-      {/* Hidden autofocus input keeps focus on this page */}
+    <div style={{ minHeight: "100vh", width: "100%", background: "#0a0a0a", color: "#fff" }}>
+      {/* focus catcher */}
       <input
         ref={focusRef}
         autoFocus
         onBlur={() => focusRef.current?.focus()}
         aria-hidden="true"
         tabIndex={-1}
+        style={{ position: "absolute", opacity: 0, width: 1, height: 1, pointerEvents: "none" }}
+      />
+
+      {/* subtle feedback overlay */}
+      <div
         style={{
-          position: "absolute",
-          opacity: 0,
-          width: 1,
-          height: 1,
+          position: "fixed",
+          inset: 0,
           pointerEvents: "none",
+          boxShadow:
+            flash === "ok"
+              ? "inset 0 0 0 9999px rgba(0,255,127,0.1)"
+              : flash === "error"
+              ? "inset 0 0 0 9999px rgba(255,0,64,0.1)"
+              : "none",
         }}
       />
 
-      <style>{`
-        .flash-idle { box-shadow: 0 0 0 0 rgba(0,0,0,0); }
-        .flash-ok { box-shadow: 0 0 0 9999px rgba(0, 255, 127, 0.10) inset; }
-        .flash-error { box-shadow: 0 0 0 9999px rgba(255, 0, 64, 0.10) inset; }
-      `}</style>
-
+      {/* top bar */}
       <div
-        className={`w-full h-full fixed top-0 left-0 pointer-events-none ${
-          flash === "ok" ? "flash-ok" : flash === "error" ? "flash-error" : "flash-idle"
-        }`}
-      />
-
-      {/* Top bar */}
-      <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
-        <div className="text-lg font-semibold">
+        style={{
+          padding: "16px 20px",
+          borderBottom: "1px solid rgba(255,255,255,0.10)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 600 }}>
           Department: {deptValid ? dept.toUpperCase() : "(invalid)"}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs opacity-60">
-            Last keys: <span className="font-mono">{buffer || "—"}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 12, opacity: 0.6 }}>
+            Last keys: <span style={{ fontFamily: "monospace" }}>{buffer || "—"}</span>
           </span>
           <button
             onClick={() => setShowManual(true)}
-            className="px-3 py-1.5 rounded bg-white text-black hover:bg-white/90"
+            style={{
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: "#fff",
+              color: "#000",
+              fontWeight: 600,
+            }}
           >
             Enter Order Manually
           </button>
         </div>
       </div>
 
-      {/* Error / loading ribbon */}
+      {/* error / loading */}
       {(loading || errMsg) && (
-        <div className="px-5 py-2">
-          {loading && <div className="text-sm opacity-70">Loading order…</div>}
-          {errMsg && <div className="text-sm text-red-400">{errMsg}</div>}
+        <div style={{ padding: "8px 20px" }}>
+          {loading && <div style={{ fontSize: 14, opacity: 0.7 }}>Loading order…</div>}
+          {errMsg && <div style={{ fontSize: 14, color: "#f88" }}>{errMsg}</div>}
         </div>
       )}
 
-      {/* Order info BAR (compact card, 1–2 lines, wraps as needed) */}
+      {/* ORDER INFO BAR — forced into 1–2 lines */}
       {orderData && (
-        <div className="px-5 pt-3">
-          <div className="bg-neutral-900 border border-white/10 rounded-xl px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+        <div style={{ padding: "10px 20px" }}>
+          <div
+            style={{
+              background: "#171717",
+              border: "1px solid rgba(255,255,255,0.10)",
+              borderRadius: 12,
+              padding: "8px 12px",
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "6px 14px",
+              lineHeight: 1.2,
+              fontSize: 13,
+            }}
+          >
             <BarItem label="Order #" value={orderData.order} />
-            <BarItem label="Company" value={orderData.company} maxCh={22} />
-            <BarItem label="Design" value={orderData.title} maxCh={22} />
-            <BarItem label="Product" value={orderData.product} maxCh={16} />
-            <BarItem label="Stage" value={orderData.stage} maxCh={14} />
+            <BarItem label="Company" value={orderData.company} maxCh={20} />
+            <BarItem label="Design" value={orderData.title} maxCh={20} />
+            <BarItem label="Product" value={orderData.product} maxCh={14} />
+            <BarItem label="Stage" value={orderData.stage} maxCh={12} />
             <BarItem label="Due" value={orderData.dueDate} />
-            <BarItem label="Fur" value={orderData.furColor} maxCh={16} />
-            <BarItem label="Qty" value={orderData.quantity} />
+            <BarItem label="Fur" value={orderData.furColor} maxCh={14} />
+            <BarItem label="Qty" value={String(orderData.quantity)} />
           </div>
         </div>
       )}
 
-      {/* Centered quadrant */}
-      <div className="px-5 pb-6 flex justify-center">
-        <div className="w-full max-w-6xl flex justify-center">
-          <Quadrant images={(orderData?.images || [])} />
+      {/* CENTERED QUADRANT AREA */}
+      <div
+        style={{
+          padding: "16px 20px 28px",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
+          <Quadrant images={orderData?.images || []} />
         </div>
       </div>
 
-      {/* Manual dialog */}
+      {/* manual dialog */}
       {showManual && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-20">
-          <div className="bg-neutral-900 w-[520px] max-w-[96vw] rounded-xl p-5 border border-white/10">
-            <h2 className="text-xl font-semibold">Open Order in {dept.toUpperCase()}</h2>
-            <p className="opacity-70 text-sm mt-1">
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#171717",
+              width: 520,
+              maxWidth: "96vw",
+              borderRadius: 12,
+              padding: 20,
+              border: "1px solid rgba(255,255,255,0.10)",
+            }}
+          >
+            <h2 style={{ fontSize: 20, fontWeight: 600 }}>Open Order in {dept.toUpperCase()}</h2>
+            <p style={{ opacity: 0.7, fontSize: 14, marginTop: 6 }}>
               Paste or type anything that contains the digits of the order number.
             </p>
             <input
               value={manualValue}
-              onChange={e => setManualValue(e.target.value)}
-              className="w-full bg-neutral-800 rounded px-3 py-2 outline-none mt-4"
+              onChange={(e) => setManualValue(e.target.value)}
               placeholder="e.g., JR|FUR|0063 → opens order 63"
+              style={{
+                width: "100%",
+                background: "#202020",
+                color: "#fff",
+                borderRadius: 8,
+                padding: "10px 12px",
+                outline: "none",
+                marginTop: 12,
+                border: "1px solid rgba(255,255,255,0.08)",
+              }}
             />
-            <div className="flex justify-end gap-2 mt-4">
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
               <button
-                className="px-3 py-1 rounded bg-white/10"
+                style={{ padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.08)" }}
                 onClick={() => setShowManual(false)}
               >
                 Cancel
               </button>
               <button
-                className="px-3 py-1 rounded bg-white text-black"
+                style={{ padding: "6px 10px", borderRadius: 8, background: "#fff", color: "#000", fontWeight: 600 }}
                 onClick={manualSubmit}
               >
                 Open
@@ -323,15 +344,24 @@ export default function Scan() {
 
 function BarItem({ label, value, maxCh }) {
   const max = maxCh ?? 18;
+  const val = clean(value);
   return (
-    <div className="flex items-baseline gap-1 min-w-0 whitespace-nowrap">
-      <span className="text-[11px] uppercase tracking-wide opacity-60">{label}:</span>
+    <div style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0, whiteSpace: "nowrap" }}>
+      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, opacity: 0.6 }}>
+        {label}:
+      </span>
       <span
-        className="font-medium truncate"
-        style={{ maxWidth: `${max}ch` }}
-        title={value || "—"}
+        title={val}
+        style={{
+          fontWeight: 600,
+          display: "inline-block",
+          maxWidth: `${max}ch`,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
       >
-        {clean(value)}
+        {val}
       </span>
     </div>
   );
@@ -345,62 +375,101 @@ function clean(v) {
 
 function Quadrant({ images }) {
   const imgs = Array.isArray(images) ? images.filter(Boolean) : [];
+  const frameStyle = {
+    height: "58vh",
+    width: "100%",
+    maxWidth: 1100,
+    margin: "0 auto",
+    background: "#171717",
+    border: "1px solid rgba(255,255,255,0.10)",
+    borderRadius: 12,
+  };
+
   if (imgs.length === 0) {
     return (
-      <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl border border-dashed border-white/15 flex items-center justify-center text-sm opacity-50">
-        No images
+      <div
+        style={{
+          ...frameStyle,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderStyle: "dashed",
+          borderColor: "rgba(255,255,255,0.15)",
+        }}
+      >
+        <span style={{ fontSize: 13, opacity: 0.5 }}>No images</span>
       </div>
     );
   }
 
-  // 1 → centered; 2 → side-by-side; 3–4 → 2x2 grid
   if (imgs.length === 1) {
     return (
-      <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl bg-neutral-900 border border-white/10 flex items-center justify-center p-4">
-        <Img src={imgs[0]} className="max-h-full max-w-full object-contain" />
+      <div style={{ ...frameStyle, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        <Img src={imgs[0]} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
       </div>
     );
   }
 
   if (imgs.length === 2) {
     return (
-      <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl bg-neutral-900 border border-white/10 grid grid-cols-2 gap-3 p-3">
-        <div className="flex items-center justify-center bg-neutral-800 rounded-lg">
-          <Img src={imgs[0]} className="max-h-full max-w-full object-contain" />
-        </div>
-        <div className="flex items-center justify-center bg-neutral-800 rounded-lg">
-          <Img src={imgs[1]} className="max-h-full max-w-full object-contain" />
-        </div>
+      <div
+        style={{
+          ...frameStyle,
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 12,
+          padding: 12,
+        }}
+      >
+        <Cell><Img src={imgs[0]} /></Cell>
+        <Cell><Img src={imgs[1]} /></Cell>
       </div>
     );
   }
 
   const four = imgs.slice(0, 4);
   return (
-    <div className="h-[58vh] w-full max-w-[1100px] mx-auto rounded-xl bg-neutral-900 border border-white/10 grid grid-cols-2 grid-rows-2 gap-3 p-3">
+    <div
+      style={{
+        ...frameStyle,
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gridTemplateRows: "1fr 1fr",
+        gap: 12,
+        padding: 12,
+      }}
+    >
       {four.map((src, i) => (
-        <div key={i} className="flex items-center justify-center bg-neutral-800 rounded-lg">
-          <Img src={src} className="max-h-full max-w-full object-contain" />
-        </div>
+        <Cell key={i}><Img src={src} /></Cell>
       ))}
     </div>
   );
 }
 
-function Img({ src, className }) {
+function Cell({ children }) {
+  return (
+    <div
+      style={{
+        background: "#202020",
+        borderRadius: 10,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Img({ src, style }) {
   const [ok, setOk] = useState(true);
   useEffect(() => setOk(true), [src]);
   if (!src) return null;
   return ok ? (
-    <img
-      src={src}
-      alt=""
-      className={className}
-      onError={() => setOk(false)}
-      draggable={false}
-    />
+    <img src={src} alt="" style={style || { maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} onError={() => setOk(false)} draggable={false} />
   ) : (
-    <div className="text-xs opacity-50 p-2">Image unavailable</div>
+    <div style={{ fontSize: 12, opacity: 0.5, padding: 8 }}>Image unavailable</div>
   );
 }
 
