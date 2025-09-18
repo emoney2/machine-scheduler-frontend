@@ -17,6 +17,7 @@ function extractOrderId(raw) {
 }
 
 export default function Scan() {
+  console.log("[Scan] compact bar + centered quadrant v2");
   const [params] = useSearchParams();
   const dept = (params.get("dept") || "").toLowerCase();
 
