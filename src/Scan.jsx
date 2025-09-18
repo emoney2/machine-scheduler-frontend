@@ -91,11 +91,11 @@ export default function Scan() {
         quantity: data.quantity ?? "—",
         thumbnailUrl: data.thumbnailUrl || null,
         images:
-          Array.isArray(data.images) && data.images.length > 0
-            ? data.images
-            : data.thumbnailUrl
-            ? [data.thumbnailUrl]
-            : [],
+          Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
+            ? data.imagesLabeled                                // already [{src,label}]
+            : Array.isArray(data.images) && data.images.length > 0
+              ? data.images.map(u => (typeof u === "string" ? { src: u, label: "" } : u))
+              : (data.thumbnailUrl ? [{ src: data.thumbnailUrl, label: "" }] : []),
       };
       setOrderData(normalized);
       flashOk();
@@ -395,8 +395,16 @@ function clean(v) {
   return v;
 }
 
+// Helper: ensure images is always [{ src, label }]
+function toImgMeta(arr) {
+  return (Array.isArray(arr) ? arr : [])
+    .filter(Boolean)
+    .map(it => (typeof it === "string" ? { src: it, label: "" } : it));
+}
+
 function Quadrant({ images }) {
-  const imgs = Array.isArray(images) ? images.filter(Boolean) : [];
+  const items = toImgMeta(images);
+
   const frameStyle = {
     height: "58vh",
     width: "100%",
@@ -407,7 +415,31 @@ function Quadrant({ images }) {
     borderRadius: 12,
   };
 
-  if (imgs.length === 0) {
+  const Tile = ({ item }) => (
+    <div
+      style={{
+        background: "#f3f4f6",
+        border: "1px solid #e5e7eb",
+        borderRadius: 10,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 8,
+        width: "100%",
+        height: "100%",
+      }}
+    >
+      <Img src={item.src} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+      {item.label ? (
+        <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280", textAlign: "center" }}>
+          {item.label}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (items.length === 0) {
     return (
       <div
         style={{
@@ -424,15 +456,17 @@ function Quadrant({ images }) {
     );
   }
 
-  if (imgs.length === 1) {
+  if (items.length === 1) {
     return (
       <div style={{ ...frameStyle, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-        <Img src={imgs[0]} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
+        <div style={{ width: "100%", height: "100%" }}>
+          <Tile item={items[0]} />
+        </div>
       </div>
     );
   }
 
-  if (imgs.length === 2) {
+  if (items.length === 2) {
     return (
       <div
         style={{
@@ -443,13 +477,13 @@ function Quadrant({ images }) {
           padding: 12,
         }}
       >
-        <Cell><Img src={imgs[0]} /></Cell>
-        <Cell><Img src={imgs[1]} /></Cell>
+        <Tile item={items[0]} />
+        <Tile item={items[1]} />
       </div>
     );
   }
 
-  const four = imgs.slice(0, 4);
+  const four = items.slice(0, 4);
   return (
     <div
       style={{
@@ -461,12 +495,13 @@ function Quadrant({ images }) {
         padding: 12,
       }}
     >
-      {four.map((src, i) => (
-        <Cell key={i}><Img src={src} /></Cell>
+      {four.map((it, i) => (
+        <Tile key={i} item={it} />
       ))}
     </div>
   );
 }
+
 
 function Cell({ children }) {
   return (
