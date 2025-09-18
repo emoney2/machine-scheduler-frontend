@@ -53,7 +53,7 @@ export default function Scan() {
     };
   }, []);
 
-  console.log("[Scan] compact bar + centered quadrant v2");
+  console.log("[Scan] compact bar + centered quadrant v2 (white theme)");
 
   function flashOk() {
     setFlash("ok");
@@ -70,7 +70,7 @@ export default function Scan() {
     setLoading(true);
     setErrMsg("");
     try {
-      // IMPORTANT: your env already includes /api
+      // Your env already includes /api
       const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
         dept
       )}&order=${encodeURIComponent(orderId)}`;
@@ -171,7 +171,7 @@ export default function Scan() {
   }, [dept]);
 
   return (
-    <div style={{ minHeight: "100vh", width: "100%", background: "#0a0a0a", color: "#fff" }}>
+    <div style={{ minHeight: "100vh", width: "100%", background: "#ffffff", color: "#111" }}>
       {/* focus catcher */}
       <input
         ref={focusRef}
@@ -182,7 +182,7 @@ export default function Scan() {
         style={{ position: "absolute", opacity: 0, width: 1, height: 1, pointerEvents: "none" }}
       />
 
-      {/* subtle feedback overlay */}
+      {/* subtle feedback overlay (tuned for white background) */}
       <div
         style={{
           position: "fixed",
@@ -190,9 +190,9 @@ export default function Scan() {
           pointerEvents: "none",
           boxShadow:
             flash === "ok"
-              ? "inset 0 0 0 9999px rgba(0,255,127,0.1)"
+              ? "inset 0 0 0 9999px rgba(16,185,129,0.08)" // teal-500 @8%
               : flash === "error"
-              ? "inset 0 0 0 9999px rgba(255,0,64,0.1)"
+              ? "inset 0 0 0 9999px rgba(239,68,68,0.08)"  // red-500 @8%
               : "none",
         }}
       />
@@ -201,27 +201,32 @@ export default function Scan() {
       <div
         style={{
           padding: "16px 20px",
-          borderBottom: "1px solid rgba(255,255,255,0.10)",
+          borderBottom: "1px solid #e5e7eb",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          background: "#fff",
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
         }}
       >
         <div style={{ fontSize: 18, fontWeight: 600 }}>
           Department: {deptValid ? dept.toUpperCase() : "(invalid)"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 12, opacity: 0.6 }}>
-            Last keys: <span style={{ fontFamily: "monospace" }}>{buffer || "—"}</span>
+          <span style={{ fontSize: 12, color: "#6b7280" }}>
+            Last keys: <span style={{ fontFamily: "monospace", color: "#111" }}>{buffer || "—"}</span>
           </span>
           <button
             onClick={() => setShowManual(true)}
             style={{
               padding: "6px 12px",
               borderRadius: 8,
-              background: "#fff",
-              color: "#000",
+              background: "#111827",
+              color: "#fff",
               fontWeight: 600,
+              border: "1px solid #111827",
             }}
           >
             Enter Order Manually
@@ -232,44 +237,41 @@ export default function Scan() {
       {/* error / loading */}
       {(loading || errMsg) && (
         <div style={{ padding: "8px 20px" }}>
-          {loading && <div style={{ fontSize: 14, opacity: 0.7 }}>Loading order…</div>}
-          {errMsg && <div style={{ fontSize: 14, color: "#f88" }}>{errMsg}</div>}
+          {loading && <div style={{ fontSize: 14, color: "#6b7280" }}>Loading order…</div>}
+          {errMsg && <div style={{ fontSize: 14, color: "#b91c1c" }}>{errMsg}</div>}
         </div>
       )}
 
-      {/* ORDER INFO BAR — forced into 1–2 lines */}
+      {/* ORDER INFO CHART-STYLE BAR (labels above values, no truncation) */}
       {orderData && (
-        <div style={{ padding: "10px 20px" }}>
+        <div style={{ padding: "12px 20px" }}>
           <div
             style={{
-              background: "#171717",
-              border: "1px solid rgba(255,255,255,0.10)",
+              background: "#f9fafb",
+              border: "1px solid #e5e7eb",
               borderRadius: 12,
-              padding: "8px 12px",
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "center",
-              gap: "6px 14px",
-              lineHeight: 1.2,
-              fontSize: 13,
+              padding: "10px 12px",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gap: "10px 16px",
             }}
           >
-            <BarItem label="Order #" value={orderData.order} />
-            <BarItem label="Company" value={orderData.company} maxCh={20} />
-            <BarItem label="Design" value={orderData.title} maxCh={20} />
-            <BarItem label="Product" value={orderData.product} maxCh={14} />
-            <BarItem label="Stage" value={orderData.stage} maxCh={12} />
-            <BarItem label="Due" value={orderData.dueDate} />
-            <BarItem label="Fur" value={orderData.furColor} maxCh={14} />
-            <BarItem label="Qty" value={String(orderData.quantity)} />
+            <InfoBox label="Order #" value={orderData.order} />
+            <InfoBox label="Company Name" value={orderData.company} />
+            <InfoBox label="Design" value={orderData.title} />
+            <InfoBox label="Product" value={orderData.product} />
+            <InfoBox label="Stage" value={orderData.stage} />
+            <InfoBox label="Due Date" value={orderData.dueDate} />
+            <InfoBox label="Fur Color" value={orderData.furColor} />
+            <InfoBox label="Quantity" value={String(orderData.quantity)} />
           </div>
         </div>
       )}
 
-      {/* CENTERED QUADRANT AREA */}
+      {/* CENTERED QUADRANT */}
       <div
         style={{
-          padding: "16px 20px 28px",
+          padding: "12px 20px 28px",
           display: "flex",
           justifyContent: "center",
         }}
@@ -285,7 +287,7 @@ export default function Scan() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.7)",
+            background: "rgba(0,0,0,0.6)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -294,16 +296,18 @@ export default function Scan() {
         >
           <div
             style={{
-              background: "#171717",
+              background: "#ffffff",
+              color: "#111",
               width: 520,
               maxWidth: "96vw",
               borderRadius: 12,
               padding: 20,
-              border: "1px solid rgba(255,255,255,0.10)",
+              border: "1px solid #e5e7eb",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
             }}
           >
-            <h2 style={{ fontSize: 20, fontWeight: 600 }}>Open Order in {dept.toUpperCase()}</h2>
-            <p style={{ opacity: 0.7, fontSize: 14, marginTop: 6 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 700 }}>Open Order in {dept.toUpperCase()}</h2>
+            <p style={{ color: "#6b7280", fontSize: 14, marginTop: 6 }}>
               Paste or type anything that contains the digits of the order number.
             </p>
             <input
@@ -312,24 +316,37 @@ export default function Scan() {
               placeholder="e.g., JR|FUR|0063 → opens order 63"
               style={{
                 width: "100%",
-                background: "#202020",
-                color: "#fff",
+                background: "#f3f4f6",
+                color: "#111",
                 borderRadius: 8,
                 padding: "10px 12px",
                 outline: "none",
                 marginTop: 12,
-                border: "1px solid rgba(255,255,255,0.08)",
+                border: "1px solid #e5e7eb",
               }}
             />
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}>
               <button
-                style={{ padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.08)" }}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: "#ffffff",
+                  border: "1px solid #e5e7eb",
+                  color: "#111",
+                }}
                 onClick={() => setShowManual(false)}
               >
                 Cancel
               </button>
               <button
-                style={{ padding: "6px 10px", borderRadius: 8, background: "#fff", color: "#000", fontWeight: 600 }}
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 8,
+                  background: "#111827",
+                  color: "#fff",
+                  fontWeight: 700,
+                  border: "1px solid #111827",
+                }}
                 onClick={manualSubmit}
               >
                 Open
@@ -342,27 +359,32 @@ export default function Scan() {
   );
 }
 
-function BarItem({ label, value, maxCh }) {
-  const max = maxCh ?? 18;
+function InfoBox({ label, value }) {
   const val = clean(value);
   return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 6, minWidth: 0, whiteSpace: "nowrap" }}>
-      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4, opacity: 0.6 }}>
-        {label}:
-      </span>
-      <span
-        title={val}
+    <div style={{ minWidth: 0 }}>
+      <div
         style={{
-          fontWeight: 600,
-          display: "inline-block",
-          maxWidth: `${max}ch`,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
+          fontSize: 11,
+          textTransform: "uppercase",
+          letterSpacing: 0.4,
+          color: "#6b7280",
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontWeight: 700,
+          fontSize: 14,
+          lineHeight: 1.2,
+          whiteSpace: "normal",
+          wordBreak: "break-word",
         }}
       >
         {val}
-      </span>
+      </div>
     </div>
   );
 }
@@ -380,8 +402,8 @@ function Quadrant({ images }) {
     width: "100%",
     maxWidth: 1100,
     margin: "0 auto",
-    background: "#171717",
-    border: "1px solid rgba(255,255,255,0.10)",
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
     borderRadius: 12,
   };
 
@@ -394,10 +416,10 @@ function Quadrant({ images }) {
           alignItems: "center",
           justifyContent: "center",
           borderStyle: "dashed",
-          borderColor: "rgba(255,255,255,0.15)",
+          borderColor: "#e5e7eb",
         }}
       >
-        <span style={{ fontSize: 13, opacity: 0.5 }}>No images</span>
+        <span style={{ fontSize: 13, color: "#9ca3af" }}>No images</span>
       </div>
     );
   }
@@ -450,7 +472,8 @@ function Cell({ children }) {
   return (
     <div
       style={{
-        background: "#202020",
+        background: "#f3f4f6",
+        border: "1px solid #e5e7eb",
         borderRadius: 10,
         display: "flex",
         alignItems: "center",
@@ -469,7 +492,7 @@ function Img({ src, style }) {
   return ok ? (
     <img src={src} alt="" style={style || { maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} onError={() => setOk(false)} draggable={false} />
   ) : (
-    <div style={{ fontSize: 12, opacity: 0.5, padding: 8 }}>Image unavailable</div>
+    <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
 }
 
