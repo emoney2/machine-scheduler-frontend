@@ -584,13 +584,31 @@ function Recut({ onExit }) {
     })();
   }, []);
 
-  // NEW: load image links (one time) → builds { "21": "https://...proxy..." }
+  // Utility: extract a Google Drive file ID from any common URL format
+  function extractDriveIdFromUrl(url) {
+    if (!url) return "";
+    try {
+      const s = String(url);
+      // /file/d/<id>/view
+      const m1 = s.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+      if (m1) return m1[1];
+      // ?id=<id>
+      const u = new URL(s);
+      const idParam = u.searchParams.get("id");
+      if (idParam) return idParam;
+    } catch (_) {}
+    return "";
+  }
+
+  // --- REPLACE your existing /combined image map effect with this one ---
   useEffect(() => {
     let alive = true;
+    // Track blob URLs so we can revoke them on cleanup
+    const blobUrls = [];
+
     (async () => {
       try {
         const res = await axios.get(`${API_ROOT}/combined`, { withCredentials: true });
-
         const ctype = String(res?.headers?.["content-type"] || "").toLowerCase();
         if (!ctype.includes("application/json")) {
           const snippet = String(res?.data ?? "").slice(0, 200);
@@ -598,40 +616,61 @@ function Recut({ onExit }) {
         }
 
         const fromCombined = Array.isArray(res.data?.orders) ? res.data.orders : [];
-        const map = {};
+        // Build a lookup of Order# -> Drive ID by scanning many possible columns
+        const fields = [
+          "Image", "Preview", "Img", "Front Image", "Mockup",
+          "Photo", "Artwork", "Image URL"
+        ];
 
+        // Avoid duplicate fetches for the same Drive ID
+        const idToOrders = new Map(); // id -> array of orderNos needing this id
         for (const o of fromCombined) {
-          const num = String(o["Order #"] || "").trim();
-          const img = o["Image"] || o["Preview"] || "";
-          if (!num || !img) continue;
+          const orderNo = String(o["Order #"] || "").trim();
+          if (!orderNo) continue;
 
-          // Prefer your backend Drive proxy thumbnail (works for PDFs + images)
-          let id = "";
-          try {
-            // Try /d/<id> first
-            const m1 = String(img).match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-            if (m1) id = m1[1];
-            // Fallback ?id= param
-            if (!id) {
-              const u = new URL(img);
-              id = u.searchParams.get("id") || "";
-            }
-          } catch (_) {}
-
-          if (id) {
-            map[num] = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w120`;
-          } else if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(img))) {
-            // Allow direct image URLs if not Drive
-            map[num] = String(img);
+          let link = "";
+          for (const f of fields) {
+            if (o[f]) { link = String(o[f]); break; }
           }
+          const id = extractDriveIdFromUrl(link);
+          if (!id) continue;
+
+          if (!idToOrders.has(id)) idToOrders.set(id, []);
+          idToOrders.get(id).push(orderNo);
         }
 
+        // Fetch thumbs as blobs (with credentials), then map to blob: URLs
+        const map = {};
+        const tasks = [];
+        for (const [id, orderNos] of idToOrders.entries()) {
+          const task = axios.get(
+            `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w120`,
+            { withCredentials: true, responseType: "blob" }
+          ).then((r) => {
+            if (!r?.data) return;
+            const url = URL.createObjectURL(r.data);
+            blobUrls.push(url);
+            for (const n of orderNos) map[n] = url;
+          }).catch(() => {
+            // ignore failures; those orders will fall back to <PreviewImg/>
+          });
+          tasks.push(task);
+        }
+
+        await Promise.allSettled(tasks);
         if (alive) setOrderImageMap(map);
       } catch (e) {
-        console.warn("[MaterialLog] failed to load /combined for images:", e?.message || e);
+        console.warn("[MaterialLog] failed to load /combined thumbs:", e?.message || e);
       }
     })();
-    return () => { alive = false; };
+
+    return () => {
+      alive = false;
+      // Revoke created blob URLs to avoid leaks
+      for (const u of blobUrls) {
+        try { URL.revokeObjectURL(u); } catch (_) {}
+      }
+    };
   }, []);
 
   const filtered = useMemo(() => {
