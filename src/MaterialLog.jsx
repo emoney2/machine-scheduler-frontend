@@ -17,19 +17,6 @@ function extractDriveId(url) {
   return "";
 }
 
-// Prefer backend proxy → this works for images & PDFs
-function toPreviewUrl(originalUrl, size = "w120") {
-  if (!originalUrl) return "";
-  const id = extractDriveId(originalUrl);
-  if (!id) {
-    // allow direct image links too
-    if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
-    return "";
-  }
-  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=${size}`;
-}
-
-
 // ---------- small utils ----------
 function excelSerialToDate(n) {
   const base = new Date(Date.UTC(1899, 11, 30));
@@ -541,14 +528,6 @@ function Recut({ onExit }) {
   const [showRecutSuccess, setShowRecutSuccess] = useState(false);
   const [embQty, setEmbQty] = useState("");
 
-  // NEW: map Order # -> thumbnail URL (via /combined)
-  const [orderImageMap, setOrderImageMap] = useState({});
-
-  const [thumbBroken, setThumbBroken] = useState({});
-  const markThumbBroken = (key) => {
-    setThumbBroken((m) => (m[key] ? m : { ...m, [key]: true }));
-  };
-
   // Keep it simple: ensure we always return an array of objects.
   function normalizeOrders(raw) {
     if (Array.isArray(raw)) return raw;
@@ -596,127 +575,6 @@ function Recut({ onExit }) {
         setLoadingOrders(false);
       }
     })();
-  }, []);
-
-
-  // Utility: extract a Google Drive file ID from any common URL format
-  function extractDriveIdFromUrl(url) {
-    if (!url) return "";
-    try {
-      const s = String(url);
-      // /file/d/<id>/view
-      const m1 = s.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-      if (m1) return m1[1];
-      // ?id=<id>
-      const u = new URL(s);
-      const idParam = u.searchParams.get("id");
-      if (idParam) return idParam;
-    } catch (_) {}
-    return "";
-  }
-
-  useEffect(() => {
-    let alive = true;
-    const blobUrls = [];
-
-    // tiny helper: parse Drive ID
-    function extractDriveIdFromUrl(url) {
-      if (!url) return "";
-      try {
-        const s = String(url);
-        const m1 = s.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-        if (m1) return m1[1];
-        const u = new URL(s);
-        const idParam = u.searchParams.get("id");
-        if (idParam) return idParam;
-      } catch (_) {}
-      return "";
-    }
-
-    // fetch one thumb with hard timeout; reject on 204/empty body
-    async function fetchThumbBlobUrl(id, ms = 8000) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ms);
-      try {
-        const r = await axios.get(
-          `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w120`,
-          { withCredentials: true, responseType: "blob", signal: controller.signal, timeout: ms }
-        );
-        // Accept only 200 with non-empty blob
-        if (r.status !== 200 || !r.data || !r.data.size) {
-          throw new Error(`thumb ${id} bad status/body: ${r.status}`);
-        }
-        const url = URL.createObjectURL(r.data);
-        blobUrls.push(url);
-        return url;
-      } finally {
-        clearTimeout(timer);
-      }
-    }
-
-    (async () => {
-      try {
-        const res = await axios.get(`${API_ROOT}/combined`, { withCredentials: true, timeout: 8000 });
-        const ctype = String(res?.headers?.["content-type"] || "").toLowerCase();
-        if (!ctype.includes("application/json")) {
-          const snippet = String(res?.data ?? "").slice(0, 200);
-          throw new Error(`Unexpected content-type for /combined. Got: ${ctype}. Snippet: ${snippet}`);
-        }
-
-        const fromCombined = Array.isArray(res.data?.orders) ? res.data.orders : [];
-        const fields = ["Image","Preview","Img","Front Image","Mockup","Photo","Artwork","Image URL"];
-
-        // Build id -> orderNos map
-        const idToOrders = new Map();
-        for (const o of fromCombined) {
-          const orderNo = String(o["Order #"] || "").trim();
-          if (!orderNo) continue;
-
-          let link = "";
-          for (const f of fields) {
-            if (o[f]) { link = String(o[f]); break; }
-          }
-          const id = extractDriveIdFromUrl(link);
-          if (!id) continue;
-
-          if (!idToOrders.has(id)) idToOrders.set(id, []);
-          idToOrders.get(id).push(orderNo);
-        }
-
-        // Concurrency limit: 4 at a time (tune as needed)
-        const entries = Array.from(idToOrders.entries());
-        const map = {};
-        let idx = 0;
-        const WORKERS = Math.min(4, entries.length);
-
-        async function worker() {
-          while (idx < entries.length) {
-            const myIdx = idx++;
-            const [id, orderNos] = entries[myIdx];
-            try {
-              const url = await fetchThumbBlobUrl(id, 8000);
-              if (url) {
-                for (const n of orderNos) map[n] = url;
-              }
-            } catch (_) {
-              // ignore failures → rows will fall back to <PreviewImg/>
-            }
-          }
-        }
-
-        await Promise.all(Array.from({ length: WORKERS }, worker));
-        if (alive) setOrderImageMap(map);
-      } catch (e) {
-        console.warn("[MaterialLog] thumbs prefetch failed:", e?.message || e);
-      }
-    })();
-
-    return () => {
-      alive = false;
-      for (const u of blobUrls) {
-        try { URL.revokeObjectURL(u); } catch (_) {}
-      }
-    };
   }, []);
 
 
@@ -944,26 +802,25 @@ function Recut({ onExit }) {
                   onClick={() => onPickOrder(o)}
                   style={{ cursor: "pointer", border: "1px solid #eee", borderRadius: 12, padding: 10 }}
                 >
-                  <div style={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 10, alignItems: "center" }}>
-                    <div style={{ width: 88, height: 88, borderRadius: 8, overflow: "hidden", background: "#f0f0f0" }}>
-                      {(() => {
-                        const key = String(orderNo || "").trim();
-                        const thumb = orderImageMap[key] || "";
-                        const showProxy = !!thumb && !thumbBroken[key];
-                        return showProxy ? (
-                          <img
-                            src={thumb}
-                            alt={orderNo ? `Order ${orderNo}` : "Artwork"}
-                            width={88}
-                            height={88}
-                            style={{ width: 88, height: 88, objectFit: "cover", display: "block" }}
-                            loading="lazy"
-                            onError={() => markThumbBroken(key)}  // << fall back if proxy fails
-                          />
-                        ) : (
-                          <PreviewImg obj={o} size={88} />
-                        );
-                      })()}
+                  <div style={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: 10, alignItems: "center" }}>
+                    <div
+                      style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: 12,
+                        background: "#fafafa",
+                        border: "1px solid #eee",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 700,
+                        fontSize: 12,
+                        color: "#666",
+                        userSelect: "none",
+                      }}
+                      aria-hidden="true"
+                    >
+                      #{orderNo}
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 2 }}>
@@ -986,23 +843,25 @@ function Recut({ onExit }) {
           <Section
             title={
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                {(() => {
-                  const selNo = String(selectedOrder?.["Order #"] || "").trim();
-                  const thumb = orderImageMap[selNo] || "";
-                  return thumb ? (
-                    <img
-                      src={thumb}
-                      alt={selNo ? `Order ${selNo}` : "Artwork"}
-                      width={54}
-                      height={54}
-                      style={{ width: 54, height: 54, objectFit: "cover", borderRadius: 8, display: "block" }}
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <PreviewImg obj={selectedOrder} size={54} />
-                  );
-                })()}
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    background: "#fafafa",
+                    border: "1px solid #eee",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: "#666",
+                    userSelect: "none",
+                  }}
+                  aria-hidden="true"
+                >
+                  #{String(selectedOrder?.["Order #"] || "").trim()}
+                </div>
                 <span>
                   Recut #{selectedOrder["Order #"]} — {selectedOrder["Product"]}
                 </span>
