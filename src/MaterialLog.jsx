@@ -562,9 +562,12 @@ function Recut({ onExit }) {
         setFetchErr("");
         setLoadingOrders(true);
 
-        const res = await axios.get(`${API_ROOT}/orders`, { withCredentials: true });
+        // Primary: /orders (8s cap)
+        const res = await axios.get(`${API_ROOT}/orders`, {
+          withCredentials: true,
+          timeout: 8000,
+        });
 
-        // Ensure we actually got JSON back (avoid HTML login pages, etc.)
         const ctype = String(res?.headers?.["content-type"] || "").toLowerCase();
         if (!ctype.includes("application/json")) {
           const snippet = String(res?.data ?? "").slice(0, 200);
@@ -574,15 +577,27 @@ function Recut({ onExit }) {
         const list = normalizeOrders(res.data);
         setOrders(Array.isArray(list) ? list : []);
       } catch (e) {
-        const msg = e?.message || "Failed to load orders.";
-        console.warn("[MaterialLog] /orders failed:", msg);
-        setFetchErr(msg);
-        setOrders([]);
+        console.warn("[MaterialLog] /orders failed, falling back to /combined:", e?.message || e);
+        // Fallback: use /combined->orders
+        try {
+          const res2 = await axios.get(`${API_ROOT}/combined`, {
+            withCredentials: true,
+            timeout: 8000,
+          });
+          const list2 = Array.isArray(res2.data?.orders) ? res2.data.orders : [];
+          setOrders(list2);
+          setFetchErr("");
+        } catch (e2) {
+          const msg = e2?.message || "Failed to load orders (both /orders and /combined).";
+          setFetchErr(msg);
+          setOrders([]);
+        }
       } finally {
         setLoadingOrders(false);
       }
     })();
   }, []);
+
 
   // Utility: extract a Google Drive file ID from any common URL format
   function extractDriveIdFromUrl(url) {
@@ -600,15 +615,48 @@ function Recut({ onExit }) {
     return "";
   }
 
-  // --- REPLACE your existing /combined image map effect with this one ---
   useEffect(() => {
     let alive = true;
-    // Track blob URLs so we can revoke them on cleanup
     const blobUrls = [];
+
+    // tiny helper: parse Drive ID
+    function extractDriveIdFromUrl(url) {
+      if (!url) return "";
+      try {
+        const s = String(url);
+        const m1 = s.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+        if (m1) return m1[1];
+        const u = new URL(s);
+        const idParam = u.searchParams.get("id");
+        if (idParam) return idParam;
+      } catch (_) {}
+      return "";
+    }
+
+    // fetch one thumb with hard timeout; reject on 204/empty body
+    async function fetchThumbBlobUrl(id, ms = 8000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        const r = await axios.get(
+          `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w120`,
+          { withCredentials: true, responseType: "blob", signal: controller.signal, timeout: ms }
+        );
+        // Accept only 200 with non-empty blob
+        if (r.status !== 200 || !r.data || !r.data.size) {
+          throw new Error(`thumb ${id} bad status/body: ${r.status}`);
+        }
+        const url = URL.createObjectURL(r.data);
+        blobUrls.push(url);
+        return url;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
 
     (async () => {
       try {
-        const res = await axios.get(`${API_ROOT}/combined`, { withCredentials: true });
+        const res = await axios.get(`${API_ROOT}/combined`, { withCredentials: true, timeout: 8000 });
         const ctype = String(res?.headers?.["content-type"] || "").toLowerCase();
         if (!ctype.includes("application/json")) {
           const snippet = String(res?.data ?? "").slice(0, 200);
@@ -616,14 +664,10 @@ function Recut({ onExit }) {
         }
 
         const fromCombined = Array.isArray(res.data?.orders) ? res.data.orders : [];
-        // Build a lookup of Order# -> Drive ID by scanning many possible columns
-        const fields = [
-          "Image", "Preview", "Img", "Front Image", "Mockup",
-          "Photo", "Artwork", "Image URL"
-        ];
+        const fields = ["Image","Preview","Img","Front Image","Mockup","Photo","Artwork","Image URL"];
 
-        // Avoid duplicate fetches for the same Drive ID
-        const idToOrders = new Map(); // id -> array of orderNos needing this id
+        // Build id -> orderNos map
+        const idToOrders = new Map();
         for (const o of fromCombined) {
           const orderNo = String(o["Order #"] || "").trim();
           if (!orderNo) continue;
@@ -639,39 +683,42 @@ function Recut({ onExit }) {
           idToOrders.get(id).push(orderNo);
         }
 
-        // Fetch thumbs as blobs (with credentials), then map to blob: URLs
+        // Concurrency limit: 4 at a time (tune as needed)
+        const entries = Array.from(idToOrders.entries());
         const map = {};
-        const tasks = [];
-        for (const [id, orderNos] of idToOrders.entries()) {
-          const task = axios.get(
-            `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w120`,
-            { withCredentials: true, responseType: "blob" }
-          ).then((r) => {
-            if (!r?.data) return;
-            const url = URL.createObjectURL(r.data);
-            blobUrls.push(url);
-            for (const n of orderNos) map[n] = url;
-          }).catch(() => {
-            // ignore failures; those orders will fall back to <PreviewImg/>
-          });
-          tasks.push(task);
+        let idx = 0;
+        const WORKERS = Math.min(4, entries.length);
+
+        async function worker() {
+          while (idx < entries.length) {
+            const myIdx = idx++;
+            const [id, orderNos] = entries[myIdx];
+            try {
+              const url = await fetchThumbBlobUrl(id, 8000);
+              if (url) {
+                for (const n of orderNos) map[n] = url;
+              }
+            } catch (_) {
+              // ignore failures → rows will fall back to <PreviewImg/>
+            }
+          }
         }
 
-        await Promise.allSettled(tasks);
+        await Promise.all(Array.from({ length: WORKERS }, worker));
         if (alive) setOrderImageMap(map);
       } catch (e) {
-        console.warn("[MaterialLog] failed to load /combined thumbs:", e?.message || e);
+        console.warn("[MaterialLog] thumbs prefetch failed:", e?.message || e);
       }
     })();
 
     return () => {
       alive = false;
-      // Revoke created blob URLs to avoid leaks
       for (const u of blobUrls) {
         try { URL.revokeObjectURL(u); } catch (_) {}
       }
     };
   }, []);
+
 
   const filtered = useMemo(() => {
     let arr = orders.slice();
