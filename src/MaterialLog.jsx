@@ -185,16 +185,41 @@ function resolvePreviewCandidates(obj, size = 200) {
   return { primary };
 }
 
-function PreviewImg({ obj, size = 160, style }) {
-  const hintedUrl = getPreviewUrl(obj);
-  const fileId = React.useMemo(() => driveIdFromUrl(hintedUrl), [hintedUrl]);
+function PreviewImg({ obj, size = 160, style, fallback }) {
+  // Try the explicit preview URL first, then scan the whole row for any Drive-like token
+  const fileId = React.useMemo(() => {
+    const hinted = getPreviewUrl(obj);
+    const idFromHint = driveIdFromUrl(hinted);
+    return idFromHint || findDriveIdAnywhere(obj);
+  }, [obj]);
 
-  if (!fileId) return null;
+  const [failed, setFailed] = React.useState(false);
 
-  const proxyUrl  = `${API_ROOT}/drive/proxy/${encodeURIComponent(fileId)}?sz=w160`;
-  const publicUrl = drivePublicThumbUrl(fileId, 160);
+  // If we don't have an ID at all or the image failed, show the fallback content
+  if (!fileId || failed) {
+    return fallback ? (
+      <div
+        style={{
+          width: size,
+          height: size,
+          borderRadius: 8,
+          background: "#eee",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontWeight: 700,
+          fontSize: 12,
+          color: "#666",
+          userSelect: "none",
+          ...(style || {}),
+        }}
+      >
+        {fallback}
+      </div>
+    ) : null;
+  }
 
-  const [src, setSrc] = React.useState(proxyUrl);
+  const publicUrl = drivePublicThumbUrl(fileId, size);
 
   return (
     <img
@@ -203,7 +228,7 @@ function PreviewImg({ obj, size = 160, style }) {
       loading="lazy"
       decoding="async"
       fetchpriority="low"
-      onError={() => { if (src !== publicUrl) setSrc(publicUrl); }}
+      onError={() => setFailed(true)}
       style={{
         width: size,
         height: size,
@@ -742,30 +767,17 @@ function Recut({ onExit }) {
                         width: 72,
                         height: 72,
                         borderRadius: 12,
-                        background: "#fafafa",
                         border: "1px solid #eee",
                         overflow: "hidden",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        background: "#fafafa",
                       }}
                     >
-                      {/* Try to show a real thumbnail; PreviewImg returns null if not available */}
-                      <PreviewImg obj={o} size={72} />
-                      {/* Fallback label stays visible if PreviewImg returned null */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          fontWeight: 700,
-                          fontSize: 12,
-                          color: "#666",
-                          userSelect: "none",
-                          pointerEvents: "none",
-                        }}
-                      >
-                        #{orderNo}
-                      </div>
+                      <PreviewImg obj={o} size={72} fallback={`#${orderNo}`} />
                     </div>
+
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 2 }}>
                         #{orderNo} — {design || product}
