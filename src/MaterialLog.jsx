@@ -5,6 +5,30 @@ import axios from "axios";
 const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || "";
 const API_ROOT      = (RAW_API_ROOT || "https://machine-scheduler-backend.onrender.com/api").replace(/\/$/, "");
 
+// Extract a Drive file ID from any Drive URL
+function extractDriveId(url) {
+  if (!url) return "";
+  try {
+    const m1 = url.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+    if (m1) return m1[1];
+    const idParam = new URL(url).searchParams.get("id");
+    if (idParam) return idParam;
+  } catch (e) {}
+  return "";
+}
+
+// Prefer backend proxy → this works for images & PDFs
+function toPreviewUrl(originalUrl, size = "w120") {
+  if (!originalUrl) return "";
+  const id = extractDriveId(originalUrl);
+  if (!id) {
+    // allow direct image links too
+    if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
+    return "";
+  }
+  return `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=${size}`;
+}
+
 
 // ---------- small utils ----------
 function excelSerialToDate(n) {
@@ -517,17 +541,13 @@ function Recut({ onExit }) {
   const [showRecutSuccess, setShowRecutSuccess] = useState(false);
   const [embQty, setEmbQty] = useState("");
 
+  // NEW: map Order # -> thumbnail URL (via /combined)
+  const [orderImageMap, setOrderImageMap] = useState({});
+
+  // Keep it simple: ensure we always return an array of objects.
   function normalizeOrders(raw) {
-    if (Array.isArray(raw) && raw.length && Array.isArray(raw[0])) {
-      const [hdr, ...rows] = raw;
-      const headers = hdr.map((h) => String(h || "").trim());
-      return rows.map((r) => {
-        const o = {};
-        headers.forEach((h, i) => { o[h] = r[i]; });
-        return o;
-      });
-    }
     if (Array.isArray(raw)) return raw;
+    if (raw && typeof raw === "object" && Array.isArray(raw.orders)) return raw.orders;
     return [];
   }
 
@@ -536,36 +556,80 @@ function Recut({ onExit }) {
       try {
         setFetchErr("");
         setLoadingOrders(true);
+
         const res = await axios.get(`${API_ROOT}/orders`, { withCredentials: true });
 
-        // Diagnose non-JSON/non-array responses (e.g., HTML redirect/login page)
+        // Ensure we actually got JSON back (avoid HTML login pages, etc.)
         const ctype = String(res?.headers?.["content-type"] || "").toLowerCase();
         if (!ctype.includes("application/json")) {
           const snippet = String(res?.data ?? "").slice(0, 200);
-          throw new Error(
-            `Unexpected content-type: ${ctype || "unknown"} from /orders. First 200 chars: ${snippet}`
-          );
+          throw new Error(`Unexpected content-type for /orders. Got: ${ctype}. Snippet: ${snippet}`);
         }
 
-        const list = normalizeOrders(res?.data);
+        const list = normalizeOrders(res.data);
         setOrders(Array.isArray(list) ? list : []);
-        if (!Array.isArray(list)) setFetchErr("Orders endpoint did not return a list.");
       } catch (e) {
-        console.error(e);
-        // If we hit our explicit throw above, e.message will contain ctype + snippet
-        setFetchErr(
-          e?.response?.data?.error
-            ? String(e.response.data.error)
-            : e?.message
-              ? String(e.message)
-              : `Failed to load orders (${e?.response?.status || "network"})`
-        );
+        const msg = e?.message || "Failed to load orders.";
+        console.warn("[MaterialLog] /orders failed:", msg);
+        setFetchErr(msg);
         setOrders([]);
       } finally {
         setLoadingOrders(false);
       }
     })();
   }, []);
+
+  // NEW: load image links (one time) → builds { "21": "https://...proxy..." }
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await axios.get(`${API_ROOT}/combined`, { withCredentials: true });
+
+        const ctype = String(res?.headers?.["content-type"] || "").toLowerCase();
+        if (!ctype.includes("application/json")) {
+          const snippet = String(res?.data ?? "").slice(0, 200);
+          throw new Error(`Unexpected content-type for /combined. Got: ${ctype}. Snippet: ${snippet}`);
+        }
+
+        const fromCombined = Array.isArray(res.data?.orders) ? res.data.orders : [];
+        const map = {};
+
+        for (const o of fromCombined) {
+          const num = String(o["Order #"] || "").trim();
+          const img = o["Image"] || o["Preview"] || "";
+          if (!num || !img) continue;
+
+          // Prefer your backend Drive proxy thumbnail (works for PDFs + images)
+          let id = "";
+          try {
+            // Try /d/<id> first
+            const m1 = String(img).match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+            if (m1) id = m1[1];
+            // Fallback ?id= param
+            if (!id) {
+              const u = new URL(img);
+              id = u.searchParams.get("id") || "";
+            }
+          } catch (_) {}
+
+          if (id) {
+            map[num] = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w120`;
+          } else if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(img))) {
+            // Allow direct image URLs if not Drive
+            map[num] = String(img);
+          }
+        }
+
+        if (alive) setOrderImageMap(map);
+      } catch (e) {
+        console.warn("[MaterialLog] failed to load /combined for images:", e?.message || e);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+}
+
 
 
   const filtered = useMemo(() => {
@@ -785,7 +849,7 @@ function Recut({ onExit }) {
               const product = (o["Product"] || "").toString();
               const company = (o["Company Name"] || "").toString();
               const due = formatDueDate(o["Due Date"]);
-              const preview = getPreviewUrl(o);
+              const thumb = orderImageMap[String(orderNo || "").trim()] || "";
               return (
                 <div
                   key={orderNo}
@@ -793,8 +857,20 @@ function Recut({ onExit }) {
                   style={{ cursor: "pointer", border: "1px solid #eee", borderRadius: 12, padding: 10 }}
                 >
                   <div style={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 10, alignItems: "center" }}>
-                    <div>
-                      <PreviewImg obj={o} size={88} showPlaceholder />
+                    <div style={{ width: 88, height: 88, borderRadius: 8, overflow: "hidden", background: "#f0f0f0" }}>
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt={orderNo ? `Order ${orderNo}` : "Artwork"}
+                          width={88}
+                          height={88}
+                          style={{ width: 88, height: 88, objectFit: "cover", display: "block" }}
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                          loading="lazy"
+                        />
+                      ) : (
+                        <PreviewImg obj={o} size={88} />
+                      )}
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 2 }}>
@@ -817,7 +893,23 @@ function Recut({ onExit }) {
           <Section
             title={
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <PreviewImg obj={selectedOrder} size={54} />
+                {(() => {
+                  const selNo = String(selectedOrder?.["Order #"] || "").trim();
+                  const thumb = orderImageMap[selNo] || "";
+                  return thumb ? (
+                    <img
+                      src={thumb}
+                      alt={selNo ? `Order ${selNo}` : "Artwork"}
+                      width={54}
+                      height={54}
+                      style={{ width: 54, height: 54, objectFit: "cover", borderRadius: 8, display: "block" }}
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <PreviewImg obj={selectedOrder} size={54} />
+                  );
+                })()}
                 <span>
                   Recut #{selectedOrder["Order #"]} — {selectedOrder["Product"]}
                 </span>
@@ -825,6 +917,7 @@ function Recut({ onExit }) {
             }
             actions={<button onClick={() => setSelectedOrder(null)}>Clear all</button>}
           >
+
             {loadingDetails ? (
               <div style={{ color: "#555" }}>Loading job details…</div>
             ) : (
