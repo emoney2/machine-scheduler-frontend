@@ -731,7 +731,7 @@ function Recut({ onExit }) {
               const product = (o["Product"] || "").toString();
               const company = (o["Company Name"] || "").toString();
               const due = formatDueDate(o["Due Date"]);
-              const thumb = orderImageMap[String(orderNo || "").trim()] || "";
+
               return (
                 <div
                   key={orderNo}
@@ -746,17 +746,27 @@ function Recut({ onExit }) {
                         borderRadius: 12,
                         background: "#fafafa",
                         border: "1px solid #eee",
+                        overflow: "hidden",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontWeight: 700,
-                        fontSize: 12,
-                        color: "#666",
-                        userSelect: "none",
                       }}
-                      aria-hidden="true"
                     >
-                      #{orderNo}
+                      {/* Try to show a real thumbnail; PreviewImg returns null if not available */}
+                      <PreviewImg obj={o} size={72} />
+                      {/* Fallback label stays visible if PreviewImg returned null */}
+                      <div
+                        style={{
+                          position: "absolute",
+                          fontWeight: 700,
+                          fontSize: 12,
+                          color: "#666",
+                          userSelect: "none",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        #{orderNo}
+                      </div>
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 2 }}>
