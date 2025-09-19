@@ -584,28 +584,29 @@ function extractDriveId(url) {
 }
 
 // Use backend thumbnail proxy (thumb=1) with a slightly larger size for better clarity
-function toPreviewUrl(originalUrl, v) {
+// Public Drive thumbnails directly — no backend proxy.
+// Keep one consistent size for caching & speed.
+function toPreviewUrl(originalUrl /*, v */) {
   if (!originalUrl) return '';
   const id = extractDriveId(originalUrl);
   if (!id) {
+    // If it's already a direct image URL, just use it.
     if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
     return '';
   }
-  let url = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w160`;
-  if (v) url += `&v=${encodeURIComponent(v)}`; // versioned → immutable cache
-  return url;
+  return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
 }
 
-
-// Full-view URL (original quality / inline display), versioned for immutable cache
-function toFullViewUrl(originalUrl, v) {
+// Full view: open the original link if it’s already a direct image,
+// otherwise use Drive’s inline viewer (no proxy).
+function toFullViewUrl(originalUrl /*, v */) {
   if (!originalUrl) return '';
   const id = extractDriveId(originalUrl);
   if (!id) return originalUrl;
-  let url = `${API_ROOT}/drive/proxy/${id}?thumb=0`;
-  if (v) url += `&v=${encodeURIComponent(v)}`;
-  return url;
+  // Use Drive file viewer URL
+  return `https://drive.google.com/file/d/${id}/view`;
 }
+
 
 
 function openArtwork(originalUrl, v) {
