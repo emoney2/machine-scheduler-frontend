@@ -35,6 +35,20 @@ function isISO8601Z(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(s);
 }
 
+// Call this right after you move a job into a machine column
+async function maybeSetStartTimeOnAssign(job) {
+  try {
+    if (!job) return;
+    // Only set when moved into a machine column and job doesn't have a start yet
+    if (!job.embroidery_start) {
+      await bumpJobStartTime(job.id);
+    }
+  } catch (e) {
+    console.warn("Failed to set start time on assign:", e?.message || e);
+  }
+}
+
+
 // Format a Date/string in America/New_York as "MM/DD h:mm AM/PM"
 function fmtET(dtLike) {
   const d = typeof dtLike === "string" ? new Date(dtLike) : dtLike;
@@ -377,31 +391,6 @@ useEffect(() => {
   socket.on("startTimeUpdated", handler);
   return () => socket.off("startTimeUpdated", handler);
 }, []);
-
-useEffect(() => {
-  const top1 = columns.machine1.jobs?.[0];
-  const top2 = columns.machine2.jobs?.[0];
-
-  if (top1?.id !== prevM1Top.current) {
-    if (top1?.id && !top1.embroidery_start) {
-      // console.log("⏱️ Setting embroidery start time for Machine 1 top job:", top1.id);
-      bumpJobStartTime(top1.id);
-    }
-    prevM1Top.current = top1?.id || null;
-  }
-
-  if (top2?.id !== prevM2Top.current) {
-    if (top2?.id && !top2.embroidery_start) {
-      // console.log("⏱️ Setting embroidery start time for Machine 2 top job:", top2.id);
-      bumpJobStartTime(top2.id);
-    }
-    prevM2Top.current = top2?.id || null;
-  }
-}, [columns.machine1.jobs, columns.machine2.jobs]);
-
-
-// ... Copilot mid-file Socket.IO hook removed (duplicate import). Using the top-level socket instance above.
-
 
 // === Section 2: Helpers ===
 function isHoliday(dt) {
@@ -1318,6 +1307,17 @@ function visualToActualIndex(fullList, visualIdx) {
   return fullList.length; // append if visualIdx is at/after the end
 }
 
+// NEW: set start time when assigning to a machine, not via "top" watcher
+async function maybeSetStartTimeOnAssign(job) {
+  try {
+    if (job && !job.embroidery_start) {
+      await bumpJobStartTime(job.id);
+    }
+  } catch (e) {
+    console.warn("Failed to set start time on assign:", e?.message || e);
+  }
+}
+
 const onDragEnd = async (result) => {
   // 🔍 DEBUGGING INSTRUMENTATION
   // console.log("🔍 DRAG-END result:", result);
@@ -1445,7 +1445,7 @@ const onDragEnd = async (result) => {
     machine2: 'Machine 2 (6)'
   };
 
-  // ─── reset the “previous top” refs so handleTopChange sees no change ───
+  // Safe even if the old "top watcher" effect is removed
   prevMachine1Top.current = nextCols.machine1.jobs[0]?.id || null;
   prevMachine2Top.current = nextCols.machine2.jobs[0]?.id || null;
 
@@ -1486,15 +1486,20 @@ const onDragEnd = async (result) => {
     machine2: nextCols.machine2.jobs.map(j => j.id),
     placeholders
   };
-  // console.log('⏹ Persisting manualState (cross-col) to server:', manualState);
   try {
     await axios.post(API_ROOT + '/manualState', manualState);
-    // console.log('✅ manualState saved (cross-col)');
   } catch (err) {
     console.error('❌ manualState save failed (cross-col)', err);
   }
 
-  // Trigger top-of-list start-time update effect
+  // NEW: only set start time when moved into a machine column (preserves drop index)
+  if (dstCol === 'machine1' || dstCol === 'machine2') {
+    const head = movedJobs?.[0];
+    if (head && !head.embroidery_start) {
+      Promise.resolve().then(() => maybeSetStartTimeOnAssign(head));
+    }
+  }
+
   setManualReorder(true);
 };
 
@@ -1505,8 +1510,6 @@ useEffect(() => {
   const sortedQueue = sortQueue(columns.queue.jobs);
   console.log("Queue column after sorting:", sortedQueue);
 }, [isScheduler, columns.queue.jobs]);
-
-
 // === Section 9: Render via Section9.jsx ===
 
   return (
