@@ -591,7 +591,7 @@ function toPreviewUrl(originalUrl, v) {
     if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
     return '';
   }
-  let url = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w240`;
+  let url = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w160`;
   if (v) url += `&v=${encodeURIComponent(v)}`; // versioned → immutable cache
   return url;
 }

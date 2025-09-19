@@ -348,47 +348,21 @@ const urlCandidatesForThreadImage = (name) => {
   ];
 };
 
-// In-memory cache of blob URLs so repeated rows don’t refetch
-const _secureImgCache = new Map();
-
-/**
- * SecureImage: fetch image with credentials (sends login cookie),
- * convert to blob URL, then feed to <img>.
- */
-function SecureImage({ candidates, style, alt = "" }) {
-  const [src, setSrc] = React.useState(null);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      for (const url of candidates) {
-        try {
-          if (_secureImgCache.has(url)) {
-            if (!cancelled) setSrc(_secureImgCache.get(url));
-            return;
-          }
-          const res = await fetch(url, { method: "GET", credentials: "include" });
-          if (!res.ok) continue;
-          const ct = (res.headers.get("content-type") || "").toLowerCase();
-          if (!ct.includes("image")) continue;
-
-          const blob = await res.blob();
-          const objUrl = URL.createObjectURL(blob);
-          _secureImgCache.set(url, objUrl);
-          if (!cancelled) setSrc(objUrl);
-          return;
-        } catch (_) {
-          // try next candidate
-        }
-      }
-      // none worked → leave null
-    })();
-    return () => { cancelled = true; };
-  }, [JSON.stringify(candidates)]);
-
-  if (!src) return null;
-  return <img src={src} alt={alt} loading="lazy" style={style} />;
+function BasicImg({ src, alt = "", style }) {
+  // Let the browser cache & HTTP validators (ETag/Cache-Control) work.
+  // Add lazy/async hints for performance.
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      fetchpriority="low"
+      style={style}
+    />
+  );
 }
+
 
 /** ThreadThumb: tries private backend image first, shows color swatch as fallback layer */
 function ThreadThumb({ name, fallbackColor }) {
@@ -913,8 +887,8 @@ export default function Overview() {
                           <ThreadThumb name={it.name} fallbackColor={swatch} />
                         ) : (
                           // Try vendor + name via backend; SecureImage fetches with credentials and caches blobs
-                          <SecureImage
-                            candidates={[materialImgUrl(ROOT, grp.vendor, it.name)]}
+                          <BasicImg
+                            src={materialImgUrl(ROOT, grp.vendor, it.name)}
                             alt=""
                             style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                           />

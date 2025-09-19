@@ -187,96 +187,32 @@ function resolvePreviewCandidates(obj, size = 200) {
   return { primary, fallback };
 }
 
-function PreviewImg({ obj, size = 88, style }) {
+function PreviewImg({ obj, size = 160, style }) {
   const hintedUrl = getPreviewUrl(obj);
   const fileId = React.useMemo(() => driveIdFromUrl(hintedUrl), [hintedUrl]);
 
-  const [src, setSrc] = React.useState("");
-  const [triedPublic, setTriedPublic] = React.useState(false);
+  if (!fileId) return null;
 
-  React.useEffect(() => {
-    let cancelled = false;
-    let objectUrl = "";
+  const proxyUrl  = `${API_ROOT}/drive/proxy/${encodeURIComponent(fileId)}?sz=w160`;
+  const publicUrl = drivePublicThumbUrl(fileId, 160);
 
-    async function load() {
-      setSrc("");
-      setTriedPublic(false);
-
-      if (!fileId) {
-        console.log("[PreviewImg] No valid Drive ID for row:", obj);
-        return;
-      }
-
-      // 1) Try authenticated proxy as an image blob (works cross-site with cookies)
-      try {
-        const proxyUrl = `${API_ROOT}/drive/proxy/${encodeURIComponent(fileId)}?sz=w${size}`;
-        console.log("[PreviewImg] Fetch proxy:", proxyUrl);
-        const res = await fetch(proxyUrl, { credentials: "include" });
-        console.log("[PreviewImg] Proxy status:", res.status, "ctype:", res.headers.get("content-type"));
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const ctype = res.headers.get("content-type") || "";
-        if (!/^image\//i.test(ctype)) throw new Error(`Not an image: ${ctype}`);
-        const blob = await res.blob();
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setSrc(objectUrl);
-        return; // success
-      } catch (err) {
-        console.warn("[PreviewImg] Proxy failed:", err);
-      }
-
-      // 2) Fallback to public Google thumbnail (no cookies)
-      try {
-        const publicUrl = drivePublicThumbUrl(fileId, size);
-        console.log("[PreviewImg] Fallback to public URL:", publicUrl);
-        if (!cancelled) {
-          setTriedPublic(true);
-          setSrc(publicUrl);
-        }
-      } catch (err) {
-        console.warn("[PreviewImg] Public fallback failed:", err);
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [fileId, size]);
-
-  if (!fileId || !src) {
-    // Uncomment if you want to see which specific rows end up without images:
-    // console.log("[PreviewImg] Hiding image: fileId or src missing", { fileId, obj });
-    return null;
-  }
+  const [src, setSrc] = React.useState(proxyUrl);
 
   return (
     <img
       src={src}
       alt=""
       loading="lazy"
+      decoding="async"
+      fetchpriority="low"
+      onError={() => { if (src !== publicUrl) setSrc(publicUrl); }}
       style={{
         width: size,
         height: size,
         objectFit: "cover",
         borderRadius: 8,
         background: "#eee",
-        ...style,
-      }}
-      onError={() => {
-        console.warn("[PreviewImg] <img> onError", { triedPublic, fileId, src });
-        if (triedPublic) setSrc("");
-        else {
-          const publicUrl = fileId ? drivePublicThumbUrl(fileId, size) : "";
-          if (publicUrl) {
-            setTriedPublic(true);
-            setSrc(publicUrl);
-          } else {
-            setSrc("");
-          }
-        }
+        ...(style || {}),
       }}
     />
   );
