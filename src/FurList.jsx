@@ -75,9 +75,7 @@ function orderThumbUrl(order) {
   }
   if (!id) return null;
 
-  const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
-  const v = encodeURIComponent(String(order["Order #"] || "").trim() || "nov");
-  return `${API_ROOT}/drive/proxy/${id}?sz=w160&v=${v}`;
+  return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
 }
 
 

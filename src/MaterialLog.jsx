@@ -181,10 +181,8 @@ function resolvePreviewCandidates(obj, size = 200) {
   // Primary: public Google thumbnail (no auth/cookies needed)
   const primary = drivePublicThumbUrl(id, size);
 
-  // Fallback: your backend proxy (works when cookies are present)
-  const fallback = `${API_ROOT}/drive/proxy/${encodeURIComponent(id)}?sz=w${size}`;
-
-  return { primary, fallback };
+  // No server proxy — use only public Drive thumbnail
+  return { primary };
 }
 
 function PreviewImg({ obj, size = 160, style }) {
@@ -200,7 +198,7 @@ function PreviewImg({ obj, size = 160, style }) {
 
   return (
     <img
-      src={src}
+      src={publicUrl}
       alt=""
       loading="lazy"
       decoding="async"

@@ -42,7 +42,7 @@ function getJobThumbUrl(job, ROOT) {
     const id = extractFileIdFromFormulaOrUrl(f);
     if (id) {
       const vkey = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
-      return `${ROOT}/drive/proxy/${id}?sz=w160&v=${vkey}`;
+      return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
     }
     if (f && /^https?:\/\//i.test(String(f))) return f; // already a direct URL
   }
@@ -53,7 +53,7 @@ function getJobThumbUrl(job, ROOT) {
     let m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
     if (m) {
       const vkey = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
-      return `${ROOT}/drive/proxy/${m[1]}?sz=w160&v=${vkey}`;
+      return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w160`;
     }
   }
   return null;

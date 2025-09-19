@@ -53,7 +53,7 @@ function orderThumbUrl(order) {
     const id = extractFileIdFromFormulaOrUrl(f);
     if (id) {
       const v = encodeURIComponent(String(order["Order #"] || order.orderNumber || "nov"));
-      return `${API_ROOT}/drive/proxy/${id}?sz=w160&v=${v}`;
+      return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
     }
     if (f && /^https?:\/\//i.test(String(f))) return f;
   }
@@ -62,7 +62,7 @@ function orderThumbUrl(order) {
     let m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
     if (m) {
       const ver = encodeURIComponent(String(order["Order #"] || order.orderNumber || "nov"));
-      return `${API_ROOT}/drive/proxy/${m[1]}?sz=w160&v=${ver}`;
+      return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w160`;
     }
   }
   return null;
