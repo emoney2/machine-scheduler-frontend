@@ -544,6 +544,11 @@ function Recut({ onExit }) {
   // NEW: map Order # -> thumbnail URL (via /combined)
   const [orderImageMap, setOrderImageMap] = useState({});
 
+  const [thumbBroken, setThumbBroken] = useState({});
+  const markThumbBroken = (key) => {
+    setThumbBroken((m) => (m[key] ? m : { ...m, [key]: true }));
+  };
+
   // Keep it simple: ensure we always return an array of objects.
   function normalizeOrders(raw) {
     if (Array.isArray(raw)) return raw;
@@ -855,19 +860,24 @@ function Recut({ onExit }) {
                 >
                   <div style={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 10, alignItems: "center" }}>
                     <div style={{ width: 88, height: 88, borderRadius: 8, overflow: "hidden", background: "#f0f0f0" }}>
-                      {thumb ? (
-                        <img
-                          src={thumb}
-                          alt={orderNo ? `Order ${orderNo}` : "Artwork"}
-                          width={88}
-                          height={88}
-                          style={{ width: 88, height: 88, objectFit: "cover", display: "block" }}
-                          onError={(e) => { e.currentTarget.style.display = "none"; }}
-                          loading="lazy"
-                        />
-                      ) : (
-                        <PreviewImg obj={o} size={88} />
-                      )}
+                      {(() => {
+                        const key = String(orderNo || "").trim();
+                        const thumb = orderImageMap[key] || "";
+                        const showProxy = !!thumb && !thumbBroken[key];
+                        return showProxy ? (
+                          <img
+                            src={thumb}
+                            alt={orderNo ? `Order ${orderNo}` : "Artwork"}
+                            width={88}
+                            height={88}
+                            style={{ width: 88, height: 88, objectFit: "cover", display: "block" }}
+                            loading="lazy"
+                            onError={() => markThumbBroken(key)}  // << fall back if proxy fails
+                          />
+                        ) : (
+                          <PreviewImg obj={o} size={88} />
+                        );
+                      })()}
                     </div>
                     <div>
                       <div style={{ fontWeight: 700, marginBottom: 2 }}>
