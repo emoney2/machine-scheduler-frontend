@@ -628,9 +628,6 @@ function Recut({ onExit }) {
     })();
     return () => { alive = false; };
   }, []);
-}
-
-
 
   const filtered = useMemo(() => {
     let arr = orders.slice();
