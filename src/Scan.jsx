@@ -33,9 +33,16 @@ export default function Scan() {
   const [errMsg, setErrMsg] = useState("");
 
   const [orderData, setOrderData] = useState(null);
+  const [lightboxSrc, setLightboxSrc] = useState("");
 
   const idleTimerRef = useRef(null);
   const focusRef = useRef(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") setLightboxSrc(""); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     const focusInput = () => {
@@ -143,31 +150,26 @@ export default function Scan() {
     // If it's a BOM tile with a bomName, try to open DXF
     if (item && item.kind === "bom" && item.bomName) {
       try {
-        const url = `${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
-        const r = await fetch(url);
+        const url = `${API_ROOT}/api/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
+        const r = await fetch(url, { credentials: "include" });
         const j = await safeJson(r);
         if (!r.ok || !j?.ok) {
           const why = (j && (j.error || j.message)) || `No DXF found for '${item.bomName}'`;
           return flashError(why);
         }
         // Open the actual stream (no &check=1)
-        window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
+        window.open(`${API_ROOT}/api/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
       } catch (e) {
         return flashError(`DXF open failed: ${e?.message || e}`);
       }
       return;
     }
 
-    // Otherwise (main image or unknown): open the image itself
+
+    // Otherwise (main image or unknown): open the image itself in-page
     const href = item?.src || "";
     if (!href) return;
-    try {
-      window.open(href, "_blank", "noopener");
-    } catch {
-      // Silent; worst case do nothing
-    }
-  }
-
+    setLightboxSrc(href);
 
   useEffect(() => {
     function scheduleIdleSubmit() {
@@ -321,7 +323,7 @@ export default function Scan() {
       >
         <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
           <Quadrant
-            images={orderData?.images || []}
+            images={orderData?.imagesLabeled || orderData?.images || []}
             onClickItem={handleImageClick}
           />
         </div>
@@ -439,9 +441,65 @@ export default function Scan() {
           </div>
         </div>
       )}
+
+      {/* IMAGE LIGHTBOX (click anywhere or "X" to close) */}
+      {lightboxSrc && (
+        <div
+          onClick={() => setLightboxSrc("")}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 70,
+            cursor: "zoom-out",
+          }}
+        >
+          {/* Close X */}
+          <button
+            aria-label="Close"
+            onClick={(e) => { e.stopPropagation(); setLightboxSrc(""); }}
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              border: "1px solid rgba(255,255,255,0.4)",
+              background: "transparent",
+              color: "#fff",
+              fontSize: 20,
+              lineHeight: "34px",
+              textAlign: "center",
+              cursor: "pointer",
+            }}
+          >
+            ×
+          </button>
+
+          {/* The image */}
+          <img
+            src={lightboxSrc}
+            alt=""
+            style={{
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              objectFit: "contain",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+              borderRadius: 8,
+              background: "#111",
+            }}
+            draggable={false}
+          />
+        </div>
+      )}
     </div>
   );
 }
+
 
 function InfoBox({ label, value }) {
   const val = clean(value);
@@ -635,7 +693,8 @@ function Img({ src, style }) {
     <img
       src={src}
       alt=""
-      style={style || { maxHeight: "100%", objectFit: "contain" }}
+      style={style || { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
+
       onLoad={() => console.debug("[Img] loaded:", src)}
       onError={() => {
         console.debug("[Img] error:", src);
