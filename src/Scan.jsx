@@ -150,7 +150,7 @@ export default function Scan() {
     // If it's a BOM tile with a bomName, try to open DXF
     if (item && item.kind === "bom" && item.bomName) {
       try {
-        const url = `${API_ROOT}/api/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
+        const url = `${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
         const r = await fetch(url, { credentials: "include" });
         const j = await safeJson(r);
         if (!r.ok || !j?.ok) {
@@ -158,13 +158,12 @@ export default function Scan() {
           return flashError(why);
         }
         // Open the actual stream (no &check=1)
-        window.open(`${API_ROOT}/api/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
+        window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
       } catch (e) {
         return flashError(`DXF open failed: ${e?.message || e}`);
       }
       return;
     }
-
 
     // Otherwise (main image or unknown): open the image itself in-page
     const href = item?.src || "";
