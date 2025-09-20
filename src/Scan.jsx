@@ -528,8 +528,8 @@ function Quadrant({ images }) {
           padding: 12,
         }}
       >
-        <Tile item={items[0]} />
-        <Tile item={items[1]} />
+        <Tile key={items[0]?.src || "a"} item={items[0]} />
+        <Tile key={items[1]?.src || "b"} item={items[1]} />
       </div>
     );
   }
@@ -555,8 +555,9 @@ function Quadrant({ images }) {
 
 function Img({ src, style }) {
   const [ok, setOk] = useState(true);
-  useEffect(() => setOk(true), [src]);
+  useEffect(() => setOk(true), [src]); // reset state when URL changes
   if (!src) return null;
+
   return ok ? (
     <img
       src={src}
@@ -573,6 +574,7 @@ function Img({ src, style }) {
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
 }
+
 
 async function safeJson(r) {
   try {
