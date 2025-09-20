@@ -139,6 +139,36 @@ export default function Scan() {
     }
   }
 
+  async function handleImageClick(item) {
+    // If it's a BOM tile with a bomName, try to open DXF
+    if (item && item.kind === "bom" && item.bomName) {
+      try {
+        const url = `${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
+        const r = await fetch(url);
+        const j = await safeJson(r);
+        if (!r.ok || !j?.ok) {
+          const why = (j && (j.error || j.message)) || `No DXF found for '${item.bomName}'`;
+          return flashError(why);
+        }
+        // Open the actual stream (no &check=1)
+        window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
+      } catch (e) {
+        return flashError(`DXF open failed: ${e?.message || e}`);
+      }
+      return;
+    }
+
+    // Otherwise (main image or unknown): open the image itself
+    const href = item?.src || "";
+    if (!href) return;
+    try {
+      window.open(href, "_blank", "noopener");
+    } catch {
+      // Silent; worst case do nothing
+    }
+  }
+
+
   useEffect(() => {
     function scheduleIdleSubmit() {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -290,7 +320,10 @@ export default function Scan() {
         }}
       >
         <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
-          <Quadrant images={orderData?.images || []} />
+          <Quadrant
+            images={orderData?.images || []}
+            onClickItem={handleImageClick}
+          />
         </div>
       </div>
 
@@ -453,7 +486,7 @@ function toImgMeta(arr) {
     .map(it => (typeof it === "string" ? { src: it, label: "" } : it));
 }
 
-function Quadrant({ images }) {
+function Quadrant({ images, onClickItem }) {
   const items = toImgMeta(images);
 
   const frameStyle = {
@@ -466,29 +499,69 @@ function Quadrant({ images }) {
     borderRadius: 12,
   };
 
-  const Tile = ({ item }) => (
-    <div
-      style={{
-        background: "#f3f4f6",
-        border: "1px solid #e5e7eb",
-        borderRadius: 10,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 8,
-        width: "100%",
-        height: "100%",
-      }}
-    >
-      <Img src={item.src} style={{ maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} />
-      {item.label ? (
-        <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280", textAlign: "center" }}>
-          {item.label}
+  const Tile = ({ item }) => {
+    const label = (item?.label || "").trim();
+    const isBom = item?.kind === "bom";
+    const title = isBom
+      ? (item?.bomName ? `Open DXF: ${item.bomName}` : "Open DXF")
+      : "Open image in new tab";
+
+    return (
+      <button
+        type="button"
+        onClick={() => onClickItem && onClickItem(item)}
+        title={title}
+        style={{
+          position: "relative",
+          background: "#fff",
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          minHeight: 120,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          cursor: "pointer",
+          textAlign: "left",
+          padding: 0,
+        }}
+      >
+        <div style={{ padding: "8px 10px", fontSize: 12, color: "#6b7280", display: "flex", alignItems: "center", gap: 8 }}>
+          {isBom ? (
+            <span style={{
+              display: "inline-block",
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              fontSize: 10,
+              padding: "2px 6px",
+              background: "#f9fafb",
+              color: "#111",
+            }}>
+              DXF
+            </span>
+          ) : (
+            <span style={{
+              display: "inline-block",
+              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              fontSize: 10,
+              padding: "2px 6px",
+              background: "#f9fafb",
+              color: "#111",
+            }}>
+              Main
+            </span>
+          )}
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {label || (isBom ? (item?.bomName || "BOM") : "Image")}
+          </span>
         </div>
-      ) : null}
-    </div>
-  );
+        <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
+          <Img src={item?.src} />
+        </div>
+      </button>
+    );
+  };
+
 
   if (items.length === 0) {
     return (
