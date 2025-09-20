@@ -170,6 +170,7 @@ export default function Scan() {
     const href = item?.src || "";
     if (!href) return;
     setLightboxSrc(href);
+  } 
 
   useEffect(() => {
     function scheduleIdleSubmit() {
