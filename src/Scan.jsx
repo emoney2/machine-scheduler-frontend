@@ -547,7 +547,7 @@ function Quadrant({ images }) {
       }}
     >
       {four.map((it, i) => (
-        <Tile key={i} item={it} />
+        <Tile key={it?.src || i} item={it} />
       ))}
     </div>
   );
@@ -558,7 +558,17 @@ function Img({ src, style }) {
   useEffect(() => setOk(true), [src]);
   if (!src) return null;
   return ok ? (
-    <img src={src} alt="" style={style || { maxHeight: "100%", maxWidth: "100%", objectFit: "contain" }} onError={() => setOk(false)} draggable={false} />
+    <img
+      src={src}
+      alt=""
+      style={style || { maxHeight: "100%", objectFit: "contain" }}
+      onLoad={() => console.debug("[Img] loaded:", src)}
+      onError={() => {
+        console.debug("[Img] error:", src);
+        setOk(false);
+      }}
+      draggable={false}
+    />
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
