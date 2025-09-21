@@ -28,13 +28,33 @@ export default function InventoryOrdered() {
 
   const load = async () => {
     try {
-      const res = await axios.get(`${API}/inventoryOrdered`);
-      setEntries(Array.isArray(res.data) ? res.data : []);
+      const etagKey  = "invOrd:etag";
+      const dataKey  = "invOrd:data";
+      const headers  = {};
+      const prevEtag = localStorage.getItem(etagKey);
+      if (prevEtag) headers["If-None-Match"] = prevEtag;
+
+      const res = await axios.get(`${API}/inventoryOrdered`, {
+        headers,
+        // accept 304 (Not Modified) without throwing
+        validateStatus: (s) => s === 200 || s === 304,
+      });
+
+      if (res.status === 304) {
+        const cached = localStorage.getItem(dataKey);
+        setEntries(cached ? JSON.parse(cached) : []);
+      } else {
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setEntries(rows);
+        if (res.headers?.etag) localStorage.setItem(etagKey, res.headers.etag);
+        localStorage.setItem(dataKey, JSON.stringify(rows));
+      }
     } catch (err) {
       console.error("Failed to load inventoryOrdered:", err);
       setEntries([]);
     }
   };
+
 
   useEffect(() => {
     load();
