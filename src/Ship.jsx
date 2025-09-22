@@ -2,34 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
-  // Labels
-  (Array.isArray(data.labels) ? data.labels : []).forEach((u) => {
-    if (isHttpUrl(u)) {
-      const w = window.open(u, "_blank", "noopener,noreferrer");
-      if (w) w.blur();
-    }
-  });
-
-  // Invoice
-  const invoiceUrl = (typeof data.invoice === "string" && data.invoice.length)
-    ? (data.invoice.startsWith("http")
-        ? data.invoice
-        : `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
-    : null;
-  if (isHttpUrl(invoiceUrl)) {
-    const iw = window.open(invoiceUrl, "_blank", "noopener,noreferrer");
-    if (iw) iw.blur();
-  }
-
-  // Slips
-  (Array.isArray(data.slips) ? data.slips : []).forEach((u) => {
-    if (isHttpUrl(u)) {
-      const w = window.open(u, "_blank", "noopener,noreferrer");
-      if (w) w.blur();
-    }
-  });
-}
-
 // ADD: Force QuickBooks auth and resume flow when done
 async function ensureQboAuth() {
   try {
