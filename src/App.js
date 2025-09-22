@@ -1290,10 +1290,20 @@ function updatePrevTopRef(prevRef, oldTop, newTop) {
   }
 }
 
-// Heuristic: jobs that should NOT be treated as draggables (adjust to your schema if needed)
+// Heuristic: jobs that should NOT be treated as draggables (must mirror Section9 filters)
 function isNonDraggable(job) {
-  return job?.placeholder === true || job?.isPlaceholder === true || job?.type === 'placeholder';
+  const isPlaceholder =
+    job?.placeholder === true || job?.isPlaceholder === true || job?.type === 'placeholder';
+
+  const status = String(job?.status || '').trim().toLowerCase();
+  const notActive = status === 'complete' || status === 'sewing';
+
+  const prod = String(job?.product ?? job?.Product ?? '').toLowerCase();
+  const isTowel = prod.includes('towel');
+
+  return isPlaceholder || notActive || isTowel;
 }
+
 
 // Convert a react-beautiful-dnd visual index (counts only draggables) to an index in the full array
 function visualToActualIndex(fullList, visualIdx) {
