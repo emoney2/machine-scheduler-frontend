@@ -750,6 +750,9 @@ const saveDriveVerCache = () => {
 const [isLoading, setIsLoading] = useState(false);
 const [hasError,   setHasError]   = useState(false);
 
+// NEW: show a yellow overlay on Scheduler while manualState is loading
+const [isManualLoading, setIsManualLoading] = useState(false);
+
 // One-at-a-time background worker for Drive meta versions
 const metaWorkerBusyRef = useRef(false);
 const pendingMetaIdsRef = useRef(new Set());
@@ -1086,15 +1089,17 @@ const fetchManualStateCore = async (previousCols) => {
       setColumns(colsAfterOrders);
 
       // 3) Apply manualState in the background; upgrade columns when it returns
+      setIsManualLoading(true);
       (async () => {
         try {
           const colsAfterManual = await fetchManualStateCore(colsAfterOrders);
           setColumns(colsAfterManual);
         } catch (e) {
           console.warn('manualState deferred fetch failed/skipped', e?.message || e);
+        } finally {
+          setIsManualLoading(false);
         }
       })();
-
 
       // 🔥 DO NOT manually re-patch embroidery_start — we only update that on drag/drop
       // console.log('fetchAllCombined ▶ done');
@@ -1591,6 +1596,25 @@ useEffect(() => {
           Logout
         </button>
       </nav>
+
+      {/* 🌕 Scheduler overlay while manualState loads */}
+      {isScheduler && isManualLoading && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0,
+          width: '100vw', height: '100vh',
+          backgroundColor: 'rgba(255, 247, 194, 0.65)', // transparent yellow
+          zIndex: 1001, // above the status bar
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontWeight: 700,
+          fontSize: '1.1rem',
+          pointerEvents: 'none' // overlay is visual only; don’t block clicks
+        }}>
+          Loading manual state…
+        </div>
+      )}
 
       {/* ─── Route Outlet ─────────────────────────────────────────────────────── */}
       <Routes>
