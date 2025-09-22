@@ -2,18 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
-// Put with other hooks near top of component
-const openedOnceRef = useRef(false);
-function isHttpUrl(u) {
-  return typeof u === "string" && /^https?:\/\//i.test(u);
-}
-function openResultsWindows(data) {
-  if (openedOnceRef.current) {
-    console.log("Suppressing duplicate popups for this shipment run");
-    return;
-  }
-  openedOnceRef.current = true;
-
   // Labels
   (Array.isArray(data.labels) ? data.labels : []).forEach((u) => {
     if (isHttpUrl(u)) {
@@ -186,6 +174,52 @@ function LoginModal({ open, onClose, onLogin }) {
 }
 
 export default function Ship() {
+  // Helpers must live inside the component (hooks rule)
+  const openedOnceRef = useRef(false);
+
+  function isHttpUrl(u) {
+    return typeof u === "string" && /^https?:\/\//i.test(u);
+  }
+
+  function openResultsWindows(data) {
+    if (openedOnceRef.current) {
+      console.log("Suppressing duplicate popups for this shipment run");
+      return;
+    }
+    openedOnceRef.current = true;
+
+    const labels = Array.isArray(data?.labels) ? data.labels : [];
+    const slips  = Array.isArray(data?.slips)  ? data.slips  : [];
+
+    // Labels
+    labels.forEach((u) => {
+      if (isHttpUrl(u)) {
+        const w = window.open(u, "_blank", "noopener,noreferrer");
+        if (w) w.blur();
+      }
+    });
+
+    // Invoice
+    const invoiceUrl =
+      typeof data?.invoice === "string" && data.invoice.length
+        ? (data.invoice.startsWith("http")
+            ? data.invoice
+            : `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
+        : null;
+    if (isHttpUrl(invoiceUrl)) {
+      const iw = window.open(invoiceUrl, "_blank", "noopener,noreferrer");
+      if (iw) iw.blur();
+    }
+
+    // Slips
+    slips.forEach((u) => {
+      if (isHttpUrl(u)) {
+        const w = window.open(u, "_blank", "noopener,noreferrer");
+        if (w) w.blur();
+      }
+    });
+  }
+
   // 📌 give this tab a name so we can re-focus it later
   useEffect(() => {
     window.name = 'mainShipTab';
@@ -315,43 +349,50 @@ export default function Ship() {
     // 1) Retry any pending shipment
     const retryPendingShipment = async () => {
       const pending = sessionStorage.getItem("pendingShipment");
-      if (pending) {
-        console.log("🔁 Resuming pending shipment...");
-        sessionStorage.removeItem("pendingShipment");
-        const parsed = JSON.parse(pending);
+      if (!pending) return;
 
-        const res = await fetch(
-          `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/set-volume`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(parsed),
-          }
-        );
+      console.log("🔁 Resuming pending shipment...");
+      sessionStorage.removeItem("pendingShipment");
+      const payload = JSON.parse(pending);
 
-        const data = await res.json();
-        if (res.ok) {
-          openResultsWindows(shipData);
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const res = await fetch(`${API_BASE}/api/process-shipment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
 
-          // refocus this tab after a brief pause (no window.open)
-          setTimeout(() => window.focus(), 500);
-
-
-          navigate("/shipment-complete", {
-            state: {
-              shippedOk:      true,
-              labelsPrinted:  data.labels.length > 0,
-              slipsSaved:     boxes.length > 0,
-              invoiceUrl
-            },
-          });
-
-        } else {
-          alert(data.error || "Shipment failed.");
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        alert(data.error || "Shipment failed.");
+        return;
       }
+
+      // Open URLs once (labels/invoice/slips)
+      openResultsWindows(data);
+
+      // Refocus current tab
+      setTimeout(() => window.focus(), 500);
+
+      // Build invoice URL for summary page
+      const invoiceUrl =
+        typeof data?.invoice === "string" && data.invoice.startsWith("http")
+          ? data.invoice
+          : data?.invoice
+          ? `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`
+          : "";
+
+      navigate("/shipment-complete", {
+        state: {
+          shippedOk: true,
+          labelsPrinted: Array.isArray(data?.labels) && data.labels.length > 0,
+          slipsSaved: Array.isArray(data?.slips) && data.slips.length > 0,
+          invoiceUrl,
+        },
+      });
     };
+
     retryPendingShipment();
 
     // 2) If we deep-linked with ?order=..., scroll into view + select
@@ -588,8 +629,11 @@ export default function Ship() {
       return;
     }
 
-    // ── PRE-OPEN POPUPS ──────────────────────────────────
+    // reset popup fence for a fresh run
+    openedOnceRef.current = false;
+
     setIsShippingOverlay(true);
+
     setShippingStage("📦 Preparing shipment...");
     setLoading(true);
 
@@ -711,32 +755,12 @@ export default function Ship() {
           : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
         : "";
 
-      // 4a) Shipping labels
-      setShippingStage(
-        `🖨️ Printing ${shipData.labels.length} shipping label${shipData.labels.length > 1 ? "s" : ""}…`
-      );
-      shipData.labels.forEach((url, i) => {
-        const win = labelWindows[i];
-        if (win) {
-          win.location = url;
-          win.blur();
-        }
-      });
+      // Open results (labels/invoice/slips) exactly once, only for real URLs
+      openResultsWindows(shipData);
 
-      // 4b) QuickBooks customer/item setup
-      setShippingStage("👤 Setting up QuickBooks customer…");
-      setShippingStage("📦 Setting up QuickBooks product info…");
+      // Refocus current tab (no named window)
+      setTimeout(() => window.focus(), 500);
 
-      // 4c) Packing slip saved
-      setShippingStage(
-        `📋 Packing slip PDF saved for ${packedBoxes.length} box${packedBoxes.length > 1 ? "es" : ""} (watching folder for print)…`
-      );
-
-      // 4d) refocus main tab immediately
-      setTimeout(() => {
-        const mainTab = window.open("", "mainShipTab");
-        if (mainTab && mainTab.focus) mainTab.focus();
-      }, 100);
 
       // 4e) Finalize
       setShippingStage("✅ Complete!");
