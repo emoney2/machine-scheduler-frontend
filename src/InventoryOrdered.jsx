@@ -41,9 +41,11 @@ export default function InventoryOrdered() {
 
       const res = await axios.get(`${API}/inventoryOrdered`, {
         headers,
+        withCredentials: true,
         // accept 304 (Not Modified) without throwing
         validateStatus: (s) => s === 200 || s === 304,
       });
+
 
       if (res.status === 304) {
         const cached = localStorage.getItem(dataKey);
@@ -106,7 +108,11 @@ export default function InventoryOrdered() {
 
   const handleReceiveRow = async (e) => {
     try {
-      await axios.put(`${API}/inventoryOrdered`, { type: e.type, row: e.row });
+      await axios.put(
+        `${API}/inventoryOrdered`,
+        { type: e.type, row: e.row },
+        { withCredentials: true }
+      );
       await load();
     } catch (err) {
       console.error("Receive failed:", err);
@@ -125,11 +131,12 @@ export default function InventoryOrdered() {
   };
   const saveEdit = async (e) => {
     try {
-      await axios.patch(`${API}/inventoryOrdered/quantity`, {
-        type: e.type,
-        row: e.row,
-        quantity: draftQty
-      });
+      await axios.patch(
+        `${API}/inventoryOrdered/quantity`,
+        { type: e.type, row: e.row, quantity: draftQty },
+        { withCredentials: true }
+      );
+
       setEditingKey(null);
       setDraftQty("");
       await load();
