@@ -30,6 +30,64 @@ import { useNavigate } from "react-router-dom";
   });
 }
 
+// ADD: Force QuickBooks auth and resume flow when done
+async function ensureQboAuth() {
+  try {
+    const resp = await fetch("/api/ensure-qbo-auth", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await resp.json();
+
+    if (data?.ok) return true;
+
+    if (data?.redirect) {
+      // Open a popup to complete QBO OAuth, then wait until it closes.
+      const w = 720, h = 720;
+      const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
+      const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
+      const popup = window.open(
+        data.redirect,
+        "qbo_oauth",
+        `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
+      );
+      if (!popup) throw new Error("Popup blocked. Please allow popups and try again.");
+
+      // Poll until popup closes
+      await new Promise((resolve, reject) => {
+        const start = Date.now();
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            resolve();
+          } else if (Date.now() - start > 5 * 60 * 1000) { // 5 min timeout
+            clearInterval(timer);
+            try { popup.close(); } catch {}
+            reject(new Error("QuickBooks login timed out"));
+          }
+        }, 800);
+      });
+
+      // After popup closes, check again
+      const recheck = await fetch("/api/ensure-qbo-auth", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const redata = await recheck.json();
+      return !!redata?.ok;
+    }
+
+    return false;
+  } catch (e) {
+    console.error("[ensureQboAuth] error:", e);
+    return false;
+  }
+}
+
 
 // Map our logical box names to their actual dimensions
 const BOX_DIMENSIONS = {
@@ -220,6 +278,63 @@ export default function Ship() {
     });
   }
 
+  // NEW: ensure QuickBooks is authorized (opens popup if needed)
+  async function ensureQboAuth() {
+    try {
+      const resp = await fetch(
+        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/ensure-qbo-auth`,
+        { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } }
+      );
+      const data = await resp.json();
+
+      if (data?.ok) return true;
+
+      if (data?.redirect) {
+        // center popup
+        const w = 720, h = 720;
+        const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
+        const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
+        const popup = window.open(
+          data.redirect,
+          "qbo_oauth",
+          `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
+        );
+        if (!popup) {
+          alert("Popup blocked. Please allow popups for QuickBooks login.");
+          return false;
+        }
+        // wait until popup closes or timeout
+        await new Promise((resolve, reject) => {
+          const start = Date.now();
+          const timer = setInterval(() => {
+            if (popup.closed) {
+              clearInterval(timer);
+              resolve();
+            } else if (Date.now() - start > 5 * 60 * 1000) {
+              clearInterval(timer);
+              try { popup.close(); } catch {}
+              reject(new Error("QuickBooks login timed out"));
+            }
+          }, 800);
+        });
+
+        // recheck
+        const re = await fetch(
+          `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/ensure-qbo-auth`,
+          { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } }
+        );
+        const redata = await re.json();
+        return !!redata?.ok;
+      }
+
+      return false;
+    } catch (e) {
+      console.error("[ensureQboAuth] error:", e);
+      return false;
+    }
+  }
+
+
   // 📌 give this tab a name so we can re-focus it later
   useEffect(() => {
     window.name = 'mainShipTab';
@@ -232,10 +347,8 @@ export default function Ship() {
   const [allCompanies, setAllCompanies] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [boxes, setBoxes] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
-  const [shippingMethod, setShippingMethod] = useState("");
-  const [projectedBoxes, setProjectedBoxes] = useState([]);
+  const [shippingMethod, setShippingMethod] = useState("Manual Shipping");
 
 // Session/login modal + stable API base for redirects
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -407,62 +520,6 @@ export default function Ship() {
       }
     }
   }, [jobs, targetOrder, navigate]);
-
-  const previewAbortRef = useRef(null);
-  useEffect(() => {
-    if (previewAbortRef.current) {
-      previewAbortRef.current.abort(); // cancel any in-flight request
-    }
-    if (selected.length === 0) {
-      setProjectedBoxes([]);
-      return;
-    }
-
-    const ctrl = new AbortController();
-    previewAbortRef.current = ctrl;
-
-    const timer = setTimeout(async () => {
-      try {
-        const body = {
-          order_ids: selected.filter(id => {
-            const name = jobs.find(j => j.orderId.toString() === id)?.Product || "";
-            return !/\s+Back$/i.test(name.trim());
-          }),
-          shipped_quantities: Object.fromEntries(
-            jobs
-              .filter(j => selected.includes(j.orderId.toString()) && !/\s+Back$/i.test(j.Product.trim()))
-              .map(j => [j.orderId, j.shipQty])
-          ),
-        };
-
-        const res = await fetch(
-          `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/prepare-shipment`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify(body),
-            signal: ctrl.signal,
-          }
-        );
-
-        if (ctrl.signal.aborted) return;
-
-        const data = await res.json().catch(() => ({}));
-        setProjectedBoxes(Array.isArray(data?.boxes) ? data.boxes : []);
-      } catch (e) {
-        if (e.name !== "AbortError") {
-          console.warn("prepare-shipment failed:", e);
-          setProjectedBoxes([]); // keep UI stable
-        }
-      }
-    }, 300); // debounce 300ms
-
-    return () => {
-      clearTimeout(timer);
-      ctrl.abort();
-    };
-  }, [selected, jobs]);
 
   async function fetchCompanyNames() {
     try {
@@ -1340,7 +1397,6 @@ export default function Ship() {
 
       {selected.length > 0 && (
         <div style={{ marginTop: "2rem", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          {/* Manual Shipping: skip UPS, immediately process shipment/invoice */}
           <button
             onClick={async () => {
               const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
@@ -1348,8 +1404,13 @@ export default function Ship() {
                 alert("Select at least one job.");
                 return;
               }
-              // ensure the manual path is used by handleShip
-              setShippingSelection(null);
+              // 1) force QuickBooks login (popup if needed)
+              const ok = await ensureQboAuth();
+              if (!ok) {
+                alert("QuickBooks login failed or was cancelled.");
+                return;
+              }
+              // 2) run your existing ship flow (no UPS/boxes)
               setShippingMethod("Manual Shipping");
               await handleShip();
             }}
@@ -1363,41 +1424,13 @@ export default function Ship() {
               boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
               cursor: "pointer"
             }}
-            title="Mark complete, create packing slip & invoice (no UPS labels)"
+            title="Create QuickBooks invoice → generate packing slip(s) → write Shipped"
           >
-            Manual Shipping
-          </button>
-
-          {/* Ship UPS: go to Box Select flow */}
-          <button
-            onClick={() => {
-              const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
-              if (selectedJobs.length === 0) {
-                alert("Select at least one job.");
-                return;
-              }
-              // Persist for next page / refresh safety
-              try {
-                sessionStorage.setItem("ship:selectedJobs", JSON.stringify(selectedJobs));
-              } catch {}
-              navigate("/box-select", { state: { selectedJobs } });
-            }}
-            style={{
-              padding: "12px 18px",
-              fontWeight: "bold",
-              borderRadius: 8,
-              border: "1px solid #333",
-              background: "#000",
-              color: "#fff",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-              cursor: "pointer"
-            }}
-            title="Choose boxes, then get live UPS rates"
-          >
-            Ship UPS →
+            Manual Ship
           </button>
         </div>
       )}
+
       <LoginModal
         open={showLoginModal}
         onClose={() => setShowLoginModal(false)}
