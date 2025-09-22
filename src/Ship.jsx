@@ -2,63 +2,64 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
-// ADD: Force QuickBooks auth and resume flow when done
-async function ensureQboAuth() {
-  try {
-    const resp = await fetch("/api/ensure-qbo-auth", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const data = await resp.json();
-
-    if (data?.ok) return true;
-
-    if (data?.redirect) {
-      // Open a popup to complete QBO OAuth, then wait until it closes.
-      const w = 720, h = 720;
-      const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
-      const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
-      const popup = window.open(
-        data.redirect,
-        "qbo_oauth",
-        `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
-      );
-      if (!popup) throw new Error("Popup blocked. Please allow popups and try again.");
-
-      // Poll until popup closes
-      await new Promise((resolve, reject) => {
-        const start = Date.now();
-        const timer = setInterval(() => {
-          if (popup.closed) {
-            clearInterval(timer);
-            resolve();
-          } else if (Date.now() - start > 5 * 60 * 1000) { // 5 min timeout
-            clearInterval(timer);
-            try { popup.close(); } catch {}
-            reject(new Error("QuickBooks login timed out"));
-          }
-        }, 800);
-      });
-
-      // After popup closes, check again
-      const recheck = await fetch("/api/ensure-qbo-auth", {
+  // NEW: Force QuickBooks auth (popup if needed), then continue
+  async function ensureQboAuth() {
+    try {
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const resp = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
       });
-      const redata = await recheck.json();
-      return !!redata?.ok;
-    }
+      const data = await resp.json();
 
-    return false;
-  } catch (e) {
-    console.error("[ensureQboAuth] error:", e);
-    return false;
+      if (data?.ok) return true;
+
+      if (data?.redirect) {
+        // Centered popup for QBO login
+        const w = 720, h = 720;
+        const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
+        const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
+        const popup = window.open(
+          `${API_BASE}${data.redirect}`,
+          "qbo_oauth",
+          `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
+        );
+        if (!popup) {
+          alert("Popup blocked. Please allow popups for QuickBooks login.");
+          return false;
+        }
+        // Wait until popup closes (5 min timeout)
+        await new Promise((resolve, reject) => {
+          const start = Date.now();
+          const timer = setInterval(() => {
+            if (popup.closed) {
+              clearInterval(timer);
+              resolve();
+            } else if (Date.now() - start > 5 * 60 * 1000) {
+              clearInterval(timer);
+              try { popup.close(); } catch {}
+              reject(new Error("QuickBooks login timed out"));
+            }
+          }, 800);
+        });
+
+        // Re-check
+        const re = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        const redata = await re.json();
+        return !!redata?.ok;
+      }
+
+      return false;
+    } catch (e) {
+      console.error("[ensureQboAuth] error:", e);
+      return false;
+    }
   }
-}
 
 
 // Map our logical box names to their actual dimensions
@@ -325,6 +326,9 @@ export default function Ship() {
   const [companyInput, setCompanyInput] = useState("");
   const [shippingMethod, setShippingMethod] = useState("Manual Shipping");
 
+  const [isPageOverlay, setIsPageOverlay] = useState(false);
+  const [pageOverlayText, setPageOverlayText] = useState("");
+
 // Session/login modal + stable API base for redirects
   const [showLoginModal, setShowLoginModal] = useState(false);
   const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
@@ -498,6 +502,9 @@ export default function Ship() {
 
   async function fetchCompanyNames() {
     try {
+      setIsPageOverlay(true);
+      setPageOverlayText("Loading customers…");
+
       const res = await fetch(
         `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/company-list`,
         { credentials: "include" }
@@ -506,12 +513,18 @@ export default function Ship() {
       setAllCompanies(data.companies || []);
     } catch (err) {
       console.error("Company fetch failed", err);
+    } finally {
+      setIsPageOverlay(false);
+      setPageOverlayText("");
     }
   }
 
 
   async function fetchJobs(company) {
     try {
+      setIsPageOverlay(true);
+      setPageOverlayText("Loading jobs…");
+
       const res = await fetch(
         `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/jobs-for-company?company=${encodeURIComponent(company)}`,
         { credentials: "include" }
@@ -523,13 +536,11 @@ export default function Ship() {
 
       const data = await res.json();
       if (res.ok) {
-        // Initialize shipQty from the sheet's "Quantity" column
         const jobsWithQty = data.jobs.map(job => {
           const qty = Number(job.Quantity ?? 0);
           return { ...job, shipQty: qty, ShippedQty: qty };
         });
         setJobs(jobsWithQty);
-        // Also clean up your selected list in case jobs changed
         setSelected(prev =>
           prev.filter(id => jobsWithQty.some(j => j.orderId.toString() === id))
         );
@@ -539,8 +550,12 @@ export default function Ship() {
     } catch (err) {
       console.error("Error loading jobs:", err);
       alert("Error loading jobs.");
+    } finally {
+      setIsPageOverlay(false);
+      setPageOverlayText("");
     }
   }
+
 
 
   const handleSelectCompany = (e) => {
@@ -666,13 +681,11 @@ export default function Ship() {
 
     setIsShippingOverlay(true);
 
-    setShippingStage("📦 Preparing shipment...");
+    setShippingStage("🔐 Checking QuickBooks login…");
     setLoading(true);
 
     try {
-      // ── PREPARE ─────────────────────────────────────────
       // ── AUTH (QuickBooks) ────────────────────────────────
-      setShippingStage("🔐 Checking QuickBooks login…");
       const authed = await ensureQboAuth();
       if (!authed) {
         setIsShippingOverlay(false);
@@ -713,6 +726,7 @@ export default function Ship() {
         console.error("process-shipment failed:", procErr);
         shipData = { labels: [], slips: [], invoice: null };
       }
+
 
       // ── HANDLE QBO REDIRECT (fallback, rarely hit) ───────
       if (shipData.redirect) {
@@ -759,12 +773,13 @@ export default function Ship() {
         navigate("/shipment-complete", {
           state: {
             shippedOk:     true,
-            labelsPrinted: (shipData.labels || []).length > 0,
-            slipsPrinted:  (shipData.slips  || []).length > 0,
+            labelsPrinted: Array.isArray(shipData.labels) && shipData.labels.length > 0,
+            slipsPrinted:  Array.isArray(shipData.slips)  && shipData.slips.length  > 0,
             invoiceUrl
           },
         });
       }, 500);
+
 
     } catch (err) {
       console.error(err);
@@ -1235,6 +1250,24 @@ export default function Ship() {
             value={errorInfo.text}
             style={{ width: "100%", height: 140, fontFamily: "monospace", fontSize: 12 }}
           />
+        </div>
+      )}
+
+      {/* 🌕 Page Overlay for initial loads */}
+      {isPageOverlay && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0,
+          width: "100vw", height: "100vh",
+          backgroundColor: "rgba(255, 247, 194, 0.65)", // transparent yellow
+          zIndex: 9998,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "1.25rem",
+          fontWeight: "bold"
+        }}>
+          {pageOverlayText || "Loading…"}
         </div>
       )}
 
