@@ -292,28 +292,46 @@ export default function Ship() {
         const data = await res.json();
         if (res.ok) {
           const mainWindow = window;
-          // open shipping labels
-          data.labels.forEach((url) => {
-            const win = window.open(url, "_blank");
-            win && win.blur();
-          });
+          const openedOnceRef = useRef(false); // put this at component top-level (if not already)
 
-          // build and open the full invoice URL
-          const invoiceUrl = data.invoice
-            ? (data.invoice.startsWith("http")
-                ? data.invoice
-                : `https://app.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`)
-            : null;
-          if (invoiceUrl) {
-            const invWin = window.open(invoiceUrl, "_blank");
-            invWin && invWin.blur();
+          function isHttpUrl(u) {
+            return typeof u === "string" && /^https?:\/\//i.test(u);
           }
 
-          // open packing slips
-          data.slips.forEach((url) => {
-            const win = window.open(url, "_blank");
-            win && win.blur();
-          });
+          if (!openedOnceRef.current) {
+            openedOnceRef.current = true;
+
+            // Labels
+            (Array.isArray(data.labels) ? data.labels : []).forEach((u) => {
+              if (isHttpUrl(u)) {
+                const w = window.open(u, "_blank", "noopener,noreferrer");
+                if (w) w.blur();
+              }
+            });
+
+            // Invoice
+            const invoiceUrl = (typeof data.invoice === "string" && data.invoice.length)
+              ? (data.invoice.startsWith("http")
+                  ? data.invoice
+                  : `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
+              : null;
+            if (isHttpUrl(invoiceUrl)) {
+              const iw = window.open(invoiceUrl, "_blank", "noopener,noreferrer");
+              if (iw) iw.blur();
+            }
+
+            // Slips
+            (Array.isArray(data.slips) ? data.slips : []).forEach((u) => {
+              if (isHttpUrl(u)) {
+                const w = window.open(u, "_blank", "noopener,noreferrer");
+                if (w) w.blur();
+              }
+            });
+
+            setTimeout(() => mainWindow.focus(), 500);
+          } else {
+            console.log("Suppressing duplicate popups for this shipment run");
+          }
 
           // refocus this tab after a brief pause
           setTimeout(() => {
@@ -355,42 +373,61 @@ export default function Ship() {
     }
   }, [jobs, targetOrder, navigate]);
 
-  // ▶︎ Whenever selection changes, re-fetch box requirements
+  const previewAbortRef = useRef(null);
   useEffect(() => {
-    async function previewBoxes() {
-      if (selected.length === 0) {
-        setProjectedBoxes([]);
-        return;
-      }
-      const res = await fetch(
-        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/prepare-shipment`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            order_ids: selected.filter(id => {
-              const name = jobs.find(j => j.orderId.toString()===id)?.Product||"";
-              return !/\s+Back$/i.test(name.trim());
-            }),
-            shipped_quantities: Object.fromEntries(
-              jobs
-                .filter((j) =>
-                  selected.includes(j.orderId.toString()) &&
-                  !/\s+Back$/i.test(j.Product.trim())
-                )
-                .map((j) => [j.orderId, j.shipQty])
-            ),
-          }),
-        }
-      );
-      const data = await res.json();
-      if (res.ok) {
-        setProjectedBoxes(data.boxes || []);
-      }
+    if (previewAbortRef.current) {
+      previewAbortRef.current.abort(); // cancel any in-flight request
     }
-    previewBoxes();
-  }, [selected]);
+    if (selected.length === 0) {
+      setProjectedBoxes([]);
+      return;
+    }
+
+    const ctrl = new AbortController();
+    previewAbortRef.current = ctrl;
+
+    const timer = setTimeout(async () => {
+      try {
+        const body = {
+          order_ids: selected.filter(id => {
+            const name = jobs.find(j => j.orderId.toString() === id)?.Product || "";
+            return !/\s+Back$/i.test(name.trim());
+          }),
+          shipped_quantities: Object.fromEntries(
+            jobs
+              .filter(j => selected.includes(j.orderId.toString()) && !/\s+Back$/i.test(j.Product.trim()))
+              .map(j => [j.orderId, j.shipQty])
+          ),
+        };
+
+        const res = await fetch(
+          `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/prepare-shipment`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+          }
+        );
+
+        if (ctrl.signal.aborted) return;
+
+        const data = await res.json().catch(() => ({}));
+        setProjectedBoxes(Array.isArray(data?.boxes) ? data.boxes : []);
+      } catch (e) {
+        if (e.name !== "AbortError") {
+          console.warn("prepare-shipment failed:", e);
+          setProjectedBoxes([]); // keep UI stable
+        }
+      }
+    }, 300); // debounce 300ms
+
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [selected, jobs]);
 
   async function fetchCompanyNames() {
     try {
