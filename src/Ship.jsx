@@ -2,6 +2,47 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
+// Put with other hooks near top of component
+const openedOnceRef = useRef(false);
+function isHttpUrl(u) {
+  return typeof u === "string" && /^https?:\/\//i.test(u);
+}
+function openResultsWindows(data) {
+  if (openedOnceRef.current) {
+    console.log("Suppressing duplicate popups for this shipment run");
+    return;
+  }
+  openedOnceRef.current = true;
+
+  // Labels
+  (Array.isArray(data.labels) ? data.labels : []).forEach((u) => {
+    if (isHttpUrl(u)) {
+      const w = window.open(u, "_blank", "noopener,noreferrer");
+      if (w) w.blur();
+    }
+  });
+
+  // Invoice
+  const invoiceUrl = (typeof data.invoice === "string" && data.invoice.length)
+    ? (data.invoice.startsWith("http")
+        ? data.invoice
+        : `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
+    : null;
+  if (isHttpUrl(invoiceUrl)) {
+    const iw = window.open(invoiceUrl, "_blank", "noopener,noreferrer");
+    if (iw) iw.blur();
+  }
+
+  // Slips
+  (Array.isArray(data.slips) ? data.slips : []).forEach((u) => {
+    if (isHttpUrl(u)) {
+      const w = window.open(u, "_blank", "noopener,noreferrer");
+      if (w) w.blur();
+    }
+  });
+}
+
+
 // Map our logical box names to their actual dimensions
 const BOX_DIMENSIONS = {
   Small:  "10×10×10",
@@ -291,58 +332,11 @@ export default function Ship() {
 
         const data = await res.json();
         if (res.ok) {
-          const mainWindow = window;
-          const openedOnceRef = useRef(false); // put this at component top-level (if not already)
+          openResultsWindows(shipData);
 
-          function isHttpUrl(u) {
-            return typeof u === "string" && /^https?:\/\//i.test(u);
-          }
+          // refocus this tab after a brief pause (no window.open)
+          setTimeout(() => window.focus(), 500);
 
-          if (!openedOnceRef.current) {
-            openedOnceRef.current = true;
-
-            // Labels
-            (Array.isArray(data.labels) ? data.labels : []).forEach((u) => {
-              if (isHttpUrl(u)) {
-                const w = window.open(u, "_blank", "noopener,noreferrer");
-                if (w) w.blur();
-              }
-            });
-
-            // Invoice
-            const invoiceUrl = (typeof data.invoice === "string" && data.invoice.length)
-              ? (data.invoice.startsWith("http")
-                  ? data.invoice
-                  : `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
-              : null;
-            if (isHttpUrl(invoiceUrl)) {
-              const iw = window.open(invoiceUrl, "_blank", "noopener,noreferrer");
-              if (iw) iw.blur();
-            }
-
-            // Slips
-            (Array.isArray(data.slips) ? data.slips : []).forEach((u) => {
-              if (isHttpUrl(u)) {
-                const w = window.open(u, "_blank", "noopener,noreferrer");
-                if (w) w.blur();
-              }
-            });
-
-            setTimeout(() => mainWindow.focus(), 500);
-          } else {
-            console.log("Suppressing duplicate popups for this shipment run");
-          }
-
-          // refocus this tab after a brief pause
-          setTimeout(() => {
-            mainWindow.focus();
-          }, 500);
-
-          // 📌 bring the main Ship tab back into view a moment later
-          setTimeout(() => {
-            const mainTab = window.open("", "mainShipTab");
-            if (mainTab && mainTab.focus) mainTab.focus();
-          }, 500);
 
           navigate("/shipment-complete", {
             state: {
@@ -595,10 +589,6 @@ export default function Ship() {
     }
 
     // ── PRE-OPEN POPUPS ──────────────────────────────────
-    const labelWindows = selected.map((_, i) =>
-      window.open("", `labelWindow${i}`, "width=600,height=400")
-    );
-
     setIsShippingOverlay(true);
     setShippingStage("📦 Preparing shipment...");
     setLoading(true);
