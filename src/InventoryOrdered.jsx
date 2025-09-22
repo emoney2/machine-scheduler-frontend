@@ -25,9 +25,14 @@ export default function InventoryOrdered() {
   const [sortConfig, setSortConfig] = useState({ key: "date", direction: "asc" });
   const [editingKey, setEditingKey] = useState(null);   // `${type}-${row}`
   const [draftQty, setDraftQty] = useState("");
+  const [isOverlay, setIsOverlay] = useState(false);
+  const [overlayText, setOverlayText] = useState("");
 
   const load = async () => {
     try {
+      setIsOverlay(true);
+      setOverlayText("Loading inventory…");
+
       const etagKey  = "invOrd:etag";
       const dataKey  = "invOrd:data";
       const headers  = {};
@@ -52,8 +57,12 @@ export default function InventoryOrdered() {
     } catch (err) {
       console.error("Failed to load inventoryOrdered:", err);
       setEntries([]);
+    } finally {
+      setOverlayText("");
+      setIsOverlay(false);
     }
   };
+
 
 
   useEffect(() => {
@@ -164,7 +173,27 @@ export default function InventoryOrdered() {
     <div style={{ padding: "1rem" }}>
       <h2 style={{ margin: 0, marginBottom: "0.75rem" }}>Inventory — Ordered</h2>
 
+      {/* 🌕 Transparent page overlay */}
+      {isOverlay && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0,
+          width: "100vw", height: "100vh",
+          backgroundColor: "rgba(255, 247, 194, 0.65)", // transparent yellow
+          zIndex: 9998,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontWeight: 700,
+          fontSize: "1.1rem",
+          pointerEvents: "none" // visual only; don't block clicks
+        }}>
+          {overlayText || "Loading…"}
+        </div>
+      )}
+
       <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #ddd" }}>
+
         <thead style={{ background: "#f5f5f5" }}>
           <tr>
             <th style={th} onClick={() => requestSort("date")}>Date</th>
