@@ -1612,7 +1612,7 @@ useEffect(() => {
           fontSize: '1.1rem',
           pointerEvents: 'none' // overlay is visual only; don’t block clicks
         }}>
-          Loading manual state…
+          Loading Schedule…
         </div>
       )}
 
