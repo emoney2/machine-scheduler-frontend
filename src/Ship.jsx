@@ -250,24 +250,26 @@ export default function Ship() {
     });
   }
 
-  // NEW: ensure QuickBooks is authorized (opens popup if needed)
+  // NEW: Force QuickBooks auth (popup if needed), then continue
   async function ensureQboAuth() {
     try {
-      const resp = await fetch(
-        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/ensure-qbo-auth`,
-        { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } }
-      );
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const resp = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
       const data = await resp.json();
 
       if (data?.ok) return true;
 
       if (data?.redirect) {
-        // center popup
+        // Centered popup for QBO login
         const w = 720, h = 720;
         const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
         const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
         const popup = window.open(
-          data.redirect,
+          `${API_BASE}${data.redirect}`,
           "qbo_oauth",
           `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
         );
@@ -275,7 +277,7 @@ export default function Ship() {
           alert("Popup blocked. Please allow popups for QuickBooks login.");
           return false;
         }
-        // wait until popup closes or timeout
+        // Wait until popup closes (5 min timeout)
         await new Promise((resolve, reject) => {
           const start = Date.now();
           const timer = setInterval(() => {
@@ -290,11 +292,12 @@ export default function Ship() {
           }, 800);
         });
 
-        // recheck
-        const re = await fetch(
-          `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/ensure-qbo-auth`,
-          { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" } }
-        );
+        // Re-check
+        const re = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
         const redata = await re.json();
         return !!redata?.ok;
       }
@@ -306,11 +309,11 @@ export default function Ship() {
     }
   }
 
-
   // 📌 give this tab a name so we can re-focus it later
   useEffect(() => {
     window.name = 'mainShipTab';
   }, []);
+
   const [searchParams] = useSearchParams();
   const targetCompany = searchParams.get("company");
   const targetOrder = searchParams.get("order");
@@ -668,80 +671,41 @@ export default function Ship() {
 
     try {
       // ── PREPARE ─────────────────────────────────────────
-      let result;
-      // Use a consistent base (handles whether REACT_APP_API_ROOT ends with /api)
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-
-      try {
-        const response = await fetch(
-          `${API_BASE}/api/prepare-shipment`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              order_ids: selected.filter(id => {
-                const j = jobs.find(x => x.orderId.toString() === id);
-                const name = (j?.Product || "").trim();
-                return !/\s+Back$/i.test(name);
-              }),
-              shipped_quantities: Object.fromEntries(
-                jobs
-                  .filter((j) =>
-                    selected.includes(j.orderId.toString()) &&
-                    !/\s+Back$/i.test((j.Product || "").trim())
-                  )
-                  .map((j) => [j.orderId, j.shipQty])
-              ),
-            }),
-          }
-        );
-
-        const data = await response.json();
-        if (!response.ok) {
-          console.warn("prepare-shipment error:", data.error);
-          result = { boxes: [] };
-        } else {
-          result = data;
-        }
-      } catch (prepErr) {
-        console.error("prepare-shipment failed:", prepErr);
-        result = { boxes: [] };
+      // ── AUTH (QuickBooks) ────────────────────────────────
+      setShippingStage("🔐 Checking QuickBooks login…");
+      const authed = await ensureQboAuth();
+      if (!authed) {
+        setIsShippingOverlay(false);
+        setLoading(false);
+        alert("QuickBooks login failed or was cancelled.");
+        return;
       }
 
-      // pack boxes
-      const packedBoxes = result.boxes || [];
-      setShippingStage("📦 Packing boxes...");
-      setBoxes(packedBoxes);
-
-      // ── PROCESS ─────────────────────────────────────────
-      setShippingStage("🚚 Processing shipment...");
+      // ── PROCESS (Manual Ship, no boxes) ─────────────────
+      setShippingStage("🧾 Creating QuickBooks invoice…");
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       let shipData;
       try {
-        const shipRes = await fetch(
-          `${API_BASE}/api/process-shipment`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
-              order_ids:          selected,
-              boxes:              packedBoxes,
-              shipped_quantities: Object.fromEntries(
-                jobs
-                  .filter((j) => selected.includes(j.orderId.toString()))
-                  .map((j) => [j.orderId, j.shipQty])
-              ),
-              shipping_method:    shippingMethod,
-              service_code:       (shippingSelection && shippingSelection.code) || null,
-              qboEnv: "production",
-            }),
-          }
-        );
+        const shipRes = await fetch(`${API_BASE}/api/process-shipment`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            order_ids: selected,
+            boxes:              [], // no boxes
+            shipped_quantities: Object.fromEntries(
+              jobs
+                .filter((j) => selected.includes(j.orderId.toString()))
+                .map((j) => [j.orderId, j.shipQty])
+            ),
+            shipping_method:   "Manual Shipping",
+            qboEnv:            "production",
+          }),
+        });
         const data = await shipRes.json();
         if (!shipRes.ok) {
           console.warn("process-shipment error:", data.error);
-          shipData = { labels: [], slips: [], invoice: null, redirect: data.redirect };
+          shipData = { labels: [], slips: [], invoice: null };
         } else {
           shipData = data;
         }
@@ -750,28 +714,26 @@ export default function Ship() {
         shipData = { labels: [], slips: [], invoice: null };
       }
 
-      // ── HANDLE QBO REDIRECT ──────────────────────────────
+      // ── HANDLE QBO REDIRECT (fallback, rarely hit) ───────
       if (shipData.redirect) {
         sessionStorage.setItem(
           "pendingShipment",
           JSON.stringify({
             order_ids:         selected,
-            boxes:             packedBoxes,
+            boxes:             [],
             shipped_quantities: Object.fromEntries(
               jobs
                 .filter((j) => selected.includes(j.orderId.toString()))
                 .map((j) => [j.orderId, j.shipQty])
             ),
-            shipping_method:   shippingMethod,
+            shipping_method:   "Manual Shipping",
             qboEnv:            "production",
           })
         );
-        window.location.href = `${process.env.REACT_APP_API_ROOT.replace(
-          /\/api$/,
-          ""
-        )}${shipData.redirect}`;
+        window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}${shipData.redirect}`;
         return;
       }
+
 
       // ── SUCCESS ─────────────────────────────────────────
       setIsShippingOverlay(false);
@@ -797,12 +759,13 @@ export default function Ship() {
         navigate("/shipment-complete", {
           state: {
             shippedOk:     true,
-            labelsPrinted: shipData.labels.length > 0,
-            slipsPrinted:  packedBoxes.length > 0,
+            labelsPrinted: (shipData.labels || []).length > 0,
+            slipsPrinted:  (shipData.slips  || []).length > 0,
             invoiceUrl
           },
         });
       }, 500);
+
     } catch (err) {
       console.error(err);
       alert("Failed to ship.");
