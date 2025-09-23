@@ -119,26 +119,6 @@ export default function InventoryOrdered() {
 
   const displayQty = (e) => e?.quantity ?? "";
 
-  // Force a few fresh reloads to let Google Sheets formulas catch up
-  const refreshAfterWrite = async () => {
-    // 1) immediate forced reload
-    setIsOverlay(true);
-    setOverlayText("Updating…");
-    await load(true);
-
-    // 2) wait ~1.2s, reload again
-    await sleep(1200);
-    setOverlayText("Finalizing update…");
-    await load(true);
-
-    // 3) wait a bit more for complicated QUERY/ARRAYFORMULA chains
-    await sleep(3000);
-    await load(true);
-
-    setOverlayText("");
-    setIsOverlay(false);
-  };
-
   const handleReceiveRow = async (e) => {
     try {
       await axios.put(
