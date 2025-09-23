@@ -121,18 +121,27 @@ export default function InventoryOrdered() {
 
   const handleReceiveRow = async (e) => {
     try {
+      // Show overlay with the item name while receiving
+      const itemName = e?.name ? String(e.name) : "";
+      setIsOverlay(true);
+      setOverlayText(itemName ? `Receiving ${itemName}…` : "Receiving…");
+
       await axios.put(
         `${API}/inventoryOrdered`,
         { type: e.type, row: e.row },
-        { withCredentials: true }
+        { withCredentials: true, timeout: 20000 }
       );
 
+      // One forced reload + short settle (refreshAfterWrite will switch text to “Updating…” then clear)
       await refreshAfterWrite();
     } catch (err) {
       console.error("Receive failed:", err);
       alert("Failed to mark as received.");
+      setOverlayText("");
+      setIsOverlay(false);
     }
   };
+
 
   // Inline edit controls (Materials only)
   const beginEdit = (e) => {
