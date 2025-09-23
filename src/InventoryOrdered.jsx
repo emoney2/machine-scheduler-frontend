@@ -28,24 +28,32 @@ export default function InventoryOrdered() {
   const [isOverlay, setIsOverlay] = useState(false);
   const [overlayText, setOverlayText] = useState("");
 
-  const load = async () => {
+  const load = async (force = false) => {
     try {
       setIsOverlay(true);
       setOverlayText("Loading inventory…");
 
-      const etagKey  = "invOrd:etag";
-      const dataKey  = "invOrd:data";
-      const headers  = {};
-      const prevEtag = localStorage.getItem(etagKey);
-      if (prevEtag) headers["If-None-Match"] = prevEtag;
+      const etagKey = "invOrd:etag";
+      const dataKey = "invOrd:data";
+      const headers = {};
 
-      const res = await axios.get(`${API}/inventoryOrdered`, {
+      // Only send If-None-Match when NOT forcing
+      if (!force) {
+        const prevEtag = localStorage.getItem(etagKey);
+        if (prevEtag) headers["If-None-Match"] = prevEtag;
+      }
+
+      // Cache-bust when forcing
+      const url = force
+        ? `${API}/inventoryOrdered?t=${Date.now()}`
+        : `${API}/inventoryOrdered`;
+
+      const res = await axios.get(url, {
         headers,
         withCredentials: true,
         // accept 304 (Not Modified) without throwing
         validateStatus: (s) => s === 200 || s === 304,
       });
-
 
       if (res.status === 304) {
         const cached = localStorage.getItem(dataKey);
@@ -64,8 +72,6 @@ export default function InventoryOrdered() {
       setIsOverlay(false);
     }
   };
-
-
 
   useEffect(() => {
     load();
@@ -113,12 +119,13 @@ export default function InventoryOrdered() {
         { type: e.type, row: e.row },
         { withCredentials: true }
       );
-      await load();
+      await load(true); // force fresh data
     } catch (err) {
       console.error("Receive failed:", err);
       alert("Failed to mark as received.");
     }
   };
+
 
   // Inline edit controls (Materials only)
   const beginEdit = (e) => {
@@ -136,15 +143,15 @@ export default function InventoryOrdered() {
         { type: e.type, row: e.row, quantity: draftQty },
         { withCredentials: true }
       );
-
       setEditingKey(null);
       setDraftQty("");
-      await load();
+      await load(true); // force fresh data, bypass ETag/cache
     } catch (err) {
       console.error("Save quantity failed:", err);
       alert("Failed to update quantity.");
     }
   };
+
 
   // ——— centered styles ———
   const th = {
