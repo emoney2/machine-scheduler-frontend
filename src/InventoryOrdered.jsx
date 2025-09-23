@@ -157,31 +157,39 @@ export default function InventoryOrdered() {
   };
 
 
-  const saveEdit = async (e) => {
-    try {
-      // Show overlay while the PATCH is in flight
-      setIsOverlay(true);
-      setOverlayText("Saving quantity…");
+const saveEdit = async (e) => {
+  try {
+    setIsOverlay(true);
+    setOverlayText("Saving quantity…");
 
-      await axios.patch(
-        `${API}/inventoryOrdered/quantity`,
-        { type: e.type, row: e.row, quantity: draftQty },
-        { withCredentials: true }
-      );
+    const body = {
+      type: e.type,     // "Material" | "Thread"
+      row:  e.row,      // original sheet row (>= 2)
+      quantity: draftQty
+    };
 
-      setEditingKey(null);
-      setDraftQty("");
+    const res = await axios.patch(
+      `${API}/inventoryOrdered/quantity`,
+      body,
+      { withCredentials: true, timeout: 20000 }
+    );
 
-      // Do a single forced reload immediately, then wait ~900ms (no second fetch)
-      await refreshAfterWrite();
-    } catch (err) {
-      console.error("Save quantity failed:", err);
-      alert("Failed to update quantity.");
-      setOverlayText("");
-      setIsOverlay(false);
+    if (res.status !== 200 || !res.data?.ok) {
+      throw new Error(res.data?.error || `Unexpected status ${res.status}`);
     }
-  };
 
+    setEditingKey(null);
+    setDraftQty("");
+
+    await refreshAfterWrite(); // one forced reload + 900ms settle
+  } catch (err) {
+    console.error("Save quantity failed:", err);
+    const msg = err?.response?.data?.error || err?.message || "Failed to update quantity.";
+    alert(msg);
+    setOverlayText("");
+    setIsOverlay(false);
+  }
+};
 
   // ——— centered styles ———
   const th = {
