@@ -114,6 +114,26 @@ export default function InventoryOrdered() {
 
   const displayQty = (e) => e?.quantity ?? "";
 
+  // Force a few fresh reloads to let Google Sheets formulas catch up
+  const refreshAfterWrite = async () => {
+    // 1) immediate forced reload
+    setIsOverlay(true);
+    setOverlayText("Updating…");
+    await load(true);
+
+    // 2) wait ~1.2s, reload again
+    await sleep(1200);
+    setOverlayText("Finalizing update…");
+    await load(true);
+
+    // 3) wait a bit more for complicated QUERY/ARRAYFORMULA chains
+    await sleep(3000);
+    await load(true);
+
+    setOverlayText("");
+    setIsOverlay(false);
+  };
+
   const handleReceiveRow = async (e) => {
     try {
       await axios.put(
@@ -122,10 +142,7 @@ export default function InventoryOrdered() {
         { withCredentials: true }
       );
 
-      // Give formulas time to recalc, then bypass cache twice
-      await load(true);          // immediate force reload
-      await sleep(700);          // wait a bit for formulas
-      await load(true);          // pull the settled values
+      await refreshAfterWrite();
     } catch (err) {
       console.error("Receive failed:", err);
       alert("Failed to mark as received.");
@@ -152,10 +169,7 @@ export default function InventoryOrdered() {
       setEditingKey(null);
       setDraftQty("");
 
-      // Give formulas time to recalc, then bypass cache twice
-      await load(true);          // immediate force reload
-      await sleep(700);          // wait a bit for formulas
-      await load(true);          // pull the settled values
+      await refreshAfterWrite();
     } catch (err) {
       console.error("Save quantity failed:", err);
       alert("Failed to update quantity.");
