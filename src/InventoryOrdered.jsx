@@ -20,6 +20,8 @@ const fmtMMDDYYYY = (d) => {
   return `${mm}/${dd}/${yyyy}`;
 };
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 export default function InventoryOrdered() {
   const [entries, setEntries] = useState([]);
   const [sortConfig, setSortConfig] = useState({ key: "date", direction: "asc" });
@@ -119,13 +121,16 @@ export default function InventoryOrdered() {
         { type: e.type, row: e.row },
         { withCredentials: true }
       );
-      await load(true); // force fresh data
+
+      // Give formulas time to recalc, then bypass cache twice
+      await load(true);          // immediate force reload
+      await sleep(700);          // wait a bit for formulas
+      await load(true);          // pull the settled values
     } catch (err) {
       console.error("Receive failed:", err);
       alert("Failed to mark as received.");
     }
   };
-
 
   // Inline edit controls (Materials only)
   const beginEdit = (e) => {
@@ -143,15 +148,19 @@ export default function InventoryOrdered() {
         { type: e.type, row: e.row, quantity: draftQty },
         { withCredentials: true }
       );
+
       setEditingKey(null);
       setDraftQty("");
-      await load(true); // force fresh data, bypass ETag/cache
+
+      // Give formulas time to recalc, then bypass cache twice
+      await load(true);          // immediate force reload
+      await sleep(700);          // wait a bit for formulas
+      await load(true);          // pull the settled values
     } catch (err) {
       console.error("Save quantity failed:", err);
       alert("Failed to update quantity.");
     }
   };
-
 
   // ——— centered styles ———
   const th = {
