@@ -30,10 +30,13 @@ export default function InventoryOrdered() {
   const [isOverlay, setIsOverlay] = useState(false);
   const [overlayText, setOverlayText] = useState("");
 
-  const load = async (force = false) => {
+  const load = async (force = false, opts = {}) => {
+    const silent = !!opts.silent; // when true, don't touch the page overlay here
     try {
-      setIsOverlay(true);
-      setOverlayText("Loading inventory…");
+      if (!silent) {
+        setIsOverlay(true);
+        setOverlayText("Loading inventory…");
+      }
 
       const etagKey = "invOrd:etag";
       const dataKey = "invOrd:data";
@@ -70,8 +73,10 @@ export default function InventoryOrdered() {
       console.error("Failed to load inventoryOrdered:", err);
       setEntries([]);
     } finally {
-      setOverlayText("");
-      setIsOverlay(false);
+      if (!silent) {
+        setOverlayText("");
+        setIsOverlay(false);
+      }
     }
   };
 
@@ -158,8 +163,26 @@ export default function InventoryOrdered() {
     setEditingKey(null);
     setDraftQty("");
   };
+
+  const refreshAfterWrite = async () => {
+    // Keep the overlay up, but let load run in "silent" mode (no flicker)
+    setOverlayText("Updating…");
+    // We already do ONE immediate forced reload to reflect raw write:
+    await load(true, { silent: true });
+    // Then wait a beat so QUERY/ARRAYFORMULA finishes
+    await sleep(900);
+    // No second fetch — we keep what we have and clear the overlay
+    setOverlayText("");
+    setIsOverlay(false);
+  };
+
+
   const saveEdit = async (e) => {
     try {
+      // Show overlay while the PATCH is in flight
+      setIsOverlay(true);
+      setOverlayText("Saving quantity…");
+
       await axios.patch(
         `${API}/inventoryOrdered/quantity`,
         { type: e.type, row: e.row, quantity: draftQty },
@@ -169,12 +192,16 @@ export default function InventoryOrdered() {
       setEditingKey(null);
       setDraftQty("");
 
+      // Do a single forced reload immediately, then wait ~900ms (no second fetch)
       await refreshAfterWrite();
     } catch (err) {
       console.error("Save quantity failed:", err);
       alert("Failed to update quantity.");
+      setOverlayText("");
+      setIsOverlay(false);
     }
   };
+
 
   // ——— centered styles ———
   const th = {
