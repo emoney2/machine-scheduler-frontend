@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 
+const [loading, setLoading] = useState(true);
+
 // ---------- Config ----------
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
@@ -265,6 +267,7 @@ export default function FurList() {
     }
   }
 
+  // Batch complete — single request to /fur/completeBatch
   async function completeSelected() {
     const ids = Object.keys(selected).filter(id => selected[id]);
     if (!ids.length) return;
@@ -280,7 +283,7 @@ export default function FurList() {
       const r = await axios.post(`${API_ROOT}/fur/completeBatch`, { items }, { withCredentials: true });
       ok = !!r.data?.ok;
       wrote = r.data?.wrote || 0;
-    } catch (e) {
+    } catch {
       ok = false;
     }
 
@@ -291,6 +294,13 @@ export default function FurList() {
     } else {
       showToast(`Batch failed — nothing written`, "error", 2600);
     }
+
+    setSelected({});
+    setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
+
+    // Re-fetch once to sync any formula-driven changes
+    await fetchOrders({ refresh: true });
+  }
 
     setSelected({});
     setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
@@ -403,10 +413,38 @@ export default function FurList() {
         <div style={{ ...cellBase, ...stickyRight(0, "#fafafa"), textAlign: "right" }}>Complete</div>
       </div>
 
-      {/* Content */}
-      {isLoading ? (
-        <div style={{ padding: "24px 8px", color: "#777" }}>Loading orders…</div>
-      ) : cards.length === 0 ? (
+      {/* Content + overlay */}
+      {isLoading && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(255, 235, 59, 0.25)", // transparent yellow
+            backdropFilter: "blur(1px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            pointerEvents: "none"
+          }}
+        >
+          <div
+            style={{
+              padding: "14px 18px",
+              background: "rgba(255, 235, 59, 0.85)",
+              border: "1px solid #d4b300",
+              borderRadius: 10,
+              fontWeight: 700,
+              fontSize: 18,
+              color: "#3b3b00",
+              boxShadow: "0 8px 20px rgba(0,0,0,0.15)"
+            }}
+          >
+            Loading Jobs…
+          </div>
+        </div>
+      )}
+      {cards.length === 0 ? (
         <div style={{ padding: "24px 8px", color: "#777" }}>No work items for Fur.</div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
@@ -493,13 +531,34 @@ export default function FurList() {
                 }}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
-                  gap: 8, padding: 8, borderRadius: 12,
-                  border: urgent ? "2px solid #e11900" : "1px solid #ddd",
-                  background: bg, color: fg, position: "relative",
-                  boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)",
+                  gap: 8, padding: 10, borderRadius: 14,
+                  border: urgent ? "2px solid #e11900" : (sel ? "2px solid #2563eb" : "1px solid #ddd"),
+                  background: sel ? "rgba(37, 99, 235, 0.05)" : bg,
+                  color: fg, position: "relative",
+                  boxShadow: sel ? "0 0 0 4px rgba(37,99,235,0.15)" : "0 1px 3px rgba(0,0,0,0.05)",
+                  transform: sel ? "translateY(-1px)" : "none",
+                  transition: "border 120ms ease, box-shadow 120ms ease, background 120ms ease, transform 120ms ease",
                   cursor: "pointer", userSelect: "none", outline: "none"
                 }}
               >
+                {sel && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 8,
+                      right: 8,
+                      background: "#2563eb",
+                      color: "white",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      borderRadius: 999,
+                      padding: "3px 8px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
+                    }}
+                  >
+                    Selected
+                  </div>
+                )}
                 <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
 
                 {/* Preview */}
