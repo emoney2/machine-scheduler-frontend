@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 
-const [loading, setLoading] = useState(true);
-
 // ---------- Config ----------
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
@@ -294,13 +292,6 @@ export default function FurList() {
     } else {
       showToast(`Batch failed — nothing written`, "error", 2600);
     }
-
-    setSelected({});
-    setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
-
-    // Re-fetch once to sync any formula-driven changes
-    await fetchOrders({ refresh: true });
-  }
 
     setSelected({});
     setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
