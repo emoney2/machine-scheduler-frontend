@@ -265,42 +265,40 @@ export default function FurList() {
     }
   }
 
-  // Batch complete (parallel 8 at a time)
   async function completeSelected() {
     const ids = Object.keys(selected).filter(id => selected[id]);
     if (!ids.length) return;
 
-    const items = cards.filter(o => ids.includes(String(o["Order #"])))
+    const items = cards
+      .filter(o => ids.includes(String(o["Order #"])))
       .map(o => ({ orderId: String(o["Order #"]), quantity: o["Quantity"] || 0 }));
 
     setSaving(prev => { const n = { ...prev }; items.forEach(it => n[it.orderId] = true); return n; });
 
-    const chunk = 8;
-    let okCount = 0, failCount = 0;
-    for (let i = 0; i < items.length; i += chunk) {
-      const slice = items.slice(i, i + chunk);
-      const proms = slice.map(it =>
-        axios.post(`${API_ROOT}/fur/complete`, it, { withCredentials: true })
-          .then(r => (r.data?.ok ? "ok" : "fail"))
-          .catch(() => "fail")
-      );
-      const results = await Promise.all(proms);
-      okCount += results.filter(x => x === "ok").length;
-      failCount += results.filter(x => x === "fail").length;
+    let ok = false, wrote = 0;
+    try {
+      const r = await axios.post(`${API_ROOT}/fur/completeBatch`, { items }, { withCredentials: true });
+      ok = !!r.data?.ok;
+      wrote = r.data?.wrote || 0;
+    } catch (e) {
+      ok = false;
     }
 
-    // Optimistic removal
-    setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
+    if (ok) {
+      // Optimistic removal of succeeded orders
+      setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
+      showToast(`Completed ${wrote} orders`, "success");
+    } else {
+      showToast(`Batch failed — nothing written`, "error", 2600);
+    }
+
     setSelected({});
     setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
 
-    // Re-fetch from Sheets once to sync any formula-driven changes
+    // Re-sync from Sheets
     await fetchOrders({ refresh: true });
-
-    if (failCount === 0) showToast(`Completed ${okCount} orders`, "success");
-    else showToast(`Completed ${okCount}, failed ${failCount}`, "error", 2600);
-
   }
+
 
   function toggleSelect(id, on = undefined) {
     setSelected(prev => {
