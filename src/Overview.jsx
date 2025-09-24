@@ -364,6 +364,40 @@ function BasicImg({ src, alt = "", style }) {
 }
 
 
+function SecureImage({ candidates = [], alt = "", style }) {
+  const [src, setSrc] = React.useState(candidates?.[0] || "");
+  const idxRef = React.useRef(0);
+
+  React.useEffect(() => {
+    idxRef.current = 0;
+    setSrc(candidates?.[0] || "");
+  }, [candidates]);
+
+  const handleError = () => {
+    const next = idxRef.current + 1;
+    idxRef.current = next;
+    if (next < (candidates?.length || 0)) {
+      setSrc(candidates[next]);
+    } else {
+      // no more fallbacks — hide the img
+      setSrc("");
+    }
+  };
+
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      fetchpriority="low"
+      style={style}
+      onError={handleError}
+    />
+  );
+}
+
 /** ThreadThumb: tries private backend image first, shows color swatch as fallback layer */
 function ThreadThumb({ name, fallbackColor }) {
   const candidates = React.useMemo(() => urlCandidatesForThreadImage(name), [name]);
@@ -380,6 +414,7 @@ function ThreadThumb({ name, fallbackColor }) {
     </div>
   );
 }
+
 
 // ——— Styles (added) ——————————————————————————————————————————————
 const header = { fontSize: 14, fontWeight: 700, marginBottom: 8 };
