@@ -648,7 +648,7 @@ export default function Overview() {
 
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
-            const res = await axios.get(`${API_ROOT}/overview/metrics`, cfg);
+            const res = await axios.get(`${ROOT}/overview/metrics`, cfg);
             if (!alive) return;
             setMetrics(res.data || null);
             break; // success
@@ -669,8 +669,6 @@ export default function Overview() {
     })();
     return () => { alive = false; };
   }, []);
-
-
 
   // Modal rows
   const modalRows = useMemo(() => {
