@@ -39,6 +39,22 @@ export default function OrderSubmission() {
   const [overlayVisibleOnce, setOverlayVisibleOnce] = useState(false);
   const [hasStartedLoadingFiles, setHasStartedLoadingFiles] = useState(false);
 
+  // NEW: loading flags for catalog fetches
+  const [loadingDirectory, setLoadingDirectory] = useState(false);
+  const [loadingProducts, setLoadingProducts]   = useState(false);
+  const [loadingMaterials, setLoadingMaterials] = useState(false);
+
+  const isLoadingCatalog =
+    loadingDirectory || loadingProducts || loadingMaterials;
+
+  const getLoadingMessage = () => {
+    if (loadingDirectory) return "Loading customers…";
+    if (loadingProducts)  return "Loading products…";
+    if (loadingMaterials) return "Loading materials…";
+    return "Loading…";
+  };
+
+
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
   const companyInputRef = useRef(null);
@@ -382,64 +398,76 @@ const handleBackMaterialInput = (e) => {
 
   useEffect(() => {
     const fetchDirectory = async () => {
-      const cfg = {
-        withCredentials: true,
-        timeout: 90000, // ↑ allow slow sheets
-        validateStatus: s => s >= 200 && s < 400,
-      };
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          const res = await axios.get(`${API_ROOT}/directory`, cfg);
-          const arr = Array.isArray(res.data) ? res.data : [];
-          console.log(`[/directory] payload size (attempt ${attempt}):`, arr.length);
-          const opts = arr
-            .map((c) => ({ value: c, label: c }))
-            .sort((a, b) => a.label.localeCompare(b.label));
-          setCompanies(opts);
-          return;
-        } catch (err) {
-          console.error(`Directory attempt ${attempt} failed:`, err?.message || err);
-          if (attempt === 3) setCompanies([]);
-          else await new Promise(r => setTimeout(r, 1000 * attempt)); // 1s, 2s
+      setLoadingDirectory(true);
+      try {
+        const cfg = {
+          withCredentials: true,
+          timeout: 90000,
+          validateStatus: s => s >= 200 && s < 400,
+        };
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await axios.get(`${API_ROOT}/directory`, cfg);
+            const arr = Array.isArray(res.data) ? res.data : [];
+            console.log(`[/directory] payload size (attempt ${attempt}):`, arr.length);
+            const opts = arr
+              .map((c) => ({ value: c, label: c }))
+              .sort((a, b) => a.label.localeCompare(b.label));
+            setCompanies(opts);
+            return;
+          } catch (err) {
+            console.error(`Directory attempt ${attempt} failed:`, err?.message || err);
+            if (attempt === 3) setCompanies([]);
+            else await new Promise(r => setTimeout(r, 1000 * attempt));
+          }
         }
+      } finally {
+        setLoadingDirectory(false);
       }
     };
     fetchDirectory();
   }, []);
 
 
+
    // ─── Fetch products ────────────────────────────────────────────────
-   useEffect(() => {
-     const fetchProducts = async () => {
-       const cfg = {
-         withCredentials: true,
-         timeout: 90000,
-         validateStatus: s => s >= 200 && s < 400,
-       };
-       for (let attempt = 1; attempt <= 3; attempt++) {
-         try {
-           const res = await axios.get(`${API_ROOT}/products`, cfg);
-           const arr = Array.isArray(res.data) ? res.data : [];
-           console.log(`[/products] payload size (attempt ${attempt}):`, arr.length);
-           setProducts(arr);
-           return;
-         } catch (err) {
-           console.error(`Products attempt ${attempt} failed:`, err?.message || err);
-           if (attempt === 3) setProducts([]);
-           else await new Promise(r => setTimeout(r, 1000 * attempt));
-         }
-       }
-     };
-     fetchProducts();
-   }, []);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setLoadingProducts(true);
+      try {
+        const cfg = {
+          withCredentials: true,
+          timeout: 90000,
+          validateStatus: s => s >= 200 && s < 400,
+        };
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await axios.get(`${API_ROOT}/products`, cfg);
+            const arr = Array.isArray(res.data) ? res.data : [];
+            console.log(`[/products] payload size (attempt ${attempt}):`, arr.length);
+            setProducts(arr);
+            return;
+          } catch (err) {
+            console.error(`Products attempt ${attempt} failed:`, err?.message || err);
+            if (attempt === 3) setProducts([]);
+            else await new Promise(r => setTimeout(r, 1000 * attempt));
+          }
+        }
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
 
 
   // ─── Fetch materials inventory from Sheet ──────────────────────
 useEffect(() => {
+  setLoadingMaterials(true);
   const cfg = {
     withCredentials: true,
-    timeout: 45000, // ↑ was 15s
+    timeout: 45000,
     validateStatus: s => s >= 200 && s < 400,
   };
   axios.get(`${API_ROOT}/materials`, cfg)
@@ -451,8 +479,10 @@ useEffect(() => {
     .catch(err => {
       console.error("Failed to load materials:", err?.message || err);
       setMaterialsInv([]);
-    });
+    })
+    .finally(() => setLoadingMaterials(false));
 }, []);
+
 
 
 
@@ -1096,6 +1126,37 @@ const handleSaveNewCompany = async () => {
 
   return (
     <>
+      {isLoadingCatalog && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(255, 255, 0, 0.35)", // transparent yellow
+            backdropFilter: "blur(1px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            pointerEvents: "none", // overlay blocks clicks visually but doesn't steal them
+          }}
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div
+            style={{
+              padding: "16px 24px",
+              borderRadius: 16,
+              background: "rgba(255,255,255,0.85)",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
+              fontSize: 18,
+              fontWeight: 600,
+            }}
+          >
+            {getLoadingMessage()}
+          </div>
+        </div>
+      )}
+
       {isSubmittingOverlay && (
         <div style={{
           position: "fixed",
