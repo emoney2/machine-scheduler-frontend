@@ -634,22 +634,34 @@ export default function Overview() {
     return () => clearInterval(id);
   }, [gmailPopup]);
 
-  // ▼ NEW: fetch Headcovers Sold / Day + Goal from Overview!V1:X2
+  // ▼ Fetch Performance Metrics (Overview!V1:X2)
   useEffect(() => {
     let alive = true;
     (async () => {
+      setLoadingMetrics(true);
       try {
-        setLoadingMetrics(true);
-        const res = await axios.get(`${ROOT}/overview/metrics`, {
+        const cfg = {
           withCredentials: true,
-          timeout: 15000,
-        });
-        if (!alive) return;
-        setMetrics(res.data || null);
-      } catch (e) {
-        console.error("Failed to load overview metrics", e?.message || e);
-        if (!alive) return;
-        setMetrics(null);
+          timeout: 60000, // allow slow Sheets
+          validateStatus: (s) => s >= 200 && s < 400,
+        };
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const res = await axios.get(`${API_ROOT}/overview/metrics`, cfg);
+            if (!alive) return;
+            setMetrics(res.data || null);
+            break; // success
+          } catch (err) {
+            if (attempt === 3) {
+              if (!alive) return;
+              console.error(`overview/metrics failed (attempt ${attempt}):`, err?.message || err);
+              setMetrics(null);
+            } else {
+              await new Promise((r) => setTimeout(r, attempt * 1000)); // 1s, 2s
+            }
+          }
+        }
       } finally {
         if (!alive) return;
         setLoadingMetrics(false);
@@ -657,6 +669,7 @@ export default function Overview() {
     })();
     return () => { alive = false; };
   }, []);
+
 
 
   // Modal rows
