@@ -799,49 +799,72 @@ export default function Overview() {
               boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
               padding: 12,
               overflow: "hidden",
+              position: "relative", // for overlay
             }}
           >
             <div style={header}>Performance Metrics</div>
 
+            {/* Yellow transparent overlay while loading this block */}
             {loadingMetrics && (
-              <div style={{ fontSize: 12, color: "#888" }}>Loading…</div>
-            )}
-
-            {!loadingMetrics && (
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, 1fr)",
-                  gap: 10,
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(255,255,0,0.25)",
+                  backdropFilter: "blur(1px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                  pointerEvents: "none",
                 }}
+                aria-live="polite"
+                aria-busy="true"
               >
-                {/* Headcovers Sold / Day */}
-                <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                  <div style={{ fontSize: 12, color: "#666" }}>
-                    Headcovers Sold / Day
-                  </div>
-                  <div style={{ fontSize: 28, fontWeight: 800 }}>
-                    {(() => {
-                      const v = Number(metrics?.sold_per_day);
-                      return Number.isFinite(v) ? v.toFixed(2) : "—";
-                    })()}
-                  </div>
-                </div>
-
-                {/* Goal */}
-                <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                  <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
-                  <div style={{ fontSize: 28, fontWeight: 800 }}>
-                    {(() => {
-                      const g = Number(metrics?.goal);
-                      return Number.isFinite(g) ? g : "—";
-                    })()}
-                  </div>
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,0.85)",
+                    fontWeight: 700,
+                  }}
+                >
+                  Loading…
                 </div>
               </div>
             )}
-          </div>
 
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: 10,
+                opacity: loadingMetrics ? 0.6 : 1,
+              }}
+            >
+              {/* Headcovers Sold / Day (V2 directly) */}
+              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: "#666" }}>Headcovers Sold / Day</div>
+                <div style={{ fontSize: 28, fontWeight: 800 }}>
+                  {(() => {
+                    const v = metrics?.headcovers_sold; // V2 literal (no coercion)
+                    return (v !== undefined && v !== null && String(v).trim() !== "") ? String(v) : "—";
+                  })()}
+                </div>
+              </div>
+
+              {/* Goal (X2) */}
+              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
+                <div style={{ fontSize: 28, fontWeight: 800 }}>
+                  {(() => {
+                    const g = Number(metrics?.goal);
+                    return Number.isFinite(g) ? g : "—";
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
           {/* Department Status */}
           <div
             style={{
@@ -877,11 +900,42 @@ export default function Overview() {
               boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
               padding: 12,
               overflow: "hidden",
+              position: "relative",
             }}
           >
             <div style={{ ...header, textAlign: "center" }}>
               Upcoming Jobs (Ship in next {daysWindow} days)
             </div>
+
+            {/* Yellow transparent overlay while loading this block */}
+            {loadingUpcoming && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(255,255,0,0.25)",
+                  backdropFilter: "blur(1px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                  pointerEvents: "none",
+                }}
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,0.85)",
+                    fontWeight: 700,
+                  }}
+                >
+                  Loading…
+                </div>
+              </div>
+            )}
 
             {/* column headers */}
             <div
@@ -894,6 +948,7 @@ export default function Overview() {
                 fontSize: 11,
                 fontWeight: 600,
                 color: "#666",
+                opacity: loadingUpcoming ? 0.6 : 1,
               }}
             >
               <div style={{ ...imgBox, border: "0", background: "transparent" }} />
@@ -909,117 +964,119 @@ export default function Overview() {
               <div style={{ ...col(110, true) }}>Hard/Soft</div>
             </div>
 
-            {loadingUpcoming && <div>Loading…</div>}
             {!loadingUpcoming && !upcoming.length && (
               <div>No jobs in the next {daysWindow} days.</div>
             )}
 
-            {!loadingUpcoming &&
-              upcoming.map((job, idx) => {
-                const ring = ringColorByShipDate(job["Ship Date"]);
-                const imageUrl = getJobThumbUrl(job, ROOT);
+            <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
+              {!loadingUpcoming &&
+                upcoming.map((job, idx) => {
+                  const ring = ringColorByShipDate(job["Ship Date"]);
+                  const imageUrl = getJobThumbUrl(job, ROOT);
 
-                return (
-                  <div key={idx} style={rowCard}>
-                    <div style={{ ...imgBox, borderColor: ring }}>
-                      {imageUrl ? (
-                        <img
-                          src={imageUrl}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          width={160}
-                          height={80}
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            display: "block",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        <div style={{ fontSize: 13, color: "#999" }}>No img</div>
-                      )}
-                    </div>
+                  return (
+                    <div key={idx} style={rowCard}>
+                      <div style={{ ...imgBox, borderColor: ring }}>
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            width={160}
+                            height={80}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "block",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 13, color: "#999" }}>No img</div>
+                        )}
+                      </div>
 
-                    {/* Uniform 13px fonts; key values slightly bolder */}
-                    <div
-                      style={{
-                        width: 58,
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: "#111827",
-                      }}
-                      title={String(job["Order #"] || "")}
-                    >
-                      {job["Order #"]}
+                      {/* Uniform 13px fonts; key values slightly bolder */}
+                      <div
+                        style={{
+                          width: 58,
+                          fontWeight: 600,
+                          fontSize: 13,
+                          color: "#111827",
+                        }}
+                        title={String(job["Order #"] || "")}
+                      >
+                        {job["Order #"]}
+                      </div>
+                      <div
+                        style={{ ...col(250), fontSize: 13, color: "#374151" }}
+                        title={String(job["Company Name"] || "")}
+                      >
+                        {job["Company Name"]}
+                      </div>
+                      <div
+                        style={{ ...col(150), fontSize: 13, color: "#374151" }}
+                        title={String(job["Design"] || "")}
+                      >
+                        {job["Design"]}
+                      </div>
+                      <div
+                        style={{
+                          ...col(56, true),
+                          fontWeight: 600,
+                          fontSize: 13,
+                          color: "#111827",
+                        }}
+                        title={String(job["Quantity"] || "")}
+                      >
+                        {job["Quantity"]}
+                      </div>
+                      <div
+                        style={{ ...col(120), fontSize: 13, color: "#374151" }}
+                        title={String(job["Product"] || "")}
+                      >
+                        {job["Product"]}
+                      </div>
+                      <div
+                        style={{ ...col(90), fontSize: 13, color: "#374151" }}
+                        title={String(job["Stage"] || "")}
+                      >
+                        {job["Stage"]}
+                      </div>
+                      <div
+                        style={{ ...col(64, true), fontSize: 13, color: "#374151" }}
+                        title={String(job["Due Date"] || "")}
+                      >
+                        {fmtMMDD(job["Due Date"])}
+                      </div>
+                      <div
+                        style={{ ...col(50, true), fontSize: 13, color: "#374151" }}
+                        title={String(job["Print"] || "")}
+                      >
+                        {job["Print"]}
+                      </div>
+                      <div
+                        style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }}
+                        title={String(job["Ship Date"] || "")}
+                      >
+                        {fmtMMDD(job["Ship Date"])}
+                      </div>
+                      <div
+                        style={{ ...col(110, true), fontSize: 13, color: "#374151" }}
+                        title={String(pickHardSoft(job) || "")}
+                      >
+                        {showMMDDorRaw(pickHardSoft(job))}
+                      </div>
                     </div>
-                    <div
-                      style={{ ...col(250), fontSize: 13, color: "#374151" }}
-                      title={String(job["Company Name"] || "")}
-                    >
-                      {job["Company Name"]}
-                    </div>
-                    <div
-                      style={{ ...col(150), fontSize: 13, color: "#374151" }}
-                      title={String(job["Design"] || "")}
-                    >
-                      {job["Design"]}
-                    </div>
-                    <div
-                      style={{
-                        ...col(56, true),
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: "#111827",
-                      }}
-                      title={String(job["Quantity"] || "")}
-                    >
-                      {job["Quantity"]}
-                    </div>
-                    <div
-                      style={{ ...col(120), fontSize: 13, color: "#374151" }}
-                      title={String(job["Product"] || "")}
-                    >
-                      {job["Product"]}
-                    </div>
-                    <div
-                      style={{ ...col(90), fontSize: 13, color: "#374151" }}
-                      title={String(job["Stage"] || "")}
-                    >
-                      {job["Stage"]}
-                    </div>
-                    <div
-                      style={{ ...col(64, true), fontSize: 13, color: "#374151" }}
-                      title={String(job["Due Date"] || "")}
-                    >
-                      {fmtMMDD(job["Due Date"])}
-                    </div>
-                    <div
-                      style={{ ...col(50, true), fontSize: 13, color: "#374151" }}
-                      title={String(job["Print"] || "")}
-                    >
-                      {job["Print"]}
-                    </div>
-                    <div
-                      style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }}
-                      title={String(job["Ship Date"] || "")}
-                    >
-                      {fmtMMDD(job["Ship Date"])}
-                    </div>
-                    <div
-                      style={{ ...col(110, true), fontSize: 13, color: "#374151" }}
-                      title={String(pickHardSoft(job) || "")}
-                    >
-                      {showMMDDorRaw(pickHardSoft(job))}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+            </div>
           </div>
+
 
           {/* Materials To Order */}
           <div
@@ -1030,135 +1087,169 @@ export default function Overview() {
               boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
               padding: 12,
               overflow: "hidden",
+              position: "relative",
             }}
           >
             <div style={header}>Materials To Order (Grouped by Vendor)</div>
-            {loadingMaterials && <div>Loading…</div>}
+
+            {/* Yellow transparent overlay while loading this block */}
+            {loadingMaterials && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(255,255,0,0.25)",
+                  backdropFilter: "blur(1px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                  pointerEvents: "none",
+                }}
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,0.85)",
+                    fontWeight: 700,
+                  }}
+                >
+                  Loading…
+                </div>
+              </div>
+            )}
+
             {!loadingMaterials && !materials.length && (
               <div>No materials currently flagged.</div>
             )}
-            {!loadingMaterials &&
-              materials.map((grp, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    border: "1px solid #eee",
-                    borderRadius: 10,
-                    padding: 10,
-                    marginBottom: 10,
-                  }}
-                >
+
+            <div style={{ opacity: loadingMaterials ? 0.6 : 1 }}>
+              {!loadingMaterials &&
+                materials.map((grp, idx) => (
                   <div
+                    key={idx}
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
+                      border: "1px solid #eee",
+                      borderRadius: 10,
+                      padding: 10,
+                      marginBottom: 10,
                     }}
                   >
-                    <div style={{ fontWeight: 700, fontSize: 13 }}>
-                      {grp.vendor || "Unknown Vendor"}
-                    </div>
-                    <button
-                      onClick={() => {
-                        const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
-                        const vMethod = (v.method || "").toLowerCase();
-                        setOrderMethod(
-                          vMethod.includes("online") || vMethod.includes("website")
-                            ? "website"
-                            : "email"
-                        );
-                        setModalOpenForVendor(grp.vendor);
-                      }}
+                    <div
                       style={{
-                        padding: "5px 8px",
-                        fontSize: 12,
-                        borderRadius: 8,
-                        border: "1px solid #ccc",
-                        cursor: "pointer",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
                       }}
                     >
-                      Order Material
-                    </button>
-                  </div>
-                  <div style={{ marginTop: 6 }}>
-                    {(grp.items || []).map((it, j) => {
-                      const isThread =
-                        String(it.type || "Material").toLowerCase() === "thread";
-                      const swatch = isThread ? colorFromName(it.name) : null;
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>
+                        {grp.vendor || "Unknown Vendor"}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
+                          const vMethod = (v.method || "").toLowerCase();
+                          setOrderMethod(
+                            vMethod.includes("online") || vMethod.includes("website")
+                              ? "website"
+                              : "email"
+                          );
+                          setModalOpenForVendor(grp.vendor);
+                        }}
+                        style={{
+                          padding: "5px 8px",
+                          fontSize: 12,
+                          borderRadius: 8,
+                          border: "1px solid #ccc",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Order Material
+                      </button>
+                    </div>
+                    <div style={{ marginTop: 6 }}>
+                      {(grp.items || []).map((it, j) => {
+                        const isThread =
+                          String(it.type || "Material").toLowerCase() === "thread";
+                        const swatch = isThread ? colorFromName(it.name) : null;
 
-                      return (
-                        <div
-                          key={j}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            fontSize: 12,
-                            lineHeight: "16px",
-                            padding: "2px 0",
-                          }}
-                        >
-                          {/* Thumb */}
+                        return (
                           <div
+                            key={j}
                             style={{
-                              width: 36,
-                              height: 24,
-                              borderRadius: 4,
-                              border: "1px solid #ddd",
-                              overflow: "hidden",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center",
-                              background: "#fafafa",
-                              flex: "0 0 36px",
+                              gap: 10,
+                              fontSize: 12,
+                              lineHeight: "16px",
+                              padding: "2px 0",
                             }}
-                            aria-label={isThread ? "Thread image" : "Material image"}
-                            title={it.name}
                           >
-                            {isThread ? (
-                              <ThreadThumb name={it.name} fallbackColor={swatch} />
-                            ) : (
-                              <BasicImg
-                                src={materialImgUrl(ROOT, grp.vendor, it.name)}
-                                alt=""
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  objectFit: "cover",
-                                  display: "block",
-                                }}
-                              />
-                            )}
-                          </div>
-                          {/* Name */}
-                          <div
-                            style={{
-                              width: 240,
-                              whiteSpace: "nowrap",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                            title={it.name}
-                          >
-                            {it.name}
-                          </div>
+                            {/* Thumb */}
+                            <div
+                              style={{
+                                width: 36,
+                                height: 24,
+                                borderRadius: 4,
+                                border: "1px solid #ddd",
+                                overflow: "hidden",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                background: "#fafafa",
+                                flex: "0 0 36px",
+                              }}
+                              aria-label={isThread ? "Thread image" : "Material image"}
+                              title={it.name}
+                            >
+                              {isThread ? (
+                                <ThreadThumb name={it.name} fallbackColor={swatch} />
+                              ) : (
+                                <BasicImg
+                                  src={materialImgUrl(ROOT, grp.vendor, it.name)}
+                                  alt=""
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                    display: "block",
+                                  }}
+                                />
+                              )}
+                            </div>
+                            {/* Name */}
+                            <div
+                              style={{
+                                width: 240,
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                              title={it.name}
+                            >
+                              {it.name}
+                            </div>
 
-                          {/* Qty / Unit / Type */}
-                          <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
-                            {it.qty}
+                            {/* Qty / Unit / Type */}
+                            <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
+                              {it.qty}
+                            </div>
+                            <div style={{ width: 60 }} title={it.unit || ""}>
+                              {it.unit || ""}
+                            </div>
+                            <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
+                              {it.type || "Material"}
+                            </div>
                           </div>
-                          <div style={{ width: 60 }} title={it.unit || ""}>
-                            {it.unit || ""}
-                          </div>
-                          <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
-                            {it.type || "Material"}
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+            </div>
           </div>
         </div>
       </div>
