@@ -474,6 +474,8 @@ export default function Overview() {
   const [requestBy, setRequestBy] = useState("");
 
   const [gmailPopup, setGmailPopup] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [loadingMetrics, setLoadingMetrics] = useState(true);
 
   // Load combined overview (upcoming + materials)
   useEffect(() => {
@@ -632,6 +634,31 @@ export default function Overview() {
     return () => clearInterval(id);
   }, [gmailPopup]);
 
+  // ▼ NEW: fetch Headcovers Sold / Day + Goal from Overview!V1:X2
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoadingMetrics(true);
+        const res = await axios.get(`${ROOT}/overview/metrics`, {
+          withCredentials: true,
+          timeout: 15000,
+        });
+        if (!alive) return;
+        setMetrics(res.data || null);
+      } catch (e) {
+        console.error("Failed to load overview metrics", e?.message || e);
+        if (!alive) return;
+        setMetrics(null);
+      } finally {
+        if (!alive) return;
+        setLoadingMetrics(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+
   // Modal rows
   const modalRows = useMemo(() => {
     if (!modalOpenForVendor) return [];
@@ -753,19 +780,47 @@ export default function Overview() {
   return (
     <div style={{ padding: 12 }}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "auto auto", gap: 16, padding: 16 }}>
-        {/* TL — Performance / Goals (placeholder metrics) */}
+        {/* TL — Sales Pace (Headcovers / Day + Goal) */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
-          <div style={header}>Company Performance</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-            {["On-Time Ship %","Avg Lead Time","Throughput (pcs/day)","Digitizing SLA","Embroidery Hours","WIP Count"].map((t,i) => (
-              <div key={i} style={{ border:"1px solid #eee", borderRadius:10, padding:10 }}>
-                <div style={{ fontSize:12, color:"#666" }}>{t}</div>
-                <div style={{ fontSize:22, fontWeight:700 }}>—</div>
-                <div style={{ fontSize:11, color:"#888" }}>calculating…</div>
+          <div style={header}>Sales Pace</div>
+
+          {loadingMetrics && (
+            <div style={{ fontSize: 12, color: "#888" }}>Loading…</div>
+          )}
+
+          {!loadingMetrics && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              {/* Headcovers Sold / Day */}
+              <div style={{ border:"1px solid #eee", borderRadius:10, padding:10 }}>
+                <div style={{ fontSize:12, color:"#666" }}>Headcovers Sold / Day</div>
+                <div style={{ fontSize:28, fontWeight:800 }}>
+                  {(() => {
+                    const v = Number(metrics?.sold_per_day);
+                    return Number.isFinite(v) ? v.toFixed(2) : "—";
+                  })()}
+                </div>
+                <div style={{ fontSize:11, color:"#888" }}>
+                  {Number.isFinite(Number(metrics?.headcovers_sold)) && Number.isFinite(Number(metrics?.business_days))
+                    ? `${metrics.headcovers_sold} sold across ${metrics.business_days} business days`
+                    : "from Overview!V1:X2"}
+                </div>
               </div>
-            ))}
-          </div>
+
+              {/* Goal */}
+              <div style={{ border:"1px solid #eee", borderRadius:10, padding:10 }}>
+                <div style={{ fontSize:12, color:"#666" }}>Goal</div>
+                <div style={{ fontSize:28, fontWeight:800 }}>
+                  {(() => {
+                    const g = Number(metrics?.goal);
+                    return Number.isFinite(g) ? g : "—";
+                  })()}
+                </div>
+                <div style={{ fontSize:11, color:"#888" }}>Goal (from Overview!V1:X2)</div>
+              </div>
+            </div>
+          )}
         </div>
+
 
         {/* TR — Upcoming Jobs */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
