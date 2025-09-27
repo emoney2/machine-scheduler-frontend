@@ -679,7 +679,8 @@ export default function Overview() {
     if (!grp) return [];
     return (grp.items || []).map(it => {
       const key = `${grp.vendor}:::${it.name}`;
-      return { vendor: grp.vendor, name: it.name, unit: it.unit || "", ...modalSelections[key], key };
+      const base = modalSelections[key] || {};
+      return { vendor: grp.vendor, name: it.name, unit: it.unit || "", ...base, key };
     });
   }, [modalOpenForVendor, modalSelections, materials]);
 
@@ -767,6 +768,7 @@ export default function Overview() {
         } else {
           materialPayload.push({ ...base, materialName: r.name, type: "Material" });
         }
+
       }
 
       if (materialPayload.length) {
