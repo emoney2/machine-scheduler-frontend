@@ -779,231 +779,390 @@ export default function Overview() {
 
   return (
     <div style={{ padding: 12 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "auto auto", gap: 16, padding: 16 }}>
-        {/* TL — Sales Pace (Headcovers / Day + Goal) */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
-          <div style={header}>Sales Pace</div>
-
-          {loadingMetrics && (
-            <div style={{ fontSize: 12, color: "#888" }}>Loading…</div>
-          )}
-
-          {!loadingMetrics && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-              {/* Headcovers Sold / Day */}
-              <div style={{ border:"1px solid #eee", borderRadius:10, padding:10 }}>
-                <div style={{ fontSize:12, color:"#666" }}>Headcovers Sold / Day</div>
-                <div style={{ fontSize:28, fontWeight:800 }}>
-                  {(() => {
-                    const v = Number(metrics?.sold_per_day);
-                    return Number.isFinite(v) ? v.toFixed(2) : "—";
-                  })()}
-                </div>
-                <div style={{ fontSize:11, color:"#888" }}>
-                  {Number.isFinite(Number(metrics?.headcovers_sold)) && Number.isFinite(Number(metrics?.business_days))
-                    ? `${metrics.headcovers_sold} sold across ${metrics.business_days} business days`
-                    : "from Overview!V1:X2"}
-                </div>
-              </div>
-
-              {/* Goal */}
-              <div style={{ border:"1px solid #eee", borderRadius:10, padding:10 }}>
-                <div style={{ fontSize:12, color:"#666" }}>Goal</div>
-                <div style={{ fontSize:28, fontWeight:800 }}>
-                  {(() => {
-                    const g = Number(metrics?.goal);
-                    return Number.isFinite(g) ? g : "—";
-                  })()}
-                </div>
-                <div style={{ fontSize:11, color:"#888" }}>Goal (from Overview!V1:X2)</div>
-              </div>
-            </div>
-          )}
-        </div>
-
-
-        {/* TR — Upcoming Jobs */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
-          <div style={{ ...header, textAlign: "center" }}>
-            Upcoming Jobs (Ship in next {daysWindow} days)
-          </div>
-
-          {/* column headers */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)",
+          gap: 16,
+          padding: 16,
+          alignItems: "start", // keep columns from stretching to match heights
+        }}
+      >
+        {/* LEFT COLUMN: Performance Metrics + Department Status */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Performance Metrics (Headcovers / Day + Goal) */}
           <div
             style={{
-              ...rowCard,
-              padding: "4px 8px",
-              marginBottom: 8,
-              background: "#fafafa",
-              borderColor: "#eee",
-              fontSize: 11,
-              fontWeight: 600,
-              color: "#666",
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
             }}
           >
-            <div style={{ ...imgBox, border: "0", background: "transparent" }} />
-            <div style={{ width: 58 }}>Order #</div>
-            <div style={col(250)}>Company Name</div>
-            <div style={col(150)}>Design</div>
-            <div style={{ ...col(56, true) }}>Qty</div>
-            <div style={col(120)}>Product</div>
-            <div style={col(90)}>Stage</div>
-            <div style={{ ...col(64, true) }}>Due</div>
-            <div style={{ ...col(50, true) }}>Print</div>
-            <div style={{ ...col(68, true) }}>Ship</div>
-            <div style={{ ...col(110, true) }}>Hard/Soft</div>
+            <div style={header}>Performance Metrics</div>
+
+            {loadingMetrics && (
+              <div style={{ fontSize: 12, color: "#888" }}>Loading…</div>
+            )}
+
+            {!loadingMetrics && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(2, 1fr)",
+                  gap: 10,
+                }}
+              >
+                {/* Headcovers Sold / Day */}
+                <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 12, color: "#666" }}>
+                    Headcovers Sold / Day
+                  </div>
+                  <div style={{ fontSize: 28, fontWeight: 800 }}>
+                    {(() => {
+                      const v = Number(metrics?.sold_per_day);
+                      return Number.isFinite(v) ? v.toFixed(2) : "—";
+                    })()}
+                  </div>
+                </div>
+
+                {/* Goal */}
+                <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
+                  <div style={{ fontSize: 28, fontWeight: 800 }}>
+                    {(() => {
+                      const g = Number(metrics?.goal);
+                      return Number.isFinite(g) ? g : "—";
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {loadingUpcoming && <div>Loading…</div>}
-          {!loadingUpcoming && !upcoming.length && <div>No jobs in the next {daysWindow} days.</div>}
-
-          {!loadingUpcoming && upcoming.map((job, idx) => {
-            const ring = ringColorByShipDate(job["Ship Date"]);
-            const imageUrl = getJobThumbUrl(job, ROOT);
-
-            return (
-              <div key={idx} style={rowCard}>
-                <div style={{ ...imgBox, borderColor: ring }}>
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      width={160}
-                      height={80}
-                      onError={(e) => { e.currentTarget.style.display = "none"; }}
-                      style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
-                    />
-                  ) : (
-                    <div style={{ fontSize: 13, color: "#999" }}>No img</div>
-                  )}
+          {/* Department Status */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+            }}
+          >
+            <div style={header}>Department Status</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+              {["Digitizing", "Fur", "Cut", "Print", "Embroidery", "Sewing"].map((d, i) => (
+                <div key={i} style={{ border: "1px solid #eee", borderRadius: 10, padding: 10, minHeight: 72 }}>
+                  <div style={{ fontSize: 12, color: "#666" }}>{d}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>—</div>
+                  <div style={{ fontSize: 11, color: "#888" }}>calculating…</div>
                 </div>
-
-                {/* Uniform 13px fonts; key values slightly bolder */}
-                <div style={{ width: 58, fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Order #"] || "")}>
-                  {job["Order #"]}
-                </div>
-                <div style={{ ...col(250), fontSize: 13, color: "#374151" }} title={String(job["Company Name"] || "")}>
-                  {job["Company Name"]}
-                </div>
-                <div style={{ ...col(150), fontSize: 13, color: "#374151" }} title={String(job["Design"] || "")}>
-                  {job["Design"]}
-                </div>
-                <div style={{ ...col(56, true), fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Quantity"] || "")}>
-                  {job["Quantity"]}
-                </div>
-                <div style={{ ...col(120), fontSize: 13, color: "#374151" }} title={String(job["Product"] || "")}>
-                  {job["Product"]}
-                </div>
-                <div style={{ ...col(90), fontSize: 13, color: "#374151" }} title={String(job["Stage"] || "")}>
-                  {job["Stage"]}
-                </div>
-                <div style={{ ...col(64, true), fontSize: 13, color: "#374151" }} title={String(job["Due Date"] || "")}>
-                  {fmtMMDD(job["Due Date"])}
-                </div>
-                <div style={{ ...col(50, true), fontSize: 13, color: "#374151" }} title={String(job["Print"] || "")}>
-                  {job["Print"]}
-                </div>
-                <div style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }} title={String(job["Ship Date"] || "")}>
-                  {fmtMMDD(job["Ship Date"])}
-                </div>
-                <div style={{ ...col(110, true), fontSize: 13, color: "#374151" }} title={String(pickHardSoft(job) || "")}>
-                  {showMMDDorRaw(pickHardSoft(job))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-
-
-        {/* BL — Department status (placeholders) */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
-          <div style={header}>Department Status</div>
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(6, 1fr)", gap:10 }}>
-            {["Digitizing","Fur","Cut","Print","Embroidery","Sewing"].map((d,i) => (
-              <div key={i} style={{ border:"1px solid #eee", borderRadius:10, padding:10, minHeight:72 }}>
-                <div style={{ fontSize:12, color:"#666" }}>{d}</div>
-                <div style={{ fontSize:22, fontWeight:700 }}>—</div>
-                <div style={{ fontSize:11, color:"#888" }}>calculating…</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* BR — Materials to order */}
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.05)", padding: 12, overflow: "hidden" }}>
-          <div style={header}>Materials To Order (Grouped by Vendor)</div>
-          {loadingMaterials && <div>Loading…</div>}
-          {!loadingMaterials && !materials.length && <div>No materials currently flagged.</div>}
-          {!loadingMaterials && materials.map((grp, idx) => (
-            <div key={idx} style={{ border:"1px solid #eee", borderRadius:10, padding:10, marginBottom:10 }}>
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                <div style={{ fontWeight:700, fontSize: 13 }}>{grp.vendor || "Unknown Vendor"}</div>
-                <button
-                  onClick={() => {
-                    const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
-                    const vMethod = (v.method || "").toLowerCase();
-                    setOrderMethod((vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email");
-                    setModalOpenForVendor(grp.vendor);
-                  }}
-                  style={{ padding:"5px 8px", fontSize:12, borderRadius:8, border:"1px solid #ccc", cursor:"pointer" }}
-                >
-                  Order Material
-                </button>
-              </div>
-              <div style={{ marginTop:6 }}>
-                {(grp.items || []).map((it, j) => {
-                  const isThread = String(it.type || "Material").toLowerCase() === "thread";
-                  const swatch = isThread ? colorFromName(it.name) : null;
-
-                  return (
-                    <div
-                      key={j}
-                      style={{ display:"flex", alignItems:"center", gap:10, fontSize:12, lineHeight:"16px", padding:"2px 0" }}
-                    >
-                      {/* Thumbnail box: tries private backend image via fetch-with-credentials; swatch underlays */}
-                      <div
-                        style={{
-                          width: 36, height: 24, borderRadius: 4, border: "1px solid #ddd",
-                          overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
-                          background: "#fafafa", flex: "0 0 36px"
-                        }}
-                        aria-label={isThread ? "Thread image" : "Material image"}
-                        title={it.name}
-                      >
-                        {isThread ? (
-                          <ThreadThumb name={it.name} fallbackColor={swatch} />
-                        ) : (
-                          // Try vendor + name via backend; SecureImage fetches with credentials and caches blobs
-                          <BasicImg
-                            src={materialImgUrl(ROOT, grp.vendor, it.name)}
-                            alt=""
-                            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                          />
-                        )}
-                      </div>
-                      {/* Name */}
-                      <div
-                        style={{ width: 240, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}
-                        title={it.name}
-                      >
-                        {it.name}
-                      </div>
-
-                      {/* Qty / Unit / Type */}
-                      <div style={{ width: 70, textAlign:"right" }} title={String(it.qty ?? "")}>{it.qty}</div>
-                      <div style={{ width: 60 }} title={it.unit || ""}>{it.unit || ""}</div>
-                      <div style={{ width: 80, color:"#666" }} title={it.type || "Material"}>{it.type || "Material"}</div>
-                    </div>
-                  );
-                })}
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Upcoming Jobs + Materials To Order */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Upcoming Jobs */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ ...header, textAlign: "center" }}>
+              Upcoming Jobs (Ship in next {daysWindow} days)
+            </div>
+
+            {/* column headers */}
+            <div
+              style={{
+                ...rowCard,
+                padding: "4px 8px",
+                marginBottom: 8,
+                background: "#fafafa",
+                borderColor: "#eee",
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#666",
+              }}
+            >
+              <div style={{ ...imgBox, border: "0", background: "transparent" }} />
+              <div style={{ width: 58 }}>Order #</div>
+              <div style={col(250)}>Company Name</div>
+              <div style={col(150)}>Design</div>
+              <div style={{ ...col(56, true) }}>Qty</div>
+              <div style={col(120)}>Product</div>
+              <div style={col(90)}>Stage</div>
+              <div style={{ ...col(64, true) }}>Due</div>
+              <div style={{ ...col(50, true) }}>Print</div>
+              <div style={{ ...col(68, true) }}>Ship</div>
+              <div style={{ ...col(110, true) }}>Hard/Soft</div>
+            </div>
+
+            {loadingUpcoming && <div>Loading…</div>}
+            {!loadingUpcoming && !upcoming.length && (
+              <div>No jobs in the next {daysWindow} days.</div>
+            )}
+
+            {!loadingUpcoming &&
+              upcoming.map((job, idx) => {
+                const ring = ringColorByShipDate(job["Ship Date"]);
+                const imageUrl = getJobThumbUrl(job, ROOT);
+
+                return (
+                  <div key={idx} style={rowCard}>
+                    <div style={{ ...imgBox, borderColor: ring }}>
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          width={160}
+                          height={80}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "block",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        <div style={{ fontSize: 13, color: "#999" }}>No img</div>
+                      )}
+                    </div>
+
+                    {/* Uniform 13px fonts; key values slightly bolder */}
+                    <div
+                      style={{
+                        width: 58,
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: "#111827",
+                      }}
+                      title={String(job["Order #"] || "")}
+                    >
+                      {job["Order #"]}
+                    </div>
+                    <div
+                      style={{ ...col(250), fontSize: 13, color: "#374151" }}
+                      title={String(job["Company Name"] || "")}
+                    >
+                      {job["Company Name"]}
+                    </div>
+                    <div
+                      style={{ ...col(150), fontSize: 13, color: "#374151" }}
+                      title={String(job["Design"] || "")}
+                    >
+                      {job["Design"]}
+                    </div>
+                    <div
+                      style={{
+                        ...col(56, true),
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: "#111827",
+                      }}
+                      title={String(job["Quantity"] || "")}
+                    >
+                      {job["Quantity"]}
+                    </div>
+                    <div
+                      style={{ ...col(120), fontSize: 13, color: "#374151" }}
+                      title={String(job["Product"] || "")}
+                    >
+                      {job["Product"]}
+                    </div>
+                    <div
+                      style={{ ...col(90), fontSize: 13, color: "#374151" }}
+                      title={String(job["Stage"] || "")}
+                    >
+                      {job["Stage"]}
+                    </div>
+                    <div
+                      style={{ ...col(64, true), fontSize: 13, color: "#374151" }}
+                      title={String(job["Due Date"] || "")}
+                    >
+                      {fmtMMDD(job["Due Date"])}
+                    </div>
+                    <div
+                      style={{ ...col(50, true), fontSize: 13, color: "#374151" }}
+                      title={String(job["Print"] || "")}
+                    >
+                      {job["Print"]}
+                    </div>
+                    <div
+                      style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }}
+                      title={String(job["Ship Date"] || "")}
+                    >
+                      {fmtMMDD(job["Ship Date"])}
+                    </div>
+                    <div
+                      style={{ ...col(110, true), fontSize: 13, color: "#374151" }}
+                      title={String(pickHardSoft(job) || "")}
+                    >
+                      {showMMDDorRaw(pickHardSoft(job))}
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          {/* Materials To Order */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+            }}
+          >
+            <div style={header}>Materials To Order (Grouped by Vendor)</div>
+            {loadingMaterials && <div>Loading…</div>}
+            {!loadingMaterials && !materials.length && (
+              <div>No materials currently flagged.</div>
+            )}
+            {!loadingMaterials &&
+              materials.map((grp, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    border: "1px solid #eee",
+                    borderRadius: 10,
+                    padding: 10,
+                    marginBottom: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>
+                      {grp.vendor || "Unknown Vendor"}
+                    </div>
+                    <button
+                      onClick={() => {
+                        const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
+                        const vMethod = (v.method || "").toLowerCase();
+                        setOrderMethod(
+                          vMethod.includes("online") || vMethod.includes("website")
+                            ? "website"
+                            : "email"
+                        );
+                        setModalOpenForVendor(grp.vendor);
+                      }}
+                      style={{
+                        padding: "5px 8px",
+                        fontSize: 12,
+                        borderRadius: 8,
+                        border: "1px solid #ccc",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Order Material
+                    </button>
+                  </div>
+                  <div style={{ marginTop: 6 }}>
+                    {(grp.items || []).map((it, j) => {
+                      const isThread =
+                        String(it.type || "Material").toLowerCase() === "thread";
+                      const swatch = isThread ? colorFromName(it.name) : null;
+
+                      return (
+                        <div
+                          key={j}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            fontSize: 12,
+                            lineHeight: "16px",
+                            padding: "2px 0",
+                          }}
+                        >
+                          {/* Thumb */}
+                          <div
+                            style={{
+                              width: 36,
+                              height: 24,
+                              borderRadius: 4,
+                              border: "1px solid #ddd",
+                              overflow: "hidden",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              background: "#fafafa",
+                              flex: "0 0 36px",
+                            }}
+                            aria-label={isThread ? "Thread image" : "Material image"}
+                            title={it.name}
+                          >
+                            {isThread ? (
+                              <ThreadThumb name={it.name} fallbackColor={swatch} />
+                            ) : (
+                              <BasicImg
+                                src={materialImgUrl(ROOT, grp.vendor, it.name)}
+                                alt=""
+                                style={{
+                                  width: "100%",
+                                  height: "100%",
+                                  objectFit: "cover",
+                                  display: "block",
+                                }}
+                              />
+                            )}
+                          </div>
+                          {/* Name */}
+                          <div
+                            style={{
+                              width: 240,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                            title={it.name}
+                          >
+                            {it.name}
+                          </div>
+
+                          {/* Qty / Unit / Type */}
+                          <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
+                            {it.qty}
+                          </div>
+                          <div style={{ width: 60 }} title={it.unit || ""}>
+                            {it.unit || ""}
+                          </div>
+                          <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
+                            {it.type || "Material"}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+          </div>
         </div>
       </div>
+
 
       {/* Order modal */}
       {modalOpenForVendor && (
