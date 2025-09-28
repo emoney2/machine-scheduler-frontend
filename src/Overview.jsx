@@ -12,9 +12,6 @@ const THREAD_IMG_BASE =
 
 const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 
-
-
-
 // --- Image helpers (single source of truth) ---
 // Handles =IMAGE("..."), uc?export=view&id=..., and /file/d/<id>/ patterns
 function extractFileIdFromFormulaOrUrl(input) {
@@ -44,14 +41,14 @@ function extractFileIdFromFormulaOrUrl(input) {
   return null;
 }
 
-
 // Prefer common fields; if none, scan the whole row for any Drive link.
-// Always return the proxy URL with a stable version key (?v=Order#) so it hits the disk cache.
+// Always return the **backend proxy** URL so auth/sizing/caching is handled server-side.
 function getJobThumbUrl(job, ROOT) {
+  const proxyForId = (id) => id ? `${ROOT}/drive/thumb/${id}?sz=w160` : null; // 👈 use proxy
   const toThumb = (idOrUrl) => {
     if (!idOrUrl) return null;
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
-    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
+    if (id) return proxyForId(id); // 👈 prefer proxy
     const s = String(idOrUrl);
     if (/^https?:\/\//i.test(s)) return s;
     return null;
@@ -87,6 +84,7 @@ function getJobThumbUrl(job, ROOT) {
 
   // Preferred fields, then arrays/attachments
   const fields = [
+    job.thumbnailUrl, // 👈 if your backend ever supplies this, take it first
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
     job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl, job.ImageURL,
     job.images, job.Images, job.imagesLabeled, job.images_labelled,
@@ -106,6 +104,7 @@ function getJobThumbUrl(job, ROOT) {
 
   return null;
 }
+
 
 
 
