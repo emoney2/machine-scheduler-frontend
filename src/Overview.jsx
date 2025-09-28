@@ -33,31 +33,68 @@ function extractFileIdFromFormulaOrUrl(v) {
 // Prefer common fields; if none, scan the whole row for any Drive link.
 // Always return the proxy URL with a stable version key (?v=Order#) so it hits the disk cache.
 function getJobThumbUrl(job, ROOT) {
+  // Try a single value (string/array/object)
+  const fromAny = (val) => {
+    if (!val) return null;
+
+    // If it's an array, try each entry
+    if (Array.isArray(val)) {
+      for (const item of val) {
+        const hit = fromAny(item);
+        if (hit) return hit;
+      }
+      return null;
+    }
+
+    // If it's an object, try common props that might hold the URL/ID
+    if (typeof val === "object") {
+      const candidates = [
+        val.src, val.url, val.href, val.link, val.image, val.thumbnail, val.preview,
+        val.Preview, val.Image, val.Thumbnail,
+      ];
+      for (const c of candidates) {
+        const hit = fromAny(c);
+        if (hit) return hit;
+      }
+      // As a last resort, stringify the object to catch embedded links
+      const s = JSON.stringify(val);
+      const idFromObj = extractFileIdFromFormulaOrUrl(s);
+      if (idFromObj) return `https://drive.google.com/thumbnail?id=${idFromObj}&sz=w160`;
+      const urlMatchObj = /https?:\/\/[^\s"]+/.exec(s);
+      if (urlMatchObj) return urlMatchObj[0];
+      return null;
+    }
+
+    // Primitive string pathway
+    const id = extractFileIdFromFormulaOrUrl(val);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
+    const s = String(val || "");
+    if (/^https?:\/\//i.test(s)) return s;
+    return null;
+  };
+
+  // Preferred direct fields first
   const fields = [
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
-    job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl
+    job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl,
+    // Arrays / nested structures commonly seen
+    job.images, job.Images, job.imagesLabeled, job.images_labelled, job.files, job.attachments,
   ];
 
   for (const f of fields) {
-    const id = extractFileIdFromFormulaOrUrl(f);
-    if (id) {
-      const vkey = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
-      return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
-    }
-    if (f && /^https?:\/\//i.test(String(f))) return f; // already a direct URL
+    const hit = fromAny(f);
+    if (hit) return hit;
   }
 
-  // Fallback: scan every field in the row for a Drive link
+  // Fallback: scan every field (including arrays/objects)
   for (const val of Object.values(job || {})) {
-    const s = String(val || "");
-    let m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m) {
-      const vkey = encodeURIComponent(String(job["Order #"] || job.orderNumber || job.id || "nov"));
-      return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w160`;
-    }
+    const hit = fromAny(val);
+    if (hit) return hit;
   }
+
   return null;
 }
+
 
 // 🔌 lightweight socket just for invalidations
 const socket = io(BACKEND_ROOT, {
@@ -917,196 +954,6 @@ export default function Overview() {
               ))}
             </div>
           </div>
-        </div>
-
-        {/* RIGHT COLUMN: Upcoming Jobs + Materials To Order */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Upcoming Jobs */}
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 10,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-              padding: 12,
-              overflow: "hidden",
-              position: "relative",
-            }}
-          >
-            <div style={{ ...header, textAlign: "center" }}>
-              Upcoming Jobs (Ship in next {daysWindow} days)
-            </div>
-
-            {/* Yellow transparent overlay while loading this block */}
-            {loadingUpcoming && (
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: "rgba(255,255,0,0.25)",
-                  backdropFilter: "blur(1px)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  zIndex: 1,
-                  pointerEvents: "none",
-                }}
-                aria-live="polite"
-                aria-busy="true"
-              >
-                <div
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 12,
-                    background: "rgba(255,255,255,0.85)",
-                    fontWeight: 700,
-                  }}
-                >
-                  Loading…
-                </div>
-              </div>
-            )}
-
-            {/* column headers */}
-            <div
-              style={{
-                ...rowCard,
-                padding: "4px 8px",
-                marginBottom: 8,
-                background: "#fafafa",
-                borderColor: "#eee",
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#666",
-                opacity: loadingUpcoming ? 0.6 : 1,
-              }}
-            >
-              <div style={{ ...imgBox, border: "0", background: "transparent" }} />
-              <div style={{ width: 58 }}>Order #</div>
-              <div style={col(250)}>Company Name</div>
-              <div style={col(150)}>Design</div>
-              <div style={{ ...col(56, true) }}>Qty</div>
-              <div style={col(120)}>Product</div>
-              <div style={col(90)}>Stage</div>
-              <div style={{ ...col(64, true) }}>Due</div>
-              <div style={{ ...col(50, true) }}>Print</div>
-              <div style={{ ...col(68, true) }}>Ship</div>
-              <div style={{ ...col(110, true) }}>Hard/Soft</div>
-            </div>
-
-            {!loadingUpcoming && !upcoming.length && (
-              <div>No jobs in the next {daysWindow} days.</div>
-            )}
-
-            <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
-              {!loadingUpcoming &&
-                upcoming.map((job, idx) => {
-                  const ring = ringColorByShipDate(job["Ship Date"]);
-                  const imageUrl = getJobThumbUrl(job, ROOT);
-
-                  return (
-                    <div key={idx} style={rowCard}>
-                      <div style={{ ...imgBox, borderColor: ring }}>
-                        {imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                            width={160}
-                            height={80}
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              display: "block",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div style={{ fontSize: 13, color: "#999" }}>No img</div>
-                        )}
-                      </div>
-
-                      {/* Uniform 13px fonts; key values slightly bolder */}
-                      <div
-                        style={{
-                          width: 58,
-                          fontWeight: 600,
-                          fontSize: 13,
-                          color: "#111827",
-                        }}
-                        title={String(job["Order #"] || "")}
-                      >
-                        {job["Order #"]}
-                      </div>
-                      <div
-                        style={{ ...col(250), fontSize: 13, color: "#374151" }}
-                        title={String(job["Company Name"] || "")}
-                      >
-                        {job["Company Name"]}
-                      </div>
-                      <div
-                        style={{ ...col(150), fontSize: 13, color: "#374151" }}
-                        title={String(job["Design"] || "")}
-                      >
-                        {job["Design"]}
-                      </div>
-                      <div
-                        style={{
-                          ...col(56, true),
-                          fontWeight: 600,
-                          fontSize: 13,
-                          color: "#111827",
-                        }}
-                        title={String(job["Quantity"] || "")}
-                      >
-                        {job["Quantity"]}
-                      </div>
-                      <div
-                        style={{ ...col(120), fontSize: 13, color: "#374151" }}
-                        title={String(job["Product"] || "")}
-                      >
-                        {job["Product"]}
-                      </div>
-                      <div
-                        style={{ ...col(90), fontSize: 13, color: "#374151" }}
-                        title={String(job["Stage"] || "")}
-                      >
-                        {job["Stage"]}
-                      </div>
-                      <div
-                        style={{ ...col(64, true), fontSize: 13, color: "#374151" }}
-                        title={String(job["Due Date"] || "")}
-                      >
-                        {fmtMMDD(job["Due Date"])}
-                      </div>
-                      <div
-                        style={{ ...col(50, true), fontSize: 13, color: "#374151" }}
-                        title={String(job["Print"] || "")}
-                      >
-                        {job["Print"]}
-                      </div>
-                      <div
-                        style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }}
-                        title={String(job["Ship Date"] || "")}
-                      >
-                        {fmtMMDD(job["Ship Date"])}
-                      </div>
-                      <div
-                        style={{ ...col(110, true), fontSize: 13, color: "#374151" }}
-                        title={String(pickHardSoft(job) || "")}
-                      >
-                        {showMMDDorRaw(pickHardSoft(job))}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-
 
           {/* Materials To Order */}
           <div
@@ -1282,7 +1129,157 @@ export default function Overview() {
             </div>
           </div>
         </div>
+
+        {/* RIGHT COLUMN: Upcoming Jobs */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Upcoming Jobs */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div style={{ ...header, textAlign: "center" }}>
+              Upcoming Jobs (Ship in next {daysWindow} days)
+            </div>
+
+            {/* Yellow transparent overlay while loading this block */}
+            {loadingUpcoming && (
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  background: "rgba(255,255,0,0.25)",
+                  backdropFilter: "blur(1px)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                  pointerEvents: "none",
+                }}
+                aria-live="polite"
+                aria-busy="true"
+              >
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: 12,
+                    background: "rgba(255,255,255,0.85)",
+                    fontWeight: 700,
+                  }}
+                >
+                  Loading…
+                </div>
+              </div>
+            )}
+
+            {/* column headers */}
+            <div
+              style={{
+                ...rowCard,
+                padding: "4px 8px",
+                marginBottom: 8,
+                background: "#fafafa",
+                borderColor: "#eee",
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#666",
+                opacity: loadingUpcoming ? 0.6 : 1,
+              }}
+            >
+              <div style={{ ...imgBox, border: "0", background: "transparent" }} />
+              <div style={{ width: 58 }}>Order #</div>
+              <div style={col(250)}>Company Name</div>
+              <div style={col(150)}>Design</div>
+              <div style={{ ...col(56, true) }}>Qty</div>
+              <div style={col(120)}>Product</div>
+              <div style={col(90)}>Stage</div>
+              <div style={{ ...col(64, true) }}>Due</div>
+              <div style={{ ...col(50, true) }}>Print</div>
+              <div style={{ ...col(68, true) }}>Ship</div>
+              <div style={{ ...col(110, true) }}>Hard/Soft</div>
+            </div>
+
+            {!loadingUpcoming && !upcoming.length && (
+              <div>No jobs in the next {daysWindow} days.</div>
+            )}
+
+            <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
+              {!loadingUpcoming &&
+                upcoming.map((job, idx) => {
+                  const ring = ringColorByShipDate(job["Ship Date"]);
+                  const imageUrl = getJobThumbUrl(job, ROOT);
+
+                  return (
+                    <div key={idx} style={rowCard}>
+                      <div style={{ ...imgBox, borderColor: ring }}>
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            width={160}
+                            height={80}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              display: "block",
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 13, color: "#999" }}>No img</div>
+                        )}
+                      </div>
+
+                      {/* Uniform 13px fonts; key values slightly bolder */}
+                      <div style={{ width: 58, fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Order #"] || "")}>
+                        {job["Order #"]}
+                      </div>
+                      <div style={{ ...col(250), fontSize: 13, color: "#374151" }} title={String(job["Company Name"] || "")}>
+                        {job["Company Name"]}
+                      </div>
+                      <div style={{ ...col(150), fontSize: 13, color: "#374151" }} title={String(job["Design"] || "")}>
+                        {job["Design"]}
+                      </div>
+                      <div style={{ ...col(56, true), fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Quantity"] || "")}>
+                        {job["Quantity"]}
+                      </div>
+                      <div style={{ ...col(120), fontSize: 13, color: "#374151" }} title={String(job["Product"] || "")}>
+                        {job["Product"]}
+                      </div>
+                      <div style={{ ...col(90), fontSize: 13, color: "#374151" }} title={String(job["Stage"] || "")}>
+                        {job["Stage"]}
+                      </div>
+                      <div style={{ ...col(64, true), fontSize: 13, color: "#374151" }} title={String(job["Due Date"] || "")}>
+                        {fmtMMDD(job["Due Date"])}
+                      </div>
+                      <div style={{ ...col(50, true), fontSize: 13, color: "#374151" }} title={String(job["Print"] || "")}>
+                        {job["Print"]}
+                      </div>
+                      <div style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }} title={String(job["Ship Date"] || "")}>
+                        {fmtMMDD(job["Ship Date"])}
+                      </div>
+                      <div style={{ ...col(110, true), fontSize: 13, color: "#374151" }} title={String(pickHardSoft(job) || "")}>
+                        {showMMDDorRaw(pickHardSoft(job))}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </div>
       </div>
+
 
 
       {/* Order modal */}
