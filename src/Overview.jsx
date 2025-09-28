@@ -850,11 +850,12 @@ export default function Overview() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(2, 1fr)",
+                gridTemplateColumns: "repeat(3, 1fr)", // was 2
                 gap: 10,
                 opacity: loadingMetrics ? 0.6 : 1,
               }}
             >
+
               {/* Headcovers Sold / Day (V2 directly) */}
               <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
                 <div style={{ fontSize: 12, color: "#666" }}>Headcovers Sold / Day</div>
@@ -866,17 +867,33 @@ export default function Overview() {
                 </div>
               </div>
 
-              {/* Goal (X2) */}
-              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
-                <div style={{ fontSize: 28, fontWeight: 800 }}>
-                  {(() => {
-                    const g = Number(metrics?.goal);
-                    return Number.isFinite(g) ? g : "—";
-                  })()}
-                </div>
-              </div>
-            </div>
+                  {/* Goal (X2) */}
+                  <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
+                    <div style={{ fontSize: 28, fontWeight: 800 }}>
+                      {(() => {
+                        const g = Number(metrics?.goal);
+                        return Number.isFinite(g) ? g : "—";
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Average Price per Cover (Production Orders!Y2) */}
+                  <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                    <div style={{ fontSize: 12, color: "#666" }}>Average Price per Cover</div>
+                    <div style={{ fontSize: 28, fontWeight: 800 }}>
+                      {(() => {
+                        const v = metrics?.average_price;
+                        // If it's numeric, format as currency; otherwise show as-is
+                        const n = Number(v);
+                        if (Number.isFinite(n)) {
+                          return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+                        }
+                        return (v !== undefined && v !== null && String(v).trim() !== "") ? String(v) : "—";
+                      })()}
+                    </div>
+                  </div>
+              </div>  {/* <-- closes the grid */}
           </div>
           {/* Department Status */}
           <div
