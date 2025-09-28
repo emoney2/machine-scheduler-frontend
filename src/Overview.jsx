@@ -44,13 +44,23 @@ function extractFileIdFromFormulaOrUrl(input) {
 // Prefer common fields; if none, scan the whole row for any Drive link.
 // Always return the **backend proxy** URL so auth/sizing/caching is handled server-side.
 function getJobThumbUrl(job, ROOT) {
-  const proxyForId = (id) => id ? `${ROOT}/drive/thumb/${id}?sz=w160` : null; // 👈 use proxy
+  // Prefer backend proxy for Drive IDs; falls back to direct Drive if needed
+  const proxyForId = (id) => {
+    if (!id) return null;
+    const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
+    const base = apiRoot.replace(/\/api$/, "") + "/api/drive/thumb";
+    return `${base}/${id}?sz=w160`;
+  };
+
   const toThumb = (idOrUrl) => {
     if (!idOrUrl) return null;
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
-    if (id) return proxyForId(id); // 👈 prefer proxy
+    if (id) {
+      // Proxy first (auth/caching stable), Drive direct as alternate is handled by caller
+      return proxyForId(id);
+    }
     const s = String(idOrUrl);
-    if (/^https?:\/\//i.test(s)) return s;
+    if (/^https?:\/\//i.test(s)) return s; // already a full URL from backend
     return null;
   };
 
@@ -82,9 +92,9 @@ function getJobThumbUrl(job, ROOT) {
     return toThumb(val);
   };
 
-  // Preferred fields, then arrays/attachments
+  // Preferred fields (put thumbnailUrl first if backend supplied it), then arrays/attachments
   const fields = [
-    job.thumbnailUrl, // 👈 if your backend ever supplies this, take it first
+    job.thumbnailUrl, // 👈 take server-provided thumbnail first when present
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
     job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl, job.ImageURL,
     job.images, job.Images, job.imagesLabeled, job.images_labelled,
@@ -96,7 +106,7 @@ function getJobThumbUrl(job, ROOT) {
     if (hit) return hit;
   }
 
-  // Deep fallback: search everything on the row
+  // Deep fallback: scan entire row (any Drive link or embedded id in any field)
   for (const val of Object.values(job || {})) {
     const hit = fromAny(val);
     if (hit) return hit;
@@ -104,9 +114,6 @@ function getJobThumbUrl(job, ROOT) {
 
   return null;
 }
-
-
-
 
 // 🔌 lightweight socket just for invalidations
 const socket = io(BACKEND_ROOT, {
