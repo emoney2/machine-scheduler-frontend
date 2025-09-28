@@ -17,27 +17,49 @@ const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 
 // --- Image helpers (single source of truth) ---
 // Handles =IMAGE("..."), uc?export=view&id=..., and /file/d/<id>/ patterns
-function extractFileIdFromFormulaOrUrl(v) {
-  try {
-    const s = String(v || "");
-    let m = s.match(/id=([A-Za-z0-9_-]+)/);
-    if (m) return m[1];
-    m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m) return m[1];
-    m = s.match(/IMAGE\("([^"]+)"/i); // =IMAGE("...url...")
-    if (m) return extractFileIdFromFormulaOrUrl(m[1]);
-  } catch {}
+function extractFileIdFromFormulaOrUrl(input) {
+  if (!input) return null;
+  const s = String(input);
+
+  // Handle simple IDs (no URL)
+  if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return s;
+
+  // Drive URL patterns
+  // .../file/d/<id>/...
+  let m = s.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+
+  // ...id=<id>...
+  m = s.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+
+  // Sharing links like .../open?id=<id> or u/0/uc?id=<id>
+  m = s.match(/\/(?:open|uc)[^?]*\?[^#]*\bid=([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+
+  // GDrive viewer URLs sometimes embed in formulas/JSON
+  m = s.match(/"id":"([A-Za-z0-9_-]{10,})"/);
+  if (m) return m[1];
+
   return null;
 }
+
 
 // Prefer common fields; if none, scan the whole row for any Drive link.
 // Always return the proxy URL with a stable version key (?v=Order#) so it hits the disk cache.
 function getJobThumbUrl(job, ROOT) {
-  // Try a single value (string/array/object)
+  const toThumb = (idOrUrl) => {
+    if (!idOrUrl) return null;
+    const id = extractFileIdFromFormulaOrUrl(idOrUrl);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
+    const s = String(idOrUrl);
+    if (/^https?:\/\//i.test(s)) return s;
+    return null;
+  };
+
   const fromAny = (val) => {
     if (!val) return null;
 
-    // If it's an array, try each entry
     if (Array.isArray(val)) {
       for (const item of val) {
         const hit = fromAny(item);
@@ -46,39 +68,29 @@ function getJobThumbUrl(job, ROOT) {
       return null;
     }
 
-    // If it's an object, try common props that might hold the URL/ID
     if (typeof val === "object") {
-      const candidates = [
+      const cand = [
         val.src, val.url, val.href, val.link, val.image, val.thumbnail, val.preview,
-        val.Preview, val.Image, val.Thumbnail,
+        val.Preview, val.Image, val.Thumbnail, val.imageUrl,
       ];
-      for (const c of candidates) {
+      for (const c of cand) {
         const hit = fromAny(c);
         if (hit) return hit;
       }
-      // As a last resort, stringify the object to catch embedded links
-      const s = JSON.stringify(val);
-      const idFromObj = extractFileIdFromFormulaOrUrl(s);
-      if (idFromObj) return `https://drive.google.com/thumbnail?id=${idFromObj}&sz=w160`;
-      const urlMatchObj = /https?:\/\/[^\s"]+/.exec(s);
-      if (urlMatchObj) return urlMatchObj[0];
-      return null;
+      // Stringify as last resort to catch embedded links/IDs
+      return toThumb(JSON.stringify(val));
     }
 
-    // Primitive string pathway
-    const id = extractFileIdFromFormulaOrUrl(val);
-    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
-    const s = String(val || "");
-    if (/^https?:\/\//i.test(s)) return s;
-    return null;
+    // string/number
+    return toThumb(val);
   };
 
-  // Preferred direct fields first
+  // Preferred fields, then arrays/attachments
   const fields = [
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
-    job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl,
-    // Arrays / nested structures commonly seen
-    job.images, job.Images, job.imagesLabeled, job.images_labelled, job.files, job.attachments,
+    job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl, job.ImageURL,
+    job.images, job.Images, job.imagesLabeled, job.images_labelled,
+    job.files, job.attachments, job.Attachment, job.Attachements, job.Art, job["Art Link"], job["Art URL"],
   ];
 
   for (const f of fields) {
@@ -86,7 +98,7 @@ function getJobThumbUrl(job, ROOT) {
     if (hit) return hit;
   }
 
-  // Fallback: scan every field (including arrays/objects)
+  // Deep fallback: search everything on the row
   for (const val of Object.values(job || {})) {
     const hit = fromAny(val);
     if (hit) return hit;
@@ -94,6 +106,7 @@ function getJobThumbUrl(job, ROOT) {
 
   return null;
 }
+
 
 
 // 🔌 lightweight socket just for invalidations
@@ -673,39 +686,36 @@ export default function Overview() {
 
   // ▼ Fetch Performance Metrics (Overview!V1:X2)
   useEffect(() => {
+    const ctrl = new AbortController();
     let alive = true;
+
     (async () => {
       setLoadingMetrics(true);
       try {
-        const cfg = {
+        const res = await axios.get(`${ROOT}/overview/metrics`, {
           withCredentials: true,
-          timeout: 60000, // allow slow Sheets
+          signal: ctrl.signal,
+          timeout: 30000, // cache on server keeps this quick after first load
           validateStatus: (s) => s >= 200 && s < 400,
-        };
-
-        for (let attempt = 1; attempt <= 3; attempt++) {
-          try {
-            const res = await axios.get(`${ROOT}/overview/metrics`, cfg);
-            if (!alive) return;
-            setMetrics(res.data || null);
-            break; // success
-          } catch (err) {
-            if (attempt === 3) {
-              if (!alive) return;
-              console.error(`overview/metrics failed (attempt ${attempt}):`, err?.message || err);
-              setMetrics(null);
-            } else {
-              await new Promise((r) => setTimeout(r, attempt * 1000)); // 1s, 2s
-            }
-          }
-        }
+        });
+        if (!alive) return;
+        setMetrics(res.data || null);
+      } catch (err) {
+        if (!alive) return;
+        console.error("overview/metrics failed:", err?.message || err);
+        setMetrics(null);
       } finally {
         if (!alive) return;
         setLoadingMetrics(false);
       }
     })();
-    return () => { alive = false; };
+
+    return () => {
+      alive = false;
+      ctrl.abort(); // cancel if user navigates away
+    };
   }, []);
+
 
   // Modal rows
   const modalRows = useMemo(() => {
@@ -1210,36 +1220,53 @@ export default function Overview() {
             )}
 
             <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
-              {!loadingUpcoming &&
-                upcoming.map((job, idx) => {
-                  const ring = ringColorByShipDate(job["Ship Date"]);
-                  const imageUrl = getJobThumbUrl(job, ROOT);
+              {!loadingUpcoming && upcoming.map((job, idx) => {
+                const ring = ringColorByShipDate(job["Ship Date"]);
 
-                  return (
-                    <div key={idx} style={rowCard}>
-                      <div style={{ ...imgBox, borderColor: ring }}>
-                        {imageUrl ? (
-                          <img
-                            src={imageUrl}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                            width={160}
-                            height={80}
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                            style={{
-                              width: "100%",
-                              height: "100%",
-                              display: "block",
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div style={{ fontSize: 13, color: "#999" }}>No img</div>
-                        )}
-                      </div>
+                // D.1 Build primary and alternate image URLs
+                const primaryUrl = getJobThumbUrl(job, ROOT);
+
+                // Try alternates if the primary fails (covers finicky Drive links)
+                const alts = [];
+                const idFromAll = extractFileIdFromFormulaOrUrl(JSON.stringify(job));
+                if (idFromAll) {
+                  alts.push(
+                    `https://drive.google.com/thumbnail?id=${idFromAll}&sz=w160`,
+                    `https://drive.google.com/uc?export=view&id=${idFromAll}`
+                  );
+                }
+
+                // D.2 Swap to alternates on image error; finally hide the <img>
+                const handleImgError = (e) => {
+                  const i = Number(e.currentTarget.dataset.errIndex || 0);
+                  if (i < alts.length) {
+                    e.currentTarget.dataset.errIndex = String(i + 1);
+                    e.currentTarget.src = alts[i];
+                  } else {
+                    e.currentTarget.style.display = "none";
+                  }
+                };
+
+                return (
+                  <div key={idx} style={rowCard}>
+                    <div style={{ ...imgBox, borderColor: ring }}>
+                      {primaryUrl ? (
+                        <img
+                          src={primaryUrl}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          width={160}
+                          height={80}
+                          onError={handleImgError}
+                          style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
+                          data-err-index="0"
+                        />
+                      ) : (
+                        <div style={{ fontSize: 13, color: "#999" }}>No img</div>
+                      )}
+                    </div>
 
                       {/* Uniform 13px fonts; key values slightly bolder */}
                       <div style={{ width: 58, fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Order #"] || "")}>
