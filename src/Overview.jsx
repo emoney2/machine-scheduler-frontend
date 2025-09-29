@@ -44,88 +44,66 @@ function extractFileIdFromFormulaOrUrl(input) {
 // Prefer common fields; if none, scan the whole row for any Drive link.
 // Always return the **backend proxy** URL so auth/sizing/caching is handled server-side.
 function getJobThumbUrl(job, ROOT) {
-  // Build a proxied thumbnail URL using the backend route that actually exists:
-  //   GET /api/drive/thumbnail?fileId=<id>&sz=w160
+  const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
+  const proxyBase = apiRoot.replace(/\/api$/, "") + "/api/drive/thumbnail";
+
   const proxyForId = (id) => {
     if (!id) return null;
-    const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
-    const base = apiRoot.replace(/\/api$/, "") + "/api/drive/thumbnail";
     const params = new URLSearchParams({ fileId: id, sz: "w160" }).toString();
-    return `${base}?${params}`;
+    return `${proxyBase}?${params}`;
   };
 
   const toThumb = (idOrUrl) => {
     if (!idOrUrl) return null;
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
     if (id) return proxyForId(id);
-
-    // If it's already a full URL (backend gave us a direct Drive thumb), use it as-is
     const s = String(idOrUrl);
-    if (/^https?:\/\//i.test(s)) return s;
-
-    // If it's a bare ID, proxy it
+    if (/^https?:\/\//i.test(s)) return s;      // already a URL (server-provided)
     if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return proxyForId(s);
     return null;
   };
 
   const fromAny = (val) => {
     if (!val) return null;
-
     if (Array.isArray(val)) {
-      for (const item of val) {
-        const hit = fromAny(item);
+      for (const v of val) {
+        const hit = fromAny(v);
         if (hit) return hit;
       }
       return null;
     }
-
     if (typeof val === "object") {
-      const cand = [
-        val.imageUrl, val.src, val.url, val.href, val.link,
-        val.image, val.thumbnail, val.preview, val.Preview, val.Image, val.Thumbnail
-      ];
+      const cand = [val.imageUrl, val.src, val.url, val.href, val.link, val.image, val.thumbnail, val.preview];
       for (const c of cand) {
         const hit = fromAny(c);
         if (hit) return hit;
       }
       return toThumb(JSON.stringify(val));
     }
-
-    // string/number
     return toThumb(val);
   };
 
-  // ✅ Priorities:
-  // 1) server-provided URL fields (often already a valid Drive thumbnail)
-  // 2) other obvious image-ish fields
-  // 3) Preview fields LAST (since they caused the early stop before)
   const fields = [
-    job.imageUrl,      // server-provided
-    job.image,         // server-provided (your /api/overview/upcoming sets this)
-    job.thumbnailUrl,
-    job.ImageURL,
-
-    // fallbacks
+    job.imageUrl,  // server
+    job.image,     // server
+    job.Preview, job.preview, job.previewFormula, job.PreviewFormula,
+    job.thumbnailUrl, job.ImageURL,
     job.images, job.Images, job.imagesLabeled, job.images_labelled,
     job.files, job.attachments, job.Attachment, job.Attachements,
     job.Art, job["Art Link"], job["Art URL"],
-
-    // LAST: Preview (since it was pointing to the wrong route before)
-    job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
   ];
 
   for (const f of fields) {
     const hit = fromAny(f);
     if (hit) return hit;
   }
-
-  // Deep fallback: scan whole row for anything that looks like a Drive link/ID
-  for (const val of Object.values(job || {})) {
-    const hit = fromAny(val);
+  for (const v of Object.values(job || {})) {
+    const hit = fromAny(v);
     if (hit) return hit;
   }
   return null;
 }
+
 
 // 🔌 lightweight socket just for invalidations
 const socket = io(BACKEND_ROOT, {
