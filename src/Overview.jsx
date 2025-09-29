@@ -18,12 +18,16 @@ function extractFileIdFromFormulaOrUrl(input) {
   if (!input) return null;
   const s = String(input);
 
+  // Handle =IMAGE("https://...") formula wrapper
+  let m = s.match(/IMAGE\("([^"]+)"/i);
+  if (m) return extractFileIdFromFormulaOrUrl(m[1]);
+
   // Handle simple IDs (no URL)
   if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return s;
 
   // Drive URL patterns
   // .../file/d/<id>/...
-  let m = s.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/);
+  m = s.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/);
   if (m) return m[1];
 
   // ...id=<id>...
@@ -41,11 +45,12 @@ function extractFileIdFromFormulaOrUrl(input) {
   return null;
 }
 
+
 // Prefer common fields; if none, scan the whole row for any Drive link.
 // Always return the **backend proxy** URL so auth/sizing/caching is handled server-side.
 function getJobThumbUrl(job, ROOT) {
   const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
-  const proxyBase = apiRoot.replace(/\/api$/, "") + "/api/drive/proxy";
+  const proxyBase = apiRoot.replace(/\/api$/, "") + "/api/drive/thumbnail";
 
   const proxyForId = (id) => {
     if (!id) return null;
