@@ -760,12 +760,20 @@ export default function Ship() {
           : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
         : "";
 
+      // Persist URLs for the completion page
+      try {
+        sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
+        sessionStorage.setItem(
+          "jrco_lastSlipUrl",
+          Array.isArray(shipData.slips) && shipData.slips[0] ? shipData.slips[0] : ""
+        );
+      } catch {}
+
       // Open results (labels/invoice/slips) exactly once, only for real URLs
       openResultsWindows(shipData);
 
       // Refocus current tab (no named window)
       setTimeout(() => window.focus(), 500);
-
 
       // 4e) Finalize
       setShippingStage("✅ Complete!");
@@ -779,6 +787,7 @@ export default function Ship() {
           },
         });
       }, 500);
+
 
 
     } catch (err) {

@@ -1,47 +1,30 @@
 // src/ShipmentComplete.jsx
-import React from "react";
+import React, { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
   const { state } = useLocation();
-  const invoiceUrl    = state?.invoiceUrl    || "";
+
   const shippedOk     = state?.shippedOk     ?? false;
   const slipsPrinted  = state?.slipsPrinted  ?? false;
   const labelsPrinted = state?.labelsPrinted ?? false;
+
+  // Prefer the URL saved by Ship.jsx; fall back to state.invoiceUrl if needed
+  const invoiceUrl = useMemo(() => {
+    try {
+      const stored = (sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
+      return stored || (state?.invoiceUrl || "");
+    } catch {
+      return state?.invoiceUrl || "";
+    }
+  }, [state]);
 
   const renderStatus = (ok, label) => (
     <li style={{ marginBottom: "0.75rem", fontSize: "1.1rem" }}>
       {ok ? "✅" : "❌"} {label}
     </li>
   );
-
-  const handleViewEdit = () => {
-    if (invoiceUrl) {
-      window.open(invoiceUrl, "_blank");
-    }
-  };
-
-  const handleSend = async () => {
-    try {
-      const res = await fetch(
-        `${process.env.REACT_APP_API_ROOT}/send-invoice`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invoiceUrl }),
-        }
-      );
-      if (res.ok) {
-        alert("Invoice emailed!");
-      } else {
-        alert("Failed to send invoice.");
-      }
-    } catch {
-      alert("Network error sending invoice.");
-    }
-  };
 
   return (
     <div
@@ -55,26 +38,26 @@ export default function ShipmentComplete() {
       <h2 style={{ textAlign: "center", marginBottom: "1.5rem" }}>
         Shipment Summary
       </h2>
+
       <ul style={{ listStyle: "none", padding: 0, lineHeight: 1.6 }}>
         {renderStatus(shippedOk, "Order Marked Shipped")}
-        {renderStatus(slipsPrinted,  "Packing Slips Generated")}
+        {renderStatus(slipsPrinted, "Packing Slips Generated")}
         {renderStatus(!!invoiceUrl, "Invoice Created")}
       </ul>
 
       <div style={{ marginTop: "2rem", textAlign: "center" }}>
-        {invoiceUrl && (
-          <button
-            onClick={handleViewEdit}
-            style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
-          >
-            View / Edit Invoice
-          </button>
-        )}
         <button
-          onClick={handleSend}
+          type="button"
+          onClick={() => {
+            if (invoiceUrl) {
+              window.open(invoiceUrl, "_blank", "noopener,noreferrer");
+            }
+          }}
+          disabled={!invoiceUrl}
+          className="btn btn-primary"
           style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
         >
-          Send Invoice
+          Open Invoice
         </button>
       </div>
 
