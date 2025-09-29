@@ -48,17 +48,15 @@ function getJobThumbUrl(job, ROOT) {
   const proxyForId = (id) => {
     if (!id) return null;
     const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
-    const base = apiRoot.replace(/\/api$/, "") + "/api/drive/thumb";
+    // 👇 your server exposes /api/drive/proxy (not /api/drive/thumb)
+    const base = apiRoot.replace(/\/api$/, "") + "/api/drive/proxy";
     return `${base}/${id}?sz=w160`;
   };
 
   const toThumb = (idOrUrl) => {
     if (!idOrUrl) return null;
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
-    if (id) {
-      // Proxy first (auth/caching stable), Drive direct as alternate is handled by caller
-      return proxyForId(id);
-    }
+    if (id) return proxyForId(id);
     const s = String(idOrUrl);
     if (/^https?:\/\//i.test(s)) return s; // already a full URL from backend
     return null;
@@ -66,7 +64,6 @@ function getJobThumbUrl(job, ROOT) {
 
   const fromAny = (val) => {
     if (!val) return null;
-
     if (Array.isArray(val)) {
       for (const item of val) {
         const hit = fromAny(item);
@@ -74,7 +71,6 @@ function getJobThumbUrl(job, ROOT) {
       }
       return null;
     }
-
     if (typeof val === "object") {
       const cand = [
         val.src, val.url, val.href, val.link, val.image, val.thumbnail, val.preview,
@@ -84,19 +80,18 @@ function getJobThumbUrl(job, ROOT) {
         const hit = fromAny(c);
         if (hit) return hit;
       }
-      // Stringify as last resort to catch embedded links/IDs
       return toThumb(JSON.stringify(val));
     }
-
-    // string/number
     return toThumb(val);
   };
 
-  // Preferred fields (put thumbnailUrl first if backend supplied it), then arrays/attachments
+  // Put server-provided URLs FIRST (your backend sets imageUrl for each upcoming row)
+  // Then fall back to other likely fields or scan the whole row.
   const fields = [
-    job.thumbnailUrl, // 👈 take server-provided thumbnail first when present
+    job.imageUrl,            // 👈 FIRST
+    job.thumbnailUrl,
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
-    job.image, job.Image, job.thumbnail, job.Thumbnail, job.imageUrl, job.ImageURL,
+    job.image, job.Image, job.thumbnail, job.Thumbnail, job.ImageURL,
     job.images, job.Images, job.imagesLabeled, job.images_labelled,
     job.files, job.attachments, job.Attachment, job.Attachements, job.Art, job["Art Link"], job["Art URL"],
   ];
@@ -111,9 +106,9 @@ function getJobThumbUrl(job, ROOT) {
     const hit = fromAny(val);
     if (hit) return hit;
   }
-
   return null;
 }
+
 
 // 🔌 lightweight socket just for invalidations
 const socket = io(BACKEND_ROOT, {
