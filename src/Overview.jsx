@@ -1243,7 +1243,14 @@ export default function Overview() {
 
                 // D.1 Build primary and alternate image URLs
                 const primaryUrl = getJobThumbUrl(job, ROOT);
-                console.debug("Overview thumb:", { order: job["Order #"], primaryUrl, image: job?.image, preview: job?.Preview || job?.preview });
+                console.log("📸 Overview thumb", {
+                  order: job?.["Order #"] ?? job?.order ?? job?.Order ?? "(no order)",
+                  product: job?.product ?? job?.Product,
+                  primaryUrl,
+                  imageUrl: job?.imageUrl,
+                  image: job?.image,
+                  preview: job?.Preview ?? job?.preview,
+                });
 
 
                 // Try alternates if the primary fails (covers finicky Drive links)
