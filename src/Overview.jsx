@@ -48,7 +48,7 @@ function getJobThumbUrl(job, ROOT) {
   const proxyForId = (id) => {
     if (!id) return null;
     const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
-    // 👇 your server exposes /api/drive/proxy (not /api/drive/thumb)
+    // ✅ your server exposes /api/drive/proxy/<id>
     const base = apiRoot.replace(/\/api$/, "") + "/api/drive/proxy";
     return `${base}/${id}?sz=w160`;
   };
@@ -56,9 +56,13 @@ function getJobThumbUrl(job, ROOT) {
   const toThumb = (idOrUrl) => {
     if (!idOrUrl) return null;
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
-    if (id) return proxyForId(id);
+    if (id) {
+      // Proxy first (auth/caching stable), Drive direct as alternate is handled by caller
+      return proxyForId(id);
+    }
     const s = String(idOrUrl);
-    if (/^https?:\/\//i.test(s)) return s; // already a full URL from backend
+    if (/^https?:\/\//i.test(s)) return s;      // already a full URL (e.g., server-provided imageUrl)
+    if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return proxyForId(s); // bare ID
     return null;
   };
 
@@ -80,15 +84,17 @@ function getJobThumbUrl(job, ROOT) {
         const hit = fromAny(c);
         if (hit) return hit;
       }
+      // Stringify as last resort to catch embedded links/IDs
       return toThumb(JSON.stringify(val));
     }
+
+    // string/number
     return toThumb(val);
   };
 
-  // Put server-provided URLs FIRST (your backend sets imageUrl for each upcoming row)
-  // Then fall back to other likely fields or scan the whole row.
+  // ✅ Put server-provided URL FIRST, then other likely fields or arrays
   const fields = [
-    job.imageUrl,            // 👈 FIRST
+    job.imageUrl,            // ← first priority: provided by /overview from Y column
     job.thumbnailUrl,
     job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
     job.image, job.Image, job.thumbnail, job.Thumbnail, job.ImageURL,
@@ -101,13 +107,14 @@ function getJobThumbUrl(job, ROOT) {
     if (hit) return hit;
   }
 
-  // Deep fallback: scan entire row (any Drive link or embedded id in any field)
+  // Deep fallback: scan entire row
   for (const val of Object.values(job || {})) {
     const hit = fromAny(val);
     if (hit) return hit;
   }
   return null;
 }
+
 
 
 // 🔌 lightweight socket just for invalidations
