@@ -44,30 +44,33 @@ function extractFileIdFromFormulaOrUrl(input) {
 // Prefer common fields; if none, scan the whole row for any Drive link.
 // Always return the **backend proxy** URL so auth/sizing/caching is handled server-side.
 function getJobThumbUrl(job, ROOT) {
-  // Prefer backend proxy for Drive IDs; falls back to direct Drive if needed
+  // Build a proxied thumbnail URL using the backend route that actually exists:
+  //   GET /api/drive/thumbnail?fileId=<id>&sz=w160
   const proxyForId = (id) => {
     if (!id) return null;
     const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
-    // ✅ your server exposes /api/drive/proxy/<id>
-    const base = apiRoot.replace(/\/api$/, "") + "/api/drive/proxy";
-    return `${base}/${id}?sz=w160`;
+    const base = apiRoot.replace(/\/api$/, "") + "/api/drive/thumbnail";
+    const params = new URLSearchParams({ fileId: id, sz: "w160" }).toString();
+    return `${base}?${params}`;
   };
 
   const toThumb = (idOrUrl) => {
     if (!idOrUrl) return null;
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
-    if (id) {
-      // Proxy first (auth/caching stable), Drive direct as alternate is handled by caller
-      return proxyForId(id);
-    }
+    if (id) return proxyForId(id);
+
+    // If it's already a full URL (backend gave us a direct Drive thumb), use it as-is
     const s = String(idOrUrl);
-    if (/^https?:\/\//i.test(s)) return s;      // already a full URL (e.g., server-provided imageUrl)
-    if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return proxyForId(s); // bare ID
+    if (/^https?:\/\//i.test(s)) return s;
+
+    // If it's a bare ID, proxy it
+    if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return proxyForId(s);
     return null;
   };
 
   const fromAny = (val) => {
     if (!val) return null;
+
     if (Array.isArray(val)) {
       for (const item of val) {
         const hit = fromAny(item);
@@ -75,16 +78,16 @@ function getJobThumbUrl(job, ROOT) {
       }
       return null;
     }
+
     if (typeof val === "object") {
       const cand = [
-        val.src, val.url, val.href, val.link, val.image, val.thumbnail, val.preview,
-        val.Preview, val.Image, val.Thumbnail, val.imageUrl,
+        val.imageUrl, val.src, val.url, val.href, val.link,
+        val.image, val.thumbnail, val.preview, val.Preview, val.Image, val.Thumbnail
       ];
       for (const c of cand) {
         const hit = fromAny(c);
         if (hit) return hit;
       }
-      // Stringify as last resort to catch embedded links/IDs
       return toThumb(JSON.stringify(val));
     }
 
@@ -92,14 +95,23 @@ function getJobThumbUrl(job, ROOT) {
     return toThumb(val);
   };
 
-  // ✅ Put server-provided URL FIRST, then other likely fields or arrays
+  // ✅ Priorities:
+  // 1) server-provided URL fields (often already a valid Drive thumbnail)
+  // 2) other obvious image-ish fields
+  // 3) Preview fields LAST (since they caused the early stop before)
   const fields = [
-    job.imageUrl,            // ← first priority: provided by /overview from Y column
+    job.imageUrl,      // server-provided
+    job.image,         // server-provided (your /api/overview/upcoming sets this)
     job.thumbnailUrl,
-    job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
-    job.image, job.Image, job.thumbnail, job.Thumbnail, job.ImageURL,
+    job.ImageURL,
+
+    // fallbacks
     job.images, job.Images, job.imagesLabeled, job.images_labelled,
-    job.files, job.attachments, job.Attachment, job.Attachements, job.Art, job["Art Link"], job["Art URL"],
+    job.files, job.attachments, job.Attachment, job.Attachements,
+    job.Art, job["Art Link"], job["Art URL"],
+
+    // LAST: Preview (since it was pointing to the wrong route before)
+    job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
   ];
 
   for (const f of fields) {
@@ -107,15 +119,13 @@ function getJobThumbUrl(job, ROOT) {
     if (hit) return hit;
   }
 
-  // Deep fallback: scan entire row
+  // Deep fallback: scan whole row for anything that looks like a Drive link/ID
   for (const val of Object.values(job || {})) {
     const hit = fromAny(val);
     if (hit) return hit;
   }
   return null;
 }
-
-
 
 // 🔌 lightweight socket just for invalidations
 const socket = io(BACKEND_ROOT, {
@@ -1233,6 +1243,8 @@ export default function Overview() {
 
                 // D.1 Build primary and alternate image URLs
                 const primaryUrl = getJobThumbUrl(job, ROOT);
+                console.debug("Overview thumb:", { order: job["Order #"], primaryUrl, image: job?.image, preview: job?.Preview || job?.preview });
+
 
                 // Try alternates if the primary fails (covers finicky Drive links)
                 const alts = [];
