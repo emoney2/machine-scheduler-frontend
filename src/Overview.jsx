@@ -45,7 +45,7 @@ function extractFileIdFromFormulaOrUrl(input) {
 // Always return the **backend proxy** URL so auth/sizing/caching is handled server-side.
 function getJobThumbUrl(job, ROOT) {
   const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
-  const proxyBase = apiRoot.replace(/\/api$/, "") + "/api/drive/thumbnail";
+  const proxyBase = apiRoot.replace(/\/api$/, "") + "/api/drive/proxy";
 
   const proxyForId = (id) => {
     if (!id) return null;
@@ -84,13 +84,12 @@ function getJobThumbUrl(job, ROOT) {
   };
 
   const fields = [
-    job.imageUrl,  // server
-    job.image,     // server
-    job.Preview, job.preview, job.previewFormula, job.PreviewFormula,
+    job.imageUrl, job.image, // server-provided first
     job.thumbnailUrl, job.ImageURL,
+    job.preview, job.Preview, job.previewFormula, job.PreviewFormula,
+    job.image, job.Image, job.thumbnail, job.Thumbnail,
     job.images, job.Images, job.imagesLabeled, job.images_labelled,
-    job.files, job.attachments, job.Attachment, job.Attachements,
-    job.Art, job["Art Link"], job["Art URL"],
+    job.files, job.attachments, job.Attachment, job.Attachements, job.Art, job["Art Link"], job["Art URL"],
   ];
 
   for (const f of fields) {
