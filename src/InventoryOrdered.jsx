@@ -117,7 +117,21 @@ export default function InventoryOrdered() {
     return copy;
   }, [entries, sortConfig]);
 
-  const displayQty = (e) => e?.quantity ?? "";
+  const displayQty = (e) => {
+    const q = e?.quantity;
+    if (q == null) return "";
+    const t = String(e.type || "").toLowerCase();
+
+    // For Threads, backend quantity may include "cones" (e.g., "1.00 cones")
+    // Show just the numeric part in the Quantity column; Unit column already shows "cones".
+    if (t === "thread") {
+      const n = parseFloat(String(q).replace(/[^\d.-]/g, ""));
+      return Number.isFinite(n) ? n.toFixed(2) : String(q);
+    }
+
+    // Materials: show as-is
+    return q;
+  };
 
   const handleReceiveRow = async (e) => {
     try {
