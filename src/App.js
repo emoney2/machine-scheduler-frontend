@@ -291,11 +291,9 @@ export default function App() {
   
       // Clamp to work window: if now is between 4:30 PM and 8:30 AM,
       // snap to *next* 8:30 AM local (uses existing clampToWorkHours)
+      // Use actual current time; server will no longer clamp
       const iso = new Date().toISOString();
-      await axios.post(API_ROOT + '/updateStartTime', {
-        id: jobId,
-        startTime: iso,
-      });
+      await axios.post(`${API_ROOT}/updateStartTime`, { id: jobId, startTime: iso });
 
       // Optimistically update all columns so UI reflects immediately
       setColumns((cols) => {

@@ -29,6 +29,7 @@ export default function InventoryOrdered() {
   const [draftQty, setDraftQty] = useState("");
   const [isOverlay, setIsOverlay] = useState(false);
   const [overlayText, setOverlayText] = useState("");
+  const [selected, setSelected] = useState(() => new Set());
 
   const load = async (force = false, opts = {}) => {
     const silent = !!opts.silent; // when true, don't touch the page overlay here
@@ -156,6 +157,66 @@ export default function InventoryOrdered() {
     }
   };
 
+  const keyOf = (e) => `${e.type}-${e.row}`;
+
+  const toggleOne = (e) => {
+    const k = keyOf(e);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
+      return next;
+    });
+  };
+
+  const pageKeys = useMemo(() => new Set(sortedEntries.map(keyOf)), [sortedEntries]);
+  const allSelectedOnPage = sortedEntries.length > 0 && sortedEntries.every((e) => selected.has(keyOf(e)));
+
+  const toggleAllOnPage = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelectedOnPage) {
+        // unselect all visible
+        sortedEntries.forEach((e) => next.delete(keyOf(e)));
+      } else {
+        // select all visible
+        sortedEntries.forEach((e) => next.add(keyOf(e)));
+      }
+      return next;
+    });
+  };
+
+  const handleBatchReceive = async () => {
+    const items = sortedEntries
+      .filter((e) => selected.has(keyOf(e)))
+      .map((e) => ({ type: e.type, row: e.row }));
+
+    if (items.length === 0) return;
+
+    try {
+      setIsOverlay(true);
+      setOverlayText(`Receiving ${items.length} item${items.length > 1 ? "s" : ""}…`);
+
+      await axios.put(
+        `${API}/inventoryOrdered/batch`,
+        { items },
+        { withCredentials: true, timeout: 30000 }
+      );
+
+      // clear selection and refresh
+      setSelected(new Set());
+      await refreshAfterWrite();
+    } catch (err) {
+      console.error(err);
+      setOverlayText("Error receiving items");
+      await sleep(1200);
+    } finally {
+      setIsOverlay(false);
+      setOverlayText("");
+    }
+  };
+
+
 
   // Inline edit controls (Materials only)
   const beginEdit = (e) => {
@@ -267,10 +328,41 @@ const saveEdit = async (e) => {
         </div>
       )}
 
+      {/* ✅ Batch actions toolbar */}
+      <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "0.5rem 0 0.75rem" }}>
+        <button
+          onClick={handleBatchReceive}
+          disabled={sortedEntries.every((e) => !selected.has(`${e.type}-${e.row}`))}
+          style={{
+            padding: "0.4rem 0.8rem",
+            borderRadius: 8,
+            border: "1px solid #27c",
+            background: sortedEntries.some((e) => selected.has(`${e.type}-${e.row}`)) ? "#e7f3ff" : "#f2f6fb",
+            cursor: sortedEntries.some((e) => selected.has(`${e.type}-${e.row}`)) ? "pointer" : "not-allowed",
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          Receive Selected
+        </button>
+        <span style={{ color: "#666", fontSize: 13 }}>
+          Selected: {Array.from(selected).length}
+        </span>
+      </div>
+
       <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid #ddd" }}>
+
 
         <thead style={{ background: "#f5f5f5" }}>
           <tr>
+            <th style={{ ...thPlain, width: 36, textAlign: "center" }}>
+              <input
+                type="checkbox"
+                checked={allSelectedOnPage}
+                onChange={toggleAllOnPage}
+                aria-label="Select all on page"
+              />
+            </th>
             <th style={th} onClick={() => requestSort("date")}>Date</th>
             <th style={th} onClick={() => requestSort("type")}>Type</th>
             <th style={th} onClick={() => requestSort("name")}>Name</th>
@@ -280,6 +372,7 @@ const saveEdit = async (e) => {
             <th style={thPlain}>Action</th>
           </tr>
         </thead>
+
         <tbody>
           {sortedEntries.map((e, i) => {
             const key = `${e.type}-${e.row}`;
@@ -288,6 +381,15 @@ const saveEdit = async (e) => {
 
             return (
               <tr key={key} style={{ backgroundColor: i % 2 === 0 ? "#fafafa" : "transparent" }}>
+                <td style={{ ...td, width: 36, textAlign: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(key)}
+                    onChange={() => toggleOne(e)}
+                    aria-label={`Select ${e.name}`}
+                  />
+                </td>
+
                 <td style={td}>{fmtMMDDYYYY(toDate(e.date))}</td>
                 <td style={td}>{e.type}</td>
                 <td style={td}>{e.name}</td>
@@ -338,7 +440,7 @@ const saveEdit = async (e) => {
           })}
           {sortedEntries.length === 0 && (
             <tr>
-              <td colSpan={7} style={{ padding: "0.8rem", textAlign: "center", color: "#777" }}>
+              <td colSpan={8} style={{ padding: "0.8rem", textAlign: "center", color: "#777" }}>
                 No ordered items
               </td>
             </tr>
