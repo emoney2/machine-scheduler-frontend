@@ -257,7 +257,12 @@ export default function App() {
   // Track last‐seen top job on each machine
   const prevMachine1Top = useRef({ id: null, ts: 0 });
   const prevMachine2Top = useRef({ id: null, ts: 0 });
+
+  // (Legacy; safe to keep if referenced elsewhere, but the watcher below won't use it)
   const bumpedJobs = useRef(new Set());
+
+  // NEW: prevent duplicate concurrent POSTs per job when stamping start time
+  const bumpInFlight = useRef(new Set());
 
   // Which route are we on? (Scheduler is at "/")
   const location = useLocation();
@@ -265,7 +270,6 @@ export default function App() {
 
   const prevM1Top = useRef(null);
   const prevM2Top = useRef(null);
-
 
   // Send a new start time when needed
   const bumpJobStartTime = async (jobId) => {
@@ -287,7 +291,7 @@ export default function App() {
   
       // Clamp to work window: if now is between 4:30 PM and 8:30 AM,
       // snap to *next* 8:30 AM local (uses existing clampToWorkHours)
-      const iso = clampToWorkHours(new Date()).toISOString();
+      const iso = new Date().toISOString();
       await axios.post(API_ROOT + '/updateStartTime', {
         id: jobId,
         startTime: iso,
@@ -365,7 +369,7 @@ export default function App() {
 
     const handle = setInterval(() => {
       fetchAllCombined();
-    }, 300000);
+    }, 15000);
 
     return () => clearInterval(handle);
   }, [isScheduler]);
@@ -1144,9 +1148,12 @@ useEffect(() => {
   const maybeBump = (top, ref) => {
     if (!top?.id) { ref.current = null; return; }
     const hasStart = !!normalizeStart(top.embroidery_start);
-    if (!hasStart && !bumpedJobs.current.has(top.id)) {
-      bumpedJobs.current.add(top.id);
-      bumpJobStartTime(top.id);
+
+    if (!hasStart && !bumpInFlight.current.has(top.id)) {
+      bumpInFlight.current.add(top.id);
+      bumpJobStartTime(top.id)
+        .catch(() => {/* swallow; will retry on next effect tick */})
+        .finally(() => bumpInFlight.current.delete(top.id));
     }
     ref.current = top.id;
   };
@@ -1154,8 +1161,6 @@ useEffect(() => {
   maybeBump(columns?.machine1?.jobs?.[0], prevM1Top);
   maybeBump(columns?.machine2?.jobs?.[0], prevM2Top);
 }, [isScheduler, columns?.machine1?.jobs, columns?.machine2?.jobs]);
-
-
 
 // === Section 6: Placeholder Management ===
 
