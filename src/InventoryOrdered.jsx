@@ -207,10 +207,12 @@ export default function InventoryOrdered() {
       setSelected(new Set());
       await refreshAfterWrite();
     } catch (err) {
-      console.error(err);
-      setOverlayText("Error receiving items");
-      await sleep(1200);
+      const msg = err?.response?.data?.error || err?.message || "Error receiving item";
+      console.error("Receive error:", msg, err?.response?.data);
+      setOverlayText(msg);
+      await sleep(1500);
     } finally {
+
       setIsOverlay(false);
       setOverlayText("");
     }

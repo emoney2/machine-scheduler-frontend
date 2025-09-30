@@ -25,6 +25,44 @@ import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 
+function isWeekend(d) {
+  const day = d.getDay(); // 0=Sun,6=Sat
+  return day === 0 || day === 6;
+}
+
+function nextBusinessDay(d) {
+  const out = new Date(d);
+  while (isWeekend(out)) {
+    out.setDate(out.getDate() + 1);
+  }
+  return out;
+}
+
+/**
+ * For UI only: Given an ISO start (the exact moment it was stamped),
+ * show 8:30 AM local on the same day if that time is after the stamp,
+ * else the NEXT business day at 8:30 AM.
+ */
+function displayClampTo830(iso) {
+  if (!iso) return "";
+  const raw = new Date(iso);
+
+  // 8:30 AM local on that stamp's date
+  const d830 = new Date(raw);
+  d830.setHours(8, 30, 0, 0);
+
+  let show = raw <= d830 ? d830 : nextBusinessDay(new Date(raw.setDate(raw.getDate() + 1)));
+  // ensure 8:30 on the chosen day
+  show.setHours(8, 30, 0, 0);
+  // if that lands on a weekend, push to next weekday 8:30
+  while (isWeekend(show)) {
+    show.setDate(show.getDate() + 1);
+    show.setHours(8, 30, 0, 0);
+  }
+  return show;
+}
+
+
 
 
 // console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
@@ -34,20 +72,6 @@ import Overview from "./Overview";
 function isISO8601Z(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(s);
 }
-
-// Call this right after you move a job into a machine column
-async function maybeSetStartTimeOnAssign(job) {
-  try {
-    if (!job) return;
-    // Only set when moved into a machine column and job doesn't have a start yet
-    if (!job.embroidery_start) {
-      await bumpJobStartTime(job.id);
-    }
-  } catch (e) {
-    console.warn("Failed to set start time on assign:", e?.message || e);
-  }
-}
-
 
 // Format a Date/string in America/New_York as "MM/DD h:mm AM/PM"
 function fmtET(dtLike) {
@@ -258,10 +282,10 @@ export default function App() {
   const prevMachine1Top = useRef({ id: null, ts: 0 });
   const prevMachine2Top = useRef({ id: null, ts: 0 });
 
-  // (Legacy; safe to keep if referenced elsewhere, but the watcher below won't use it)
+  // (Legacy; safe if referenced elsewhere)
   const bumpedJobs = useRef(new Set());
 
-  // NEW: prevent duplicate concurrent POSTs per job when stamping start time
+  // NEW: prevent duplicate concurrent POSTs per job
   const bumpInFlight = useRef(new Set());
 
   // Which route are we on? (Scheduler is at "/")
@@ -272,46 +296,46 @@ export default function App() {
   const prevM2Top = useRef(null);
 
   // Send a new start time when needed
+  // >>> REPLACE your entire bumpJobStartTime with this <<<
+  // Posts a real "now" timestamp for the top job's Order #
+  // (No overwrite: server is idempotent and will no-op if already set)
   const bumpJobStartTime = async (jobId) => {
     try {
-      // If this job already has a valid start, skip
+      // Find the job by id across both machines and the queue
       const findJobById = () => {
-        for (const key of ['machine1', 'machine2', 'queue']) {
-          const hit = (columns?.[key]?.jobs || []).find(j => j.id === jobId);
+        for (const key of ["machine1", "machine2", "queue"]) {
+          const hit = (columns?.[key]?.jobs || []).find((j) => j.id === jobId);
           if (hit) return hit;
         }
         return null;
       };
 
-      const existing = findJobById();
-      if (existing && normalizeStart(existing.embroidery_start)) {
-        // console.log(`⏭️ Job ${jobId} already has start time (${existing.embroidery_start}), skipping`);
-        return;
-      }
-  
-      // Clamp to work window: if now is between 4:30 PM and 8:30 AM,
-      // snap to *next* 8:30 AM local (uses existing clampToWorkHours)
-      // Use actual current time; server will no longer clamp
+      const job = findJobById();
+      if (!job) return;
+
+      // If this job already has a start in the sheet, do nothing
+      const hasStart = !!job.embroidery_start;
+      if (hasStart) return;
+
+      // Resolve Order # (adjust fallback fields if yours differ)
+      const orderNumber = String(
+        job?.order ?? job?.order_number ?? job?.orderNo ?? ""
+      ).trim();
+      if (!orderNumber) return;
+
+      // Use actual current moment (ISO). Sheet keeps raw ISO; UI clamps to 8:30 for display only.
       const iso = new Date().toISOString();
-      await axios.post(`${API_ROOT}/updateStartTime`, { id: jobId, startTime: iso });
 
-      // Optimistically update all columns so UI reflects immediately
-      setColumns((cols) => {
-        const patch = (jobs) =>
-          jobs.map((j) => (j.id === jobId ? { ...j, embroidery_start: iso, start_date: iso } : j));
-        return {
-          ...cols,
-          queue:    { ...cols.queue,    jobs: patch(cols.queue.jobs) },
-          machine1: { ...cols.machine1, jobs: patch(cols.machine1.jobs) },
-          machine2: { ...cols.machine2, jobs: patch(cols.machine2.jobs) },
-        };
+      await axios.post(`${API_ROOT}/updateStartTime`, {
+        orderNumber,
+        startTime: iso,
       });
-
-      // console.log(`✅ Set start time for ${jobId}: ${fmtET(iso)} ET`);
     } catch (err) {
-      console.error('Failed to bump start time', err);
+      console.error("Failed to bump start time", err);
+      // Swallow; the watcher will retry on next refresh
     }
   };
+
 
   // live sheet data
   const [orders, setOrders]                 = useState([]);
@@ -376,23 +400,16 @@ export default function App() {
 
 // Listen for just-startTime updates, splice machine1 only
 useEffect(() => {
-  const handler = ({ orderId, startTime }) => {
-    setColumns(cols => {
-      const patch = (jobs) =>
-        jobs.map(j => j.id === orderId ? { ...j, embroidery_start: startTime } : j);
+  if (!socket) return;
 
-      return {
-        ...cols,
-        queue:    { ...cols.queue,    jobs: patch(cols.queue.jobs) },
-        machine1: { ...cols.machine1, jobs: patch(cols.machine1.jobs) },
-        machine2: { ...cols.machine2, jobs: patch(cols.machine2.jobs) },
-      };
-    });
+  const onStartTimeUpdated = () => {
+    // Re-fetch from backend so the UI reflects the new timestamp immediately
+    fetchAllCombined();
   };
 
-  socket.on("startTimeUpdated", handler);
-  return () => socket.off("startTimeUpdated", handler);
-}, []);
+  socket.on("startTimeUpdated", onStartTimeUpdated);
+  return () => socket.off("startTimeUpdated", onStartTimeUpdated);
+}, [socket]);
 
 // === Section 2: Helpers ===
 function isHoliday(dt) {
@@ -1143,22 +1160,27 @@ const fetchManualStateCore = async (previousCols) => {
 useEffect(() => {
   if (!isScheduler) return;
 
-  const maybeBump = (top, ref) => {
-    if (!top?.id) { ref.current = null; return; }
-    const hasStart = !!normalizeStart(top.embroidery_start);
+  const maybeStamp = (top, ref) => {
+    if (!top) { ref.current = null; return; }
 
-    if (!hasStart && !bumpInFlight.current.has(top.id)) {
-      bumpInFlight.current.add(top.id);
+    const hasStart = !!top?.embroidery_start; // raw from server/sheet
+    const key = String(top?.order ?? top?.order_number ?? top?.orderNo ?? "").trim();
+    if (!key) { ref.current = null; return; }
+
+    if (!hasStart && !bumpInFlight.current.has(key)) {
+      bumpInFlight.current.add(key);
       bumpJobStartTime(top.id)
-        .catch(() => {/* swallow; will retry on next effect tick */})
-        .finally(() => bumpInFlight.current.delete(top.id));
+        .catch(() => { /* transient: retry next tick */ })
+        .finally(() => bumpInFlight.current.delete(key));
     }
-    ref.current = top.id;
+
+    ref.current = key;
   };
 
-  maybeBump(columns?.machine1?.jobs?.[0], prevM1Top);
-  maybeBump(columns?.machine2?.jobs?.[0], prevM2Top);
+  maybeStamp(columns?.machine1?.jobs?.[0], prevM1Top);
+  maybeStamp(columns?.machine2?.jobs?.[0], prevM2Top);
 }, [isScheduler, columns?.machine1?.jobs, columns?.machine2?.jobs]);
+
 
 // === Section 6: Placeholder Management ===
 
