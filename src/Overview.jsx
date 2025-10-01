@@ -119,6 +119,30 @@ const socket = io(BACKEND_ROOT, {
 
 const LS_OVERVIEW_KEY = "jrco.overview.cache.v1";
 
+const LS_METRICS_KEY = "jrco.metrics.cache.v1";
+
+function saveMetricsCache(data) {
+  try {
+    localStorage.setItem(
+      LS_METRICS_KEY,
+      JSON.stringify({ t: Date.now(), data })
+    );
+  } catch {}
+}
+
+function loadMetricsCache(maxAgeMs = 10 * 60 * 1000) { // 10 minutes
+  try {
+    const raw = localStorage.getItem(LS_METRICS_KEY);
+    if (!raw) return null;
+    const { t, data } = JSON.parse(raw);
+    if (!t || (Date.now() - t) > maxAgeMs) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+
 function saveOverviewCache(data) {
   try { localStorage.setItem(LS_OVERVIEW_KEY, JSON.stringify({ t: Date.now(), data })); } catch {}
 }
@@ -685,37 +709,65 @@ export default function Overview() {
   }, [gmailPopup]);
 
   // ▼ Fetch Performance Metrics (Overview!V1:X2)
+  // ▼ Fetch Performance Metrics (Overview!V1:X2) — cached + retries + shorter timeouts
   useEffect(() => {
-    const ctrl = new AbortController();
     let alive = true;
 
-    (async () => {
+    // 1) Hydrate instantly from cache if present
+    const cached = loadMetricsCache();
+    if (cached) {
+      setMetrics(cached);
+      setLoadingMetrics(false); // don't block UI while we refetch
+    } else {
       setLoadingMetrics(true);
-      try {
-        const res = await axios.get(`${ROOT}/overview/metrics`, {
-          withCredentials: true,
-          signal: ctrl.signal,
-          timeout: 30000, // cache on server keeps this quick after first load
-          validateStatus: (s) => s >= 200 && s < 400,
-        });
-        if (!alive) return;
-        setMetrics(res.data || null);
-      } catch (err) {
-        if (!alive) return;
-        console.error("overview/metrics failed:", err?.message || err);
-        setMetrics(null);
-      } finally {
-        if (!alive) return;
-        setLoadingMetrics(false);
+    }
+
+    // 2) Try fetching with backoff and shorter timeouts
+    const timeouts = [12000, 15000, 20000]; // 12s → 15s → 20s
+    async function fetchWithBackoff() {
+      for (let i = 0; i < timeouts.length; i++) {
+        const ctrl = new AbortController();
+        try {
+          const res = await axios.get(`${ROOT}/overview/metrics`, {
+            withCredentials: true,
+            signal: ctrl.signal,
+            timeout: timeouts[i],
+            validateStatus: (s) => s >= 200 && s < 400,
+          });
+          if (!alive) return;
+          const data = res?.data || null;
+          setMetrics(data);
+          saveMetricsCache(data);
+          setLoadingMetrics(false);
+          return; // success
+        } catch (err) {
+          if (!alive) return;
+          const msg = err?.message || String(err);
+          console.warn(
+            `overview/metrics attempt ${i + 1} failed (${timeouts[i]}ms):`,
+            msg
+          );
+          // If last attempt, stop loading but keep whatever we have (cached or null)
+          if (i === timeouts.length - 1) {
+            setLoadingMetrics(false);
+          } else {
+            // brief pause before next attempt
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
       }
-    })();
+    }
+
+    fetchWithBackoff();
+
+    // Optional: periodic refresh (keeps metrics fresh without blocking)
+    const poll = setInterval(fetchWithBackoff, 5 * 60 * 1000);
 
     return () => {
       alive = false;
-      ctrl.abort(); // cancel if user navigates away
+      clearInterval(poll);
     };
   }, []);
-
 
   // Modal rows
   const modalRows = useMemo(() => {
