@@ -489,9 +489,56 @@ function ThreadThumb({ name, fallbackColor }) {
   );
 }
 
+// ⬇️ Put near the top of Overview.jsx, below other helpers/imports
+function formatClock(d) {
+  if (!d) return "";
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const s = String(d.getSeconds()).padStart(2, "0");
+  const ap = h < 12 ? "AM" : "PM";
+  h = (h % 12) || 12;
+  return `${h}:${m}:${s} ${ap}`;
+}
+
+function timeAgo(d) {
+  if (!d) return "";
+  const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (diff < 5)   return "just now";
+  if (diff < 60)  return `${diff}s ago`;
+  const mins = Math.floor(diff / 60);
+  if (mins < 60)  return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ago`;
+}
+
+function LastUpdatedBadge({ at }) {
+  const [, force] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => force(x => x + 1), 1000); // tick every second for “ago”
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div style={{
+      fontSize: 12,
+      color: "#111",
+      background: "#f3f4f6",
+      border: "1px solid #e5e7eb",
+      borderRadius: 999,
+      padding: "4px 10px",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6
+    }}>
+      <span style={{width: 8, height: 8, borderRadius: 999, background: at ? "#10b981" : "#9ca3af"}} />
+      {at ? <>Updated {formatClock(at)} · {timeAgo(at)}</> : "Loading…"}
+    </div>
+  );
+}
+
 
 // ——— Styles (added) ——————————————————————————————————————————————
 const header = { fontSize: 14, fontWeight: 700, marginBottom: 8 };
+const subtleUpdatedStyle = { fontSize: 12, color: "#9CA3AF", fontStyle: "italic" };
 
 const rowCard = {
   display: "flex",
@@ -551,6 +598,10 @@ export default function Overview() {
   const [metrics, setMetrics] = useState(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
 
+  // ⬇️ Inside export default function Overview() { ... } with your other useState hooks
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const markUpdated = React.useCallback(() => setLastUpdated(new Date()), []);
+
   // Load combined overview (upcoming + materials)
   useEffect(() => {
     let alive = true;
@@ -565,6 +616,7 @@ export default function Overview() {
       });
       setUpcoming(jobs);
       setMaterials(materials ?? []);
+      markUpdated();
       // Prime selections
       const init = {};
       for (const g of (materials ?? [])) {
@@ -606,6 +658,7 @@ export default function Overview() {
         setUpcoming(jobs);
         setMaterials(materials ?? []);
         if (dw) setDaysWindow(String(dw));
+        markUpdated();
 
         const init = {};
         for (const g of (materials ?? [])) {
@@ -718,6 +771,7 @@ export default function Overview() {
     if (cached) {
       setMetrics(cached);
       setLoadingMetrics(false); // don't block UI while we refetch
+      markUpdated();
     } else {
       setLoadingMetrics(true);
     }
@@ -739,6 +793,7 @@ export default function Overview() {
           setMetrics(data);
           saveMetricsCache(data);
           setLoadingMetrics(false);
+          markUpdated();
           return; // success
         } catch (err) {
           if (!alive) return;
@@ -914,7 +969,12 @@ export default function Overview() {
               position: "relative", // for overlay
             }}
           >
-            <div style={header}>Performance Metrics</div>
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>Performance Metrics</span>
+              <span style={subtleUpdatedStyle}>
+                {lastUpdated ? `Updated ${formatClock(lastUpdated)} · ${timeAgo(lastUpdated)}` : "Loading…"}
+              </span>
+            </div>
 
             {/* Yellow transparent overlay while loading this block */}
             {loadingMetrics && (
@@ -1029,7 +1089,12 @@ export default function Overview() {
               position: "relative",
             }}
           >
-            <div style={header}>Materials To Order (Grouped by Vendor)</div>
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>Materials To Order (Grouped by Vendor)</span>
+              <span style={subtleUpdatedStyle}>
+                {lastUpdated ? `Updated ${formatClock(lastUpdated)} · ${timeAgo(lastUpdated)}` : "Loading…"}
+              </span>
+            </div>
 
             {/* Yellow transparent overlay while loading this block */}
             {loadingMaterials && (
@@ -1206,9 +1271,22 @@ export default function Overview() {
               position: "relative",
             }}
           >
-            <div style={{ ...header, textAlign: "center" }}>
-              Upcoming Jobs (Ship in next {daysWindow} days)
+            <div
+              style={{
+                ...header,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                textAlign: "center",
+              }}
+            >
+              <span>Upcoming Jobs (Ship in next {daysWindow} days)</span>
+              <span style={subtleUpdatedStyle}>
+                {lastUpdated ? `Updated ${formatClock(lastUpdated)} · ${timeAgo(lastUpdated)}` : "Loading…"}
+              </span>
             </div>
+
 
             {/* Yellow transparent overlay while loading this block */}
             {loadingUpcoming && (
