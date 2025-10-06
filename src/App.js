@@ -1579,16 +1579,17 @@ useEffect(() => {
         }}
       >
         {[
-          { to: "/Overview",          label: "Overview" },
-          { to: "/",                  label: "Scheduler" },
-          { to: "/submit",            label: "Order Submission" },
-          { to: "/inventory",         label: "Inventory" },
-          { to: "/inventory-ordered", label: "Inventory Ordered" },
-          { to: "/fur",               label: "Fur List" },
-          { to: "/cut",               label: "Cut List" },  
-          { to: "/ship",              label: "Ship" },
-          { to: "/material-log", label: "Material Log" },
-          { to: "/departments",       label: "Departments" }
+         { to: "/Overview",          label: "Overview" },
+         { to: "/",                  label: "Scheduler" },
+         { to: "/submit",            label: "Order Submission" },
+         { to: "/inventory",         label: "Inventory" },
+         { to: "/inventory-ordered", label: "Inventory Ordered" },
+         { to: "/digitizing",        label: "Digitizing" }, 
+         { to: "/fur",               label: "Fur List" },
+         { to: "/cut",               label: "Cut List" },  
+         { to: "/ship",              label: "Ship" },
+         { to: "/material-log",      label: "Material Log" },
+         { to: "/departments",       label: "Departments" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
             padding: '0.5rem 1rem',
