@@ -167,9 +167,6 @@ export default function DigitizingList() {
   const [toastKind, setToastKind] = useState("success");
   const toastTimer = useRef(null);
 
-  const [saving, setSaving] = useState({});   // { [orderId]: true }
-  const [selected, setSelected] = useState({}); // { [orderId]: true }
-
   // responsive compact mode for narrow screens
   const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
   useEffect(() => {
@@ -266,106 +263,16 @@ export default function DigitizingList() {
     return base;
   }, [orders, mode]);
 
-
-  // ---------- Actions ----------
-  async function markComplete(order) {
-    const orderId = String(order["Order #"] || "");
-    const qty = order["Quantity"] || 0;
-
-    setSaving(prev => ({ ...prev, [orderId]: true }));
-    try {
-      const resp = await axios.post(`${API_ROOT}/fur/complete`,
-        { orderId, quantity: qty }, { withCredentials: true });
-      if (resp.data?.ok) {
-        // Quick optimistic removal to feel snappy
-        setOrders(prev => prev.filter(o => String(o["Order #"]) !== orderId));
-        setSelected(prev => { const n = { ...prev }; delete n[orderId]; return n; });
-        showToast("Saved to Fur List", "success");
-
-        // Now re-fetch from Sheets so any downstream formulas/status changes are reflected
-        await fetchOrders({ refresh: true });
-      } else {
-        showToast(resp.data?.error || "Write failed", "error", 2600);
-      }
-
-    } catch {
-      showToast("Error writing to Fur List", "error", 2600);
-    } finally {
-      setSaving(prev => { const n = { ...prev }; delete n[orderId]; return n; });
-    }
-  }
-
-  // Batch complete — single request to /fur/completeBatch
-  async function completeSelected() {
-    const ids = Object.keys(selected).filter(id => selected[id]);
-    if (!ids.length) return;
-
-    const items = cards
-      .filter(o => ids.includes(String(o["Order #"])))
-      .map(o => ({ orderId: String(o["Order #"]), quantity: o["Quantity"] || 0 }));
-
-    setSaving(prev => { const n = { ...prev }; items.forEach(it => n[it.orderId] = true); return n; });
-
-    let ok = false, wrote = 0;
-    try {
-      const r = await axios.post(`${API_ROOT}/fur/completeBatch`, { items }, { withCredentials: true });
-      ok = !!r.data?.ok;
-      wrote = r.data?.wrote || 0;
-    } catch {
-      ok = false;
-    }
-
-    if (ok) {
-      // Optimistic removal of succeeded orders
-      setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
-      showToast(`Completed ${wrote} orders`, "success");
-    } else {
-      showToast(`Batch failed — nothing written`, "error", 2600);
-    }
-
-    setSelected({});
-    setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
-
-    // Re-sync from Sheets
-    await fetchOrders({ refresh: true });
-  }
-
-
-  function toggleSelect(id, on = undefined) {
-    setSelected(prev => {
-      const n = { ...prev };
-      const cur = !!n[id];
-      n[id] = on === undefined ? !cur : !!on;
-      return n;
-    });
-  }
-  function toggleSelectAll() {
-    if (!cards.length) return;
-    const allSelected = cards.every(o => selected[String(o["Order #"])]);
-    const next = {};
-    if (!allSelected) for (const o of cards) next[String(o["Order #"])] = true;
-    setSelected(next);
-  }
-
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
-  // [Order#, Preview, Company, Design, Qty, Product, Stage, Due, (Print), Fur Color, Ship, (Hard/Soft), Complete]
-  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 68px 100px 78px 78px 110px 92px";
-  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 96px 74px 74px 92px"; // compact: no Print, no Hard/Soft
+  // [Order#, Preview, Company, Design, Qty, Product, Stage, (Print), Fur Color, Ship, Due, (Hard/Soft)]
+  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 100px 78px 78px 110px 92px";
+  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 74px 74px 92px";
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const cellBase = {
     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center"
   };
-
-  // Sticky helper (one right sticky column now: Complete)
-  const stickyRight = (offset, bg) => ({
-    position: "sticky", right: offset, zIndex: 2, background: bg || "#fff",
-    boxShadow: offset ? "-8px 0 8px -8px rgba(0,0,0,0.12)" : "inset 8px 0 8px -8px rgba(0,0,0,0.12)"
-  });
-
-
-  const selectedCount = Object.values(selected).filter(Boolean).length;
 
   return (
     <div style={{ padding: 12, fontSize: 12, lineHeight: 1.2 }}>
@@ -376,28 +283,20 @@ export default function DigitizingList() {
         .btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #bbb; font-weight: 700; cursor: pointer; }
       `}</style>
 
-      {/* Top bar: filters + batch action */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+        {["Main", "Fur Color", "Product"].map(m => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className="btn"
+            style={{ background: mode === m ? "#eee" : "#fff" }}
+          >
+            {m}
+          </button>
+        ))}
         <div style={{ flex: 1 }} />
-        <button
-          onClick={completeSelected}
-          className="btn"
-          disabled={!selectedCount}
-          title={selectedCount ? `Complete ${selectedCount} selected` : "Select orders to enable"}
-          style={{ background: selectedCount ? "#f6f6f6" : "#f0f0f0", opacity: selectedCount ? 1 : 0.6 }}
-        >
-          Complete Selected {selectedCount ? `(${selectedCount})` : ""}
-        </button>
-        <button
-          onClick={() => setSelected({})}
-          className="btn"
-          disabled={!selectedCount}
-          style={{ background: "#f8f8f8", opacity: selectedCount ? 1 : 0.6 }}
-          title="Clear all selections"
-        >
-          Clear
-        </button>
       </div>
+
 
       {/* Header row */}
       <div
@@ -420,7 +319,6 @@ export default function DigitizingList() {
         <div style={cellBase}>Ship</div>
         <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
-        <div style={{ ...cellBase, ...stickyRight(0, "#fafafa"), textAlign: "right" }}>Complete</div>
       </div>
 
       {/* Content + overlay */}
@@ -598,30 +496,6 @@ export default function DigitizingList() {
                 <div style={cellBase}>{fmtMMDD(ship)}</div>
                 <div style={cellBase}>{fmtMMDD(due)}</div>
                 {!compact && <div style={cellBase}>{hardSoft}</div>}
-
-                {/* Complete (final sticky cell). Stop click from toggling the card */}
-                <div style={{ ...stickyRight(0, bg), textAlign: "right" }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); markComplete(order); }}
-                    disabled={isSaving}
-                    className="btn"
-                    style={{
-                      background: isSaving ? "rgba(255,255,255,0.8)" : "#ffffff",
-                      color: "#222", display: "inline-flex", alignItems: "center", gap: 8,
-                      opacity: isSaving ? 0.9 : 1
-                    }}
-                    title="Write Quantity to Fur List → Quantity Made, then hide"
-                    aria-busy={isSaving ? "true" : "false"}
-                  >
-                    {isSaving && (
-                      <span
-                        className="spin" aria-hidden="true"
-                        style={{ width: 12, height: 12, border: "2px solid #999", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }}
-                      />
-                    )}
-                    {isSaving ? "Saving…" : "Complete"}
-                  </button>
-                </div>
               </div>
             );
           })}
