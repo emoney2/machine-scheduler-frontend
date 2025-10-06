@@ -24,6 +24,7 @@ import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
+import DigitizingList from "./DigitizingList";
 
 function isWeekend(d) {
   const day = d.getDay(); // 0=Sun,6=Sat
@@ -1679,6 +1680,7 @@ useEffect(() => {
           <Route path="/submit" element={<OrderSubmission />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/inventory-ordered" element={<InventoryOrdered />} />
+          <Route path="/digitizing" element={<DigitizingList />} />
           <Route path="/cut" element={<CutList />} />
           <Route path="/ship" element={<Ship />} />
           <Route path="/fur" element={<FurList />} />
