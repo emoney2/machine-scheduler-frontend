@@ -1,3 +1,4 @@
+// /src/DigitizingList.jsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 
@@ -26,22 +27,6 @@ function firstField(obj, names) {
     if (val !== undefined && val !== null && String(val).trim() !== "") return val;
   }
   return null;
-}
-
-function businessDaysUntil(target) {
-  if (!target) return null;
-  const t = new Date(target); t.setHours(0,0,0,0);
-  const today = new Date();   today.setHours(0,0,0,0);
-
-  // If already past due, treat as 0 to force highlight
-  if (t <= today) return 0;
-
-  let count = 0;
-  for (let d = new Date(today); d < t; d.setDate(d.getDate() + 1)) {
-    const day = d.getDay(); // 0 Sun, 6 Sat
-    if (day !== 0 && day !== 6) count += 1;
-  }
-  return count;
 }
 
 // Extract Google Drive file ID from =IMAGE(...) or URL
@@ -78,49 +63,7 @@ function orderThumbUrl(order) {
   return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
 }
 
-
-// Stage priority: Sewing → Embroidery → Print → Cut → Fur → Ordered
-function stageBucket(order) {
-  const s = String(order["Stage"] || "").toLowerCase();
-  if (s.includes("sew"))        return 0;
-  if (s.includes("embroidery")) return 1;
-  if (s.includes("print"))      return 2;
-  if (s.includes("cut"))        return 3;
-  if (s.includes("fur"))        return 4;
-  if (s.includes("ordered"))    return 5;
-  return 6;
-}
-function makeComparator() {
-  return (a, b) => {
-    const ba = stageBucket(a), bb = stageBucket(b);
-    if (ba !== bb) return ba - bb;
-
-    // Embroidery: prefer End Embroidery Time
-    if (ba === 1) {
-      const aEnd = toDate(firstField(a, [
-        "End Embroidery Time","Embroidery End Time","Embroidery End","End Embroidery","End Time"
-      ]));
-      const bEnd = toDate(firstField(b, [
-        "End Embroidery Time","Embroidery End Time","Embroidery End","End Embroidery","End Time"
-      ]));
-      const at = aEnd ? aEnd.getTime() : Infinity;
-      const bt = bEnd ? bEnd.getTime() : Infinity;
-      if (at !== bt) return at - bt;
-    }
-
-    // Otherwise: Due Date
-    const aDue = toDate(a["Due Date"]);
-    const bDue = toDate(b["Due Date"]);
-    const at = aDue ? aDue.getTime() : Infinity;
-    const bt = bDue ? bDue.getTime() : Infinity;
-    if (at !== bt) return at - bt;
-
-    const aId = String(a["Order #"] || "");
-    const bId = String(b["Order #"] || "");
-    return aId.localeCompare(bId, undefined, { numeric: true });
-  };
-}
-
+// Optional: grouping helper (same behavior as Fur List if you keep the mode buttons)
 function priorityPartition(rows, key) {
   if (!rows.length) return rows;
   const target = String(rows[0][key] || "").trim().toLowerCase();
@@ -133,7 +76,7 @@ function priorityPartition(rows, key) {
   return [...yes, ...no];
 }
 
-// ---------- Toast ----------
+// ---------- (Optional) Toast ----------
 function Toast({ kind = "success", message, onClose }) {
   if (!message) return null;
   return (
@@ -160,11 +103,10 @@ function Toast({ kind = "success", message, onClose }) {
 export default function DigitizingList() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [mode, setMode] = useState("Main"); // Main | Fur Color | Product
+  const [mode, setMode] = useState("Main"); // Main | Fur Color | Product (optional grouping)
   const inFlight = useRef(false);
 
-  const saving = {};
-
+  // (Optional) toast state — safe to leave
   const [toastMsg, setToastMsg] = useState("");
   const [toastKind, setToastKind] = useState("success");
   const toastTimer = useRef(null);
@@ -200,7 +142,7 @@ export default function DigitizingList() {
       if (!opts.refresh) setIsLoading(false);
       inFlight.current = false;
     }
-  }, [API_ROOT]);
+  }, []);
 
   // initial + polling
   useEffect(() => {
@@ -229,39 +171,22 @@ export default function DigitizingList() {
     });
 
     // 3) Sort strictly by Due Date (oldest first).
-    function toDateOnly(v) {
-      // Use the same serial/Date parsing you already have in this file.
-      // If you already have a `toDate` helper above in the file, use it.
-      // Here’s a safe inline version:
-      if (v == null) return null;
-      if (typeof v === "number" && isFinite(v)) {
-        const base = new Date(Date.UTC(1899, 11, 30));
-        return new Date(base.getTime() + v * 86400000);
-      }
-      const d = new Date(String(v).trim());
-      return isNaN(d) ? null : d;
-    }
-
     base.sort((a, b) => {
-      const ad = toDateOnly(a["Due Date"]);
-      const bd = toDateOnly(b["Due Date"]);
+      const ad = toDate(a["Due Date"]);
+      const bd = toDate(b["Due Date"]);
       const at = ad ? ad.getTime() : Infinity;
       const bt = bd ? bd.getTime() : Infinity;
       if (at !== bt) return at - bt;
 
-      // Stable tie-breaker: by Order # (numeric-aware)
+      // tie-breaker: Order # (numeric-aware)
       const aId = String(a["Order #"] || "");
       const bId = String(b["Order #"] || "");
       return aId.localeCompare(bId, undefined, { numeric: true });
     });
 
-    // (Optional) Keep your Fur List’s grouping buttons working:
-    // If your file has a `mode` state and `priorityPartition`, preserve it.
-    if (typeof mode === "string") {
-      if (mode === "Fur Color") return priorityPartition(base, "Fur Color");
-      if (mode === "Product")   return priorityPartition(base, "Product");
-    }
-
+    // Optional grouping (keeps the same "feel" as Fur List, but sort remains by due date)
+    if (mode === "Fur Color") return priorityPartition(base, "Fur Color");
+    if (mode === "Product")   return priorityPartition(base, "Product");
     return base;
   }, [orders, mode]);
 
@@ -280,11 +205,11 @@ export default function DigitizingList() {
     <div style={{ padding: 12, fontSize: 12, lineHeight: 1.2 }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        .spin { animation: spin 0.9s linear infinite; }
         .hdr { font-size: 11px; font-weight: 700; color: #444; text-transform: uppercase; }
         .btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #bbb; font-weight: 700; cursor: pointer; }
       `}</style>
 
+      {/* Top bar — optional grouping buttons to match Fur List look */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
         {["Main", "Fur Color", "Product"].map(m => (
           <button
@@ -298,7 +223,6 @@ export default function DigitizingList() {
         ))}
         <div style={{ flex: 1 }} />
       </div>
-
 
       {/* Header row */}
       <div
@@ -323,13 +247,13 @@ export default function DigitizingList() {
         {!compact && <div style={cellBase}>Hard/Soft</div>}
       </div>
 
-      {/* Content + overlay */}
+      {/* Loading overlay */}
       {isLoading && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(255, 235, 59, 0.25)", // transparent yellow
+            background: "rgba(255, 235, 59, 0.25)",
             backdropFilter: "blur(1px)",
             display: "flex",
             alignItems: "center",
@@ -354,8 +278,12 @@ export default function DigitizingList() {
           </div>
         </div>
       )}
+
+      {/* Content */}
       {cards.length === 0 ? (
-        <div style={{ padding: "24px 8px", color: "#777" }}>No work items for Fur.</div>
+        <div style={{ padding: "24px 8px", color: "#777" }}>
+          No digitizing items (Stage = Ordered) to show.
+        </div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {cards.map(order => {
@@ -368,107 +296,19 @@ export default function DigitizingList() {
             const due     = toDate(order["Due Date"]);
             const print   = order["Print"] || "";
             const color   = order["Fur Color"] || "";
-            const ship    = toDate(order["Ship Date"]);
+            const ship    = toDate(order["Ship Date"]); // your data seems to use "Ship Date"
             const hardSoft= order["Hard Date/Soft Date"] || "";
             const imageUrl= orderThumbUrl(order);
-            const isSaving = !!saving[orderId];
-            const sel = !!selected[orderId];
-
-            // Card background from Fur Color (with readable text)
-            const bg = (() => {
-              const nameRaw = color || "";
-              const s = String(nameRaw).trim().toLowerCase();
-              const table = [
-                { k: ["light grey","light gray","lt grey","lt gray"], v: "#D3D3D3" },
-                { k: ["grey","gray"], v: "#BEBEBE" },
-                { k: ["dark grey","dark gray"], v: "#A9A9A9" },
-                { k: ["black"], v: "#111111" },
-                { k: ["white"], v: "#FFFFFF" },
-                { k: ["navy"], v: "#001F3F" },
-                { k: ["blue"], v: "#1E90FF" },
-                { k: ["red"], v: "#D9534F" },
-                { k: ["green"], v: "#28A745" },
-                { k: ["yellow"], v: "#FFD34D" },
-                { k: ["orange"], v: "#FF9F40" },
-                { k: ["brown","chocolate","coffee"], v: "#7B4B26" },
-                { k: ["tan","khaki","beige","sand"], v: "#D2B48C" },
-                { k: ["cream","ivory","off white","off-white"], v: "#F5F1E6" },
-                { k: ["maroon","burgundy","wine"], v: "#800020" },
-                { k: ["purple","violet"], v: "#7D4AA6" },
-                { k: ["teal","cyan","aqua"], v: "#3AB7BF" },
-                { k: ["pink","rose"], v: "#FF6FA6" },
-                { k: ["gold"], v: "#D4AF37" },
-                { k: ["silver"], v: "#C0C0C0" },
-              ];
-              for (const row of table) if (row.k.some(k => s.includes(k))) return row.v;
-              const last = s.split(/\s+/).pop();
-              for (const row of table) if (row.k.includes(last)) return row.v;
-              return nameRaw || "#fff";
-            })();
-            const fg = (() => {
-              const hex = String(bg).replace("#","");
-              if (!/^[0-9a-f]{6}$/i.test(hex)) return "#111";
-              const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-              const lum = (0.2126*r + 0.7152*g + 0.0722*b)/255;
-              return lum > 0.6 ? "#111" : "#fff";
-            })();
-
-            // 🚨 Urgency: within 7 business days of Ship Date (or overdue)
-            const daysToShip = (() => {
-              if (!ship) return null;
-              const target = new Date(ship); target.setHours(0,0,0,0);
-              const today  = new Date();     today.setHours(0,0,0,0);
-              if (target <= today) return 0;
-              let count = 0;
-              const d = new Date(today);
-              while (d < target) {
-                const day = d.getDay(); // 0 Sun, 6 Sat
-                if (day !== 0 && day !== 6) count++;
-                d.setDate(d.getDate() + 1);
-              }
-              return count;
-            })();
-            const urgent = daysToShip !== null && daysToShip <= 7;
 
             return (
               <div
                 key={orderId}
-                role="button"
-                tabIndex={0}
-                onClick={() => toggleSelect(orderId)}
-                onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleSelect(orderId); }
-                }}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
-                  gap: 8, padding: 10, borderRadius: 14,
-                  border: urgent ? "2px solid #e11900" : (sel ? "2px solid #2563eb" : "1px solid #ddd"),
-                  background: sel ? "rgba(37, 99, 235, 0.05)" : bg,
-                  color: fg, position: "relative",
-                  boxShadow: sel ? "0 0 0 4px rgba(37,99,235,0.15)" : "0 1px 3px rgba(0,0,0,0.05)",
-                  transform: sel ? "translateY(-1px)" : "none",
-                  transition: "border 120ms ease, box-shadow 120ms ease, background 120ms ease, transform 120ms ease",
-                  cursor: "pointer", userSelect: "none", outline: "none"
+                  gap: 8, padding: 10, borderRadius: 10,
+                  border: "1px solid #ddd", background: "#fff"
                 }}
               >
-                {sel && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 8,
-                      right: 8,
-                      background: "#2563eb",
-                      color: "white",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      borderRadius: 999,
-                      padding: "3px 8px",
-                      boxShadow: "0 2px 6px rgba(0,0,0,0.15)"
-                    }}
-                  >
-                    Selected
-                  </div>
-                )}
                 <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
 
                 {/* Preview */}
@@ -496,7 +336,7 @@ export default function DigitizingList() {
                 {!compact && <div style={cellBase}>{print}</div>}
                 <div style={cellBase}>{color}</div>
                 <div style={cellBase}>{fmtMMDD(ship)}</div>
-                <div style={cellBase}>{fmtMMDD(due)}</div>
+                <div style={{ ...cellBase, fontWeight: 700 }}>{fmtMMDD(due)}</div>
                 {!compact && <div style={cellBase}>{hardSoft}</div>}
               </div>
             );
