@@ -90,6 +90,8 @@ function fmtET(dtLike) {
   return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
 }
 
+// ---- Time formatting (display only) ---- export function formatLocalStamp(iso) { if (!iso) return ""; // accept Date, number, or string const d = typeof iso === "string" || typeof iso === "number" ? new Date(iso) : iso; if (isNaN(d)) return ""; // local parts const mm = String(d.getMonth() + 1).padStart(2, "0"); const dd = String(d.getDate()).padStart(2, "0"); let hh = d.getHours(); const mins = String(d.getMinutes()).padStart(2, "0"); const ampm = hh >= 12 ? "PM" : "AM"; hh = hh % 12 || 12; return ${mm}/${dd} ${hh}:${mins} ${ampm}; }
+
 // Convert "M/D/YYYY H:MM AM/PM" (Eastern local text) → ISO (UTC) safely, DST-aware.
 function etDisplayToISO(s) {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4}) (\d{1,2}):(\d{2}) (AM|PM)$/.exec(s?.trim() || "");
@@ -490,35 +492,42 @@ function fmtDT(dtLike) {
 function parseEmbroideryStart(val) {
   if (val == null || val === '') return '';
 
-  // Accept ISO (with or without a stray space before T)
   if (typeof val === 'string') {
     let s = val.trim().replace(/\s*T\s*/, 'T');
+
+    // 1) ISO (with or without stray space before T)
     if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s;
 
-    // M/D/YYYY H:MM AM/PM
+    // 2) M/D/YYYY H:MM AM/PM
     let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
     if (m) {
       let [, mo, da, yr, hh, mm, ap] = m;
-      mo=+mo; da=+da; yr=+yr; hh=+hh; mm=+mm;
+      mo = +mo; da = +da; yr = +yr; hh = +hh; mm = +mm;
       if (/pm/i.test(ap) && hh < 12) hh += 12;
       if (/am/i.test(ap) && hh === 12) hh = 0;
       const dt = new Date(yr, mo - 1, da, hh, mm, 0, 0);
       return isNaN(dt) ? '' : dt.toISOString();
     }
 
-    // M/D H:MM AM/PM  (assume current year)
+    // 3) M/D H:MM AM/PM  (assume current year)
     m = s.match(/^(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
     if (m) {
       let [, mo, da, hh, mm, ap] = m;
       const yr = new Date().getFullYear();
-      mo=+mo; da=+da; hh=+hh; mm=+mm;
+      mo = +mo; da = +da; hh = +hh; mm = +mm;
       if (/pm/i.test(ap) && hh < 12) hh += 12;
       if (/am/i.test(ap) && hh === 12) hh = 0;
       const dt = new Date(yr, mo - 1, da, hh, mm, 0, 0);
       return isNaN(dt) ? '' : dt.toISOString();
     }
 
-    // Fallback
+    // 4) ⛔️ Explicitly reject ambiguous short forms that cause the 10/22 issue
+    //    e.g., "10/22" or "10/25" or "10/22/25" (2-digit year) — treat as invalid
+    if (/^\d{1,2}\/\d{1,2}(\/\d{2})?$/.test(s)) {
+      return '';
+    }
+
+    // 5) Final fallback — try native Date, but only if it yields a full ISO reliably
     const dt = new Date(s);
     return isNaN(dt) ? '' : dt.toISOString();
   }
@@ -533,8 +542,6 @@ function parseEmbroideryStart(val) {
   const dt = new Date(val);
   return isNaN(dt) ? '' : dt.toISOString();
 }
-
-
 
 function parseDueDate(d) {
   if (d === null || d === undefined || d === '') return null;
