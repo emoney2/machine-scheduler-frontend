@@ -26,6 +26,26 @@ import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 import DigitizingList from "./DigitizingList";
 
+function isActiveStage(stageLike) {
+  const s = String(stageLike || '').toLowerCase();
+  return s !== 'sewing' && s !== 'complete';
+}
+
+function reconcileManualState(prevManualState, allJobs) {
+  const byId = new Map(allJobs.map(j => [j.id, j]));
+  const activeIds = new Set(allJobs.filter(j => isActiveStage(j.Stage || j.stage)).map(j => j.id));
+
+  // 1) prune anything missing or not active
+  const pruned = prevManualState.filter(id => byId.has(id) && activeIds.has(id));
+
+  // 2) append any active ids not already present
+  for (const id of activeIds) {
+    if (!pruned.includes(id)) pruned.push(id);
+  }
+  return pruned;
+}
+
+
 function isWeekend(d) {
   const day = d.getDay(); // 0=Sun,6=Sat
   return day === 0 || day === 6;
@@ -873,10 +893,11 @@ const fetchOrdersEmbroLinksCore = async () => {
     const embRes      = { data: combinedRes.data?.embroideryList || [] };
     const linksRes    = { data: combinedRes.data?.links || {} };
 
-    // 2) Prepare orders array, filter out completed
-    let orders = (ordersRes.data || []).filter(
-      o => (o['Stage'] || '').toLowerCase() !== 'complete'
-    );
+    // drop Sewing and Complete
+    let orders = (ordersRes.data || []).filter(o => {
+      const stage = String(o['Stage'] || '').toLowerCase();
+      return stage !== 'sewing' && stage !== 'complete';
+    });
     const embList = embRes.data || [];
     let linksData = linksRes.data || {};
 
@@ -1035,8 +1056,9 @@ const fetchManualStateCore = async (previousCols) => {
       ...previousCols.machine2.jobs,
     ].filter(job =>
       !msData.placeholders.some(p => p.id === job.id) &&
-      String(job.status || '').toLowerCase() !== 'complete'
+      !['sewing','complete'].includes(String(job.status || '').toLowerCase())
     );
+
 
     // Fast lookup by id
     const byId = new Map(pool.map(j => [j.id, { ...j, machineId: 'queue' }]));
