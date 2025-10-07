@@ -163,6 +163,8 @@ export default function DigitizingList() {
   const [mode, setMode] = useState("Main"); // Main | Fur Color | Product
   const inFlight = useRef(false);
 
+  const saving = {};
+
   const [toastMsg, setToastMsg] = useState("");
   const [toastKind, setToastKind] = useState("success");
   const toastTimer = useRef(null);
