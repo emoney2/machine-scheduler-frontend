@@ -26,6 +26,7 @@ import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 import DigitizingList from "./DigitizingList";
 
+
 function isActiveStage(stageLike) {
   const s = String(stageLike || '').toLowerCase();
   return s !== 'sewing' && s !== 'complete';
@@ -310,6 +311,10 @@ export default function App() {
 
   // NEW: prevent duplicate concurrent POSTs per job
   const bumpInFlight = useRef(new Set());
+
+  // ── Write-guard to prevent snap-back after saving manual state ──
+  const manualStateSaveInFlight   = useRef(false);
+  const manualStateWriteGuardUntil = useRef(0); 
 
   // Which route are we on? (Scheduler is at "/")
   const location = useLocation();
@@ -1038,9 +1043,15 @@ const fetchOrdersEmbroLinksCore = async () => {
   }
 };
 // ─── Section 5B: fetchManualState only ───────────────────────────────────────────
+// ─── Section 5B: fetchManualState only (GUARDED) ───────────────────────────────
 const fetchManualStateCore = async (previousCols) => {
-  // console.log('fetchManualStateCore ▶ start');
   try {
+    // If a save just happened (or is happening), skip applying GETs to avoid snap-back
+    if (manualStateSaveInFlight.current || Date.now() < manualStateWriteGuardUntil.current) {
+      console.log("[manual-state] skip GET (write in-flight or guarded)");
+      return previousCols;
+    }
+
     // Robust fetch with one quick retry and longer timeout.
     const attempt = (ms) => axios.get(API_ROOT + '/manualState', { timeout: ms });
 
@@ -1054,11 +1065,15 @@ const fetchManualStateCore = async (previousCols) => {
         ({ data: msData } = await attempt(45000));
       } catch (e2) {
         console.error('manualState second attempt failed:', e2?.message || e2);
-        // Gracefully degrade: return previous columns unchanged
         return previousCols;
       }
     }
-    //    msData = { machineColumns: [ [...], [...] ], placeholders: [...] }
+
+    // Guard again immediately before applying, in case a save occurred during the GET
+    if (manualStateSaveInFlight.current || Date.now() < manualStateWriteGuardUntil.current) {
+      console.log("[manual-state] skip APPLY (write in-flight or guarded)");
+      return previousCols;
+    }
 
     // 2) Overwrite local placeholders state
     setPlaceholders(msData.placeholders || []);
@@ -1078,8 +1093,6 @@ const fetchManualStateCore = async (previousCols) => {
       !['sewing','complete'].includes(String(job.status || '').toLowerCase())
     );
 
-
-    // Fast lookup by id
     const byId = new Map(pool.map(j => [j.id, { ...j, machineId: 'queue' }]));
 
     // 5) Start fresh columns; everything begins in the queue
@@ -1097,14 +1110,13 @@ const fetchManualStateCore = async (previousCols) => {
       const idx = mergedCols.queue.jobs.findIndex(j => j.id === id);
       if (idx !== -1) {
         const [jobObj] = mergedCols.queue.jobs.splice(idx, 1);
-        jobObj.machineId = machineKey; // tag for clarity
+        jobObj.machineId = machineKey;
         mergedCols[machineKey].jobs.push(jobObj);
       }
     }
 
     // 6) Place machine1 ids in exact saved order
     machine1Ids.forEach(id => pullToMachine(id, 'machine1'));
-
     // 7) Place machine2 ids in exact saved order
     machine2Ids.forEach(id => pullToMachine(id, 'machine2'));
 
@@ -1135,6 +1147,7 @@ const fetchManualStateCore = async (previousCols) => {
     throw err;
   }
 };
+
 
   // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
   const fetchAllCombined = async () => {
@@ -1486,11 +1499,15 @@ const onDragEnd = async (result) => {
       placeholders
     };
     try {
+      manualStateSaveInFlight.current = true;                         // begin guard
       await axios.post(API_ROOT + '/manualState', manualState);
+      manualStateWriteGuardUntil.current = Date.now() + 1500;         // ignore GETs for 1.5s
+      console.log("[manual-state] wrote (same-col) → write-guard 1500ms");
     } catch (err) {
       console.error('❌ manualState save failed (same-col reorder)', err);
+    } finally {
+      manualStateSaveInFlight.current = false;                        // end guard
     }
-
     setManualReorder(true);
     return;
   }
@@ -1576,11 +1593,15 @@ const onDragEnd = async (result) => {
     placeholders
   };
   try {
+    manualStateSaveInFlight.current = true;                         // begin guard
     await axios.post(API_ROOT + '/manualState', manualState);
+    manualStateWriteGuardUntil.current = Date.now() + 1500;         // ignore GETs for 1.5s
+    console.log("[manual-state] wrote (cross-col) → write-guard 1500ms");
   } catch (err) {
     console.error('❌ manualState save failed (cross-col)', err);
+  } finally {
+    manualStateSaveInFlight.current = false;                        // end guard
   }
-
   // NEW: only set start time when moved into a machine column (preserves drop index)
   if (dstCol === 'machine1' || dstCol === 'machine2') {
     const head = movedJobs?.[0];
