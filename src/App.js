@@ -338,13 +338,13 @@ export default function App() {
       const hasStart = !!job.embroidery_start;
       if (hasStart) return;
 
-      const orderNumber = String(
-        job?.order ?? job?.order_number ?? job?.orderNo ?? ""
-      ).trim();
+      // Our jobs use `id` for Order #
+      const orderNumber = String(job?.id ?? "").trim();
       if (!orderNumber) {
         console.warn("[start-stamp] skipped (no Order #) for id:", jobId);
         return;
       }
+
 
       const iso = new Date().toISOString();
 
@@ -1213,7 +1213,8 @@ useEffect(() => {
     if (!top) { ref.current = null; return; }
 
     const hasStart = !!top?.embroidery_start; // raw from server/sheet
-    const key = String(top?.order ?? top?.order_number ?? top?.orderNo ?? "").trim();
+    // Order # lives on job.id
+    const key = String(top?.id ?? "").trim();
     if (!key) { ref.current = null; return; }
 
     if (!hasStart && !bumpInFlight.current.has(key)) {
@@ -1222,7 +1223,6 @@ useEffect(() => {
         .catch(() => { /* transient: retry next tick */ })
         .finally(() => bumpInFlight.current.delete(key));
     }
-
     ref.current = key;
   };
 
