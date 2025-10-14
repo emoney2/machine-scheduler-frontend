@@ -849,9 +849,18 @@ export default function Overview() {
     if (!grp) return [];
     return (grp.items || []).map(it => {
       const key = `${grp.vendor}:::${it.name}`;
-      const base = modalSelections[key] || {};
-      return { vendor: grp.vendor, name: it.name, unit: it.unit || "", ...base, key };
+      const base =
+        modalSelections[key] ||
+        selections[key] || // use the prebuilt defaults if present
+        {
+          selected: true,
+          qty: String(it.qty ?? "1"),
+          unit: it.unit ?? "",
+          type: it.type ?? "Material",
+        };
+      return { vendor: grp.vendor, name: it.name, ...base, key };
     });
+
   }, [modalOpenForVendor, modalSelections, materials]);
 
   // Submit order: email (or open website) + log to inventory
@@ -1176,11 +1185,29 @@ export default function Overview() {
                           const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
                           const vMethod = (v.method || "").toLowerCase();
                           setOrderMethod(
-                            vMethod.includes("online") || vMethod.includes("website")
+                            (orderMethod || "").toLowerCase().includes("website")
                               ? "website"
                               : "email"
                           );
                           setModalOpenForVendor(grp.vendor);
+
+                          // Seed defaults so the modal is ready to send
+                          setModalSelections((s) => {
+                            const next = { ...s };
+                            for (const it of (grp.items || [])) {
+                              const key = `${grp.vendor}:::${it.name}`;
+                              if (!next[key]) {
+                                next[key] = {
+                                  selected: true,
+                                  qty: String(it.qty ?? "1"),
+                                  unit: it.unit ?? "",
+                                  type: it.type ?? "Material",
+                                };
+                              }
+                            }
+                            return next;
+                          });
+
                         }}
                         style={{
                           padding: "5px 8px",
@@ -1547,7 +1574,7 @@ export default function Overview() {
                     onChange={(e) =>
                       setModalSelections((s) => ({
                         ...s,
-                        [r.key]: { ...s[r.key], selected: e.target.checked },
+                        [r.key]: { ...(s[r.key] || {}), selected: e.target.checked },
                       }))
                     }
                   />
