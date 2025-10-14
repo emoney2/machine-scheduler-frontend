@@ -324,7 +324,6 @@ export default function App() {
   // (No overwrite: server is idempotent and will no-op if already set)
   const bumpJobStartTime = async (jobId) => {
     try {
-      // Find the job by id across both machines and the queue
       const findJobById = () => {
         for (const key of ["machine1", "machine2", "queue"]) {
           const hit = (columns?.[key]?.jobs || []).find((j) => j.id === jobId);
@@ -336,28 +335,48 @@ export default function App() {
       const job = findJobById();
       if (!job) return;
 
-      // If this job already has a start in the sheet, do nothing
       const hasStart = !!job.embroidery_start;
       if (hasStart) return;
 
-      // Resolve Order # (adjust fallback fields if yours differ)
       const orderNumber = String(
         job?.order ?? job?.order_number ?? job?.orderNo ?? ""
       ).trim();
-      if (!orderNumber) return;
+      if (!orderNumber) {
+        console.warn("[start-stamp] skipped (no Order #) for id:", jobId);
+        return;
+      }
 
-      // Use actual current moment (ISO). Sheet keeps raw ISO; UI clamps to 8:30 for display only.
       const iso = new Date().toISOString();
 
-      await axios.post(`${API_ROOT}/updateStartTime`, {
+      const resp = await axios.post(`${API_ROOT}/updateStartTime`, {
         orderNumber,
         startTime: iso,
       });
+
+      if (resp?.data?.ok && resp?.data?.wrote) {
+        console.log(`[start-stamp] wrote start for #${orderNumber} →`, iso);
+      } else {
+        console.log(
+          `[start-stamp] no-op (already set?) for #${orderNumber} — server said:`,
+          resp?.data
+        );
+      }
     } catch (err) {
-      console.error("Failed to bump start time", err);
-      // Swallow; the watcher will retry on next refresh
+      const code = err?.response?.status;
+      const msg  = err?.response?.data?.error || err?.message || String(err);
+      console.error(`[start-stamp] failed for jobId=${jobId} →`, code, msg);
+
+      // If session expired, your global axios 401 interceptor will redirect to /login,
+      // but we log a clear banner too so it’s obvious in the UI console.
+      if (code === 401) {
+        console.warn(
+          "[start-stamp] 401 Unauthorized — you’ve likely been logged out. You’ll be redirected to login."
+        );
+      }
+      // let the watcher retry on the next refresh
     }
   };
+
 
 
   // live sheet data
