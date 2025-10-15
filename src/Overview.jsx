@@ -668,15 +668,16 @@ export default function Overview() {
         const data = res?.data || {};
         saveOverviewCache(data);
 
-        const { upcoming, materials, daysWindow: dw } = data;
+        const { upcoming, materials } = data;
         const jobs = (upcoming ?? []).filter(j => {
           const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
           return stage !== "COMPLETE" && stage !== "COMPLETED";
         });
         setUpcoming(jobs);
         setMaterials(materials ?? []);
-        if (dw) setDaysWindow(String(dw));
+        // days window disabled — do not setDaysWindow
         markUpdated();
+
 
         const init = {};
         for (const g of (materials ?? [])) {
@@ -1392,8 +1393,9 @@ export default function Overview() {
             </div>
 
             {!loadingUpcoming && !upcoming.length && (
-              <div>No jobs in the next {daysWindow} days.</div>
+              <div>No jobs pending.</div>
             )}
+
 
             <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
               {!loadingUpcoming && upcoming.map((job, idx) => {
