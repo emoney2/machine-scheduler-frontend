@@ -1407,6 +1407,18 @@ export default function Overview() {
               {!loadingUpcoming && upcoming.map((job, idx) => {
                 const ring = ringColorByShipDate(job["Ship Date"]);
 
+                // Map the existing ring color → card fill + border color.
+                // If your ring function returns orange for moderate, use YELLOW for both fill and border.
+                const ORANGE = "#ffa500";
+                const RED = "#ff0000";
+                const YELLOW = "#ffd000"; // slightly warm yellow for better contrast
+
+                const borderColor = (ring && ring.toLowerCase() === ORANGE) ? YELLOW : ring;
+                const fillColor =
+                  (ring && ring.toLowerCase() === RED)    ? "rgba(255, 0, 0, 0.08)" :
+                  (ring && ring.toLowerCase() === ORANGE) ? "rgba(255, 221, 0, 0.12)" : "transparent";
+
+
                 // D.1 Build primary and alternate image URLs
                 const primaryUrl = getJobThumbUrl(job, ROOT);
                 console.log("📸 Overview thumb", {
@@ -1441,8 +1453,9 @@ export default function Overview() {
                 };
 
                 return (
-                  <div key={idx} style={rowCard}>
-                    <div style={{ ...imgBox, borderColor: ring }}>
+                  <div key={idx} style={{ ...rowCard, background: fillColor }}>
+                    <div style={{ ...imgBox, borderColor }}>
+
                       {primaryUrl ? (
                         <img
                           src={primaryUrl}
