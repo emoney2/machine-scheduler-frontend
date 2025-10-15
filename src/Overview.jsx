@@ -657,13 +657,18 @@ export default function Overview() {
     async function loadFresh() {
       setLoadingUpcoming(!cached);
       setLoadingMaterials(!cached);
+      // cancel any prior in-flight overview request
+      try { overviewCtrlRef.current?.abort(); } catch {}
       const ctrl = new AbortController();
+      overviewCtrlRef.current = ctrl;
       try {
-        const res = await axios.get(`${ROOT}/overview`, {
-          withCredentials: true,
-          signal: ctrl.signal,
-          timeout: 20000,
-        });
+        const res = await getWithRetry(
+          axios,
+          `${ROOT}/overview`,
+          { withCredentials: true, signal: ctrl.signal },
+          [15000, 25000, 35000]
+        );
+
         if (!alive) return;
         const data = res?.data || {};
         saveOverviewCache(data);
@@ -723,6 +728,7 @@ export default function Overview() {
 
     return () => {
       alive = false;
+      try { overviewCtrlRef.current?.abort(); } catch {}
       clearInterval(id);
       socket.off("ordersUpdated", debounced);
       socket.off("manualStateUpdated", debounced);
