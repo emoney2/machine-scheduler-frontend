@@ -235,12 +235,16 @@ export default function CutList() {
            - Die Cut = white (plain)
            - Custom/Both = very light diagonal grey */
         .cardStripeCustomBoth {
-          background-image:
-            linear-gradient(white, white),
-            repeating-linear-gradient(135deg, rgba(0,0,0,0.035) 0, rgba(0,0,0,0.035) 2px, transparent 2px, transparent 6px);
-          background-origin: border-box;
-          background-clip: padding-box, border-box;
+          background-color: #fff;
+          background-image: repeating-linear-gradient(
+            135deg,
+            rgba(0,0,0,0.06) 0,
+            rgba(0,0,0,0.06) 2px,
+            transparent 2px,
+            transparent 6px
+          );
         }
+
 
         .hdr { font-size: 11px; font-weight: 700; color: #444; text-transform: uppercase; }
         .btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #bbb; font-weight: 700; cursor: pointer; }
@@ -396,10 +400,12 @@ export default function CutList() {
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
                   gap: 6, padding: 6, borderRadius: 12,
                   border: urgent ? "2px solid #e11900" : "1px solid #ddd",
-                  background: "#fff", color: "#111", position: "relative",
+                  backgroundColor: "#fff",          // ✅ lets the CSS background-image show through
+                  color: "#111", position: "relative",
                   boxShadow: sel ? "0 0 0 2px rgba(0,0,0,0.25) inset" : "0 1px 3px rgba(0,0,0,0.05)",
                   cursor: "pointer", userSelect: "none", outline: "none"
                 }}
+
               >
                 {/* Order # */}
                 <div style={{ textAlign: "center", fontWeight: 700 }}>{orderId}</div>
