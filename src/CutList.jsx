@@ -252,16 +252,21 @@ export default function CutList() {
           justify-content: center;
           width: 100%;
           min-height: 24px;
-          padding: 4px 6px;
+          padding: 3px 4px;              /* a bit tighter */
           border-radius: 8px;
           border: 1px solid #cfcfcf;
           background: #ffffff;
           font-weight: 700;
-          line-height: 1;
+          font-size: 10px;               /* ↓ smaller text */
+          line-height: 1.1;              /* room for 2-line labels */
+          text-align: center;            /* center multi-line text */
+          white-space: normal;           /* allow wrapping */
+          word-break: break-word;        /* break long words if needed */
           cursor: pointer;
           user-select: none;
           transition: transform 0.06s ease, box-shadow 0.06s ease, background 0.06s ease, border-color 0.06s ease;
         }
+
         .matBtn:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
         .matBtn:active { transform: translateY(1px); }
         .matBtn:focus-visible { outline: 2px solid #6aa9ff; outline-offset: 1px; }
@@ -354,11 +359,8 @@ export default function CutList() {
             const notes   = order["Notes"] || "";
             const hardSoft= order["Hard Date/Soft Date"] || "";
             const cutType = String(order["Cut Type"] || "").trim().toLowerCase();
+            const isStriped = ["custom", "custom cut", "both"].includes(cutType);
 
-            // Color coding rule:
-            //   Die Cut => plain white
-            //   Custom/Both => striped
-            const isStriped = (cutType === "custom cut" || cutType === "custom" || cutType === "both");
 
             const isSaving = !!saving[orderId];
             const sel = !!selected[orderId];
