@@ -34,23 +34,6 @@ function businessDaysUntil(target) {
   return count;
 }
 
-// ---------- Toast ----------
-function Toast({ kind = "success", message, onClose }) {
-  if (!message) return null;
-  const color = kind === "error" ? "#a00" : "#0a0";
-  const bg    = kind === "error" ? "#fde8e8" : "#e9fbe9";
-  return (
-    <div style={{
-      position: "fixed", bottom: 16, left: 16, padding: "10px 12px",
-      background: bg, color, border: `1px solid ${color}33`, borderRadius: 8,
-      boxShadow: "0 6px 20px rgba(0,0,0,0.12)", fontSize: 12, zIndex: 50
-    }}>
-      {message}
-      <button onClick={onClose} style={{ marginLeft: 10, border: "none", background: "transparent", cursor: "pointer" }}>✕</button>
-    </div>
-  );
-}
-
 // Parse Drive file id from URL or =IMAGE("...") formula
 function extractFileIdFromFormulaOrUrl(v) {
   try {
@@ -83,9 +66,7 @@ export default function CutList() {
   const [isLoading, setIsLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [toastKind, setToastKind] = useState("success");
-
-  // Per-material submitted map: { [orderId]: {Material1:true, ...} }
-  const [submittedMap, setSubmittedMap] = useState({});
+  const [submittedMap, setSubmittedMap] = useState({}); // { [orderId]: {Material1:true,...} }
 
   const inFlight = useRef(false);
   const toastTimer = useRef(null);
@@ -98,7 +79,6 @@ export default function CutList() {
   };
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
-  // Fetcher
   const fetchOrders = useCallback(async (opts = { refresh: false }) => {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -108,11 +88,8 @@ export default function CutList() {
       const res = await axios.get(url, { withCredentials: true });
       const list = res.data?.orders || [];
       setOrders(list);
-
-      // Optional: hydrate submittedMap if backend exposes cut material status in /combined.
-      // If not available, we’ll manage it optimistically on click.
     } catch {
-      // keep last-known data
+      // keep last-known
     } finally {
       if (!opts.refresh) setIsLoading(false);
       inFlight.current = false;
@@ -137,7 +114,6 @@ export default function CutList() {
     });
     base = base.filter(o => !String(o["Product"] || "").toLowerCase().includes("towel"));
 
-    // Sort: Due Date asc, then Order #
     base.sort((a, b) => {
       const aDue = toDate(a["Due Date"]);
       const bDue = toDate(b["Due Date"]);
@@ -185,7 +161,6 @@ export default function CutList() {
     let ok = 0, fail = 0;
 
     try {
-      // Fallback: loop (keeps code simple and more resilient if partial failures occur)
       for (const id of ids) {
         const order = orders.find(o => String(o["Order #"]) === id);
         if (!order) { fail++; continue; }
@@ -219,14 +194,12 @@ export default function CutList() {
       const res = await axios.post(`${API_ROOT}/cut/submitMaterial`, {
         orderId,
         materialKey,
-        // quantity omitted → server will use job Quantity in the row
       }, { withCredentials: true });
 
       if (res.data?.ok) {
         const submitted = res.data.submitted || {};
         setSubmittedMap(prev => ({ ...prev, [orderId]: submitted }));
 
-        // If all six are submitted, auto-complete + remove
         const allDone = MATERIAL_KEYS.every(k => submitted[k]);
         if (allDone) {
           await markComplete(order);
@@ -243,7 +216,7 @@ export default function CutList() {
 
   // Layout
   const gridFull =
-    "60px 44px 120px 120px 42px 96px 84px 52px 60px 60px 60px 60px 60px 90px 64px 64px 100px 92px 80px"; // removed the old "Cut Type" column
+    "60px 44px 120px 120px 42px 96px 84px 52px 60px 60px 60px 60px 60px 90px 64px 64px 100px 92px 80px";
   const gridTemplate = gridFull;
   const stickyRight = (offset, bg) => ({
     position: "sticky", right: offset, zIndex: 2, background: bg || "#fff",
@@ -258,31 +231,62 @@ export default function CutList() {
   return (
     <div style={{ padding: 10, fontSize: 11, lineHeight: 1.2 }}>
       <style>{`
-        .cardStripeBoth {
+        /* Card backgrounds:
+           - Die Cut = white (plain)
+           - Custom/Both = very light diagonal grey */
+        .cardStripeCustomBoth {
           background-image:
             linear-gradient(white, white),
-            repeating-linear-gradient(135deg, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 2px, transparent 2px, transparent 6px);
+            repeating-linear-gradient(135deg, rgba(0,0,0,0.035) 0, rgba(0,0,0,0.035) 2px, transparent 2px, transparent 6px);
           background-origin: border-box;
           background-clip: padding-box, border-box;
         }
-        .matClickable { cursor: pointer; }
-        .matDisabled  { cursor: default; opacity: 0.5; }
+
         .hdr { font-size: 11px; font-weight: 700; color: #444; text-transform: uppercase; }
         .btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #bbb; font-weight: 700; cursor: pointer; }
+
+        /* Material buttons */
+        .matBtn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          min-height: 24px;
+          padding: 4px 6px;
+          border-radius: 8px;
+          border: 1px solid #cfcfcf;
+          background: #ffffff;
+          font-weight: 700;
+          line-height: 1;
+          cursor: pointer;
+          user-select: none;
+          transition: transform 0.06s ease, box-shadow 0.06s ease, background 0.06s ease, border-color 0.06s ease;
+        }
+        .matBtn:hover { box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+        .matBtn:active { transform: translateY(1px); }
+        .matBtn:focus-visible { outline: 2px solid #6aa9ff; outline-offset: 1px; }
+
+        .matBtnDisabled {
+          background: #eeeeee;
+          color: #666;
+          border-color: #d8d8d8;
+          cursor: default;
+          box-shadow: none;
+        }
       `}</style>
 
       {/* Legend row (replaces "Cut List" title) */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={legendTileBase} />
-          <span style={{ fontWeight: 700 }}>Custom/Die</span>
+          <span style={{ ...legendTileBase, background: "#fff" }} />
+          <span style={{ fontWeight: 700 }}>Die Cut</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{
             ...legendTileBase,
             backgroundImage: "repeating-linear-gradient(135deg, rgba(0,0,0,0.08) 0, rgba(0,0,0,0.08) 2px, transparent 2px, transparent 6px)"
           }} />
-          <span style={{ fontWeight: 700 }}>Both</span>
+          <span style={{ fontWeight: 700 }}>Custom/Both</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ ...legendTileBase, background: "#e6e6e6" }} />
@@ -349,7 +353,12 @@ export default function CutList() {
             const ship    = toDate(order["Ship Date"]);
             const notes   = order["Notes"] || "";
             const hardSoft= order["Hard Date/Soft Date"] || "";
-            const cutType = String(order["Cut Type"] || "").trim();
+            const cutType = String(order["Cut Type"] || "").trim().toLowerCase();
+
+            // Color coding rule:
+            //   Die Cut => plain white
+            //   Custom/Both => striped
+            const isStriped = (cutType === "custom cut" || cutType === "custom" || cutType === "both");
 
             const isSaving = !!saving[orderId];
             const sel = !!selected[orderId];
@@ -357,20 +366,17 @@ export default function CutList() {
             const daysToShip = businessDaysUntil(ship);
             const urgent = daysToShip !== null && daysToShip <= 7;
 
-            const ctLower = cutType.toLowerCase();
-            const isBoth = (ctLower === "both");
-            // Custom and Die are treated the same (plain card). Both = diagonal micro-stripe.
-
             const sub = submittedMap[orderId] || {};
-            const matStatus = (key, labelValue) => {
-              const isEmpty = !String(labelValue || "").trim();
+            const matState = (key, val) => {
+              const label = String(val || "").trim();
+              const exists = !!label;
               const done = !!sub[key];
-              const className = " " + (done ? "matDisabled" : (isEmpty ? "" : "matClickable"));
-              return { done, isEmpty, className };
+              const disabled = done || !exists;
+              return { label, disabled, done };
             };
 
             const onClickMat = (key, labelValue) => (e) => {
-              if (!String(labelValue || "").trim()) return; // ignore empty cells
+              if (!String(labelValue || "").trim()) return;
               handleMaterialClick(e, order, key);
             };
 
@@ -383,7 +389,7 @@ export default function CutList() {
                 onKeyDown={(e) => {
                   if (e.key === " " || e.key === "Enter") { e.preventDefault(); setSelected(s => ({ ...s, [orderId]: !s[orderId] })); }
                 }}
-                className={isBoth ? "cardStripeBoth" : ""}
+                className={isStriped ? "cardStripeCustomBoth" : ""}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
                   gap: 6, padding: 6, borderRadius: 12,
@@ -412,40 +418,33 @@ export default function CutList() {
                 <div style={{ textAlign: "center" }}>{stage}</div>
                 <div style={{ textAlign: "center" }}>{print}</div>
 
-                {/* Materials — individually clickable */}
+                {/* Materials as buttons */}
                 {(() => {
-                  const s1 = matStatus("Material1", m1);
-                  const s2 = matStatus("Material2", m2);
-                  const s3 = matStatus("Material3", m3);
-                  const s4 = matStatus("Material4", m4);
-                  const s5 = matStatus("Material5", m5);
-                  const sb = matStatus("Back Material", backMat);
+                  const s1 = matState("Material1", m1);
+                  const s2 = matState("Material2", m2);
+                  const s3 = matState("Material3", m3);
+                  const s4 = matState("Material4", m4);
+                  const s5 = matState("Material5", m5);
+                  const sb = matState("Back Material", backMat);
+                  const Button = ({state, onClick}) => (
+                    <button
+                      type="button"
+                      className={`matBtn${state.disabled ? " matBtnDisabled" : ""}`}
+                      onClick={state.disabled ? undefined : onClick}
+                      title={state.disabled ? (state.done ? "Submitted" : "") : (state.label || "")}
+                      aria-disabled={state.disabled}
+                    >
+                      {state.label || ""}
+                    </button>
+                  );
                   return (
                     <>
-                      <div className={s1.className} onClick={onClickMat("Material1", m1)} title={s1.done ? "Submitted" : (m1 || "")}
-                           style={{ textAlign: "center", background: s1.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
-                        {m1 || ""}
-                      </div>
-                      <div className={s2.className} onClick={onClickMat("Material2", m2)} title={s2.done ? "Submitted" : (m2 || "")}
-                           style={{ textAlign: "center", background: s2.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
-                        {m2 || ""}
-                      </div>
-                      <div className={s3.className} onClick={onClickMat("Material3", m3)} title={s3.done ? "Submitted" : (m3 || "")}
-                           style={{ textAlign: "center", background: s3.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
-                        {m3 || ""}
-                      </div>
-                      <div className={s4.className} onClick={onClickMat("Material4", m4)} title={s4.done ? "Submitted" : (m4 || "")}
-                           style={{ textAlign: "center", background: s4.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
-                        {m4 || ""}
-                      </div>
-                      <div className={s5.className} onClick={onClickMat("Material5", m5)} title={s5.done ? "Submitted" : (m5 || "")}
-                           style={{ textAlign: "center", background: s5.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
-                        {m5 || ""}
-                      </div>
-                      <div className={sb.className} onClick={onClickMat("Back Material", backMat)} title={sb.done ? "Submitted" : (backMat || "")}
-                           style={{ textAlign: "center", background: sb.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
-                        {backMat || ""}
-                      </div>
+                      <Button state={s1} onClick={onClickMat("Material1", m1)} />
+                      <Button state={s2} onClick={onClickMat("Material2", m2)} />
+                      <Button state={s3} onClick={onClickMat("Material3", m3)} />
+                      <Button state={s4} onClick={onClickMat("Material4", m4)} />
+                      <Button state={s5} onClick={onClickMat("Material5", m5)} />
+                      <Button state={sb} onClick={onClickMat("Back Material", backMat)} />
                     </>
                   );
                 })()}
@@ -472,8 +471,24 @@ export default function CutList() {
           })}
         </div>
       )}
-
       <Toast kind={toastKind} message={toastMsg} onClose={() => setToastMsg("")} />
+    </div>
+  );
+}
+
+// ---------- Toast (inline to keep file single) ----------
+function Toast({ kind = "success", message, onClose }) {
+  if (!message) return null;
+  const color = kind === "error" ? "#a00" : "#0a0";
+  const bg    = kind === "error" ? "#fde8e8" : "#e9fbe9";
+  return (
+    <div style={{
+      position: "fixed", bottom: 16, left: 16, padding: "10px 12px",
+      background: bg, color, border: `1px solid ${color}33`, borderRadius: 8,
+      boxShadow: "0 6px 20px rgba(0,0,0,0.12)", fontSize: 12, zIndex: 50
+    }}>
+      {message}
+      <button onClick={onClose} style={{ marginLeft: 10, border: "none", background: "transparent", cursor: "pointer" }}>✕</button>
     </div>
   );
 }
