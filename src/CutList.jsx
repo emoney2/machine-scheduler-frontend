@@ -62,11 +62,12 @@ function orderThumbUrl(order) {
 export default function CutList() {
   const [orders, setOrders] = useState([]);
   const [selected, setSelected] = useState({});
-  const [saving, setSaving] = useState({});
+  const [saving, setSaving] = useState({});               // whole-card submit
+  const [materialSaving, setMaterialSaving] = useState({}); // material-only submit
   const [isLoading, setIsLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [toastKind, setToastKind] = useState("success");
-  const [submittedMap, setSubmittedMap] = useState({}); // { [orderId]: {Material1:true,...} }
+  const [submittedMap, setSubmittedMap] = useState({});
 
   const inFlight = useRef(false);
   const toastTimer = useRef(null);
@@ -190,6 +191,8 @@ export default function CutList() {
     const already = submittedMap[orderId]?.[materialKey];
     if (already) return;
 
+    // start overlay for this order
+    setMaterialSaving(prev => ({ ...prev, [orderId]: true }));
     try {
       const res = await axios.post(`${API_ROOT}/cut/submitMaterial`, {
         orderId,
@@ -202,7 +205,7 @@ export default function CutList() {
 
         const allDone = MATERIAL_KEYS.every(k => submitted[k]);
         if (allDone) {
-          await markComplete(order);
+          await markComplete(order); // this will flip the global 'saving' state as well
         } else {
           showToast(`Submitted ${materialKey}`);
         }
@@ -211,8 +214,16 @@ export default function CutList() {
       }
     } catch {
       showToast("Error submitting material", "error", 2600);
+    } finally {
+      // stop overlay for this order (unless markComplete is now showing it)
+      setMaterialSaving(prev => {
+        const n = { ...prev };
+        delete n[orderId];
+        return n;
+      });
     }
   };
+
 
   // Layout
   const gridFull =
@@ -282,7 +293,35 @@ export default function CutList() {
           cursor: default;
           box-shadow: none;
         }
+
+        /* Submission overlay (transparent yellow) */
+        .overlayBusy {
+          position: fixed;
+          inset: 0;
+          background: rgba(255, 230, 128, 0.35); /* transparent yellow */
+          backdrop-filter: blur(0.5px);
+          z-index: 999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .overlayCard {
+          background: #fff8cc;
+          border: 1px solid #e6d87a;
+          border-radius: 12px;
+          padding: 14px 16px;
+          box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+          font-weight: 800;
+          color: #6a5d00;
+        }
+
       `}</style>
+
+        {(Object.values(saving).some(Boolean) || Object.values(materialSaving).some(Boolean)) && (
+          <div className="overlayBusy">
+            <div className="overlayCard">Submitting&hellip;</div>
+          </div>
+        )}
 
       {/* Legend row (replaces "Cut List" title) */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
