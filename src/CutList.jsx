@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 
-// ---------- Config ----------
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
 // ---------- Utils ----------
@@ -20,96 +19,6 @@ function fmtMMDD(d) {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${mm}/${dd}`;
 }
-function firstField(obj, names) {
-  for (const n of names) {
-    const val = obj?.[n];
-    if (val !== undefined && val !== null && String(val).trim() !== "") return val;
-  }
-  return null;
-}
-
-// Parse Drive file id from URL or =IMAGE("...") formula
-function extractFileIdFromFormulaOrUrl(v) {
-  try {
-    const s = String(v || "");
-    let m = s.match(/id=([A-Za-z0-9_-]+)/);
-    if (m) return m[1];
-    m = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m) return m[1];
-    m = s.match(/IMAGE\("([^"]+)"/i); // =IMAGE("...url...")
-    if (m) return extractFileIdFromFormulaOrUrl(m[1]);
-  } catch {}
-  return null;
-}
-
-// Build thumbnail URL via proxy (hits disk cache)
-// We scan common fields, then the entire row if needed.
-function orderThumbUrl(order) {
-  const fields = [
-    order.preview, order.Preview, order.previewFormula, order.PreviewFormula,
-    order.image, order.Image, order.thumbnail, order.Thumbnail, order.imageUrl, order.ImageURL
-  ];
-  for (const f of fields) {
-    const id = extractFileIdFromFormulaOrUrl(f);
-    if (id) {
-      const v = encodeURIComponent(String(order["Order #"] || order.orderNumber || "nov"));
-      return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
-    }
-    if (f && /^https?:\/\//i.test(String(f))) return f;
-  }
-  for (const v of Object.values(order || {})) {
-    const s = String(v || "");
-    let m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m) {
-      const ver = encodeURIComponent(String(order["Order #"] || order.orderNumber || "nov"));
-      return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w160`;
-    }
-  }
-  return null;
-}
-
-// Stage priority: Sewing → Embroidery → Print → Cut → Fur → Ordered
-function stageBucket(order) {
-  const s = String(order["Stage"] || "").toLowerCase();
-  if (s.includes("sew"))        return 0;
-  if (s.includes("embroidery")) return 1;
-  if (s.includes("print"))      return 2;
-  if (s.includes("cut"))        return 3;
-  if (s.includes("fur"))        return 4;
-  if (s.includes("ordered"))    return 5;
-  return 6;
-}
-function makeComparator() {
-  return (a, b) => {
-    const ba = stageBucket(a), bb = stageBucket(b);
-    if (ba !== bb) return ba - bb;
-
-    // Embroidery: prefer End Embroidery Time if available
-    if (ba === 1) {
-      const aEnd = toDate(firstField(a, [
-        "End Embroidery Time","Embroidery End Time","Embroidery End","End Embroidery","End Time"
-      ]));
-      const bEnd = toDate(firstField(b, [
-        "End Embroidery Time","Embroidery End Time","Embroidery End","End Embroidery","End Time"
-      ]));
-      const at = aEnd ? aEnd.getTime() : Infinity;
-      const bt = bEnd ? bEnd.getTime() : Infinity;
-      if (at !== bt) return at - bt;
-    }
-
-    // Otherwise: Due Date
-    const aDue = toDate(a["Due Date"]);
-    const bDue = toDate(b["Due Date"]);
-    const at = aDue ? aDue.getTime() : Infinity;
-    const bt = bDue ? bDue.getTime() : Infinity;
-    if (at !== bt) return at - bt;
-
-    const aId = String(a["Order #"] || "");
-    const bId = String(b["Order #"] || "");
-    return aId.localeCompare(bId, undefined, { numeric: true });
-  };
-}
-
 function businessDaysUntil(target) {
   if (!target) return null;
   const t = new Date(target); t.setHours(0,0,0,0);
@@ -128,52 +37,65 @@ function businessDaysUntil(target) {
 // ---------- Toast ----------
 function Toast({ kind = "success", message, onClose }) {
   if (!message) return null;
+  const color = kind === "error" ? "#a00" : "#0a0";
+  const bg    = kind === "error" ? "#fde8e8" : "#e9fbe9";
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      style={{
-        position: "fixed", right: 16, bottom: 16, maxWidth: 360,
-        background: kind === "success" ? "#0fbf4a" : "#e45858",
-        color: "#fff", padding: "10px 14px", borderRadius: 10,
-        boxShadow: "0 6px 20px rgba(0,0,0,0.18)", fontWeight: 600,
-        zIndex: 9999, display: "flex", alignItems: "center", gap: 10, cursor: "pointer"
-      }}
-      onClick={onClose}
-      title="Click to dismiss"
-    >
-      <span>{kind === "success" ? "✓" : "⚠"}</span>
-      <span style={{ lineHeight: 1.2 }}>{message}</span>
+    <div style={{
+      position: "fixed", bottom: 16, left: 16, padding: "10px 12px",
+      background: bg, color, border: `1px solid ${color}33`, borderRadius: 8,
+      boxShadow: "0 6px 20px rgba(0,0,0,0.12)", fontSize: 12, zIndex: 50
+    }}>
+      {message}
+      <button onClick={onClose} style={{ marginLeft: 10, border: "none", background: "transparent", cursor: "pointer" }}>✕</button>
     </div>
   );
 }
 
-// ---------- Component ----------
+// Parse Drive file id from URL or =IMAGE("...") formula
+function extractFileIdFromFormulaOrUrl(v) {
+  try {
+    const s = String(v || "").trim();
+    if (!s) return null;
+    const m1 = s.match(/=IMAGE\("([^"]+)"/i);
+    const url = m1 ? m1[1] : s;
+    const m2 = url.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]{20,})/);
+    return m2 ? m2[1] : null;
+  } catch { return null; }
+}
+
+function orderThumbUrl(order) {
+  const fields = [
+    order.preview, order.Preview, order.previewFormula, order.PreviewFormula,
+    order.image, order.Image, order.thumbnail, order.Thumbnail, order.imageUrl, order.ImageURL
+  ];
+  for (const f of fields) {
+    const id = extractFileIdFromFormulaOrUrl(f);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
+    if (f && /^https?:\/\//i.test(String(f))) return String(f);
+  }
+  return "";
+}
+
 export default function CutList() {
   const [orders, setOrders] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const inFlight = useRef(false);
-
-  const [saving, setSaving] = useState({});
   const [selected, setSelected] = useState({});
-
+  const [saving, setSaving] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [toastKind, setToastKind] = useState("success");
+
+  // Per-material submitted map: { [orderId]: {Material1:true, ...} }
+  const [submittedMap, setSubmittedMap] = useState({});
+
+  const inFlight = useRef(false);
   const toastTimer = useRef(null);
 
-  const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
-  useEffect(() => {
-    function onResize() { setWw(window.innerWidth); }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  const compact = ww < 1200;
-
-  function showToast(message, kind = "success", ms = 1800) {
-    setToastMsg(message); setToastKind(kind);
+  const showToast = (msg, kind = "success", ms = 1600) => {
+    setToastMsg(msg);
+    setToastKind(kind);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastMsg(""), ms);
-  }
+  };
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   // Fetcher
@@ -184,7 +106,11 @@ export default function CutList() {
       if (!opts.refresh) setIsLoading(true);
       const url = `${API_ROOT}/combined${opts.refresh ? "?refresh=1" : ""}`;
       const res = await axios.get(url, { withCredentials: true });
-      setOrders(res.data?.orders || []);
+      const list = res.data?.orders || [];
+      setOrders(list);
+
+      // Optional: hydrate submittedMap if backend exposes cut material status in /combined.
+      // If not available, we’ll manage it optimistically on click.
     } catch {
       // keep last-known data
     } finally {
@@ -193,7 +119,6 @@ export default function CutList() {
     }
   }, []);
 
-  // initial + polling
   useEffect(() => {
     let canceled = false;
     (async () => { if (!canceled) await fetchOrders(); })();
@@ -201,26 +126,34 @@ export default function CutList() {
     return () => { canceled = true; clearInterval(t); };
   }, [fetchOrders]);
 
-  // Filter + sort
+  // Filter + sort (exclude completed)
   const cards = useMemo(() => {
     let base = (orders || []).filter(o => {
       const stage = String(o["Stage"] || "").trim().toUpperCase();
-      // Prefer Cut Status if present, else general Status
       const statusCut = String(o["Cut Status"] || "").trim().toUpperCase();
       const status    = String(o["Status"]     || "").trim().toUpperCase();
       const statusForCut = statusCut || status;
-
       return stage !== "COMPLETE" && statusForCut !== "COMPLETE";
     });
-
-    // Product exclusions — per your note: exclude "towel" only (case-insensitive).
     base = base.filter(o => !String(o["Product"] || "").toLowerCase().includes("towel"));
 
-    const sorted = [...base].sort(makeComparator());
-    return sorted;
+    // Sort: Due Date asc, then Order #
+    base.sort((a, b) => {
+      const aDue = toDate(a["Due Date"]);
+      const bDue = toDate(b["Due Date"]);
+      const at = aDue ? aDue.getTime() : Infinity;
+      const bt = bDue ? bDue.getTime() : Infinity;
+      if (at !== bt) return at - bt;
+      const aId = String(a["Order #"] || "");
+      const bId = String(b["Order #"] || "");
+      return aId.localeCompare(bId, undefined, { numeric: true });
+    });
+
+    return base;
   }, [orders]);
 
-  // Actions
+  const selectedCount = Object.values(selected).filter(Boolean).length;
+
   async function markComplete(order) {
     const orderId = String(order["Order #"] || "");
     const qty = order["Quantity"] || 0;
@@ -232,9 +165,8 @@ export default function CutList() {
         { withCredentials: true }
       );
       if (resp.data?.ok) {
-        // optimistic removal then refresh from Sheets
         setOrders(prev => prev.filter(o => String(o["Order #"]) !== orderId));
-        showToast("Saved to Cut List", "success");
+        showToast("Saved to Cut List");
         await fetchOrders({ refresh: true });
       } else {
         showToast(resp.data?.error || "Write failed", "error", 2600);
@@ -248,97 +180,114 @@ export default function CutList() {
   }
 
   async function completeSelected() {
-    const ids = Object.keys(selected).filter(id => selected[id]);
+    const ids = Object.keys(selected).filter(k => selected[k]);
     if (!ids.length) return;
-
-    const items = cards
-      .filter(o => ids.includes(String(o["Order #"])))
-      .map(o => ({ orderId: String(o["Order #"]), quantity: o["Quantity"] || 0 }));
-
-    // mark all as saving
-    setSaving(prev => { const n = { ...prev }; items.forEach(it => n[it.orderId] = true); return n; });
+    let ok = 0, fail = 0;
 
     try {
-      // One fast batch request
-      const { data } = await axios.post(
-        `${API_ROOT}/cut/completeBatch`,
-        { items },
-        { withCredentials: true, timeout: 30000 }
-      );
-
-      // Optimistic prune + refresh once
-      setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
-      setSelected({});
-      await fetchOrders({ refresh: true });
-
-      if (data?.ok) {
-        const okCount = (items.length - (data?.missing?.length || 0));
-        showToast(`Completed ${okCount} orders`, "success");
-      } else {
-        showToast(data?.error || "Batch write failed", "error", 2600);
-      }
-
-    } catch (err) {
-      // Fallback: sequential single calls (more resilient to transient errors)
-      let ok = 0, fail = 0;
-      for (const it of items) {
+      // Fallback: loop (keeps code simple and more resilient if partial failures occur)
+      for (const id of ids) {
+        const order = orders.find(o => String(o["Order #"]) === id);
+        if (!order) { fail++; continue; }
         try {
-          const r = await axios.post(`${API_ROOT}/cut/complete`, it, { withCredentials: true, timeout: 15000 });
-          if (r.data?.ok) ok++; else fail++;
+          const res = await axios.post(`${API_ROOT}/cut/complete`,
+            { orderId: id, quantity: order["Quantity"] || 0 },
+            { withCredentials: true }
+          );
+          if (res.data?.ok) { ok++; } else { fail++; }
         } catch { fail++; }
       }
 
-      // Refresh after fallback
       setOrders(prev => prev.filter(o => !ids.includes(String(o["Order #"]))));
       setSelected({});
       await fetchOrders({ refresh: true });
-
       showToast(fail ? `Completed ${ok}, failed ${fail}` : `Completed ${ok} orders`,
         fail ? "error" : "success", fail ? 2600 : 1800);
+    } finally {}
+  }
 
-    } finally {
-      // clear saving flags
-      setSaving(prev => { const n = { ...prev }; ids.forEach(id => delete n[id]); return n; });
+  // Material-only submit
+  const MATERIAL_KEYS = ["Material1", "Material2", "Material3", "Material4", "Material5", "Back Material"];
+
+  const handleMaterialClick = async (e, order, materialKey) => {
+    e.stopPropagation(); // don’t toggle card selection
+    const orderId = String(order["Order #"] || "");
+    const already = submittedMap[orderId]?.[materialKey];
+    if (already) return;
+
+    try {
+      const res = await axios.post(`${API_ROOT}/cut/submitMaterial`, {
+        orderId,
+        materialKey,
+        // quantity omitted → server will use job Quantity in the row
+      }, { withCredentials: true });
+
+      if (res.data?.ok) {
+        const submitted = res.data.submitted || {};
+        setSubmittedMap(prev => ({ ...prev, [orderId]: submitted }));
+
+        // If all six are submitted, auto-complete + remove
+        const allDone = MATERIAL_KEYS.every(k => submitted[k]);
+        if (allDone) {
+          await markComplete(order);
+        } else {
+          showToast(`Submitted ${materialKey}`);
+        }
+      } else {
+        showToast(res.data?.error || "Submit failed", "error", 2600);
+      }
+    } catch {
+      showToast("Error submitting material", "error", 2600);
     }
-  }
+  };
 
-
-  function toggleSelect(id, on = undefined) {
-    setSelected(prev => {
-      const n = { ...prev };
-      n[id] = on === undefined ? !prev[id] : !!on;
-      return n;
-    });
-  }
-  const selectedCount = Object.values(selected).filter(Boolean).length;
-
-  // Layout — same sticky right columns (Complete, Select). White cards; only red border for urgency.
-  // New column order (as requested):
-  // Order #, Preview, Company Name, Design, Quantity, Product, Stage, Price, Due Date, Print, Material1..5, Back Material, Ship Date, Notes, Hard/Soft, Cut Type, Complete, Select
+  // Layout
   const gridFull =
-    "60px 44px 120px 120px 42px 96px 84px 52px 60px 60px 60px 60px 60px 90px 64px 64px 100px 92px 80px 72px";
-  const gridCompact = gridFull;
-  const gridTemplate = compact ? gridCompact : gridFull;
-
+    "60px 44px 120px 120px 42px 96px 84px 52px 60px 60px 60px 60px 60px 90px 64px 64px 100px 92px 80px"; // removed the old "Cut Type" column
+  const gridTemplate = gridFull;
   const stickyRight = (offset, bg) => ({
     position: "sticky", right: offset, zIndex: 2, background: bg || "#fff",
     boxShadow: "-8px 0 8px -8px rgba(0,0,0,0.12)"
   });
 
-  const cellBase = { textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+  const legendTileBase = {
+    width: 16, height: 12, borderRadius: 3, border: "1px solid #cfcfcf",
+    background: "#fff", display: "inline-block", verticalAlign: "middle", marginRight: 6
+  };
 
   return (
     <div style={{ padding: 10, fontSize: 11, lineHeight: 1.2 }}>
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .spin { animation: spin 0.9s linear infinite; }
+        .cardStripeBoth {
+          background-image:
+            linear-gradient(white, white),
+            repeating-linear-gradient(135deg, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 2px, transparent 2px, transparent 6px);
+          background-origin: border-box;
+          background-clip: padding-box, border-box;
+        }
+        .matClickable { cursor: pointer; }
+        .matDisabled  { cursor: default; opacity: 0.5; }
         .hdr { font-size: 11px; font-weight: 700; color: #444; text-transform: uppercase; }
         .btn { padding: 6px 10px; border-radius: 10px; border: 1px solid #bbb; font-weight: 700; cursor: pointer; }
       `}</style>
 
-      {/* Top bar */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontWeight: 700 }}>Cut List</div>
+      {/* Legend row (replaces "Cut List" title) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={legendTileBase} />
+          <span style={{ fontWeight: 700 }}>Custom/Die</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{
+            ...legendTileBase,
+            backgroundImage: "repeating-linear-gradient(135deg, rgba(0,0,0,0.08) 0, rgba(0,0,0,0.08) 2px, transparent 2px, transparent 6px)"
+          }} />
+          <span style={{ fontWeight: 700 }}>Both</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ ...legendTileBase, background: "#e6e6e6" }} />
+          <span style={{ fontWeight: 700 }}>Submitted material</span>
+        </div>
         <div style={{ flex: 1 }} />
         <button
           onClick={completeSelected}
@@ -349,30 +298,13 @@ export default function CutList() {
         >
           Complete Selected {selectedCount ? `(${selectedCount})` : ""}
         </button>
-        <button
-          onClick={() => setSelected({})}
-          className="btn"
-          disabled={!selectedCount}
-          style={{ background: "#f8f8f8", opacity: selectedCount ? 1 : 0.6 }}
-          title="Clear all selections"
-        >
-          Clear
-        </button>
       </div>
 
-      {/* Header */}
-      <div
-        className="hdr"
-        style={{
-          display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
-          gap: 6, padding: "6px 6px", borderRadius: 10, border: "1px solid #ddd",
-          background: "#fafafa", marginBottom: 6, position: "relative"
-        }}
-      >
-
-        <div style={{ textAlign: "center" }}>Order #</div>
+      {/* Headers */}
+      <div className="hdr" style={{ display: "grid", gridTemplateColumns: gridTemplate, gap: 6, padding: "6px 6px" }}>
+        <div style={{ textAlign: "center" }}>#</div>
         <div style={{ textAlign: "center" }}>Preview</div>
-        <div style={{ textAlign: "center" }}>Company Name</div>
+        <div style={{ textAlign: "center" }}>Company</div>
         <div style={{ textAlign: "center" }}>Design</div>
         <div style={{ textAlign: "center" }}>Qty</div>
         <div style={{ textAlign: "center" }}>Product</div>
@@ -388,7 +320,6 @@ export default function CutList() {
         <div style={{ textAlign: "center" }}>Due</div>
         <div style={{ textAlign: "center" }}>Notes</div>
         <div style={{ textAlign: "center" }}>Hard/Soft</div>
-        <div style={{ textAlign: "center" }}>Cut Type</div>
         <div style={{ ...stickyRight(0, "#fafafa"), textAlign: "right" }}>Complete</div>
       </div>
 
@@ -408,8 +339,6 @@ export default function CutList() {
             const qty     = order["Quantity"] || "";
             const product = order["Product"] || "";
             const stage   = order["Stage"] || "";
-            const price   = order["Price"] || "";
-            const due     = toDate(order["Due Date"]);
             const print   = order["Print"] || "";
             const m1      = order["Material1"] || "";
             const m2      = order["Material2"] || "";
@@ -420,24 +349,41 @@ export default function CutList() {
             const ship    = toDate(order["Ship Date"]);
             const notes   = order["Notes"] || "";
             const hardSoft= order["Hard Date/Soft Date"] || "";
-            const cutType = order["Cut Type"] || "";
+            const cutType = String(order["Cut Type"] || "").trim();
 
             const isSaving = !!saving[orderId];
             const sel = !!selected[orderId];
 
-            // Urgency: ≤ 7 business days to Ship (or overdue)
             const daysToShip = businessDaysUntil(ship);
             const urgent = daysToShip !== null && daysToShip <= 7;
+
+            const ctLower = cutType.toLowerCase();
+            const isBoth = (ctLower === "both");
+            // Custom and Die are treated the same (plain card). Both = diagonal micro-stripe.
+
+            const sub = submittedMap[orderId] || {};
+            const matStatus = (key, labelValue) => {
+              const isEmpty = !String(labelValue || "").trim();
+              const done = !!sub[key];
+              const className = " " + (done ? "matDisabled" : (isEmpty ? "" : "matClickable"));
+              return { done, isEmpty, className };
+            };
+
+            const onClickMat = (key, labelValue) => (e) => {
+              if (!String(labelValue || "").trim()) return; // ignore empty cells
+              handleMaterialClick(e, order, key);
+            };
 
             return (
               <div
                 key={orderId}
                 role="button"
                 tabIndex={0}
-                onClick={() => toggleSelect(orderId)}
+                onClick={() => setSelected(s => ({ ...s, [orderId]: !s[orderId] }))}
                 onKeyDown={(e) => {
-                  if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleSelect(orderId); }
+                  if (e.key === " " || e.key === "Enter") { e.preventDefault(); setSelected(s => ({ ...s, [orderId]: !s[orderId] })); }
                 }}
+                className={isBoth ? "cardStripeBoth" : ""}
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
                   gap: 6, padding: 6, borderRadius: 12,
@@ -447,61 +393,78 @@ export default function CutList() {
                   cursor: "pointer", userSelect: "none", outline: "none"
                 }}
               >
-
+                {/* Order # */}
                 <div style={{ textAlign: "center", fontWeight: 700 }}>{orderId}</div>
 
                 {/* Preview */}
                 <div style={{ display: "grid", placeItems: "center" }}>
                   <div style={{ width: 50, height: 34, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
                     {imageUrl ? (
-                      <img loading="lazy" decoding="async" src={imageUrl} alt="preview"
-                        onError={(e) => { e.currentTarget.style.display = "none"; }}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    ) : (
-                      <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 11, color: "#666" }}>
-                        No Preview
-                      </div>
-                    )}
+                      <img loading="lazy" decoding="async" src={imageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    ) : <div style={{ width: "100%", height: "100%", background: "linear-gradient(45deg,#f4f4f4,#f9f9f9)" }} />}
                   </div>
                 </div>
 
-                <div style={{ textAlign: "center" }}>{company}</div>
-                <div style={{ textAlign: "center" }}>{design}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{company}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{design}</div>
                 <div style={{ textAlign: "center" }}>{qty}</div>
-                <div style={{ textAlign: "center" }}>{product}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{product}</div>
                 <div style={{ textAlign: "center" }}>{stage}</div>
                 <div style={{ textAlign: "center" }}>{print}</div>
-                <div style={{ textAlign: "center" }}>{m1}</div>
-                <div style={{ textAlign: "center" }}>{m2}</div>
-                <div style={{ textAlign: "center" }}>{m3}</div>
-                <div style={{ textAlign: "center" }}>{m4}</div>
-                <div style={{ textAlign: "center" }}>{m5}</div>
-                <div style={{ textAlign: "center" }}>{backMat}</div>
-                <div style={{ textAlign: "center" }}>{fmtMMDD(ship)}</div>
-                <div style={{ textAlign: "center" }}>{fmtMMDD(due)}</div>
-                <div style={{ textAlign: "center" }}>{notes}</div>
-                <div style={{ textAlign: "center" }}>{hardSoft}</div>
-                <div style={{ textAlign: "center" }}>{cutType}</div>
 
-                {/* Complete (final sticky cell). Stop click from toggling selection */}
-                <div style={{ ...stickyRight(0, "#fff"), textAlign: "right" }}>
+                {/* Materials — individually clickable */}
+                {(() => {
+                  const s1 = matStatus("Material1", m1);
+                  const s2 = matStatus("Material2", m2);
+                  const s3 = matStatus("Material3", m3);
+                  const s4 = matStatus("Material4", m4);
+                  const s5 = matStatus("Material5", m5);
+                  const sb = matStatus("Back Material", backMat);
+                  return (
+                    <>
+                      <div className={s1.className} onClick={onClickMat("Material1", m1)} title={s1.done ? "Submitted" : (m1 || "")}
+                           style={{ textAlign: "center", background: s1.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
+                        {m1 || ""}
+                      </div>
+                      <div className={s2.className} onClick={onClickMat("Material2", m2)} title={s2.done ? "Submitted" : (m2 || "")}
+                           style={{ textAlign: "center", background: s2.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
+                        {m2 || ""}
+                      </div>
+                      <div className={s3.className} onClick={onClickMat("Material3", m3)} title={s3.done ? "Submitted" : (m3 || "")}
+                           style={{ textAlign: "center", background: s3.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
+                        {m3 || ""}
+                      </div>
+                      <div className={s4.className} onClick={onClickMat("Material4", m4)} title={s4.done ? "Submitted" : (m4 || "")}
+                           style={{ textAlign: "center", background: s4.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
+                        {m4 || ""}
+                      </div>
+                      <div className={s5.className} onClick={onClickMat("Material5", m5)} title={s5.done ? "Submitted" : (m5 || "")}
+                           style={{ textAlign: "center", background: s5.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
+                        {m5 || ""}
+                      </div>
+                      <div className={sb.className} onClick={onClickMat("Back Material", backMat)} title={sb.done ? "Submitted" : (backMat || "")}
+                           style={{ textAlign: "center", background: sb.done ? "#eee" : "#fff", borderRadius: 6, padding: "4px 2px" }}>
+                        {backMat || ""}
+                      </div>
+                    </>
+                  );
+                })()}
+
+                <div style={{ textAlign: "center" }}>{fmtMMDD(ship)}</div>
+                <div style={{ textAlign: "center" }}>{fmtMMDD(toDate(order["Due Date"]))}</div>
+                <div style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{notes}</div>
+                <div style={{ textAlign: "center" }}>{hardSoft}</div>
+
+                {/* Complete */}
+                <div style={{ ...stickyRight(0, "#fff"), display: "flex", justifyContent: "flex-end" }}>
                   <button
                     onClick={(e) => { e.stopPropagation(); markComplete(order); }}
-                    disabled={isSaving}
+                    disabled={!!saving[orderId]}
                     className="btn"
-                    style={{
-                      background: isSaving ? "rgba(255,255,255,0.8)" : "#ffffff",
-                      color: "#222", display: "inline-flex", alignItems: "center", gap: 8,
-                      opacity: isSaving ? 0.9 : 1
-                    }}
-                    title="Write Quantity to Cut List based on H..R sources"
-                    aria-busy={isSaving ? "true" : "false"}
+                    style={{ background: saving[orderId] ? "#f0f0f0" : "#f6f6f6" }}
+                    title="Mark this job complete (writes Quantity next to each listed material)"
                   >
-                    {isSaving && (
-                      <span className="spin" aria-hidden="true"
-                        style={{ width: 12, height: 12, border: "2px solid #999", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }} />
-                    )}
-                    {isSaving ? "Saving…" : "Complete"}
+                    {saving[orderId] ? "Saving…" : "Complete"}
                   </button>
                 </div>
               </div>
