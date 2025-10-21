@@ -230,18 +230,6 @@ export default function Ship() {
       }
     });
 
-    // Invoice
-    const invoiceUrl =
-      typeof data?.invoice === "string" && data.invoice.length
-        ? (data.invoice.startsWith("http")
-            ? data.invoice
-            : `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`)
-        : null;
-    if (isHttpUrl(invoiceUrl)) {
-      const iw = window.open(invoiceUrl, "_blank", "noopener,noreferrer");
-      if (iw) iw.blur();
-    }
-
     // Slips
     slips.forEach((u) => {
       if (isHttpUrl(u)) {
@@ -1381,16 +1369,9 @@ export default function Ship() {
                 alert("Select at least one job.");
                 return;
               }
-              // 1) force QuickBooks login (popup if needed)
-              const ok = await ensureQboAuth();
-              if (!ok) {
-                alert("QuickBooks login failed or was cancelled.");
-                return;
-              }
-              // 2) run your existing ship flow (no UPS/boxes)
-              setShippingMethod("Manual Shipping");
               await handleShip();
             }}
+            disabled={isShippingOverlay || loading}
             style={{
               padding: "12px 18px",
               fontWeight: "bold",
@@ -1399,7 +1380,8 @@ export default function Ship() {
               background: "#444",
               color: "#fff",
               boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
-              cursor: "pointer"
+              cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
+              opacity: (isShippingOverlay || loading) ? 0.6 : 1
             }}
             title="Create QuickBooks invoice → generate packing slip(s) → write Shipped"
           >
