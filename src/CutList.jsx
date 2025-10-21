@@ -185,6 +185,10 @@ export default function CutList() {
   // Material-only submit
   const MATERIAL_KEYS = ["Material1", "Material2", "Material3", "Material4", "Material5", "Back Material"];
 
+  // Only count materials that have a non-empty label on this order
+  const presentMaterialKeys = (order) =>
+    MATERIAL_KEYS.filter(k => String(order[k] || "").trim());
+
   const handleMaterialClick = async (e, order, materialKey) => {
     e.stopPropagation(); // don’t toggle card selection
     const orderId = String(order["Order #"] || "");
@@ -203,12 +207,20 @@ export default function CutList() {
         const submitted = res.data.submitted || {};
         setSubmittedMap(prev => ({ ...prev, [orderId]: submitted }));
 
-        const allDone = MATERIAL_KEYS.every(k => submitted[k]);
+        const presentKeys = presentMaterialKeys(order);
+        const allDone = presentKeys.length ? presentKeys.every(k => submitted[k]) : true;
+
         if (allDone) {
-          await markComplete(order); // this will flip the global 'saving' state as well
+          // 👇 Remove from UI immediately
+          setOrders(prev => prev.filter(o => String(o["Order #"] || "") !== orderId));
+          setSelected(prev => { const n = { ...prev }; delete n[orderId]; return n; });
+
+          // Finish the write to Sheets (overlay will show briefly)
+          await markComplete(order);
         } else {
           showToast(`Submitted ${materialKey}`);
         }
+
       } else {
         showToast(res.data?.error || "Submit failed", "error", 2600);
       }
