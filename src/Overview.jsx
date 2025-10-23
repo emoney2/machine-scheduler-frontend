@@ -599,6 +599,8 @@ export default function Overview() {
   const [selections, setSelections] = useState({});
   const [daysWindow, setDaysWindow] = useState("7");
   const overviewCtrlRef = useRef(null);
+  const fetchLockRef = useRef(false);      // prevents re-entrant loadFresh()
+  const lastFetchAtRef = useRef(0);        // debounce rapid triggers
 
   // Order modal
   const [modalOpenForVendor, setModalOpenForVendor] = useState(null);
@@ -647,26 +649,38 @@ export default function Overview() {
 
     // 2) Fetch fresh in background (stale-while-revalidate)
     async function loadFresh() {
+      // ⛔ Debounce: skip if last fetch < 5s ago
+      const now = Date.now();
+      if (now - (lastFetchAtRef.current || 0) < 5000) return;
+      lastFetchAtRef.current = now;
+
+      // 🔒 Single-flight: if already fetching, do nothing
+      if (fetchLockRef.current) return;
+      fetchLockRef.current = true;
+
       setLoadingUpcoming(!cached);
       setLoadingMaterials(!cached);
-      // cancel any prior in-flight overview request
+
+      // Cancel any prior in-flight overview fetch
       try { overviewCtrlRef.current?.abort(); } catch {}
       const ctrl = new AbortController();
       overviewCtrlRef.current = ctrl;
+
       try {
+        // Run /overview and /orders in parallel with **fewer, longer** timeouts
         const [overRes, ordersRes] = await Promise.all([
           getWithRetry(
             axios,
             `${ROOT}/overview`,
             { withCredentials: true, signal: ctrl.signal },
-            [15000, 25000, 35000]
+            [30000]  // single, longer attempt; reduces churn/cancel noise
           ),
           getWithRetry(
             axios,
             `${ROOT}/orders`,
             { withCredentials: true, signal: ctrl.signal },
-            [12000, 15000, 20000]
-          )
+            [25000]  // single, longer attempt
+          ),
         ]);
 
         if (!alive) return;
@@ -674,6 +688,52 @@ export default function Overview() {
         saveOverviewCache(data);
 
         const { upcoming, materials } = data;
+
+        // Keep non-complete rows from sheet (next 7 days)
+        const sheetJobs = (upcoming ?? []).filter(j => {
+          const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
+          return stage !== "COMPLETE" && stage !== "COMPLETED";
+        });
+
+        // Merge overdue from /orders (not already included)
+        const allOrders = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+        const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
+        const overdueJobs = allOrders.filter(j => {
+          const stage = String(j["Stage"] ?? "").trim().toUpperCase();
+          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
+          const d = daysUntil(j["Due Date"]);
+          if (d === null) return false;
+          const orderId = String(j["Order #"] || "").trim();
+          return d < 0 && !included.has(orderId);
+        });
+
+        // Merge + sort (overdue first → smaller daysUntil)
+        const merged = [...sheetJobs, ...overdueJobs];
+        const sorted = merged.slice().sort((a, b) => {
+          const da = daysUntil(a["Due Date"]), db = daysUntil(b["Due Date"]);
+          if (da === null && db === null) return 0;
+          if (da === null) return 1;
+          if (db === null) return -1;
+          if (da !== db) return da - db;
+
+          const sa = daysUntil(a["Ship Date"]), sb = daysUntil(b["Ship Date"]);
+          if (sa !== null && sb !== null && sa !== sb) return sa - sb;
+
+          const oa = parseInt(String(a["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
+          const ob = parseInt(String(b["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
+          return oa - ob;
+        });
+
+        setUpcoming(sorted);
+        setMaterials(materials ?? []);
+        markUpdated();
+      } catch (e) {
+        console.warn("Overview loadFresh failed:", e);
+      } finally {
+        fetchLockRef.current = false;
+      }
+    }
+
 
         // 1) Keep only non-complete rows the sheet already surfaced (next 7 days)
         const sheetJobs = (upcoming ?? []).filter(j => {
