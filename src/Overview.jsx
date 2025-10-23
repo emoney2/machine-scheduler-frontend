@@ -602,6 +602,11 @@ export default function Overview() {
   const fetchLockRef = useRef(false);      // prevents re-entrant loadFresh()
   const lastFetchAtRef = useRef(0);        // debounce rapid triggers
 
+  const vendorsCtrlRef = useRef(null);
+  const vendorsLockRef = useRef(false);
+  const metricsCtrlRef = useRef(null);
+  const metricsLockRef = useRef(false);
+
   // Order modal
   const [modalOpenForVendor, setModalOpenForVendor] = useState(null);
   const [modalSelections, setModalSelections] = useState({}); // key: `${vendor}:::${name}` -> { selected, qty, unit, type }
@@ -780,10 +785,19 @@ export default function Overview() {
 
     // 2) Fetch fresh in background and update cache + state
     (async () => {
+      if (vendorsLockRef.current) return;    // single-flight guard
+      vendorsLockRef.current = true;
+
+      // cancel any prior in-flight vendors request
+      try { vendorsCtrlRef.current?.abort(); } catch {}
+      const ctrl = new AbortController();
+      vendorsCtrlRef.current = ctrl;
+
       try {
         const res = await axios.get(`${ROOT}/vendors`, {
           withCredentials: true,
-          timeout: 20000,
+          signal: ctrl.signal,
+          timeout: 30000, // single, longer attempt to avoid churn
         });
         if (!alive) return;
 
@@ -796,9 +810,14 @@ export default function Overview() {
         setVendorDir(map);
         try { localStorage.setItem(LS_VENDORS_KEY, JSON.stringify(map)); } catch {}
       } catch (e) {
-        console.error("Failed to load vendor directory", e);
+        if (e?.name !== "CanceledError" && e?.message !== "canceled") {
+          console.error("Failed to load vendor directory", e);
+        }
+      } finally {
+        vendorsLockRef.current = false;
       }
     })();
+
 
     return () => { alive = false; };
   }, []);
@@ -813,8 +832,7 @@ export default function Overview() {
     return () => clearInterval(id);
   }, [gmailPopup]);
 
-  // ▼ Fetch Performance Metrics (Overview!V1:X2)
-  // ▼ Fetch Performance Metrics (Overview!V1:X2) — cached + retries + shorter timeouts
+  // ▼ Fetch Performance Metrics (Overview!V1:X2) — cached + single-flight + abortable
   useEffect(() => {
     let alive = true;
 
@@ -822,59 +840,57 @@ export default function Overview() {
     const cached = loadMetricsCache();
     if (cached) {
       setMetrics(cached);
-      setLoadingMetrics(false); // don't block UI while we refetch
+      setLoadingMetrics(false);
       markUpdated();
     } else {
       setLoadingMetrics(true);
     }
 
-    // 2) Try fetching with backoff and shorter timeouts
-    const timeouts = [12000, 15000, 20000]; // 12s → 15s → 20s
-    async function fetchWithBackoff() {
-      for (let i = 0; i < timeouts.length; i++) {
-        const ctrl = new AbortController();
-        try {
-          const res = await axios.get(`${ROOT}/overview/metrics`, {
-            withCredentials: true,
-            signal: ctrl.signal,
-            timeout: timeouts[i],
-            validateStatus: (s) => s >= 200 && s < 400,
-          });
-          if (!alive) return;
-          const data = res?.data || null;
-          setMetrics(data);
-          saveMetricsCache(data);
-          setLoadingMetrics(false);
-          markUpdated();
-          return; // success
-        } catch (err) {
-          if (!alive) return;
-          const msg = err?.message || String(err);
-          console.warn(
-            `overview/metrics attempt ${i + 1} failed (${timeouts[i]}ms):`,
-            msg
-          );
-          // If last attempt, stop loading but keep whatever we have (cached or null)
-          if (i === timeouts.length - 1) {
-            setLoadingMetrics(false);
-          } else {
-            // brief pause before next attempt
-            await new Promise(r => setTimeout(r, 2000));
-          }
-        }
+    async function fetchMetrics() {
+      if (metricsLockRef.current) return; // single-flight
+      metricsLockRef.current = true;
+
+      // abort any prior metrics request
+      try { metricsCtrlRef.current?.abort(); } catch {}
+      const ctrl = new AbortController();
+      metricsCtrlRef.current = ctrl;
+
+      try {
+        const res = await axios.get(`${ROOT}/overview/metrics`, {
+          withCredentials: true,
+          signal: ctrl.signal,
+          timeout: 30000, // single, longer attempt
+          validateStatus: (s) => s >= 200 && s < 400,
+        });
+        if (!alive) return;
+        const data = res?.data || null;
+        setMetrics(data);
+        saveMetricsCache(data);
+        setLoadingMetrics(false);
+        markUpdated();
+      } catch (err) {
+        if (!alive) return;
+        const msg = err?.message || String(err);
+        console.warn("overview/metrics failed:", msg);
+        setLoadingMetrics(false); // don't block UI
+      } finally {
+        metricsLockRef.current = false;
       }
     }
 
-    fetchWithBackoff();
+    // initial fetch
+    fetchMetrics();
 
-    // Optional: periodic refresh (keeps metrics fresh without blocking)
-    const poll = setInterval(fetchWithBackoff, 5 * 60 * 1000);
+    // periodic refresh every 5 minutes; respects lock so no overlap
+    const poll = setInterval(fetchMetrics, 5 * 60 * 1000);
 
     return () => {
       alive = false;
+      try { metricsCtrlRef.current?.abort(); } catch {}
       clearInterval(poll);
     };
   }, []);
+
 
   // Modal rows
   const modalRows = useMemo(() => {
