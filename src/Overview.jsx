@@ -641,20 +641,6 @@ export default function Overview() {
       setMaterials(materials ?? []);
       markUpdated();
 
-      // Prime selections
-      const init = {};
-      for (const g of (materials ?? [])) {
-        for (const it of (g.items || [])) {
-          const key = `${g.vendor}:::${it.name}`;
-          init[key] = {
-            selected: true,
-            qty: String(it.qty ?? ""),
-            unit: it.unit ?? "",
-            type: it.type ?? "Material",
-          };
-        }
-      }
-      setSelections(init);
       setLoadingUpcoming(false);
       setLoadingMaterials(false);
     }
@@ -668,15 +654,23 @@ export default function Overview() {
       const ctrl = new AbortController();
       overviewCtrlRef.current = ctrl;
       try {
-        const res = await getWithRetry(
-          axios,
-          `${ROOT}/overview`,
-          { withCredentials: true, signal: ctrl.signal },
-          [15000, 25000, 35000]
-        );
+        const [overRes, ordersRes] = await Promise.all([
+          getWithRetry(
+            axios,
+            `${ROOT}/overview`,
+            { withCredentials: true, signal: ctrl.signal },
+            [15000, 25000, 35000]
+          ),
+          getWithRetry(
+            axios,
+            `${ROOT}/orders`,
+            { withCredentials: true, signal: ctrl.signal },
+            [12000, 15000, 20000]
+          )
+        ]);
 
         if (!alive) return;
-        const data = res?.data || {};
+        const data = overRes?.data || {};
         saveOverviewCache(data);
 
         const { upcoming, materials } = data;
@@ -687,58 +681,51 @@ export default function Overview() {
           return stage !== "COMPLETE" && stage !== "COMPLETED";
         });
 
-        // 2) Pull all orders so we can find *overdue* jobs not in the sheet list
-        let overdueJobs = [];
-        try {
-          const ordersRes = await getWithRetry(
-            axios,
-            `${ROOT}/orders`,
-            { withCredentials: true, signal: ctrl.signal },
-            [12000, 15000, 20000]
-          );
+        // 2) Overdue from /orders (not already included)
+        const allOrders = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+        const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
+        const overdueJobs = allOrders.filter(j => {
+          const stage = String(j["Stage"] ?? "").trim().toUpperCase();
+          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
+          const d = daysUntil(j["Due Date"]);
+          if (d === null) return false;
+          const orderId = String(j["Order #"] || "").trim();
+          return d < 0 && !included.has(orderId);
+        });
 
-          const allOrders = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
-          // Build quick set of Order #s already included from the sheet
-          const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
-
-          // Overdue = due date exists, daysUntil(due) < 0, stage not complete, and not already included
-          overdueJobs = allOrders.filter(j => {
-            const stage = String(j["Stage"] ?? "").trim().toUpperCase();
-            if (stage === "COMPLETE" || stage === "COMPLETED") return false;
-            const d = daysUntil(j["Due Date"]);
-            if (d === null) return false;
-            const orderId = String(j["Order #"] || "").trim();
-            return d < 0 && !included.has(orderId);
-          });
-        } catch (e) {
-          // If /orders fails, just proceed without overdue
-          console.warn("Failed to load /orders for overdue merge", e);
-        }
 
         // 3) Merge: sheet (next 7 days) + overdue (past due)
-        // Keep sheet order first; append overdue (you can sort overdue by date if you prefer)
         const merged = [...sheetJobs, ...overdueJobs];
 
-        setUpcoming(merged);
+        // 4) Sort by Due Date (overdue first → smallest daysUntil), then Ship Date as tiebreaker, then Order #
+        const sorted = merged.slice().sort((a, b) => {
+          const da = daysUntil(a["Due Date"]);
+          const db = daysUntil(b["Due Date"]);
+
+          // Put missing dates at the bottom
+          if (da === null && db === null) return 0;
+          if (da === null) return 1;
+          if (db === null) return -1;
+
+          if (da !== db) return da - db;
+
+          // Tie-breaker 1: ship date nearest first
+          const sa = daysUntil(a["Ship Date"]);
+          const sb = daysUntil(b["Ship Date"]);
+          if (sa !== null && sb !== null && sa !== sb) return sa - sb;
+
+          // Tie-breaker 2: numeric order id
+          const oa = parseInt(String(a["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
+          const ob = parseInt(String(b["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
+          return oa - ob;
+        });
+
+        setUpcoming(sorted);
         setMaterials(materials ?? []);
+
 
         // days window disabled — do not setDaysWindow
         markUpdated();
-
-
-        const init = {};
-        for (const g of (materials ?? [])) {
-          for (const it of (g.items || [])) {
-            const key = `${g.vendor}:::${it.name}`;
-            init[key] = {
-              selected: true,
-              qty: String(it.qty ?? ""),
-              unit: it.unit ?? "",
-              type: it.type ?? "Material",
-            };
-          }
-        }
-        setSelections(init);
 
       } catch (e) {
         if (e?.name !== "CanceledError" && e?.message !== "canceled") {
@@ -1448,6 +1435,24 @@ export default function Overview() {
             <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
               {!loadingUpcoming && upcoming.map((job, idx) => {
                 const ring = ringColorByShipDate(job["Ship Date"]);
+                const isHard = /^hard/i.test(String(pickHardSoft(job)));
+                const hardPill = isHard ? (
+                  <span style={{
+                    marginLeft: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: 8,
+                    background: "#fee2e2",
+                    color: "#991b1b",
+                    border: "1px solid #fecaca",
+                    letterSpacing: 0.2
+                  }}>
+                    HARD
+                  </span>
+                ) : null;
+
+
 
                 // Map the existing ring color → card fill + border color.
                 // If your ring function returns orange for moderate, use YELLOW for both fill and border.
@@ -1461,38 +1466,13 @@ export default function Overview() {
                   (ring && ring.toLowerCase() === ORANGE) ? "rgba(255, 221, 0, 0.12)" : "transparent";
 
 
-                // D.1 Build primary and alternate image URLs
                 const primaryUrl = getJobThumbUrl(job, ROOT);
-                console.log("📸 Overview thumb", {
-                  order: job?.["Order #"] ?? job?.order ?? job?.Order ?? "(no order)",
-                  product: job?.product ?? job?.Product,
-                  primaryUrl,
-                  imageUrl: job?.imageUrl,
-                  image: job?.image,
-                  preview: job?.Preview ?? job?.preview,
-                });
 
-
-                // Try alternates if the primary fails (covers finicky Drive links)
-                const alts = [];
-                const idFromAll = extractFileIdFromFormulaOrUrl(JSON.stringify(job));
-                if (idFromAll) {
-                  alts.push(
-                    `https://drive.google.com/thumbnail?id=${idFromAll}&sz=w160`,
-                    `https://drive.google.com/uc?export=view&id=${idFromAll}`
-                  );
-                }
-
-                // D.2 Swap to alternates on image error; finally hide the <img>
+                // Keep it simple: if the primary fails, hide the image (skip JSON scanning)
                 const handleImgError = (e) => {
-                  const i = Number(e.currentTarget.dataset.errIndex || 0);
-                  if (i < alts.length) {
-                    e.currentTarget.dataset.errIndex = String(i + 1);
-                    e.currentTarget.src = alts[i];
-                  } else {
-                    e.currentTarget.style.display = "none";
-                  }
+                  e.currentTarget.style.display = "none";
                 };
+
 
                 return (
                   <div key={idx} style={{ ...rowCard, background: fillColor }}>
@@ -1536,7 +1516,7 @@ export default function Overview() {
                         {job["Stage"]}
                       </div>
                       <div style={{ ...col(64, true), fontSize: 13, color: "#374151" }} title={String(job["Due Date"] || "")}>
-                        {fmtMMDD(job["Due Date"])}
+                        {fmtMMDD(job["Due Date"])}{hardPill}
                       </div>
                       <div style={{ ...col(50, true), fontSize: 13, color: "#374151" }} title={String(job["Print"] || "")}>
                         {job["Print"]}
