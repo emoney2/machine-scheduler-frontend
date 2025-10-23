@@ -785,7 +785,7 @@ export default function Overview() {
 
     // 2) Fetch fresh in background and update cache + state
     (async () => {
-      if (vendorsLockRef.current) return;    // single-flight guard
+      if (vendorsLockRef.current) return; // single-flight guard
       vendorsLockRef.current = true;
 
       // cancel any prior in-flight vendors request
@@ -797,7 +797,7 @@ export default function Overview() {
         const res = await axios.get(`${ROOT}/vendors`, {
           withCredentials: true,
           signal: ctrl.signal,
-          timeout: 30000, // single, longer attempt to avoid churn
+          timeout: 10000, // ⏱️ fail fast at 10s
         });
         if (!alive) return;
 
@@ -810,8 +810,13 @@ export default function Overview() {
         setVendorDir(map);
         try { localStorage.setItem(LS_VENDORS_KEY, JSON.stringify(map)); } catch {}
       } catch (e) {
-        if (e?.name !== "CanceledError" && e?.message !== "canceled") {
-          console.error("Failed to load vendor directory", e);
+        const msg = e?.message || String(e);
+        if (e?.name === "CanceledError" || msg === "canceled") {
+          // quiet cancel
+        } else if (msg.includes("timeout")) {
+          // quiet timeout; keep cached vendors
+        } else {
+          console.warn("Failed to load vendor directory:", msg);
         }
       } finally {
         vendorsLockRef.current = false;
@@ -819,7 +824,11 @@ export default function Overview() {
     })();
 
 
-    return () => { alive = false; };
+
+    return () => {
+      alive = false;
+      try { vendorsCtrlRef.current?.abort(); } catch {}
+    };
   }, []);
 
 
@@ -859,7 +868,7 @@ export default function Overview() {
         const res = await axios.get(`${ROOT}/overview/metrics`, {
           withCredentials: true,
           signal: ctrl.signal,
-          timeout: 30000, // single, longer attempt
+          timeout: 10000, // ⏱️ fail fast at 10s
           validateStatus: (s) => s >= 200 && s < 400,
         });
         if (!alive) return;
@@ -871,7 +880,11 @@ export default function Overview() {
       } catch (err) {
         if (!alive) return;
         const msg = err?.message || String(err);
-        console.warn("overview/metrics failed:", msg);
+        if (msg === "canceled" || err?.name === "CanceledError" || msg.includes("timeout")) {
+          // quiet cancel/timeout; keep whatever we have
+        } else {
+          console.warn("overview/metrics failed:", msg);
+        }
         setLoadingMetrics(false); // don't block UI
       } finally {
         metricsLockRef.current = false;
@@ -881,8 +894,12 @@ export default function Overview() {
     // initial fetch
     fetchMetrics();
 
-    // periodic refresh every 5 minutes; respects lock so no overlap
-    const poll = setInterval(fetchMetrics, 5 * 60 * 1000);
+    // periodic refresh every 5 minutes; only when tab is visible
+    const poll = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchMetrics();
+      }
+    }, 5 * 60 * 1000);
 
     return () => {
       alive = false;
@@ -890,6 +907,7 @@ export default function Overview() {
       clearInterval(poll);
     };
   }, []);
+
 
 
   // Modal rows
