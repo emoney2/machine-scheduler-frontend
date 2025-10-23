@@ -742,6 +742,8 @@ export default function Overview() {
       }
     }
 
+    // ✅ Fire once on mount so we don’t sit on “Loading…” when there’s no cache
+    loadFresh();
 
     // slow safety poll (5 minutes)
     const id = setInterval(loadFresh, 300000);
