@@ -628,13 +628,19 @@ export default function Overview() {
     const cached = loadOverviewCache();
     if (cached) {
       const { upcoming = [], materials = [] } = cached;
-      const jobs = (upcoming ?? []).filter(j => {
+
+      // Keep only non-complete from the sheet first
+      const baseJobs = (upcoming ?? []).filter(j => {
         const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
         return stage !== "COMPLETE" && stage !== "COMPLETED";
       });
-      setUpcoming(jobs);
+
+      // We’ll enrich with overdue below if we already have them cached elsewhere;
+      // otherwise we’ll do it in the fresh load (the next block).
+      setUpcoming(baseJobs);
       setMaterials(materials ?? []);
       markUpdated();
+
       // Prime selections
       const init = {};
       for (const g of (materials ?? [])) {
@@ -674,12 +680,48 @@ export default function Overview() {
         saveOverviewCache(data);
 
         const { upcoming, materials } = data;
-        const jobs = (upcoming ?? []).filter(j => {
+
+        // 1) Keep only non-complete rows the sheet already surfaced (next 7 days)
+        const sheetJobs = (upcoming ?? []).filter(j => {
           const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
           return stage !== "COMPLETE" && stage !== "COMPLETED";
         });
-        setUpcoming(jobs);
+
+        // 2) Pull all orders so we can find *overdue* jobs not in the sheet list
+        let overdueJobs = [];
+        try {
+          const ordersRes = await getWithRetry(
+            axios,
+            `${ROOT}/orders`,
+            { withCredentials: true, signal: ctrl.signal },
+            [12000, 15000, 20000]
+          );
+
+          const allOrders = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+          // Build quick set of Order #s already included from the sheet
+          const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
+
+          // Overdue = due date exists, daysUntil(due) < 0, stage not complete, and not already included
+          overdueJobs = allOrders.filter(j => {
+            const stage = String(j["Stage"] ?? "").trim().toUpperCase();
+            if (stage === "COMPLETE" || stage === "COMPLETED") return false;
+            const d = daysUntil(j["Due Date"]);
+            if (d === null) return false;
+            const orderId = String(j["Order #"] || "").trim();
+            return d < 0 && !included.has(orderId);
+          });
+        } catch (e) {
+          // If /orders fails, just proceed without overdue
+          console.warn("Failed to load /orders for overdue merge", e);
+        }
+
+        // 3) Merge: sheet (next 7 days) + overdue (past due)
+        // Keep sheet order first; append overdue (you can sort overdue by date if you prefer)
+        const merged = [...sheetJobs, ...overdueJobs];
+
+        setUpcoming(merged);
         setMaterials(materials ?? []);
+
         // days window disabled — do not setDaysWindow
         markUpdated();
 
