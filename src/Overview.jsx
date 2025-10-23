@@ -731,74 +731,12 @@ export default function Overview() {
         console.warn("Overview loadFresh failed:", e);
       } finally {
         fetchLockRef.current = false;
-      }
-    }
-
-
-        // 1) Keep only non-complete rows the sheet already surfaced (next 7 days)
-        const sheetJobs = (upcoming ?? []).filter(j => {
-          const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
-          return stage !== "COMPLETE" && stage !== "COMPLETED";
-        });
-
-        // 2) Overdue from /orders (not already included)
-        const allOrders = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
-        const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
-        const overdueJobs = allOrders.filter(j => {
-          const stage = String(j["Stage"] ?? "").trim().toUpperCase();
-          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
-          const d = daysUntil(j["Due Date"]);
-          if (d === null) return false;
-          const orderId = String(j["Order #"] || "").trim();
-          return d < 0 && !included.has(orderId);
-        });
-
-
-        // 3) Merge: sheet (next 7 days) + overdue (past due)
-        const merged = [...sheetJobs, ...overdueJobs];
-
-        // 4) Sort by Due Date (overdue first → smallest daysUntil), then Ship Date as tiebreaker, then Order #
-        const sorted = merged.slice().sort((a, b) => {
-          const da = daysUntil(a["Due Date"]);
-          const db = daysUntil(b["Due Date"]);
-
-          // Put missing dates at the bottom
-          if (da === null && db === null) return 0;
-          if (da === null) return 1;
-          if (db === null) return -1;
-
-          if (da !== db) return da - db;
-
-          // Tie-breaker 1: ship date nearest first
-          const sa = daysUntil(a["Ship Date"]);
-          const sb = daysUntil(b["Ship Date"]);
-          if (sa !== null && sb !== null && sa !== sb) return sa - sb;
-
-          // Tie-breaker 2: numeric order id
-          const oa = parseInt(String(a["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
-          const ob = parseInt(String(b["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
-          return oa - ob;
-        });
-
-        setUpcoming(sorted);
-        setMaterials(materials ?? []);
-
-
-        // days window disabled — do not setDaysWindow
-        markUpdated();
-
-      } catch (e) {
-        if (e?.name !== "CanceledError" && e?.message !== "canceled") {
-          console.error("Failed to load overview", e?.message || e);
-        }
-      } finally {
         if (!alive) return;
         setLoadingUpcoming(false);
         setLoadingMaterials(false);
       }
     }
 
-    loadFresh();
 
     // slow safety poll (5 minutes)
     const id = setInterval(loadFresh, 300000);
