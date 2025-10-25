@@ -160,15 +160,12 @@ export default function DigitizingList() {
       return stage === "ORDERED";
     });
 
-    // 2) Exclude products with pocket/towel/back (same as Fur List behavior)
+    // 2) Show all products (front, back, pocket, towel, etc.)
     base = base.filter(o => {
-      const prod = String(o["Product"] || "").toLowerCase();
-      return !(
-        prod.includes("pocket") ||
-        prod.includes("towel")  ||
-        prod.includes("back")
-      );
+      // no exclusions
+      return true;
     });
+
 
     // 3) Sort strictly by Due Date (oldest first).
     base.sort((a, b) => {

@@ -27,6 +27,8 @@ import Overview from "./Overview";
 import DigitizingList from "./DigitizingList";
 
 
+
+
 function isActiveStage(stageLike) {
   const s = String(stageLike || '').toLowerCase();
   return s !== 'sewing' && s !== 'complete';
@@ -266,6 +268,9 @@ export default function App() {
   // NEW: prevent overlapping combined fetches
   const combinedInFlightRef = useRef(false);
 
+  // Keep last-seen hashes for delta polling
+  const changesHashesRef = useRef({});
+
   // Log once on mount (optional — keeps your existing console signal)
   useEffect(() => {
     // console.log("🔔 App component mounted");
@@ -339,9 +344,6 @@ export default function App() {
 
       const job = findJobById();
       if (!job) return;
-
-      const hasStart = !!job.embroidery_start;
-      if (hasStart) return;
 
       // Our jobs use `id` for Order #
       const orderNumber = String(job?.id ?? "").trim();
@@ -433,15 +435,17 @@ export default function App() {
   // Real-time updates listener
   useEffect(() => {
     if (!isScheduler) return;
-
-    fetchAllCombined();
-
-    const handle = setInterval(() => {
-      fetchAllCombined();
-    }, 15000);
-
-    return () => clearInterval(handle);
-  }, [isScheduler]);
+    // Always keep queue due-date sorted immediately after any change
+    setColumns(prev => {
+      const sorted = sortQueue(prev.queue.jobs);
+      // Avoid churn if already sorted
+      if (sorted === prev.queue.jobs) return prev;
+      return {
+        ...prev,
+        queue: { ...prev.queue, jobs: sorted }
+      };
+    });
+  }, [isScheduler, columns.queue.jobs]);
 
 
 
@@ -1196,27 +1200,55 @@ const fetchManualStateCore = async (previousCols) => {
 
 
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
+  // ─── Section 5D: Initial full load, then every 15s ask "did anything change?" ─────────────
   useEffect(() => {
-    // console.log("📡 Initial load: combined fetchAllCombined()");
-
-    // 1) Run immediately on mount
+    // 1) One full load on mount (keeps your thin status bar behavior)
     fetchAllCombined();
 
-    // 2) Set up the 5-minute polling WITHOUT modifying start times
-    const handle = setInterval(() => {
-      // console.log("⏳ Poll: combined fetchAllCombined()");
-      fetchAllCombined();
-    }, 300000); // 5 minutes
+    let canceled = false;
 
-    return () => clearInterval(handle);
+    async function pollChanges() {
+      try {
+        const root = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+        const url  = `${root}/changes`;
+        const res  = await fetch(url, { credentials: "include" });
+        if (!res.ok) return; // silent skip on transient errors
+        const data = await res.json();
+
+        const serverHashes = data?.hashes || {};
+        const prevHashes   = changesHashesRef.current || {};
+
+        // Figure out if anything changed or was removed
+        let somethingChanged = false;
+
+        // changed/added
+        for (const [oid, h] of Object.entries(serverHashes)) {
+          if (prevHashes[oid] !== h) { somethingChanged = true; break; }
+        }
+        // removed
+        if (!somethingChanged) {
+          for (const oid of Object.keys(prevHashes)) {
+            if (!(oid in serverHashes)) { somethingChanged = true; break; }
+          }
+        }
+
+        // Update our memory for next tick
+        changesHashesRef.current = serverHashes;
+
+        // If nothing changed, do nothing (no heavy reload)
+        if (!somethingChanged) return;
+
+        // If anything changed, do one normal reload
+        await fetchAllCombined();
+      } catch (e) {
+        // swallow brief hiccups
+      }
+    }
+
+    const handle = setInterval(() => { if (!canceled) pollChanges(); }, 15000);
+
+    return () => { canceled = true; clearInterval(handle); };
   }, []);
-
-  const handleSync = async () => {
-    setSyncStatus('');
-    await fetchAllCombined();
-    setSyncStatus('updated');
-    setTimeout(() => setSyncStatus(''), 2000);
-  };
 
 // ─── Section 5E: Always ensure top jobs have a start time (no clamp) ───
 useEffect(() => {
@@ -1613,13 +1645,17 @@ const onDragEnd = async (result) => {
   setManualReorder(true);
 };
 
-// Add debugging logs to inspect the state of the queue column
 useEffect(() => {
   if (!isScheduler) return;
-  console.log("Queue column before sorting:", columns.queue.jobs);
-  const sortedQueue = sortQueue(columns.queue.jobs);
-  console.log("Queue column after sorting:", sortedQueue);
-}, [isScheduler, columns.queue.jobs]);
+  setColumns(prev => {
+    // sort by your due date rule
+    const sorted = sortQueue(prev.queue.jobs);
+    // avoid extra state updates if nothing changed
+    if (sorted === prev.queue.jobs) return prev;
+    return { ...prev, queue: { ...prev.queue, jobs: sorted } };
+  });
+}, [isScheduler, columns?.queue?.jobs]);
+
 // === Section 9: Render via Section9.jsx ===
 
   return (
@@ -1692,25 +1728,6 @@ useEffect(() => {
           Logout
         </button>
       </nav>
-
-      {/* 🌕 Scheduler overlay while manualState loads */}
-      {isScheduler && isManualLoading && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0,
-          width: '100vw', height: '100vh',
-          backgroundColor: 'rgba(255, 247, 194, 0.65)', // transparent yellow
-          zIndex: 1001, // above the status bar
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontWeight: 700,
-          fontSize: '1.1rem',
-          pointerEvents: 'none' // overlay is visual only; don’t block clicks
-        }}>
-          Loading Schedule…
-        </div>
-      )}
 
       {/* ─── Route Outlet ─────────────────────────────────────────────────────── */}
       <Routes>
