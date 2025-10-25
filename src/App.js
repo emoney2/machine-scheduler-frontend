@@ -1186,26 +1186,24 @@ const fetchManualStateCore = async (previousCols) => {
       // 1) First, build new columns from orders/embroidery/links only
       const colsAfterOrders = await fetchOrdersEmbroLinksCore();
 
-      // 2) Show orders immediately — do NOT block on manualState
-      setColumns(colsAfterOrders);
-
-      // 3) Apply manualState in the background; upgrade columns when it returns
+      // 2) Now apply manualState BEFORE updating the UI, so cards don't bounce
       setIsManualLoading(true);
-      (async () => {
-        try {
-          const colsAfterManual = await fetchManualStateCore(colsAfterOrders);
-          setColumns(colsAfterManual);
-        } catch (e) {
-          console.warn('manualState deferred fetch failed/skipped', e?.message || e);
-        } finally {
-          setIsManualLoading(false);
-        }
-      })();
+      let colsFinal;
+      try {
+        colsFinal = await fetchManualStateCore(colsAfterOrders);
+      } catch (e) {
+        console.warn('manualState fetch failed/skipped', e?.message || e);
+        colsFinal = colsAfterOrders; // fallback if manualState fails
+      } finally {
+        setIsManualLoading(false);
+      }
 
-      // 🔥 DO NOT manually re-patch embroidery_start — we only update that on drag/drop
-      // console.log('fetchAllCombined ▶ done');
+      // 3) Update UI once, after manualState is applied (no temporary queue bounce)
+      setColumns(colsFinal);
+
       setHasError(false);
     } catch (err) {
+
       console.error('❌ fetchAllCombined error', err);
       setHasError(true);
     } finally {
