@@ -696,16 +696,96 @@ function openArtwork(originalUrl, v) {
 
 
 
-function sortQueue(arr) {
-  return [...arr].sort((a, b) => {
-    const da = parseDueDate(a.due_date);
-    const db = parseDueDate(b.due_date);
-    if (da && db) return da - db;
-    if (da) return -1;
-    if (db) return 1;
+// --- Queue sort: Due Date asc, then Order # asc ---
+function sortQueue(list) {
+  const toTS = (raw) => {
+    // Accepts values like "1/2", "01/02", "1/02", "MM/DD[/YYYY]" or Date/ISO
+    if (!raw) return Number.POSITIVE_INFINITY;
+    // Already a Date?
+    if (raw instanceof Date && !isNaN(raw)) return raw.getTime();
+
+    const s = String(raw).trim();
+    if (!s) return Number.POSITIVE_INFINITY;
+
+    // If it already looks like ISO, try Date parse
+    if (/\d{4}-\d{2}-\d{2}/.test(s)) {
+      const d = new Date(s);
+      return isNaN(d) ? Number.POSITIVE_INFINITY : d.getTime();
+    }
+
+    // Handle M/D or M/D/YY(YY) → normalize to current year if missing
+    const m = s.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/);
+    if (m) {
+      let [_, mm, dd, yy] = m;
+      mm = String(mm).padStart(2, "0");
+      dd = String(dd).padStart(2, "0");
+      if (!yy) {
+        // no year → use this year
+        yy = String(new Date().getFullYear());
+      } else if (yy.length === 2) {
+        // 2-digit year → 20YY
+        yy = "20" + yy;
+      }
+      const d = new Date(`${yy}-${mm}-${dd}T00:00:00`);
+      return isNaN(d) ? Number.POSITIVE_INFINITY : d.getTime();
+    }
+
+    const d = new Date(s);
+    return isNaN(d) ? Number.POSITIVE_INFINITY : d.getTime();
+  };
+
+  const getDue = (job) =>
+    job.dueDate ?? job.due ?? job["Due Date"] ?? job.due_date ?? null;
+
+  const getOrderNum = (job) => {
+    // prefer numeric Order # if possible
+    const raw =
+      job.id ??
+      job.orderId ??
+      job["Order #"] ??
+      job.order ??
+      job.order_number ??
+      "";
+    const n = Number(String(raw).replace(/[^0-9.-]/g, ""));
+    return isNaN(n) ? null : n;
+  };
+
+  // Make a copy before sorting to avoid mutating original arrays
+  return [...(list || [])].sort((a, b) => {
+    const aTS = toTS(getDue(a));
+    const bTS = toTS(getDue(b));
+    if (aTS !== bTS) return aTS - bTS; // earlier date first
+
+    const aN = getOrderNum(a);
+    const bN = getOrderNum(b);
+
+    // If both numeric, sort numerically; else fallback to string compare
+    if (aN != null && bN != null) return aN - bN;
+
+    const aS =
+      String(
+        a.id ??
+          a.orderId ??
+          a["Order #"] ??
+          a.order ??
+          a.order_number ??
+          ""
+      ).toLowerCase();
+    const bS =
+      String(
+        b.id ??
+          b.orderId ??
+          b["Order #"] ??
+          b.order ??
+          b.order_number ??
+          ""
+      ).toLowerCase();
+    if (aS < bS) return -1;
+    if (aS > bS) return 1;
     return 0;
   });
 }
+
 
 // === Section 3: Scheduling & Late (using embroidery_start) ===
 function scheduleMachineJobs(jobs, machineKey = '') {
