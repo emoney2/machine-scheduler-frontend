@@ -421,6 +421,22 @@ export default function App() {
   });
   const [syncStatus, setSyncStatus] = useState('');
 
+
+  // Sync button handler for Section9: do a full combined reload
+  const handleSync = async () => {
+    try {
+      setSyncStatus('Syncing…');
+      await fetchAllCombined();
+      setSyncStatus('Synced');
+    } catch (e) {
+      console.warn('Sync failed:', e?.message || e);
+      setSyncStatus('Sync failed');
+    } finally {
+      setTimeout(() => setSyncStatus(''), 1500);
+    }
+  };
+
+
   // Modal form state
   const [showModal, setShowModal] = useState(false);
   const [ph, setPh] = useState({
