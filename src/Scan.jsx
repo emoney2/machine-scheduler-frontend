@@ -201,55 +201,32 @@ export default function Scan() {
 
 // --- LIGHTBURN OPEN HELPERS ---
 function openInLightBurn(bomNameOrPath) {
-  // Accept "name", "name.dxf", or a relative path under LaserFiles
   let rel = String(bomNameOrPath || "").trim();
   if (!rel) return false;
   if (!/\.dxf$/i.test(rel)) rel = `${rel}.dxf`;
-
   const protoUrl = `jrco-lightburn://open?path=${encodeURIComponent(rel)}`;
-
-  // Try protocol; provide a very soft fallback after a tick
-  let fallbackTimer = setTimeout(() => {
-    // If protocol isn’t registered, user stays on page; fallback to server stream
-    window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(bomNameOrPath)}`, "_blank", "noopener");
-  }, 800);
-
-  try {
-    window.location.href = protoUrl; // triggers local handler if registered
-  } catch {
-    clearTimeout(fallbackTimer);
-    window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(bomNameOrPath)}`, "_blank", "noopener");
-  }
+  window.location.href = protoUrl;  // desktop protocol only
   return true;
 }
 
+
   async function handleImageClick(item) {
-    // If it's a BOM tile with a bomName, open in LightBurn if possible (fallback to server)
+    // If it's a BOM tile with a bomName, open in LightBurn via protocol only
     if (item && item.kind === "bom" && item.bomName) {
-      // Allow Alt-click to force server stream (useful for testing)
+      // Optional: Alt-click to force the old download route for testing
       if (window.event && window.event.altKey) {
         window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
         return;
       }
-      // Try protocol handler (desktop LightBurn). If not installed, fallback happens automatically.
+
       const ok = openInLightBurn(item.bomName);
       if (!ok) {
-        // Protocol function refused (empty name, etc.), fallback to old behavior with precheck
-        try {
-          const url = `${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
-          const r = await fetch(url, { credentials: "include" });
-          const j = await safeJson(r);
-          if (!r.ok || !j?.ok) {
-            const why = (j && (j.error || j.message)) || `No DXF found for '${item.bomName}'`;
-            return flashError(why);
-          }
-          window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
-        } catch (e) {
-          return flashError(`DXF open failed: ${e?.message || e}`);
-        }
+        return flashError(`No DXF name for this item`);
       }
       return;
     }
+
+
 
 
     // Otherwise (main image or unknown): open the image itself in-page
