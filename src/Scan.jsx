@@ -111,25 +111,33 @@ export default function Scan() {
     setErrMsg("");
 
     try {
-      // 1) FAST PATH: /api/order_fast (RAM lookup, should return in ms)
-      let fast = null;
+      // 1) FAST, LIGHTWEIGHT SUMMARY (no Drive calls)
+      const liteUrl = `${API_ROOT}/order-summary-lite?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(orderId)}`;
       try {
-        fast = await fetchFastOrder(orderId);
+        const lr = await fetch(liteUrl, { credentials: "include" });
+        if (lr.ok) {
+          const ld = await lr.json();
+          const quick = {
+            order: ld.order ?? orderId,
+            company: ld.company ?? "—",
+            title: ld.title ?? "",
+            product: ld.product ?? "",
+            stage: ld.stage ?? "",
+            dueDate: ld.dueDate ?? "",
+            furColor: ld.furColor ?? "",
+            quantity: ld.quantity ?? "—",
+            thumbnailUrl: null,
+            images: [],
+          };
+          setOrderData(quick); // paint immediately
+        }
       } catch (e) {
-        // fast path failed; keep going (we'll still try summary below)
-        console.warn("[Scan] fast order failed; falling back to summary", e);
+        // ignore lite failures; full summary below will handle it
+        console.warn("[Scan] lite summary failed", e);
       }
 
-      if (fast) {
-        const quick = normalizeFast(fast, orderId);
-        setOrderData(quick); // quick paint now
-      }
-
-      // 2) ENRICH: your existing /order-summary (images, labels, thumbnails)
-      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
-        dept
-      )}&order=${encodeURIComponent(orderId)}`;
-
+      // 2) FULL SUMMARY (images/thumbnails etc.)
+      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(orderId)}`;
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) {
         const j = await safeJson(r);
@@ -139,13 +147,13 @@ export default function Scan() {
 
       const normalized = {
         order: data.order ?? orderId,
-        company: data.company ?? (fast?.["Company Name"] ?? "—"),
-        title: data.title ?? fast?.Design ?? "",
-        product: data.product ?? fast?.Product ?? "",
-        stage: data.stage ?? fast?.Stage ?? "",
-        dueDate: data.dueDate ?? fast?.["Due Date"] ?? "",
-        furColor: data.furColor ?? fast?.["Fur Color"] ?? "",
-        quantity: data.quantity ?? fast?.Quantity ?? "—",
+        company: data.company ?? "—",
+        title: data.title ?? "",
+        product: data.product ?? "",
+        stage: data.stage ?? "",
+        dueDate: data.dueDate ?? "",
+        furColor: data.furColor ?? "",
+        quantity: data.quantity ?? "—",
         thumbnailUrl: data.thumbnailUrl || null,
         images:
           Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
@@ -166,6 +174,7 @@ export default function Scan() {
       setPendingOrderId("");
     }
   }
+
 
 
   function handleSubmit(text, fromScan) {
