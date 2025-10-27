@@ -5,6 +5,35 @@ import { useSearchParams } from "react-router-dom";
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 const IDLE_TIMEOUT_MS = 600;
 
+// --- FAST ORDER HELPERS ---
+async function fetchFastOrder(orderId) {
+  const url = `${API_ROOT}/api/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
+  const r = await fetch(url, { credentials: "include" });
+  if (!r.ok) {
+    let j = null;
+    try { j = await r.json(); } catch {}
+    throw new Error(j?.error || `HTTP ${r.status}`);
+  }
+  const j = await r.json();
+  return j?.order || null; // raw row dict from server
+}
+function normalizeFast(o, fallbackOrderId) {
+  // Keep this defensive — fast row may not have every field your summary returns
+  return {
+    order: String(o?.["Order #"] ?? fallbackOrderId ?? "—"),
+    company: o?.["Company Name"] ?? o?.company ?? "—",
+    title: o?.Design ?? o?.title ?? "",
+    product: o?.Product ?? o?.product ?? "",
+    stage: o?.Stage ?? o?.stage ?? "",
+    dueDate: o?.["Due Date"] ?? o?.dueDate ?? "",
+    furColor: o?.["Fur Color"] ?? o?.furColor ?? "",
+    quantity: o?.Quantity ?? o?.quantity ?? "—",
+    thumbnailUrl: null,
+    images: [], // enrich later via /order-summary
+  };
+}
+
+
 function extractOrderId(raw) {
   const digits = (raw || "").replace(/\D+/g, "");
   const trimmed = digits.replace(/^0+/, "");
@@ -77,11 +106,26 @@ export default function Scan() {
 
   async function fetchOrder(orderId) {
     if (!deptValid) return flashError("Invalid department");
-    setPendingOrderId(orderId);          // <-- show which order is loading
+    setPendingOrderId(orderId);
     setLoading(true);
     setErrMsg("");
 
     try {
+      // 1) FAST PATH: /api/order_fast (RAM lookup, should return in ms)
+      let fast = null;
+      try {
+        fast = await fetchFastOrder(orderId);
+      } catch (e) {
+        // fast path failed; keep going (we'll still try summary below)
+        console.warn("[Scan] fast order failed; falling back to summary", e);
+      }
+
+      if (fast) {
+        const quick = normalizeFast(fast, orderId);
+        setOrderData(quick); // quick paint now
+      }
+
+      // 2) ENRICH: your existing /order-summary (images, labels, thumbnails)
       const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
         dept
       )}&order=${encodeURIComponent(orderId)}`;
@@ -95,15 +139,14 @@ export default function Scan() {
 
       const normalized = {
         order: data.order ?? orderId,
-        company: data.company ?? "—",
-        title: data.title ?? "",
-        product: data.product ?? "",
-        stage: data.stage ?? "",
-        dueDate: data.dueDate ?? "",
-        furColor: data.furColor ?? "",
-        quantity: data.quantity ?? "—",
+        company: data.company ?? (fast?.["Company Name"] ?? "—"),
+        title: data.title ?? fast?.Design ?? "",
+        product: data.product ?? fast?.Product ?? "",
+        stage: data.stage ?? fast?.Stage ?? "",
+        dueDate: data.dueDate ?? fast?.["Due Date"] ?? "",
+        furColor: data.furColor ?? fast?.["Fur Color"] ?? "",
+        quantity: data.quantity ?? fast?.Quantity ?? "—",
         thumbnailUrl: data.thumbnailUrl || null,
-        // Prefer labeled images; fall back to plain images; else to the thumbnail
         images:
           Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
             ? data.imagesLabeled
@@ -123,6 +166,7 @@ export default function Scan() {
       setPendingOrderId("");
     }
   }
+
 
   function handleSubmit(text, fromScan) {
     const raw = (text || "").trim();
@@ -146,24 +190,58 @@ export default function Scan() {
     }
   }
 
+// --- LIGHTBURN OPEN HELPERS ---
+function openInLightBurn(bomNameOrPath) {
+  // Accept "name", "name.dxf", or a relative path under LaserFiles
+  let rel = String(bomNameOrPath || "").trim();
+  if (!rel) return false;
+  if (!/\.dxf$/i.test(rel)) rel = `${rel}.dxf`;
+
+  const protoUrl = `jrco-lightburn://open?path=${encodeURIComponent(rel)}`;
+
+  // Try protocol; provide a very soft fallback after a tick
+  let fallbackTimer = setTimeout(() => {
+    // If protocol isn’t registered, user stays on page; fallback to server stream
+    window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(bomNameOrPath)}`, "_blank", "noopener");
+  }, 800);
+
+  try {
+    window.location.href = protoUrl; // triggers local handler if registered
+  } catch {
+    clearTimeout(fallbackTimer);
+    window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(bomNameOrPath)}`, "_blank", "noopener");
+  }
+  return true;
+}
+
   async function handleImageClick(item) {
-    // If it's a BOM tile with a bomName, try to open DXF
+    // If it's a BOM tile with a bomName, open in LightBurn if possible (fallback to server)
     if (item && item.kind === "bom" && item.bomName) {
-      try {
-        const url = `${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
-        const r = await fetch(url, { credentials: "include" });
-        const j = await safeJson(r);
-        if (!r.ok || !j?.ok) {
-          const why = (j && (j.error || j.message)) || `No DXF found for '${item.bomName}'`;
-          return flashError(why);
-        }
-        // Open the actual stream (no &check=1)
+      // Allow Alt-click to force server stream (useful for testing)
+      if (window.event && window.event.altKey) {
         window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
-      } catch (e) {
-        return flashError(`DXF open failed: ${e?.message || e}`);
+        return;
+      }
+      // Try protocol handler (desktop LightBurn). If not installed, fallback happens automatically.
+      const ok = openInLightBurn(item.bomName);
+      if (!ok) {
+        // Protocol function refused (empty name, etc.), fallback to old behavior with precheck
+        try {
+          const url = `${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}&check=1`;
+          const r = await fetch(url, { credentials: "include" });
+          const j = await safeJson(r);
+          if (!r.ok || !j?.ok) {
+            const why = (j && (j.error || j.message)) || `No DXF found for '${item.bomName}'`;
+            return flashError(why);
+          }
+          window.open(`${API_ROOT}/drive/dxf?name=${encodeURIComponent(item.bomName)}`, "_blank", "noopener");
+        } catch (e) {
+          return flashError(`DXF open failed: ${e?.message || e}`);
+        }
       }
       return;
     }
+
 
     // Otherwise (main image or unknown): open the image itself in-page
     const href = item?.src || "";
