@@ -672,21 +672,22 @@ export default function Overview() {
       overviewCtrlRef.current = ctrl;
 
       try {
-        // Run /overview and /api/combined in parallel, fail fast so UI isn't blocked
+        // Run /overview and /api/combined in parallel, but fail fast at 10s so we never hang the tab
         const [overRes, comboRes] = await Promise.all([
           getWithRetry(
             axios,
             `${ROOT}/overview`,
             { withCredentials: true, signal: ctrl.signal },
-            [10000]  // 10s max attempt
+            [10000] // 10s cap
           ),
           getWithRetry(
             axios,
             `${ROOT}/api/combined`,
             { withCredentials: true, signal: ctrl.signal },
-            [10000]  // 10s max attempt
+            [10000] // 10s cap
           ),
         ]);
+
 
         if (!alive) return;
         const data = overRes?.data || {};
