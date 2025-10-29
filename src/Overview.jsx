@@ -679,13 +679,13 @@ export default function Overview() {
             axios,
             `${ROOT}/overview`,
             { withCredentials: true, signal: ctrl.signal },
-            [20000] // 10s cap
+            [30000, 40000, 50000]
           ),
           getWithRetry(
             axios,
             `${ROOT}/combined`,
             { withCredentials: true, signal: ctrl.signal },
-            [20000] // 10s cap
+            [20000, 30000]
           ),
         ]);
 
