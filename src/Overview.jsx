@@ -672,19 +672,19 @@ export default function Overview() {
       overviewCtrlRef.current = ctrl;
 
       try {
-        // Run /overview and /orders in parallel with **fewer, longer** timeouts
-        const [overRes, ordersRes] = await Promise.all([
+        // Run /overview and /api/combined in parallel, fail fast so UI isn't blocked
+        const [overRes, comboRes] = await Promise.all([
           getWithRetry(
             axios,
             `${ROOT}/overview`,
             { withCredentials: true, signal: ctrl.signal },
-            [30000]  // single, longer attempt; reduces churn/cancel noise
+            [10000]  // 10s max attempt
           ),
           getWithRetry(
             axios,
-            `${ROOT}/orders`,
+            `${ROOT}/api/combined`,
             { withCredentials: true, signal: ctrl.signal },
-            [25000]  // single, longer attempt
+            [10000]  // 10s max attempt
           ),
         ]);
 
@@ -701,7 +701,7 @@ export default function Overview() {
         });
 
         // Merge overdue from /orders (not already included)
-        const allOrders = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+        const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
         const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
         const overdueJobs = allOrders.filter(j => {
           const stage = String(j["Stage"] ?? "").trim().toUpperCase();
