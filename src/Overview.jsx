@@ -122,7 +122,7 @@ const LS_OVERVIEW_KEY = "jrco.overview.cache.v1";
 const LS_METRICS_KEY = "jrco.metrics.cache.v1";
 
 // Simple Axios GET with per-attempt timeouts and exponential backoff
-async function getWithRetry(axiosInstance, url, baseConfig = {}, attempts = [12000, 15000, 20000, 30000]) {
+async function getWithRetry(axiosInstance, url, baseConfig = {}, attempts = [15000, 20000, 25000, 30000, 40000]) {
   let lastErr;
   for (let i = 0; i < attempts.length; i++) {
     try {
@@ -130,13 +130,14 @@ async function getWithRetry(axiosInstance, url, baseConfig = {}, attempts = [120
       return res;
     } catch (err) {
       lastErr = err;
-      // Backoff before next try (500ms * 2^i)
-      const wait = 500 * Math.pow(2, i);
+      if (axios.isCancel(err)) throw err;
+      const wait = 1000 * Math.pow(1.5, i);
       await new Promise(r => setTimeout(r, wait));
     }
   }
   throw lastErr;
 }
+
 
 
 function saveMetricsCache(data) {
