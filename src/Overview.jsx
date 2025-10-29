@@ -683,7 +683,7 @@ export default function Overview() {
           ),
           getWithRetry(
             axios,
-            `${ROOT}/api/combined`,
+            `${ROOT}/combined`,
             { withCredentials: true, signal: ctrl.signal },
             [20000] // 10s cap
           ),
