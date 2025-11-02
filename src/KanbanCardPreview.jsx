@@ -124,9 +124,9 @@ export default function KanbanCardPreview() {
   const orderTarget = item.orderMethod === "Email"
     ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
     : (item.orderUrl || "");
-  const shortOrderUrl = orderTarget
-    ? `${APP_ORIGIN}/kanban/go?to=${encodeURIComponent(orderTarget)}`
-    : `${APP_ORIGIN}/kanban/go`;
+  // Use a super short link that only carries the ID; /kanban/go will look up and redirect
+  const shortOrderUrl = `${APP_ORIGIN}/kanban/go?id=${encodeURIComponent(item.kanbanId)}`;
+
 
   const reorderScanUrl = `${APP_ORIGIN}/kanban/scan-public?id=${encodeURIComponent(item.kanbanId)}&qty=1`;
 
