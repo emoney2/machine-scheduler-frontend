@@ -94,6 +94,7 @@ export default function KanbanQueue() {
                 <Th>Method</Th>
                 <Th>Order Link / Email</Th>
                 <Th>Requested By</Th>
+                <Th>Status</Th>
                 <Th>Actions</Th>
               </tr>
             </thead>
@@ -144,24 +145,43 @@ export default function KanbanQueue() {
                       </a>
                     )}
                   </Td>
+                  {/* Requested By */}
                   <Td>{r["Requested By"] || "Public Scanner"}</Td>
+
+                  {/* Status (Open / Ordered) */}
+                  {(() => {
+                    const status = (r["Event Status"] || "").toLowerCase();
+                    const nice = status ? status[0].toUpperCase() + status.slice(1) : "";
+                    return <Td>{nice}</Td>;
+                  })()}
+
+                  {/* Actions: show only what applies */}
                   <Td>
-                    <div className="flex gap-2">
-                      <button
-                        className="px-3 py-1 rounded bg-black text-white"
-                        onClick={() => markOrdered(r["Event ID"])}
-                        title="Append ORDERED row and mark this request as Ordered"
-                      >
-                        Mark Ordered
-                      </button>
-                      <button
-                        className="px-3 py-1 rounded border"
-                        onClick={() => markReceived(r["Event ID"])}
-                        title="Append RECEIVED row and close this request"
-                      >
-                        Mark Received
-                      </button>
-                    </div>
+                    {(() => {
+                      const status = (r["Event Status"] || "").toLowerCase();
+                      return (
+                        <div className="flex gap-2">
+                          {status === "open" && (
+                            <button
+                              className="px-3 py-1 rounded bg-black text-white"
+                              onClick={() => markOrdered(r["Event ID"])}
+                              title="Append ORDERED row and mark this request as Ordered"
+                            >
+                              Mark Ordered
+                            </button>
+                          )}
+                          {status === "ordered" && (
+                            <button
+                              className="px-3 py-1 rounded border"
+                              onClick={() => markReceived(r["Event ID"])}
+                              title="Append RECEIVED row and close this request"
+                            >
+                              Mark Received
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </Td>
                 </tr>
               ))}
