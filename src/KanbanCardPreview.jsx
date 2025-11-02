@@ -15,11 +15,6 @@ const makeQr = (data, size = 180) =>
   )}&choe=UTF-8`;
 
 
-const APP_ORIGIN = "https://machineschedule.netlify.app";
-const makeQr = (data, size = 180) =>
-  `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(data)}&choe=UTF-8`;
-
-
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
@@ -116,10 +111,10 @@ export default function KanbanCardPreview() {
         {/* Body */}
         <div style={{ display: "grid", gap: 8 }}>
           <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 8 }}>
-            {item["Photo URL"] ? (
+            {item.photoUrl ? (
               <img
                 alt=""
-                src={item["Photo URL"]}
+                src={item.photoUrl}
                 style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }}
               />
             ) : (
@@ -139,6 +134,7 @@ export default function KanbanCardPreview() {
                 No photo
               </div>
             )}
+
 
             <div style={{ display: "grid", gap: 4 }}>
               <div style={{ fontWeight: 800, fontSize: 16 }}>{item.itemName}</div>
@@ -223,8 +219,8 @@ export default function KanbanCardPreview() {
             );
           })()}
 
-
-      </div>
+        </div> {/* closes Body */}
+      </div>   {/* closes .card */}
 
       {/* print styles */}
       <style>{`
@@ -237,6 +233,7 @@ export default function KanbanCardPreview() {
     </div>
   );
 }
+
 
 function Field({ label, value }) {
   return (
