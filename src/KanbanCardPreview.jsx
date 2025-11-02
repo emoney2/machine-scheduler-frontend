@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
-// App origin for building in-app links (used by /kanban/scan only)
+// App origin for building short redirect / public scan links
 const APP_ORIGIN =
   typeof window !== "undefined" && window.location?.origin
     ? (window.location.origin.includes("netlify.app")
@@ -32,7 +32,7 @@ function getLocationStyles(locKey) {
     black: "#111827",
     gray: "#9CA3AF",
     royal: "#1D4ED8",
-    kelly: "#10B981",   // kelly-like green
+    kelly: "#10B981",
     purple: "#7E22CE",
     orange: "#F97316",
     teal: "#0D9488",
@@ -74,7 +74,7 @@ export default function KanbanCardPreview() {
         const j = await r.json();
         if (!j?.item) throw new Error("Item not found (empty payload)");
 
-        // --- KEY NORMALIZER ---
+        // --- KEY NORMALIZER (handles odd spacing/characters) ---
         const raw = j.item;
         const normKey = (k) => String(k || "").toLowerCase().replace(/[^a-z0-9]/g, "");
         const nmap = {};
@@ -138,13 +138,17 @@ export default function KanbanCardPreview() {
   }
   if (!item) return <div style={{ padding: 24 }}>Loading…</div>;
 
-  // Order QR: go *direct* to vendor URL (or mailto if Email)
+  // Order QR → short app redirect (for scannability), then to vendor URL
   const orderTarget = item.orderMethod === "Email"
     ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
     : (item.orderUrl || "");
 
-  // Public reorder QR (handled by your /kanban/scan page on frontend)
-  const reorderScanUrl = `${APP_ORIGIN}/kanban/scan?id=${encodeURIComponent(item.kanbanId)}&qty=1`;
+  const shortOrderUrl = orderTarget
+    ? `${APP_ORIGIN}/kanban/go?to=${encodeURIComponent(orderTarget)}`
+    : `${APP_ORIGIN}/kanban/go`;
+
+  // Public success page for reorder (no login)
+  const reorderScanUrl = `${APP_ORIGIN}/kanban/scan-public?id=${encodeURIComponent(item.kanbanId)}&qty=1`;
 
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
@@ -270,7 +274,7 @@ export default function KanbanCardPreview() {
           <div style={{ fontWeight: 800, fontSize: 11, textAlign: "center" }}>Order Page</div>
           <img
             alt="Order QR"
-            src={makeQr(orderTarget || "about:blank", 140)}
+            src={makeQr(shortOrderUrl, 140)}
             style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
