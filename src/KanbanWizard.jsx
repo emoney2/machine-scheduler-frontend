@@ -78,7 +78,7 @@ export default function KanbanWizard() {
       return;
     }
     // Go back to queue
-    window.location.href = "/kanban/queue";
+    window.location.href = `/kanban/preview/${encodeURIComponent(kanbanId)}`;
   }
 
   return (
