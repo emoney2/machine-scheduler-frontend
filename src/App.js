@@ -26,6 +26,7 @@ import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 import DigitizingList from "./DigitizingList";
 import KanbanQueue from "./KanbanQueue";
+import KanbanWizard from "./KanbanWizard";
 
 
 
@@ -1871,6 +1872,7 @@ useEffect(() => {
           <Route path="/material-log" element={<MaterialLog />} />
           <Route path="/departments" element={<Departments />} />
           <Route path="/kanban/queue" element={<KanbanQueue />} />
+          <Route path="/kanban/new" element={<KanbanWizard />} />
 
           {/* 👇 New routes */}
           <Route path="/scan" element={<Scan />} />

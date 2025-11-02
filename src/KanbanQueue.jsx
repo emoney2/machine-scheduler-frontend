@@ -160,12 +160,33 @@ export default function KanbanQueue() {
       )}
 
       <div style={{ maxWidth: 960, margin: "0 auto", padding: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Kanban — Needs to Order</h1>
-        <p style={{ color: "#4b5563", marginTop: 6 }}>
-          Open: <span style={{ fontWeight: 600 }}>{openCount}</span> • Ordered:{" "}
-          <span style={{ fontWeight: 600 }}>{orderedCount}</span>
-        </p>
-
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h1 style={{ fontSize: 22, fontWeight: 800 }}>Kanban — Needs to Order</h1>
+            <p style={{ color: "#4b5563", marginTop: 6 }}>
+              Open: <span style={{ fontWeight: 600 }}>{openCount}</span> • Ordered:{" "}
+              <span style={{ fontWeight: 600 }}>{orderedCount}</span>
+            </p>
+          </div>
+          <div>
+            <a
+              href="/kanban/new"
+              style={{
+                display: "inline-block",
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid #111827",
+                background: "#111827",
+                color: "white",
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+              title="Create a new Kanban card"
+            >
+              + New Kanban
+            </a>
+          </div>
+        </div>
         {grouped.all.length === 0 ? (
           <div style={{ marginTop: 16, color: "#6b7280" }}>No open requests.</div>
         ) : (
