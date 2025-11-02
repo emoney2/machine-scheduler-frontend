@@ -25,6 +25,8 @@ import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 import DigitizingList from "./DigitizingList";
+import KanbanQueue from "./pages/KanbanQueue";
+
 
 
 
@@ -1788,7 +1790,8 @@ useEffect(() => {
          { to: "/cut",               label: "Cut List" },  
          { to: "/ship",              label: "Ship" },
          { to: "/material-log",      label: "Material Log" },
-         { to: "/departments",       label: "Departments" }
+         { to: "/departments",       label: "Departments" },
+         { to: "/kanban/queue",      label: "Kanban Queue" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
             padding: '0.5rem 1rem',
@@ -1867,6 +1870,7 @@ useEffect(() => {
           <Route path="/fur" element={<FurList />} />
           <Route path="/material-log" element={<MaterialLog />} />
           <Route path="/departments" element={<Departments />} />
+          <Route path="/kanban/queue" element={<KanbanQueue />} />
 
           {/* 👇 New routes */}
           <Route path="/scan" element={<Scan />} />
