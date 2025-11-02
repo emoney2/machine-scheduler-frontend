@@ -37,27 +37,35 @@ export default function KanbanCardPreview() {
         const j = await r.json();
         if (!j || !j.item) throw new Error("Item not found");
 
-        // normalize keys from either camelCase or sheet headers
+        // normalize keys from either camelCase or sheet headers (with fallbacks)
         function norm(it) {
+          const n = (v) => (v === undefined || v === null ? "" : String(v).trim());
+
+          // Try a few alias keys we’ve seen
+          const lead = n(it["Lead Time (days)"] ?? it.leadTimeDays ?? it.leadTime ?? "");
+          const bin = n(it["Bin Qty (units)"] ?? it.binQtyUnits ?? it.binQty ?? it.binQuantity ?? "");
+          const reorder = n(it["Reorder Qty (basis)"] ?? it.reorderQtyBasis ?? it.reorderQty ?? "");
+
           return {
-            kanbanId: it["Kanban ID"] ?? it.kanbanId ?? kanbanId,
-            itemName: it["Item Name"] ?? it.itemName ?? "",
-            sku: it["SKU"] ?? it.sku ?? "",
-            dept: it["Dept"] ?? it.dept ?? "",
-            category: it["Category"] ?? it.category ?? "",
-            location: it["Location"] ?? it.location ?? "",
-            packageSize: it["Package Size"] ?? it.packageSize ?? "",
-            leadTimeDays: it["Lead Time (days)"] ?? it.leadTimeDays ?? "",
-            binQtyUnits: it["Bin Qty (units)"] ?? it.binQtyUnits ?? "",
-            reorderQtyBasis: it["Reorder Qty (basis)"] ?? it.reorderQtyBasis ?? "",
-            orderMethod: it["Order Method (Email/Online)"] ?? it.orderMethod ?? "",
-            orderUrl: it["Order URL"] ?? it.orderUrl ?? "",
-            orderEmail: it["Order Email"] ?? it.orderEmail ?? "",
-            photoUrl: it["Photo URL"] ?? it.photoUrl ?? "",
+            kanbanId: n(it["Kanban ID"] ?? it.kanbanId ?? kanbanId),
+            itemName: n(it["Item Name"] ?? it.itemName ?? ""),
+            sku: n(it["SKU"] ?? it.sku ?? ""),
+            dept: n(it["Dept"] ?? it.dept ?? ""),
+            category: n(it["Category"] ?? it.category ?? ""),
+            location: n(it["Location"] ?? it.location ?? ""),
+            packageSize: n(it["Package Size"] ?? it.packageSize ?? ""),
+            leadTimeDays: lead,
+            binQtyUnits: bin,
+            reorderQtyBasis: reorder,
+            orderMethod: n(it["Order Method (Email/Online)"] ?? it.orderMethod ?? ""),
+            orderUrl: n(it["Order URL"] ?? it.orderUrl ?? ""),
+            orderEmail: n(it["Order Email"] ?? it.orderEmail ?? ""),
+            photoUrl: n(it["Photo URL"] ?? it.photoUrl ?? ""),
           };
         }
 
         setItem(norm(j.item));
+
 
       } catch (e) {
         setErr(String(e));
@@ -102,11 +110,24 @@ export default function KanbanCardPreview() {
         }}
       >
         {/* Header */}
-        <div style={{ fontWeight: 800, fontSize: 18 }}>KANBAN CARD</div>
+        <div style={{ fontWeight: 900, fontSize: 22, letterSpacing: 0.3 }}>
+          KANBAN CARD
+        </div>
+
+        {/* Location immediately under title, big and bold */}
+        {item.location ? (
+          <div style={{ fontWeight: 900, fontSize: 18, color: "#111827" }}>
+            Location: {item.location}
+          </div>
+        ) : (
+          <div style={{ fontWeight: 900, fontSize: 18, color: "#9ca3af" }}>
+            Location: —
+          </div>
+        )}
+
         <div style={{ fontSize: 12, color: "#374151" }}>
           {item.dept} {item.category ? `• ${item.category}` : ""}
         </div>
-
 
         {/* Body */}
         <div style={{ display: "grid", gap: 8 }}>
@@ -115,7 +136,7 @@ export default function KanbanCardPreview() {
               <img
                 alt=""
                 src={item.photoUrl}
-                style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }}
+                style={{ width: 140, height: 140, objectFit: "cover", borderRadius: 10, border: "1px solid #e5e7eb" }}
               />
             ) : (
               <div
@@ -139,8 +160,9 @@ export default function KanbanCardPreview() {
             <div style={{ display: "grid", gap: 4 }}>
               <div style={{ fontWeight: 800, fontSize: 16 }}>{item.itemName}</div>
               <div style={{ fontSize: 12, color: "#6b7280" }}>{item.sku || ""}</div>
-              <div style={{ fontSize: 12, color: "#374151" }}>
-                {item.packageSize} • Lead: {item.leadTimeDays}d
+              <div style={{ fontSize: 12, color: "#111827" }}>
+                {item.packageSize || "—"}
+                {item.leadTimeDays ? ` • Lead: ${item.leadTimeDays}d` : ""}
               </div>
               {item.location ? (
                 <div style={{ fontSize: 12, color: "#374151" }}>Location: {item.location}</div>
@@ -149,10 +171,17 @@ export default function KanbanCardPreview() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <Field label="Bin Qty (units)" value={item.binQtyUnits} />
-            <Field label="Reorder Qty (basis)" value={item.reorderQtyBasis} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
+            <div>
+              <div style={{ fontSize: 12, color: "#6b7280" }}>Bin Qty (units)</div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>{item.binQtyUnits || "—"}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#6b7280" }}>Reorder Qty (basis)</div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>{item.reorderQtyBasis || "—"}</div>
+            </div>
           </div>
+
 
           {/* Order & Reorder QR row */}
           {(() => {
@@ -189,8 +218,8 @@ export default function KanbanCardPreview() {
                     src={makeQr(orderTarget)}
                     style={{ width: 120, height: 120, alignSelf: "center" }}
                   />
-                  <div style={{ fontSize: 10, color: "#6b7280", wordBreak: "break-all" }}>
-                    {orderTarget}
+                  <div style={{ fontSize: 10, color: "#6b7280" }}>
+                    {item.orderMethod === "Online" ? "Opens product page" : "Opens email compose"}
                   </div>
                 </div>
 
