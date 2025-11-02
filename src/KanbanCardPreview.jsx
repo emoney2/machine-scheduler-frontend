@@ -12,19 +12,18 @@ const APP_ORIGIN =
         : window.location.origin)
     : "https://machineschedule.netlify.app";
 
-// QR generator (use short in-app URLs for reliability)
+// QR generator (short URLs -> reliable images)
 const makeQr = (data, size = 160) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&qzone=1&data=${encodeURIComponent(
     data
   )}`;
 
-// Show "—" only if value is truly empty/null/undefined
+// Only show "—" when truly empty/null/undefined (preserve 0)
 function showVal(v) {
   if (v === null || v === undefined) return "—";
   const s = String(v).trim();
-  return s === "" ? "—" : s; // preserves "0"
+  return s === "" ? "—" : s;
 }
-
 
 // Location color map (case-insensitive)
 function getLocationStyles(locKey) {
@@ -75,24 +74,40 @@ export default function KanbanCardPreview() {
         const j = await r.json();
         if (!j?.item) throw new Error("Item not found (empty payload)");
 
-        // normalize fields (accept camelCase or sheet headers)
-        const n = (v) => (v == null ? "" : String(v).trim());
+        // keep data types (don’t force to string here)
+        const n = (v, d = "") => (v === undefined || v === null ? d : v);
         const it = j.item;
 
+        // Flexible field resolution
+        const lead = n(it["Lead Time (days)"] ?? it.leadTimeDays ?? it.leadTime, "");
+        const bin  = n(
+          it["Bin Qty (units)"] ??
+          it["Bin Quantity (units)"] ?? // legacy header variant
+          it.binQtyUnits ??
+          it.binQty ??
+          it.binQuantity,
+          ""
+        );
+        const reorder = n(
+          it["Reorder Qty (basis)"] ??
+          it.reorderQtyBasis ??
+          it.reorderQty,
+          ""
+        );
+
         const normalized = {
-          kanbanId: n(it["Kanban ID"] ?? it.kanbanId ?? kanbanId),
-          itemName: n(it["Item Name"] ?? it.itemName ?? ""),
-          sku: n(it["SKU"] ?? it.sku ?? ""),
-          // dept/category intentionally dropped from UI (you asked to remove “Facilities”)
-          location: n(it["Location"] ?? it.location ?? ""),
-          packageSize: n(it["Package Size"] ?? it.packageSize ?? ""),
-          leadTimeDays: n(it["Lead Time (days)"] ?? it.leadTimeDays ?? it.leadTime ?? ""),
-          binQtyUnits: n(it["Bin Qty (units)"] ?? it.binQtyUnits ?? it.binQty ?? it.binQuantity ?? ""),
-          reorderQtyBasis: n(it["Reorder Qty (basis)"] ?? it.reorderQtyBasis ?? it.reorderQty ?? ""),
-          orderMethod: n(it["Order Method (Email/Online)"] ?? it.orderMethod ?? ""),
-          orderUrl: n(it["Order URL"] ?? it.orderUrl ?? ""),
-          orderEmail: n(it["Order Email"] ?? it.orderEmail ?? ""),
-          photoUrl: n(it["Photo URL"] ?? it.photoUrl ?? ""),
+          kanbanId: n(it["Kanban ID"] ?? it.kanbanId ?? kanbanId, ""),
+          itemName: n(it["Item Name"] ?? it.itemName, ""),
+          sku: n(it["SKU"] ?? it.sku, ""),
+          location: n(it["Location"] ?? it.location, ""),
+          packageSize: n(it["Package Size"] ?? it.packageSize, ""),
+          leadTimeDays: lead === "" ? "" : String(lead).trim(),
+          binQtyUnits: bin,
+          reorderQtyBasis: reorder,
+          orderMethod: n(it["Order Method (Email/Online)"] ?? it.orderMethod, ""),
+          orderUrl: n(it["Order URL"] ?? it.orderUrl, ""),
+          orderEmail: n(it["Order Email"] ?? it.orderEmail, ""),
+          photoUrl: n(it["Photo URL"] ?? it.photoUrl, ""),
         };
 
         setItem(normalized);
@@ -149,8 +164,8 @@ export default function KanbanCardPreview() {
           border: "2px solid #111827",
           borderRadius: 12,
           background: "white",
-          // Add extra bottom padding so content never sits behind corner QR cards
-          padding: "12px 12px 150px 12px",
+          boxSizing: "border-box",        // keep padding inside 4x6
+          padding: "12px 12px 150px 12px", // extra bottom space for corner QRs
           display: "grid",
           gridTemplateRows: "auto auto 1fr",
           gap: 8,
@@ -215,15 +230,16 @@ export default function KanbanCardPreview() {
 
           {/* Item name */}
           <div style={{ fontWeight: 900, fontSize: 16, textAlign: "center" }}>
-            {item.itemName || "—"}
+            {showVal(item.itemName)}
           </div>
 
           {/* Package size + Lead (if present) */}
           <div style={{ fontSize: 12, color: "#111827", textAlign: "center" }}>
-            {item.packageSize || "—"}{item.leadTimeDays ? ` • Lead: ${item.leadTimeDays}d` : ""}
+            {showVal(item.packageSize)}
+            {item.leadTimeDays ? ` • Lead: ${String(item.leadTimeDays).trim()}d` : ""}
           </div>
 
-          {/* Bin / Reorder back (big & bold) */}
+          {/* Bin / Reorder (big & bold, preserves 0) */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "#6b7280" }}>Bin Qty (units)</div>
