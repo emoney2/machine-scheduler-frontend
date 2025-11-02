@@ -6,72 +6,89 @@ const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
 export default function KanbanScan() {
   const [sp] = useSearchParams();
-  const id = sp.get("id") || "";
-  const qtyStr = sp.get("qty") || "1";
-  const qty = Math.max(1, parseInt(qtyStr, 10) || 1);
+  const id = (sp.get("id") || "").trim();
+  const qty = (sp.get("qty") || "1").trim();
 
-  const [status, setStatus] = useState("working"); // working | ok | err
-  const [msg, setMsg] = useState("");
+  const [status, setStatus] = useState("Working…");
+  const [itemName, setItemName] = useState("");
+  const [err, setErr] = useState("");
 
   useEffect(() => {
     const run = async () => {
       if (!id) {
-        setStatus("err");
-        setMsg("Missing id parameter.");
+        setErr("Missing id parameter.");
+        setStatus("");
         return;
       }
       try {
-        // Try without credentials first (so anyone can scan)
-        let r = await fetch(`${BACKEND}/api/kanban/request`, {
+        // Optional: fetch item to show friendly name
+        try {
+          const rItem = await fetch(`${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(id)}`, {
+            credentials: "omit", // public
+          });
+          if (rItem.ok) {
+            const j = await rItem.json();
+            const item = j?.item || {};
+            const name = item["Item Name"] || item.itemName || "";
+            setItemName(name);
+          }
+        } catch {}
+
+        // Post REQUEST row (public — no login)
+        const r = await fetch(`${BACKEND}/api/kanban/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "omit", // <-- IMPORTANT: public
           body: JSON.stringify({ kanbanId: id, qty }),
         });
 
-        // If backend requires auth, one retry with credentials included
-        if (r.status === 401) {
-          r = await fetch(`${BACKEND}/api/kanban/request`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ kanbanId: id, qty }),
-          });
+        if (!r.ok) {
+          const t = await r.text().catch(() => "");
+          throw new Error(`HTTP ${r.status} ${t}`);
         }
 
-        const txt = await r.text();
-        if (!r.ok) throw new Error(txt || `HTTP ${r.status}`);
-
-        setStatus("ok");
-        setMsg("Request added to the queue.");
+        const j = await r.json().catch(() => ({}));
+        if (j && j.ok) {
+          setStatus("Added to queue ✅");
+        } else {
+          setStatus("");
+          setErr(j?.error || "Unknown error");
+        }
       } catch (e) {
-        setStatus("err");
-        setMsg(String(e));
+        setStatus("");
+        setErr(String(e?.message || e));
       }
     };
     run();
   }, [id, qty]);
 
   return (
-    <div style={{ padding: 24, display: "grid", gap: 12 }}>
-      <h1 style={{ margin: 0 }}>Kanban Scan</h1>
-      <div>ID: <b>{id || "—"}</b> • Qty: <b>{qty}</b></div>
+    <div style={{ padding: 24, maxWidth: 520 }}>
+      <h1 style={{ margin: 0, fontSize: 22 }}>Kanban Scan</h1>
+      <div style={{ marginTop: 6, color: "#6b7280" }}>
+        This page logs a reorder request directly from a QR scan.
+      </div>
 
-      {status === "working" && <div>Submitting request…</div>}
-      {status === "ok" && (
-        <div style={{ color: "#065f46", background: "#ecfdf5", border: "1px solid #a7f3d0", padding: 12, borderRadius: 8 }}>
-          ✅ {msg}
+      <div style={{ marginTop: 16, border: "1px solid #e5e7eb", borderRadius: 8, padding: 12 }}>
+        <div style={{ fontWeight: 800 }}>
+          {itemName ? `Item: ${itemName}` : "Item"} ({id || "—"})
         </div>
-      )}
-      {status === "err" && (
-        <div style={{ color: "#991b1b", background: "#fef2f2", border: "1px solid #fecaca", padding: 12, borderRadius: 8, whiteSpace: "pre-wrap" }}>
-          ❌ Could not add request.
-          {"\n"}{msg}
-          {"\n\n"}If your backend requires login, sign in first and scan again.
-        </div>
-      )}
+        <div style={{ marginTop: 4 }}>Quantity: <strong>{qty}</strong></div>
+        {status && (
+          <div style={{ marginTop: 12, padding: 8, borderRadius: 8, background: "#ecfdf5", border: "1px solid #10b981", color: "#065f46" }}>
+            {status}
+          </div>
+        )}
+        {err && (
+          <div style={{ marginTop: 12, padding: 8, borderRadius: 8, background: "#fef2f2", border: "1px solid #ef4444", color: "#991b1b", whiteSpace: "pre-wrap" }}>
+            Error: {err}
+          </div>
+        )}
+      </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+      <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
         <Link to="/kanban/queue">← Back to Queue</Link>
+        <a href={`/kanban/preview/${encodeURIComponent(id)}`}>View Card</a>
       </div>
     </div>
   );
