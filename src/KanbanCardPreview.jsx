@@ -121,14 +121,37 @@ export default function KanbanCardPreview() {
   if (!item) return <div style={{ padding: 24 }}>Loading…</div>;
 
   // Short Order QR → /kanban/go?to=... (tiny QR) → immediately redirects to vendor URL/mailto
+  // (existing)
   const orderTarget = item.orderMethod === "Email"
     ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
     : (item.orderUrl || "");
-  // Use a super short link that only carries the ID; /kanban/go will look up and redirect
-  const shortOrderUrl = `${APP_ORIGIN}/kanban/go?id=${encodeURIComponent(item.kanbanId)}`;
+
+  // NEW: ask backend to shorten the real URL, then use that in the QR
+  const [shortOrderUrl, setShortOrderUrl] = useState("");
+
+  useEffect(() => {
+    if (!orderTarget) { setShortOrderUrl(""); return; }
+    fetch(`${BACKEND}/api/util/shorten?url=${encodeURIComponent(orderTarget)}`)
+      .then(r => r.json())
+      .then(j => setShortOrderUrl(j.short || orderTarget))
+      .catch(() => setShortOrderUrl(orderTarget));
+  }, [orderTarget]);
 
 
-  const reorderScanUrl = `${APP_ORIGIN}/kanban/scan-public?id=${encodeURIComponent(item.kanbanId)}&qty=1`;
+  // Replace placeholders with YOUR Form IDs:
+  // Google Form details for direct submit (no login)
+  const GOOGLE_FORM_ID = "1FAIpQLScsQeFaR22LNHcSZWbqwtNSBQU-j5MJdbxK1AA3cF-yBBxutA";
+
+  // Map your form fields (swap these two if you find they’re reversed)
+  const ENTRY_KANBAN = "entry.1189949378";  // Kanban ID field
+  const ENTRY_QTY    = "entry.312175649";   // Quantity field
+
+  // Direct-submit URL to Google Forms (uses /formResponse)
+  const reorderScanUrl =
+    `https://docs.google.com/forms/d/e/${GOOGLE_FORM_ID}/formResponse` +
+    `?${ENTRY_KANBAN}=${encodeURIComponent(item.kanbanId)}` +
+    `&${ENTRY_QTY}=1` +
+    `&submit=Submit`;
 
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
@@ -255,10 +278,11 @@ export default function KanbanCardPreview() {
           {/* generate at 180px for a cleaner, easier-to-scan code, but render at 100×100 */}
           <img
             alt="Order QR"
-            src={makeQr(shortOrderUrl, 180)}
+            src={makeQr(shortOrderUrl || orderTarget, 180)}
             style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
+
         </div>
 
         <div
