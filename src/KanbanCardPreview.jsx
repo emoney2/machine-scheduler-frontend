@@ -4,7 +4,6 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
-// App origin for building short redirect / public scan links
 const APP_ORIGIN =
   typeof window !== "undefined" && window.location?.origin
     ? (window.location.origin.includes("netlify.app")
@@ -12,20 +11,17 @@ const APP_ORIGIN =
         : window.location.origin)
     : "https://machineschedule.netlify.app";
 
-// Generate a QR code image (use short/clean URLs when possible)
 const makeQr = (data, size = 160) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&qzone=1&data=${encodeURIComponent(
-    data
+    data || ""
   )}`;
 
-// Only show "—" when truly empty/null/undefined (preserve 0)
 function showVal(v) {
   if (v === null || v === undefined) return "—";
   const s = String(v);
   return s.trim() === "" ? "—" : s;
 }
 
-// Location color map (case-insensitive)
 function getLocationStyles(locKey) {
   const k = (locKey || "").toLowerCase().trim();
   const COLORS = {
@@ -42,7 +38,6 @@ function getLocationStyles(locKey) {
   };
   let bg = COLORS.light;
   let text = COLORS.text;
-
   if (k === "kitchen") { bg = COLORS.black; text = COLORS.white; }
   else if (k === "cut") { bg = COLORS.gray; }
   else if (k === "fur") { bg = COLORS.royal; }
@@ -50,7 +45,6 @@ function getLocationStyles(locKey) {
   else if (k === "sewing") { bg = COLORS.purple; }
   else if (k === "shipping") { bg = COLORS.orange; }
   else if (k === "embroidery") { bg = COLORS.teal; }
-
   return { bg, text };
 }
 
@@ -65,7 +59,7 @@ export default function KanbanCardPreview() {
       try {
         const r = await fetch(
           `${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(kanbanId)}`,
-          { credentials: "include" }
+          { credentials: "omit" }
         );
         if (!r.ok) {
           const t = await r.text().catch(() => "");
@@ -74,13 +68,11 @@ export default function KanbanCardPreview() {
         const j = await r.json();
         if (!j?.item) throw new Error("Item not found (empty payload)");
 
-        // --- KEY NORMALIZER (handles odd spacing/characters) ---
+        // Key normalizer: crush weird spaces/characters
         const raw = j.item;
         const normKey = (k) => String(k || "").toLowerCase().replace(/[^a-z0-9]/g, "");
         const nmap = {};
-        Object.keys(raw).forEach((k) => {
-          nmap[normKey(k)] = raw[k];
-        });
+        Object.keys(raw).forEach((k) => { nmap[normKey(k)] = raw[k]; });
         const pick = (...aliases) => {
           for (const a of aliases) {
             const v = nmap[normKey(a)];
@@ -90,34 +82,24 @@ export default function KanbanCardPreview() {
         };
 
         const normalized = {
-          kanbanId:        pick("Kanban ID", "kanbanId"),
-          itemName:        pick("Item Name", "itemName"),
-          sku:             pick("SKU", "sku"),
-          location:        pick("Location", "location"),
-          packageSize:     pick("Package Size", "packageSize"),
-          leadTimeDays:    String(pick("Lead Time (days)", "leadTimeDays", "leadTime")).trim(),
+          kanbanId:        pick("Kanban ID","kanbanId"),
+          itemName:        pick("Item Name","itemName"),
+          sku:             pick("SKU","sku"),
+          location:        pick("Location","location"),
+          packageSize:     pick("Package Size","packageSize"),
+          leadTimeDays:    String(pick("Lead Time (days)","leadTimeDays","leadTime")).trim(),
 
-          // ✅ Your exact headers + fallbacks
-          binQtyUnits:     pick("Bin Qty (units)", "Bin Quantity (units)", "binQtyUnits", "binQty", "binQuantity"),
-          reorderQtyBasis: pick("Reorder Qty (basis)", "reorderQtyBasis", "reorderQty"),
+          // 👇 Your exact headers with multiple fallbacks
+          binQtyUnits:     pick("Bin Qty (units)","Bin Quantity (units)","binQtyUnits","binQty","binQuantity"),
+          reorderQtyBasis: pick("Reorder Qty (basis)","reorderQtyBasis","reorderQty"),
 
-          orderMethod:     pick("Order Method (Email/Online)", "orderMethod"),
-          orderUrl:        pick("Order URL", "orderUrl"),
-          orderEmail:      pick("Order Email", "orderEmail"),
-          photoUrl:        pick("Photo URL", "photoUrl"),
+          orderMethod:     pick("Order Method (Email/Online)","orderMethod"),
+          orderUrl:        pick("Order URL","orderUrl"),
+          orderEmail:      pick("Order Email","orderEmail"),
+          photoUrl:        pick("Photo URL","photoUrl"),
         };
 
         setItem({ ...normalized, _debugRaw: raw });
-
-        // Optional: log preview
-        try {
-          await fetch(`${BACKEND}/api/kanban/log-card`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ kanbanId: normalized.kanbanId }),
-          });
-        } catch {}
       } catch (e) {
         setErr(String(e?.message || e));
       }
@@ -138,16 +120,14 @@ export default function KanbanCardPreview() {
   }
   if (!item) return <div style={{ padding: 24 }}>Loading…</div>;
 
-  // Order QR → short app redirect (for scannability), then to vendor URL
+  // Short Order QR → /kanban/go?to=... (tiny QR) → immediately redirects to vendor URL/mailto
   const orderTarget = item.orderMethod === "Email"
     ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
     : (item.orderUrl || "");
-
   const shortOrderUrl = orderTarget
     ? `${APP_ORIGIN}/kanban/go?to=${encodeURIComponent(orderTarget)}`
     : `${APP_ORIGIN}/kanban/go`;
 
-  // Public success page for reorder (no login)
   const reorderScanUrl = `${APP_ORIGIN}/kanban/scan-public?id=${encodeURIComponent(item.kanbanId)}&qty=1`;
 
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
@@ -169,8 +149,8 @@ export default function KanbanCardPreview() {
           border: "2px solid #111827",
           borderRadius: 12,
           background: "white",
-          boxSizing: "border-box",         // keep padding inside 4x6
-          padding: "12px 12px 150px 12px", // extra bottom space for corner QRs
+          boxSizing: "border-box",
+          padding: "12px 12px 150px 12px", // bottom space for QR corners
           display: "grid",
           gridTemplateRows: "auto auto 1fr",
           gap: 8,
@@ -183,7 +163,7 @@ export default function KanbanCardPreview() {
           KANBAN CARD
         </div>
 
-        {/* Location banner (full width, centered, NO label) */}
+        {/* Location banner */}
         <div
           style={{
             background: locBg,
@@ -200,7 +180,7 @@ export default function KanbanCardPreview() {
 
         {/* Body */}
         <div style={{ display: "grid", gap: 8 }}>
-          {/* BIG centered image */}
+          {/* Big centered image */}
           <div style={{ display: "grid", justifyItems: "center" }}>
             {item.photoUrl ? (
               <img
@@ -238,13 +218,13 @@ export default function KanbanCardPreview() {
             {showVal(item.itemName)}
           </div>
 
-          {/* Package size + Lead (if present) */}
+          {/* Package size + Lead */}
           <div style={{ fontSize: 12, color: "#111827", textAlign: "center" }}>
             {showVal(item.packageSize)}
             {item.leadTimeDays ? ` • Lead: ${String(item.leadTimeDays).trim()}d` : ""}
           </div>
 
-          {/* Bin / Reorder (big & bold, preserves 0) */}
+          {/* Bin / Reorder */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "#6b7280" }}>Bin Qty (units)</div>
@@ -257,7 +237,7 @@ export default function KanbanCardPreview() {
           </div>
         </div>
 
-        {/* Corner QR codes — smaller, far apart, on top of everything */}
+        {/* Corner QRs */}
         <div
           style={{
             position: "absolute",
@@ -274,11 +254,12 @@ export default function KanbanCardPreview() {
           <div style={{ fontWeight: 800, fontSize: 11, textAlign: "center" }}>Order Page</div>
           <img
             alt="Order QR"
-            src={makeQr(shortOrderUrl, 140)}
+            // generate at 180px for a cleaner, easier-to-scan code, but render at 100×100
+            src={makeQr(shortOrderUrl, 180)}
             style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
-        </div>
+
 
         <div
           style={{
@@ -303,7 +284,7 @@ export default function KanbanCardPreview() {
         </div>
       </div>
 
-      {/* Debug panel (only shows if ?debug=1) */}
+      {/* Debug panel (add ?debug=1 to URL) */}
       {typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("debug") === "1" ? (
         <pre
@@ -322,7 +303,6 @@ export default function KanbanCardPreview() {
         </pre>
       ) : null}
 
-      {/* print styles */}
       <style>{`
         @media print {
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
