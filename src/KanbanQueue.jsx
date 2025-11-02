@@ -169,192 +169,224 @@ export default function KanbanQueue() {
         {grouped.all.length === 0 ? (
           <div style={{ marginTop: 16, color: "#6b7280" }}>No open requests.</div>
         ) : (
-          <div style={{ marginTop: 16, overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-              <thead style={{ background: "#f3f4f6" }}>
-                <tr>
-                  <Th>Time</Th>
-                  <Th>Kanban ID</Th>
-                  <Th>Item</Th>
-                  <Th>Qty</Th>
-                  <Th>Supplier</Th>
-                  <Th>Method</Th>
-                  <Th>Order Link / Email</Th>
-                  <Th>Requested By</Th>
-                  <Th>Status</Th>
-                  <Th>Actions</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {grouped.all.map((r) => {
-                  const status = statusForRow(r);
-                  const isOpen = status === "open";
-                  const rowStyle = {
-                    borderTop: "1px solid #e5e7eb",
-                    background: isOpen ? "rgba(254, 243, 199, 0.55)" : "#f8fafc",
-                  };
-                  const leftBarStyle = {
-                    width: 4,
-                    background: isOpen ? "#f59e0b" : "#cbd5e1",
-                  };
-                  return (
-                    <tr
-                      key={r["Event ID"] || `${r["Kanban ID"]}-${r["Timestamp"]}`}
-                      style={rowStyle}
+          <div style={{ marginTop: 16 }}>
+            {/* Card list (no horizontal scroll) */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {grouped.all.map((r) => {
+                const status = statusForRow(r);
+                const isOpen = status === "open";
+
+                return (
+                  <div
+                    key={r["Event ID"] || `${r["Kanban ID"]}-${r["Timestamp"]}`}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 10,
+                      background: isOpen ? "rgba(254, 243, 199, 0.55)" : "#f8fafc",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* accent bar */}
+                    <div
+                      style={{
+                        height: 4,
+                        background: isOpen ? "#f59e0b" : "#cbd5e1",
+                      }}
+                    />
+
+                    {/* content */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        gap: 12,
+                        padding: 12,
+                      }}
                     >
-                      {/* left emphasis bar */}
-                      <td style={{ padding: 0, width: 4 }}>
-                        <div style={leftBarStyle} />
-                      </td>
+                      {/* left info stack */}
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {/* top row: time + status badge */}
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <div style={{ color: "#374151", fontSize: 12 }}>
+                            {formatWhen(r["Timestamp"])}
+                          </div>
+                          {status === "open" ? (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                background: "#fde68a",
+                                color: "#78350f",
+                              }}
+                            >
+                              Needs Order
+                            </span>
+                          ) : status === "ordered" ? (
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                background: "#bfdbfe",
+                                color: "#1e3a8a",
+                              }}
+                            >
+                              Ordered
+                            </span>
+                          ) : null}
+                        </div>
 
-                      {/* Time */}
-                      <Td>{formatWhen(r["Timestamp"])}</Td>
-
-                      {/* Kanban ID */}
-                      <Td mono>{r["Kanban ID"]}</Td>
-
-                      {/* Item (image + info) */}
-                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
-                        <div style={{ display: "flex", alignItems: "center" }}>
+                        {/* main row: photo + name/sku + details */}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "auto 1fr",
+                            gap: 12,
+                            alignItems: "center",
+                          }}
+                        >
                           {r["Photo URL"] ? (
                             <img
                               src={r["Photo URL"]}
                               alt=""
                               style={{
-                                width: 40,
-                                height: 40,
+                                width: 56,
+                                height: 56,
                                 objectFit: "cover",
-                                borderRadius: 6,
+                                borderRadius: 8,
                                 border: "1px solid #e5e7eb",
-                                marginRight: 12,
                               }}
                             />
-                          ) : null}
-                          <div>
-                            <div style={{ fontWeight: 600 }}>
+                          ) : (
+                            <div
+                              style={{
+                                width: 56,
+                                height: 56,
+                                borderRadius: 8,
+                                border: "1px dashed #e5e7eb",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "#9ca3af",
+                                fontSize: 12,
+                              }}
+                            >
+                              No photo
+                            </div>
+                          )}
+
+                          <div style={{ display: "grid", gap: 4 }}>
+                            <div style={{ fontWeight: 700 }}>
                               {r["Item Name"] || "(unnamed)"}
                             </div>
-                            <div style={{ fontSize: 12, color: "#6b7280" }}>{r["SKU"]}</div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#6b7280",
+                                fontFamily:
+                                  'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                              }}
+                            >
+                              {r["SKU"]}
+                            </div>
+
+                            {/* metadata chips */}
+                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                              <Chip label="Kanban" value={r["Kanban ID"]} mono />
+                              <Chip label="Qty" value={r["Event Qty"]} mono />
+                              <Chip label="Supplier" value={r["Supplier"]} />
+                              <Chip label="Method" value={r["Order Method"]} />
+                              <Chip label="Requested By" value={r["Requested By"] || "Public Scanner"} />
+                            </div>
                           </div>
                         </div>
-                      </td>
 
-                      {/* Qty */}
-                      <Td mono>{r["Event Qty"]}</Td>
-
-                      {/* Supplier */}
-                      <Td>{r["Supplier"]}</Td>
-
-                      {/* Method */}
-                      <Td>{r["Order Method"]}</Td>
-
-                      {/* Order link / email */}
-                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
-                        {r["Order Method"] === "Email" ? (
-                          <a
-                            href={`mailto:${r["Order Email"] || ""}`}
-                            style={{ color: "#2563eb", textDecoration: "underline" }}
-                          >
-                            {r["Order Email"] || "(missing email)"}
-                          </a>
-                        ) : (
-                          <a
-                            href={r["Order URL"] || "#"}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              color: "#2563eb",
-                              textDecoration: "underline",
-                              wordBreak: "break-all",
-                            }}
-                          >
-                            {r["Order URL"] || "(missing link)"}
-                          </a>
-                        )}
-                      </td>
-
-                      {/* Requested By */}
-                      <Td>{r["Requested By"] || "Public Scanner"}</Td>
-
-                      {/* Status badge */}
-                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
-                        {status === "open" ? (
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "2px 8px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              background: "#fde68a",
-                              color: "#78350f",
-                            }}
-                          >
-                            Needs Order
-                          </span>
-                        ) : status === "ordered" ? (
-                          <span
-                            style={{
-                              display: "inline-block",
-                              padding: "2px 8px",
-                              borderRadius: 999,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              background: "#bfdbfe",
-                              color: "#1e3a8a",
-                            }}
-                          >
-                            Ordered
-                          </span>
-                        ) : (
-                          ""
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          {status === "open" && (
-                            <button
-                              onClick={() => markOrdered(r["Event ID"])}
-                              title="Append ORDERED row and mark this request as Ordered"
-                              style={{
-                                padding: "6px 10px",
-                                borderRadius: 6,
-                                border: "1px solid #111827",
-                                background: "#111827",
-                                color: "white",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
+                        {/* link/email row */}
+                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                          {r["Order Method"] === "Email" ? (
+                            <a
+                              href={`mailto:${r["Order Email"] || ""}`}
+                              style={{ color: "#2563eb", textDecoration: "underline" }}
                             >
-                              Mark Ordered
-                            </button>
-                          )}
-                          {status === "ordered" && (
-                            <button
-                              onClick={() => markReceived(r["Event ID"])}
-                              title="Append RECEIVED row and close this request"
-                              style={{
-                                padding: "6px 10px",
-                                borderRadius: 6,
-                                border: "1px solid #e5e7eb",
-                                background: "white",
-                                color: "#111827",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
+                              {r["Order Email"] || "(missing email)"}
+                            </a>
+                          ) : (
+                            <a
+                              href={r["Order URL"] || "#"}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ color: "#2563eb", textDecoration: "underline", wordBreak: "break-all" }}
                             >
-                              Mark Received
-                            </button>
+                              {r["Order URL"] || "(missing link)"}
+                            </a>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </div>
+
+                      {/* right actions */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "flex-end",
+                          gap: 8,
+                          minWidth: 180,
+                        }}
+                      >
+                        {status === "open" && (
+                          <button
+                            onClick={() => markOrdered(r["Event ID"])}
+                            title="Append ORDERED row and mark this request as Ordered"
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: 8,
+                              border: "1px solid #111827",
+                              background: "#111827",
+                              color: "white",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Mark Ordered
+                          </button>
+                        )}
+                        {status === "ordered" && (
+                          <button
+                            onClick={() => markReceived(r["Event ID"])}
+                            title="Append RECEIVED row and close this request"
+                            style={{
+                              padding: "8px 12px",
+                              borderRadius: 8,
+                              border: "1px solid #e5e7eb",
+                              background: "white",
+                              color: "#111827",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Mark Received
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -367,35 +399,35 @@ export default function KanbanQueue() {
   );
 }
 
-function Th({ children }) {
+function Chip({ label, value, mono }) {
+  if (!value) return null;
   return (
-    <th
+    <span
+      title={`${label}: ${value}`}
       style={{
-        textAlign: "left",
-        padding: "8px 12px",
-        borderBottom: "1px solid #e5e7eb",
-        fontWeight: 600,
-        whiteSpace: "nowrap",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "2px 8px",
+        borderRadius: 999,
+        border: "1px solid #e5e7eb",
+        background: "white",
+        color: "#374151",
+        fontSize: 12,
       }}
     >
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, mono }) {
-  return (
-    <td
-      style={{
-        padding: "8px 12px",
-        verticalAlign: "top",
-        fontFamily: mono
-          ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
-          : "inherit",
-      }}
-    >
-      {children}
-    </td>
+      <span style={{ color: "#6b7280" }}>{label}:</span>
+      <span
+        style={{
+          fontFamily: mono
+            ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+            : "inherit",
+          fontWeight: 600,
+        }}
+      >
+        {value}
+      </span>
+    </span>
   );
 }
 
