@@ -283,6 +283,7 @@ export default function KanbanCardPreview() {
           />
         </div>
 
+      </div> {/* CLOSE: .card */}
 
       {/* Debug panel (add ?debug=1 to URL) */}
       {typeof window !== "undefined" &&
