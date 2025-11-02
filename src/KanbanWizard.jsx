@@ -86,6 +86,41 @@ export default function KanbanWizard() {
   function next() { setStep((s) => Math.min(6, s + 1)); }
   function back() { setStep((s) => Math.max(1, s - 1)); }
 
+  // --- NEW: Prefill from URL using backend scraper ---
+  async function prefillFromUrl() {
+    try {
+      let u = (url || "").trim();
+      if (!u) {
+        alert("Enter a product URL first.");
+        return;
+      }
+      // Normalize schemeless URLs (e.g., amazon.com/...) to https://
+      if (!/^https?:\/\//i.test(u)) {
+        u = "https://" + u;
+        setUrl(u); // update field so the saved Kanban uses canonical form
+      }
+
+      const resp = await fetch(`${BACKEND}/api/kanban/scrape?url=${encodeURIComponent(u)}`, {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok || !data.ok) {
+        alert(`Prefill failed: ${data.error || `HTTP ${resp.status}`}`);
+        return;
+      }
+
+      // Apply scraped values if present
+      if (data.title && !itemName) setItemName(data.title);
+      if (data.image && !photoUrl) setPhotoUrl(data.image);
+      if (data.price && !costPerPkg) setCostPerPkg(data.price.replace(/^\$/, "")); // keep number only in field
+      if (data.canonical && data.canonical !== url) setUrl(data.canonical);
+    } catch (e) {
+      alert(`Prefill error: ${e}`);
+    }
+  }
+
   async function save() {
     const payload = {
       kanbanId,
@@ -144,53 +179,40 @@ export default function KanbanWizard() {
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>How do you order this?</h2>
               <div style={{ display: "grid", gap: 10 }}>
-                <label>
-                  <input
-                    type="radio"
-                    name="meth"
-                    checked={orderMethod === "Online"}
-                    onChange={() => setOrderMethod("Online")}
-                    style={{ marginRight: 8 }}
-                  />
-                  Online (URL)
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="meth"
-                    checked={orderMethod === "Email"}
-                    onChange={() => setOrderMethod("Email")}
-                    style={{ marginRight: 8 }}
-                  />
-                  Email
-                </label>
+                <div style={{ display: "flex", gap: 16 }}>
+                  <label>
+                    <input
+                      type="radio"
+                      name="meth"
+                      checked={orderMethod === "Online"}
+                      onChange={() => setOrderMethod("Online")}
+                      style={{ marginRight: 8 }}
+                    />
+                    Online (URL)
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="meth"
+                      checked={orderMethod === "Email"}
+                      onChange={() => setOrderMethod("Email")}
+                      style={{ marginRight: 8 }}
+                    />
+                    Email
+                  </label>
+                </div>
 
-                {orderMethod === "Online" ? (
-                  <div>
+                {orderMethod === "Online" && (
+                  <div style={{ display: "grid", gap: 8 }}>
                     <div style={{ marginTop: 12, fontWeight: 600 }}>Product URL</div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <input
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        placeholder="https://vendor.com/product"
-                        style={{ ...inp, flex: 1 }}
-                      />
-                      <button
-                        id="kanban-prefill-btn"
-                        type="button"
-                        onClick={prefillFromUrl}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 8,
-                          border: "1px solid #111827",
-                          background: "#111827",
-                          color: "white",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                        title="Scrape title / image / price from the product page"
-                      >
+                    <input
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="https://vendor.com/product"
+                      style={inp}
+                    />
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <button type="button" onClick={prefillFromUrl} style={btnSecondary}>
                         Prefill from URL
                       </button>
                     </div>
@@ -198,20 +220,10 @@ export default function KanbanWizard() {
                       The prefill grabs the page’s title, a product image, approximate price, and canonical URL.
                     </p>
                   </div>
-                ) : (
-                  <div>
-                    <div style={{ marginTop: 12, fontWeight: 600 }}>Order Email</div>
-                    <input
-                      value={orderEmail}
-                      onChange={(e) => setOrderEmail(e.target.value)}
-                      placeholder="purchasing@vendor.com"
-                      style={inp}
-                    />
-                  </div>
                 )}
 
-                ) : (
-                  <div>
+                {orderMethod === "Email" && (
+                  <div style={{ display: "grid", gap: 8 }}>
                     <div style={{ marginTop: 12, fontWeight: 600 }}>Order Email</div>
                     <input
                       value={orderEmail}
@@ -224,6 +236,7 @@ export default function KanbanWizard() {
               </div>
             </div>
           )}
+
 
           {step === 2 && (
             <div>
