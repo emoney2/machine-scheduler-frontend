@@ -13,13 +13,37 @@ export default function KanbanCardPreview() {
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await fetch(`${BACKEND}/api/kanban/get-item?kanbanId=${encodeURIComponent(kanbanId)}`, {
-          credentials: "include",
-        });
+        const r = await fetch(
+          `${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(kanbanId)}`,
+          { credentials: "include" }
+        );
+
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
         if (!j || !j.item) throw new Error("Item not found");
-        setItem(j.item);
+
+        // normalize keys from either camelCase or sheet headers
+        function norm(it) {
+          return {
+            kanbanId: it["Kanban ID"] ?? it.kanbanId ?? kanbanId,
+            itemName: it["Item Name"] ?? it.itemName ?? "",
+            sku: it["SKU"] ?? it.sku ?? "",
+            dept: it["Dept"] ?? it.dept ?? "",
+            category: it["Category"] ?? it.category ?? "",
+            location: it["Location"] ?? it.location ?? "",
+            packageSize: it["Package Size"] ?? it.packageSize ?? "",
+            leadTimeDays: it["Lead Time (days)"] ?? it.leadTimeDays ?? "",
+            binQtyUnits: it["Bin Qty (units)"] ?? it.binQtyUnits ?? "",
+            reorderQtyBasis: it["Reorder Qty (basis)"] ?? it.reorderQtyBasis ?? "",
+            orderMethod: it["Order Method (Email/Online)"] ?? it.orderMethod ?? "",
+            orderUrl: it["Order URL"] ?? it.orderUrl ?? "",
+            orderEmail: it["Order Email"] ?? it.orderEmail ?? "",
+            photoUrl: it["Photo URL"] ?? it.photoUrl ?? "",
+          };
+        }
+
+        setItem(norm(j.item));
+
       } catch (e) {
         setErr(String(e));
       }
@@ -64,7 +88,10 @@ export default function KanbanCardPreview() {
       >
         {/* Header */}
         <div style={{ fontWeight: 800, fontSize: 18 }}>KANBAN CARD</div>
-        <div style={{ fontSize: 12, color: "#374151" }}>{item["Dept"]} • {item["Category"] || "Supplies"}</div>
+        <div style={{ fontSize: 12, color: "#374151" }}>
+          {item.dept} {item.category ? `• ${item.category}` : ""}
+        </div>
+
 
         {/* Body */}
         <div style={{ display: "grid", gap: 8 }}>
@@ -94,31 +121,33 @@ export default function KanbanCardPreview() {
             )}
 
             <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ fontWeight: 800, fontSize: 16 }}>{item["Item Name"]}</div>
-              <div style={{ fontSize: 12, color: "#6b7280" }}>{item["SKU"] || ""}</div>
+              <div style={{ fontWeight: 800, fontSize: 16 }}>{item.itemName}</div>
+              <div style={{ fontSize: 12, color: "#6b7280" }}>{item.sku || ""}</div>
               <div style={{ fontSize: 12, color: "#374151" }}>
-                {item["Package Size"]} • Lead: {item["Lead Time (days)"]}d
+                {item.packageSize} • Lead: {item.leadTimeDays}d
               </div>
-              {item["Location"] ? (
-                <div style={{ fontSize: 12, color: "#374151" }}>Location: {item["Location"]}</div>
+              {item.location ? (
+                <div style={{ fontSize: 12, color: "#374151" }}>Location: {item.location}</div>
               ) : null}
+
             </div>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <Field label="Bin Qty (units)" value={item["Bin Qty (units)"]} />
-            <Field label="Reorder Qty (basis)" value={item["Reorder Qty (basis)"]} />
+            <Field label="Bin Qty (units)" value={item.binQtyUnits} />
+            <Field label="Reorder Qty (basis)" value={item.reorderQtyBasis} />
           </div>
 
           <div style={{ fontSize: 12 }}>
-            Order via: <b>{item["Order Method (Email/Online)"]}</b>
+            Order via: <b>{item.orderMethod}</b>
             {" — "}
-            {item["Order Method (Email/Online)"] === "Online" ? (
-              <span style={{ wordBreak: "break-all" }}>{item["Order URL"]}</span>
+            {item.orderMethod === "Online" ? (
+              <span style={{ wordBreak: "break-all" }}>{item.orderUrl}</span>
             ) : (
-              <span>{item["Order Email"]}</span>
+              <span>{item.orderEmail}</span>
             )}
           </div>
+
         </div>
 
         {/* QR footer */}
