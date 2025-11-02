@@ -37,89 +37,9 @@ export default function KanbanWizard() {
 
   const kanbanId = useMemo(() => makeKanbanId(dept, category, sku), [dept, category, sku]);
 
-  // Prefill fields by scraping the product page
-  async function prefillFromUrl() {
-    const u = (url || "").trim();
-    if (!u) {
-      alert("Please paste a product URL first.");
-      return;
-    }
-    try {
-      // Optional: simple loading state via button disabled text
-      const btn = document.getElementById("kanban-prefill-btn");
-      if (btn) { btn.disabled = true; btn.textContent = "Prefilling…"; }
 
-      const qs = new URLSearchParams({ url: u });
-      const r = await fetch(`${BACKEND}/api/kanban/scrape?${qs}`, {
-        method: "GET",
-        credentials: "include",
-      });
-      const j = await r.json();
-
-      if (!r.ok || !j.ok) {
-        throw new Error(j?.error || `Failed to scrape (HTTP ${r.status})`);
-      }
-
-      // Map result to our fields
-      if (j.title) setItemName((prev) => prev || j.title);
-      if (j.image) setPhotoUrl((prev) => prev || j.image);
-      if (j.price) setCostPerPkg((prev) => prev || String(j.price));
-      if (j.canonical) setUrl(j.canonical);
-
-      // Heuristic: if itemName still blank, suggest deriving from URL
-      if (!itemName && !j.title) {
-        try {
-          const urlObj = new URL(u);
-          const slug = (urlObj.pathname || "").split("/").filter(Boolean).pop() || "";
-          if (slug) setItemName(slug.replace(/[-_]+/g, " "));
-        } catch {}
-      }
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      const btn = document.getElementById("kanban-prefill-btn");
-      if (btn) { btn.disabled = false; btn.textContent = "Prefill from URL"; }
-    }
-  }
-
-
-  function next() { setStep((s) => Math.min(6, s + 1)); }
+  function next() { setStep((s) => Math.min(3, s + 1)); }
   function back() { setStep((s) => Math.max(1, s - 1)); }
-
-  // --- NEW: Prefill from URL using backend scraper ---
-  async function prefillFromUrl() {
-    try {
-      let u = (url || "").trim();
-      if (!u) {
-        alert("Enter a product URL first.");
-        return;
-      }
-      // Normalize schemeless URLs (e.g., amazon.com/...) to https://
-      if (!/^https?:\/\//i.test(u)) {
-        u = "https://" + u;
-        setUrl(u); // update field so the saved Kanban uses canonical form
-      }
-
-      const resp = await fetch(`${BACKEND}/api/kanban/scrape?url=${encodeURIComponent(u)}`, {
-        method: "GET",
-        credentials: "include",
-      });
-      const data = await resp.json().catch(() => ({}));
-
-      if (!resp.ok || !data.ok) {
-        alert(`Prefill failed: ${data.error || `HTTP ${resp.status}`}`);
-        return;
-      }
-
-      // Apply scraped values if present
-      if (data.title && !itemName) setItemName(data.title);
-      if (data.image && !photoUrl) setPhotoUrl(data.image);
-      if (data.price && !costPerPkg) setCostPerPkg(data.price.replace(/^\$/, "")); // keep number only in field
-      if (data.canonical && data.canonical !== url) setUrl(data.canonical);
-    } catch (e) {
-      alert(`Prefill error: ${e}`);
-    }
-  }
 
   async function save() {
     const payload = {
@@ -169,142 +89,84 @@ export default function KanbanWizard() {
       </div>
 
       {/* Stepper */}
-      <p style={{ color: "#6b7280", marginTop: 6 }}>Step {step} of 6</p>
+      <p style={{ color: "#6b7280", marginTop: 6 }}>Step {step} of 3</p>
 
       <div style={{ marginTop: 16, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
-        <div style={{ height: 4, background: "#111827", width: `${(step/6)*100}%` }} />
+        <div style={{ height: 4, background: "#111827", width: `${(step/3)*100}%` }} />
 
         <div style={{ padding: 16, display: "grid", gap: 14 }}>
           {step === 1 && (
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>How do you order this?</h2>
-              <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ display: "flex", gap: 16 }}>
-                  <label>
-                    <input
-                      type="radio"
-                      name="meth"
-                      checked={orderMethod === "Online"}
-                      onChange={() => setOrderMethod("Online")}
-                      style={{ marginRight: 8 }}
-                    />
-                    Online (URL)
-                  </label>
-                  <label>
-                    <input
-                      type="radio"
-                      name="meth"
-                      checked={orderMethod === "Email"}
-                      onChange={() => setOrderMethod("Email")}
-                      style={{ marginRight: 8 }}
-                    />
-                    Email
-                  </label>
-                </div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12 }}>How do you order this?</h2>
 
-                {orderMethod === "Online" && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ marginTop: 12, fontWeight: 600 }}>Product URL</div>
-                    <input
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://vendor.com/product"
-                      style={inp}
-                    />
-                    <div style={{ display: "flex", gap: 10 }}>
-                      <button type="button" onClick={prefillFromUrl} style={btnSecondary}>
-                        Prefill from URL
-                      </button>
-                    </div>
-                    <p style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>
-                      The prefill grabs the page’s title, a product image, approximate price, and canonical URL.
-                    </p>
-                  </div>
-                )}
+              {/* Big choice buttons */}
+              <div style={{ display: "grid", gap: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => { setOrderMethod("Online"); setStep(2); }}
+                  style={{
+                    padding: "18px 16px",
+                    borderRadius: 10,
+                    border: "1px solid #111827",
+                    background: orderMethod === "Online" ? "#111827" : "white",
+                    color: orderMethod === "Online" ? "white" : "#111827",
+                    fontWeight: 800,
+                    fontSize: 16,
+                    cursor: "pointer",
+                  }}
+                >
+                  Order Online
+                </button>
 
-                {orderMethod === "Email" && (
-                  <div style={{ display: "grid", gap: 8 }}>
-                    <div style={{ marginTop: 12, fontWeight: 600 }}>Order Email</div>
-                    <input
-                      value={orderEmail}
-                      onChange={(e) => setOrderEmail(e.target.value)}
-                      placeholder="purchasing@vendor.com"
-                      style={inp}
-                    />
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => { setOrderMethod("Email"); setStep(2); }}
+                  style={{
+                    padding: "18px 16px",
+                    borderRadius: 10,
+                    border: "1px solid #111827",
+                    background: orderMethod === "Email" ? "#111827" : "white",
+                    color: orderMethod === "Email" ? "white" : "#111827",
+                    fontWeight: 800,
+                    fontSize: 16,
+                    cursor: "pointer",
+                  }}
+                >
+                  Order via Email
+                </button>
               </div>
             </div>
           )}
-
-
           {step === 2 && (
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Item basics</h2>
-              <div style={grid2}>
-                <Field label="Item Name" value={itemName} setValue={setItemName} />
-                <Field label="SKU" value={sku} setValue={setSku} mono />
-                <Field label="Dept" value={dept} setValue={setDept} />
-                <Field label="Category" value={category} setValue={setCategory} />
-                <Field label="Location" value={location} setValue={setLocation} />
-                <Field label="Package Size" value={packageSize} setValue={setPackageSize} placeholder="e.g., 6 rolls/case" />
+              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+                {orderMethod === "Online" ? "Order Online — Details" : "Order via Email — Details"}
+              </h2>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                {orderMethod === "Online" ? (
+                  <Field label="Product URL (required)" value={url} setValue={setUrl} placeholder="https://vendor.com/product" />
+                ) : (
+                  <Field label="Order Email (required)" value={orderEmail} setValue={setOrderEmail} placeholder="purchasing@vendor.com" />
+                )}
+
+                <Field label="Item Name (required)" value={itemName} setValue={setItemName} />
+                <Field label="Dept (required)" value={dept} setValue={setDept} />
+                <Field label="Location (optional)" value={location} setValue={setLocation} />
+                <Field label="Package Size (required)" value={packageSize} setValue={setPackageSize} placeholder="e.g., 6 rolls/case" />
+                <Field label="SKU (optional)" value={sku} setValue={setSku} mono />
+                <Field label="Category (optional)" value={category} setValue={setCategory} />
+                <Field label="Photo URL (optional)" value={photoUrl} setValue={setPhotoUrl} placeholder="https://image..." />
               </div>
             </div>
           )}
-
           {step === 3 && (
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>2-Bin & Ordering</h2>
-              <div style={grid3}>
-                <Field label="Bin Qty (units)" value={binQtyUnits} setValue={setBinQtyUnits} mono />
-                <Field label="Case Multiple" value={caseMultiple} setValue={setCaseMultiple} mono />
-                <Field label="Reorder Qty (basis)" value={reorderQtyBasis} setValue={setReorderQtyBasis} mono />
-                <Select
-                  label="Units Basis"
-                  value={unitsBasis}
-                  setValue={setUnitsBasis}
-                  options={["units", "cases"]}
-                />
-                <Field label="Lead Time (days)" value={leadTimeDays} setValue={setLeadTimeDays} mono />
-              </div>
-            </div>
-          )}
-
-          {step === 4 && (
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Supplier</h2>
-              <div style={grid3}>
-                <Field label="Supplier" value={supplier} setValue={setSupplier} />
-                <Field label="Supplier SKU" value={supplierSku} setValue={setSupplierSku} mono />
-                <Field label="Cost (per pkg)" value={costPerPkg} setValue={setCostPerPkg} mono />
-                <Select label="Substitutes (Y/N)" value={substitutes} setValue={setSubstitutes} options={["Y", "N"]} />
-                <Field label="Notes" value={notes} setValue={setNotes} />
-              </div>
-            </div>
-          )}
-
-          {step === 5 && (
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Photo</h2>
-              <p style={{ color: "#6b7280", marginBottom: 8 }}>
-                Next iteration we’ll add a “Take Photo” camera button with crop/resize. For now, paste a hosted image URL.
-              </p>
-              <Field label="Photo URL" value={photoUrl} setValue={setPhotoUrl} placeholder="https://..." />
-              {photoUrl ? (
-                <img src={photoUrl} alt="" style={{ width: 120, height: 120, objectFit: "cover", marginTop: 10, border: "1px solid #e5e7eb", borderRadius: 8 }} />
-              ) : null}
-            </div>
-          )}
-
-          {step === 6 && (
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>Preview</h2>
-              <div style={{ display: "grid", gap: 8 }}>
-                <div><b>Kanban ID:</b> <code>{kanbanId}</code></div>
-                <div><b>Item:</b> {itemName || "(unnamed)"} <span style={{ color: "#6b7280" }}>({sku})</span></div>
-                <div><b>Order via:</b> {orderMethod === "Online" ? (url || "(missing link)") : (orderEmail || "(missing email)")}</div>
-                <div><b>Supplier:</b> {supplier || "(none)"} | <b>Lead Time:</b> {leadTimeDays || "-"} days</div>
-                {photoUrl ? <img src={photoUrl} alt="" style={{ width: 120, height: 120, objectFit: "cover", border: "1px solid #e5e7eb", borderRadius: 8 }} /> : null}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <Field label="Bin Qty (units) — required" value={binQtyUnits} setValue={setBinQtyUnits} mono />
+                <Field label="Lead Time (days) — required" value={leadTimeDays} setValue={setLeadTimeDays} mono />
+                <Field label="Reorder Qty (basis) — required" value={reorderQtyBasis} setValue={setReorderQtyBasis} mono />
               </div>
             </div>
           )}
@@ -318,12 +180,15 @@ export default function KanbanWizard() {
             )}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            {step < 6 ? (
+            {step < 3 ? (
               <button
                 onClick={next}
                 style={btnPrimary}
-                disabled={!canContinue(step, { orderMethod, url, orderEmail, itemName, sku })}
-                title={!canContinue(step, { orderMethod, url, orderEmail, itemName, sku }) ? "Please complete required fields" : ""}
+                disabled={
+                  (step === 2 && (orderMethod === "Online" ? !url : !orderEmail)) ||
+                  (step === 2 && (!itemName || !dept || !packageSize))
+                }
+                title="Complete required fields to continue"
               >
                 Next
               </button>
@@ -337,12 +202,7 @@ export default function KanbanWizard() {
   );
 }
 
-function canContinue(step, ctx) {
-  if (step === 1) {
-    if (ctx.orderMethod === "Online") return !!ctx.url;
-    return !!ctx.orderEmail;
-  }
-  if (step === 2) return !!ctx.itemName && !!ctx.sku;
+function canContinue() {
   return true;
 }
 
