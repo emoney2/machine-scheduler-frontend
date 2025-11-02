@@ -2,6 +2,16 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
+function statusForRow(r) {
+  const raw =
+    r["Event Status"] ??
+    r["Status"] ??
+    r["Event status"] ??
+    r["event status"] ??
+    "";
+  return String(raw).trim().toLowerCase(); // "open" | "ordered" | "received" | ""
+}
+
 export default function KanbanQueue() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,9 +21,7 @@ export default function KanbanQueue() {
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await fetch(`${BACKEND}/api/kanban/queue`, {
-          credentials: "include",
-        });
+        const r = await fetch(`${BACKEND}/api/kanban/queue`, { credentials: "include" });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
         setRows(j.rows || []);
@@ -30,12 +38,11 @@ export default function KanbanQueue() {
     const open = [];
     const ordered = [];
     for (const r of rows || []) {
-      const s = String(r["Event Status"] || "").toLowerCase();
+      const s = statusForRow(r);
       if (s === "open") open.push(r);
       else if (s === "ordered") ordered.push(r);
     }
-    const byTimeDesc = (a, b) =>
-      new Date(b["Timestamp"] || 0) - new Date(a["Timestamp"] || 0);
+    const byTimeDesc = (a, b) => new Date(b["Timestamp"] || 0) - new Date(a["Timestamp"] || 0);
     open.sort(byTimeDesc);
     ordered.sort(byTimeDesc);
     return { open, ordered, all: [...open, ...ordered] };
@@ -101,38 +108,70 @@ export default function KanbanQueue() {
     }
   }
 
-  if (loading) return <div className="p-6">Loading…</div>;
-  if (err) return <div className="p-6 text-red-600">Error loading queue: {err}</div>;
+  if (loading) return <div style={{ padding: 24 }}>Loading…</div>;
+  if (err) return <div style={{ padding: 24, color: "#b91c1c" }}>Error loading queue: {err}</div>;
 
   return (
-    <div className="relative">
+    <div style={{ position: "relative" }}>
       {/* Overlay */}
       {overlay && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-yellow-200/80"
           aria-live="assertive"
           role="alert"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(250, 204, 21, 0.55)", // yellow overlay
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <div className="rounded-xl shadow-lg border border-yellow-400 bg-yellow-100 px-6 py-4 text-yellow-900 text-base font-medium flex items-center gap-3">
-            <span className="inline-block w-4 h-4 border-2 border-yellow-700 border-t-transparent rounded-full animate-spin" />
+          <div
+            style={{
+              border: "1px solid #f59e0b",
+              background: "#fef3c7",
+              color: "#713f12",
+              borderRadius: 12,
+              padding: "12px 16px",
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              boxShadow: "0 6px 20px rgba(0,0,0,0.15)",
+            }}
+          >
+            <span
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                border: "2px solid #78350f",
+                borderTopColor: "transparent",
+                display: "inline-block",
+                animation: "spin 0.8s linear infinite",
+              }}
+            />
             <span>{overlay.message}</span>
           </div>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
 
-      <div className="max-w-5xl mx-auto p-6">
-        <h1 className="text-2xl font-bold">Kanban — Needs to Order</h1>
-        <p className="text-gray-600 mt-1">
-          Open: <span className="font-semibold">{openCount}</span> • Ordered:{" "}
-          <span className="font-semibold">{orderedCount}</span>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: 24 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800 }}>Kanban — Needs to Order</h1>
+        <p style={{ color: "#4b5563", marginTop: 6 }}>
+          Open: <span style={{ fontWeight: 600 }}>{openCount}</span> • Ordered:{" "}
+          <span style={{ fontWeight: 600 }}>{orderedCount}</span>
         </p>
 
         {grouped.all.length === 0 ? (
-          <div className="mt-6 text-gray-500">No open requests.</div>
+          <div style={{ marginTop: 16, color: "#6b7280" }}>No open requests.</div>
         ) : (
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full border text-sm">
-              <thead className="bg-gray-100">
+          <div style={{ marginTop: 16, overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead style={{ background: "#f3f4f6" }}>
                 <tr>
                   <Th>Time</Th>
                   <Th>Kanban ID</Th>
@@ -148,93 +187,169 @@ export default function KanbanQueue() {
               </thead>
               <tbody>
                 {grouped.all.map((r) => {
-                  const status = (r["Event Status"] || "").toLowerCase();
-                  const rowClass =
-                    status === "open"
-                      ? "border-t bg-yellow-50 border-l-4 border-l-yellow-400"
-                      : "border-t bg-slate-50";
+                  const status = statusForRow(r);
+                  const isOpen = status === "open";
+                  const rowStyle = {
+                    borderTop: "1px solid #e5e7eb",
+                    background: isOpen ? "rgba(254, 243, 199, 0.55)" : "#f8fafc",
+                  };
+                  const leftBarStyle = {
+                    width: 4,
+                    background: isOpen ? "#f59e0b" : "#cbd5e1",
+                  };
                   return (
                     <tr
                       key={r["Event ID"] || `${r["Kanban ID"]}-${r["Timestamp"]}`}
-                      className={rowClass}
+                      style={rowStyle}
                     >
+                      {/* left emphasis bar */}
+                      <td style={{ padding: 0, width: 4 }}>
+                        <div style={leftBarStyle} />
+                      </td>
+
+                      {/* Time */}
                       <Td>{formatWhen(r["Timestamp"])}</Td>
+
+                      {/* Kanban ID */}
                       <Td mono>{r["Kanban ID"]}</Td>
-                      <Td>
-                        <div className="flex items-center gap-3">
+
+                      {/* Item (image + info) */}
+                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
+                        <div style={{ display: "flex", alignItems: "center" }}>
                           {r["Photo URL"] ? (
                             <img
                               src={r["Photo URL"]}
                               alt=""
-                              className="w-10 h-10 object-cover rounded border"
+                              style={{
+                                width: 40,
+                                height: 40,
+                                objectFit: "cover",
+                                borderRadius: 6,
+                                border: "1px solid #e5e7eb",
+                                marginRight: 12,
+                              }}
                             />
                           ) : null}
                           <div>
-                            <div className="font-medium">
+                            <div style={{ fontWeight: 600 }}>
                               {r["Item Name"] || "(unnamed)"}
                             </div>
-                            <div className="text-xs text-gray-500">{r["SKU"]}</div>
+                            <div style={{ fontSize: 12, color: "#6b7280" }}>{r["SKU"]}</div>
                           </div>
                         </div>
-                      </Td>
+                      </td>
+
+                      {/* Qty */}
                       <Td mono>{r["Event Qty"]}</Td>
+
+                      {/* Supplier */}
                       <Td>{r["Supplier"]}</Td>
+
+                      {/* Method */}
                       <Td>{r["Order Method"]}</Td>
-                      <Td>
+
+                      {/* Order link / email */}
+                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
                         {r["Order Method"] === "Email" ? (
                           <a
-                            className="text-blue-600 underline"
                             href={`mailto:${r["Order Email"] || ""}`}
+                            style={{ color: "#2563eb", textDecoration: "underline" }}
                           >
                             {r["Order Email"] || "(missing email)"}
                           </a>
                         ) : (
                           <a
-                            className="text-blue-600 underline break-all"
                             href={r["Order URL"] || "#"}
                             target="_blank"
                             rel="noreferrer"
+                            style={{
+                              color: "#2563eb",
+                              textDecoration: "underline",
+                              wordBreak: "break-all",
+                            }}
                           >
                             {r["Order URL"] || "(missing link)"}
                           </a>
                         )}
-                      </Td>
+                      </td>
+
+                      {/* Requested By */}
                       <Td>{r["Requested By"] || "Public Scanner"}</Td>
-                      <Td>
+
+                      {/* Status badge */}
+                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
                         {status === "open" ? (
-                          <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-yellow-200 text-yellow-900">
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              background: "#fde68a",
+                              color: "#78350f",
+                            }}
+                          >
                             Needs Order
                           </span>
                         ) : status === "ordered" ? (
-                          <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-200 text-blue-900">
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              fontSize: 12,
+                              fontWeight: 700,
+                              background: "#bfdbfe",
+                              color: "#1e3a8a",
+                            }}
+                          >
                             Ordered
                           </span>
                         ) : (
                           ""
                         )}
-                      </Td>
-                      <Td>
-                        <div className="flex gap-2">
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: "8px 12px", verticalAlign: "top" }}>
+                        <div style={{ display: "flex", gap: 8 }}>
                           {status === "open" && (
                             <button
-                              className="px-3 py-1 rounded bg-black text-white"
                               onClick={() => markOrdered(r["Event ID"])}
                               title="Append ORDERED row and mark this request as Ordered"
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 6,
+                                border: "1px solid #111827",
+                                background: "#111827",
+                                color: "white",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
                             >
                               Mark Ordered
                             </button>
                           )}
                           {status === "ordered" && (
                             <button
-                              className="px-3 py-1 rounded border"
                               onClick={() => markReceived(r["Event ID"])}
                               title="Append RECEIVED row and close this request"
+                              style={{
+                                padding: "6px 10px",
+                                borderRadius: 6,
+                                border: "1px solid #e5e7eb",
+                                background: "white",
+                                color: "#111827",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
                             >
                               Mark Received
                             </button>
                           )}
                         </div>
-                      </Td>
+                      </td>
                     </tr>
                   );
                 })}
@@ -243,9 +358,9 @@ export default function KanbanQueue() {
           </div>
         )}
 
-        <p className="text-xs text-gray-500 mt-4">
-          Tip: click the link/email above to place the order. Then mark Ordered or
-          Received to keep the queue clean.
+        <p style={{ fontSize: 12, color: "#6b7280", marginTop: 16 }}>
+          Tip: click the link/email above to place the order. Then mark Ordered or Received to keep
+          the queue clean.
         </p>
       </div>
     </div>
@@ -253,11 +368,37 @@ export default function KanbanQueue() {
 }
 
 function Th({ children }) {
-  return <th className="text-left px-3 py-2 border-b font-semibold">{children}</th>;
+  return (
+    <th
+      style={{
+        textAlign: "left",
+        padding: "8px 12px",
+        borderBottom: "1px solid #e5e7eb",
+        fontWeight: 600,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {children}
+    </th>
+  );
 }
+
 function Td({ children, mono }) {
-  return <td className={`px-3 py-2 align-top ${mono ? "font-mono" : ""}`}>{children}</td>;
+  return (
+    <td
+      style={{
+        padding: "8px 12px",
+        verticalAlign: "top",
+        fontFamily: mono
+          ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
+          : "inherit",
+      }}
+    >
+      {children}
+    </td>
+  );
 }
+
 function formatWhen(ts) {
   if (!ts) return "";
   try {
