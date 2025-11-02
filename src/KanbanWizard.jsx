@@ -37,6 +37,52 @@ export default function KanbanWizard() {
 
   const kanbanId = useMemo(() => makeKanbanId(dept, category, sku), [dept, category, sku]);
 
+  // Prefill fields by scraping the product page
+  async function prefillFromUrl() {
+    const u = (url || "").trim();
+    if (!u) {
+      alert("Please paste a product URL first.");
+      return;
+    }
+    try {
+      // Optional: simple loading state via button disabled text
+      const btn = document.getElementById("kanban-prefill-btn");
+      if (btn) { btn.disabled = true; btn.textContent = "Prefilling…"; }
+
+      const qs = new URLSearchParams({ url: u });
+      const r = await fetch(`${BACKEND}/api/kanban/scrape?${qs}`, {
+        method: "GET",
+        credentials: "include",
+      });
+      const j = await r.json();
+
+      if (!r.ok || !j.ok) {
+        throw new Error(j?.error || `Failed to scrape (HTTP ${r.status})`);
+      }
+
+      // Map result to our fields
+      if (j.title) setItemName((prev) => prev || j.title);
+      if (j.image) setPhotoUrl((prev) => prev || j.image);
+      if (j.price) setCostPerPkg((prev) => prev || String(j.price));
+      if (j.canonical) setUrl(j.canonical);
+
+      // Heuristic: if itemName still blank, suggest deriving from URL
+      if (!itemName && !j.title) {
+        try {
+          const urlObj = new URL(u);
+          const slug = (urlObj.pathname || "").split("/").filter(Boolean).pop() || "";
+          if (slug) setItemName(slug.replace(/[-_]+/g, " "));
+        } catch {}
+      }
+    } catch (e) {
+      alert(String(e));
+    } finally {
+      const btn = document.getElementById("kanban-prefill-btn");
+      if (btn) { btn.disabled = false; btn.textContent = "Prefill from URL"; }
+    }
+  }
+
+
   function next() { setStep((s) => Math.min(6, s + 1)); }
   function back() { setStep((s) => Math.max(1, s - 1)); }
 
@@ -122,16 +168,48 @@ export default function KanbanWizard() {
                 {orderMethod === "Online" ? (
                   <div>
                     <div style={{ marginTop: 12, fontWeight: 600 }}>Product URL</div>
-                    <input
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="https://vendor.com/product"
-                      style={inp}
-                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <input
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="https://vendor.com/product"
+                        style={{ ...inp, flex: 1 }}
+                      />
+                      <button
+                        id="kanban-prefill-btn"
+                        type="button"
+                        onClick={prefillFromUrl}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          border: "1px solid #111827",
+                          background: "#111827",
+                          color: "white",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                        title="Scrape title / image / price from the product page"
+                      >
+                        Prefill from URL
+                      </button>
+                    </div>
                     <p style={{ fontSize: 12, color: "#6b7280", marginTop: 6 }}>
-                      We can add a backend endpoint to prefill fields from this page (no AI needed).
+                      The prefill grabs the page’s title, a product image, approximate price, and canonical URL.
                     </p>
                   </div>
+                ) : (
+                  <div>
+                    <div style={{ marginTop: 12, fontWeight: 600 }}>Order Email</div>
+                    <input
+                      value={orderEmail}
+                      onChange={(e) => setOrderEmail(e.target.value)}
+                      placeholder="purchasing@vendor.com"
+                      style={inp}
+                    />
+                  </div>
+                )}
+
                 ) : (
                   <div>
                     <div style={{ marginTop: 12, fontWeight: 600 }}>Order Email</div>
