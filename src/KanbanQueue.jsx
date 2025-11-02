@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 
+const BACKEND = "https://machine-scheduler-backend.onrender.com";
+
 export default function KanbanQueue() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -8,10 +10,9 @@ export default function KanbanQueue() {
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await fetch(
-          "https://machine-scheduler-backend.onrender.com/api/kanban/queue",
-          { credentials: "include" }
-        );
+        const r = await fetch(`${BACKEND}/api/kanban/queue`, {
+          credentials: "include",
+        });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
         setRows(j.rows || []);
@@ -23,6 +24,52 @@ export default function KanbanQueue() {
     };
     load();
   }, []);
+
+  async function markOrdered(eventId) {
+    const qtyStr = prompt("Ordered qty (cases/units)?", "1");
+    if (!qtyStr) return;
+    const qty = Number(qtyStr);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      alert("Please enter a positive number.");
+      return;
+    }
+    const po = prompt("PO # (optional)", "") || "";
+    const r = await fetch(`${BACKEND}/api/kanban/ordered`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ eventId, orderedQty: qty, po }),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      alert(`Failed to mark ordered (HTTP ${r.status}) ${t}`);
+      return;
+    }
+    // simple reload to refresh list
+    window.location.reload();
+  }
+
+  async function markReceived(eventId) {
+    const qtyStr = prompt("Received qty (cases/units)?", "1");
+    if (!qtyStr) return;
+    const qty = Number(qtyStr);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      alert("Please enter a positive number.");
+      return;
+    }
+    const r = await fetch(`${BACKEND}/api/kanban/received`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ eventId, receivedQty: qty }),
+    });
+    if (!r.ok) {
+      const t = await r.text().catch(() => "");
+      alert(`Failed to mark received (HTTP ${r.status}) ${t}`);
+      return;
+    }
+    window.location.reload();
+  }
 
   if (loading) return <div className="p-6">Loading…</div>;
   if (err) return <div className="p-6 text-red-600">Error loading queue: {err}</div>;
@@ -47,11 +94,15 @@ export default function KanbanQueue() {
                 <Th>Method</Th>
                 <Th>Order Link / Email</Th>
                 <Th>Requested By</Th>
+                <Th>Actions</Th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r["Event ID"] || `${r["Kanban ID"]}-${r["Timestamp"]}`} className="border-t">
+                <tr
+                  key={r["Event ID"] || `${r["Kanban ID"]}-${r["Timestamp"]}`}
+                  className="border-t"
+                >
                   <Td>{formatWhen(r["Timestamp"])}</Td>
                   <Td mono>{r["Kanban ID"]}</Td>
                   <Td>
@@ -64,7 +115,9 @@ export default function KanbanQueue() {
                         />
                       ) : null}
                       <div>
-                        <div className="font-medium">{r["Item Name"] || "(unnamed)"}</div>
+                        <div className="font-medium">
+                          {r["Item Name"] || "(unnamed)"}
+                        </div>
                         <div className="text-xs text-gray-500">{r["SKU"]}</div>
                       </div>
                     </div>
@@ -74,7 +127,10 @@ export default function KanbanQueue() {
                   <Td>{r["Order Method"]}</Td>
                   <Td>
                     {r["Order Method"] === "Email" ? (
-                      <a className="text-blue-600 underline" href={`mailto:${r["Order Email"] || ""}`}>
+                      <a
+                        className="text-blue-600 underline"
+                        href={`mailto:${r["Order Email"] || ""}`}
+                      >
                         {r["Order Email"] || "(missing email)"}
                       </a>
                     ) : (
@@ -89,6 +145,24 @@ export default function KanbanQueue() {
                     )}
                   </Td>
                   <Td>{r["Requested By"] || "Public Scanner"}</Td>
+                  <Td>
+                    <div className="flex gap-2">
+                      <button
+                        className="px-3 py-1 rounded bg-black text-white"
+                        onClick={() => markOrdered(r["Event ID"])}
+                        title="Append ORDERED row and mark this request as Ordered"
+                      >
+                        Mark Ordered
+                      </button>
+                      <button
+                        className="px-3 py-1 rounded border"
+                        onClick={() => markReceived(r["Event ID"])}
+                        title="Append RECEIVED row and close this request"
+                      >
+                        Mark Received
+                      </button>
+                    </div>
+                  </Td>
                 </tr>
               ))}
             </tbody>
@@ -97,7 +171,8 @@ export default function KanbanQueue() {
       )}
 
       <p className="text-xs text-gray-500 mt-4">
-        Tip: click the link/email above to place the order. We’ll add “Mark Ordered / Received” next.
+        Tip: click the link/email above to place the order. Then mark Ordered or
+        Received to keep the queue clean.
       </p>
     </div>
   );
