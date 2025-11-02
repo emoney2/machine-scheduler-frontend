@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
+const APP_ORIGIN = "https://machineschedule.netlify.app";
+const makeQr = (data, size = 180) =>
+  `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(data)}&choe=UTF-8`;
+
+
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
 // Minimal fetch of the item (by Kanban ID) to render the card
@@ -138,39 +143,68 @@ export default function KanbanCardPreview() {
             <Field label="Reorder Qty (basis)" value={item.reorderQtyBasis} />
           </div>
 
-          <div style={{ fontSize: 12 }}>
-            Order via: <b>{item.orderMethod}</b>
-            {" — "}
-            {item.orderMethod === "Online" ? (
-              <span style={{ wordBreak: "break-all" }}>{item.orderUrl}</span>
-            ) : (
-              <span>{item.orderEmail}</span>
-            )}
-          </div>
+          {/* Order & Reorder QR row */}
+          {(() => {
+            const orderMethod = item.orderMethod;
+            const orderTarget = orderMethod === "Online" ? item.orderUrl : `mailto:${item.orderEmail}`;
+            const scanUrl = `${APP_ORIGIN}/kanban/scan?id=${encodeURIComponent(item.kanbanId)}&qty=1`;
 
-        </div>
+            return (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                  marginTop: 4,
+                }}
+              >
+                {/* Order Page QR */}
+                <div
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 10,
+                    padding: 8,
+                    display: "grid",
+                    gap: 6,
+                    alignContent: "start",
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 12 }}>Order Page</div>
+                  <img
+                    alt="Order QR"
+                    src={makeQr(orderTarget)}
+                    style={{ width: 120, height: 120, alignSelf: "center" }}
+                  />
+                  <div style={{ fontSize: 10, color: "#6b7280", wordBreak: "break-all" }}>
+                    {orderTarget}
+                  </div>
+                </div>
+          
+                {/* Reorder Request QR (adds to queue) */}
+                <div
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 10,
+                    padding: 8,
+                    display: "grid",
+                    gap: 6,
+                    alignContent: "start",
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 12 }}>Scan to Request Reorder</div>
+                  <img
+                    alt="Reorder Request QR"
+                    src={makeQr(scanUrl)}
+                    style={{ width: 120, height: 120, alignSelf: "center" }}
+                  />
+                  <div style={{ fontSize: 10, color: "#6b7280" }}>
+                    ID: <b>{item.kanbanId}</b> • Qty: 1
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
-        {/* QR footer */}
-        <div style={{ marginTop: 4, display: "grid", gridTemplateColumns: "auto 1fr", gap: 10, alignItems: "center" }}>
-          <div
-            style={{
-              width: 92,
-              height: 92,
-              border: "1px solid #e5e7eb",
-              borderRadius: 6,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 10,
-              color: "#6b7280",
-            }}
-          >
-            QR
-          </div>
-          <div style={{ fontSize: 11, color: "#374151" }}>
-            Scan to request reorder • ID: <b>{item["Kanban ID"]}</b>
-          </div>
-        </div>
       </div>
 
       {/* print styles */}

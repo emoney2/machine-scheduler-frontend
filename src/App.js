@@ -28,6 +28,7 @@ import DigitizingList from "./DigitizingList";
 import KanbanQueue from "./KanbanQueue";
 import KanbanWizard from "./KanbanWizard";
 import KanbanCardPreview from "./KanbanCardPreview";
+import KanbanScan from "./KanbanScan";
 
 
 
@@ -1875,6 +1876,8 @@ useEffect(() => {
           <Route path="/kanban/queue" element={<KanbanQueue />} />
           <Route path="/kanban/new" element={<KanbanWizard />} />
           <Route path="/kanban/preview/:kanbanId" element={<KanbanCardPreview />} />
+          <Route path="/kanban/scan" element={<KanbanScan />} />
+
 
           {/* 👇 New routes */}
           <Route path="/scan" element={<Scan />} />
