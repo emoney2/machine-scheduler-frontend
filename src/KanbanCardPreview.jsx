@@ -1,9 +1,24 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
+// --- QR helpers (add this near the top of the file) ---
+const APP_ORIGIN =
+  typeof window !== "undefined" && window.location?.origin
+    ? (window.location.origin.includes("netlify.app")
+        ? "https://machineschedule.netlify.app"
+        : window.location.origin)
+    : "https://machineschedule.netlify.app";
+
+const makeQr = (data, size = 180) =>
+  `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(
+    data
+  )}&choe=UTF-8`;
+
+
 const APP_ORIGIN = "https://machineschedule.netlify.app";
 const makeQr = (data, size = 180) =>
   `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(data)}&choe=UTF-8`;
+
 
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
@@ -146,8 +161,11 @@ export default function KanbanCardPreview() {
           {/* Order & Reorder QR row */}
           {(() => {
             const orderMethod = item.orderMethod;
-            const orderTarget = orderMethod === "Online" ? item.orderUrl : `mailto:${item.orderEmail}`;
-            const scanUrl = `${APP_ORIGIN}/kanban/scan?id=${encodeURIComponent(item.kanbanId)}&qty=1`;
+            const orderTarget =
+              orderMethod === "Online" ? item.orderUrl : `mailto:${item.orderEmail}`;
+            const scanUrl = `${APP_ORIGIN}/kanban/scan?id=${encodeURIComponent(
+              item.kanbanId
+            )}&qty=1`;
 
             return (
               <div
@@ -179,7 +197,7 @@ export default function KanbanCardPreview() {
                     {orderTarget}
                   </div>
                 </div>
-          
+
                 {/* Reorder Request QR (adds to queue) */}
                 <div
                   style={{
@@ -198,12 +216,13 @@ export default function KanbanCardPreview() {
                     style={{ width: 120, height: 120, alignSelf: "center" }}
                   />
                   <div style={{ fontSize: 10, color: "#6b7280" }}>
-                    ID: <b>{item.kanbanId}</b> • Qty: 1
+                    ID: <b>{item.kanbanId || "—"}</b> • Qty: 1
                   </div>
                 </div>
               </div>
             );
           })()}
+
 
       </div>
 
