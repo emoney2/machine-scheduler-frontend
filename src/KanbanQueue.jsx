@@ -8,9 +8,10 @@ export default function KanbanQueue() {
   useEffect(() => {
     const load = async () => {
       try {
-        const r = await fetch("https://machine-scheduler-backend.onrender.com/api/kanban/queue", {
-          credentials: "include",
-        });
+        const r = await fetch(
+          "https://machine-scheduler-backend.onrender.com/api/kanban/queue",
+          { credentials: "include" }
+        );
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j = await r.json();
         setRows(j.rows || []);
@@ -50,7 +51,7 @@ export default function KanbanQueue() {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r["Event ID"]} className="border-t">
+                <tr key={r["Event ID"] || `${r["Kanban ID"]}-${r["Timestamp"]}`} className="border-t">
                   <Td>{formatWhen(r["Timestamp"])}</Td>
                   <Td mono>{r["Kanban ID"]}</Td>
                   <Td>
@@ -73,7 +74,7 @@ export default function KanbanQueue() {
                   <Td>{r["Order Method"]}</Td>
                   <Td>
                     {r["Order Method"] === "Email" ? (
-                      <a className="text-blue-600 underline" href={`mailto:${r["Order Email"]}`}>
+                      <a className="text-blue-600 underline" href={`mailto:${r["Order Email"] || ""}`}>
                         {r["Order Email"] || "(missing email)"}
                       </a>
                     ) : (
@@ -96,8 +97,7 @@ export default function KanbanQueue() {
       )}
 
       <p className="text-xs text-gray-500 mt-4">
-        Tip: click the link/email above to place the order, then we’ll add buttons here to mark
-        Ordered / Received next.
+        Tip: click the link/email above to place the order. We’ll add “Mark Ordered / Received” next.
       </p>
     </div>
   );
@@ -107,11 +107,7 @@ function Th({ children }) {
   return <th className="text-left px-3 py-2 border-b font-semibold">{children}</th>;
 }
 function Td({ children, mono }) {
-  return (
-    <td className={`px-3 py-2 align-top ${mono ? "font-mono" : ""}`}>
-      {children}
-    </td>
-  );
+  return <td className={`px-3 py-2 align-top ${mono ? "font-mono" : ""}`}>{children}</td>;
 }
 function formatWhen(ts) {
   if (!ts) return "";

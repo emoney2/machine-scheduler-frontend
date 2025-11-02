@@ -25,7 +25,7 @@ import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
 import DigitizingList from "./DigitizingList";
-import KanbanQueue from "./pages/KanbanQueue";
+import KanbanQueue from "./KanbanQueue";
 
 
 
