@@ -18,6 +18,14 @@ const makeQr = (data, size = 160) =>
     data
   )}`;
 
+// Show "—" only if value is truly empty/null/undefined
+function showVal(v) {
+  if (v === null || v === undefined) return "—";
+  const s = String(v).trim();
+  return s === "" ? "—" : s; // preserves "0"
+}
+
+
 // Location color map (case-insensitive)
 function getLocationStyles(locKey) {
   const k = (locKey || "").toLowerCase().trim();
@@ -219,11 +227,11 @@ export default function KanbanCardPreview() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "#6b7280" }}>Bin Qty (units)</div>
-              <div style={{ fontSize: 20, fontWeight: 900 }}>{item.binQtyUnits || "—"}</div>
+              <div style={{ fontSize: 20, fontWeight: 900 }}>{showVal(item.binQtyUnits)}</div>
             </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 12, color: "#6b7280" }}>Reorder Qty (basis)</div>
-              <div style={{ fontSize: 20, fontWeight: 900 }}>{item.reorderQtyBasis || "—"}</div>
+              <div style={{ fontSize: 20, fontWeight: 900 }}>{showVal(item.reorderQtyBasis)}</div>
             </div>
           </div>
         </div>
