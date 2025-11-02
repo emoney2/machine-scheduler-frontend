@@ -252,15 +252,14 @@ export default function KanbanCardPreview() {
           }}
         >
           <div style={{ fontWeight: 800, fontSize: 11, textAlign: "center" }}>Order Page</div>
+          {/* generate at 180px for a cleaner, easier-to-scan code, but render at 100×100 */}
           <img
             alt="Order QR"
-            {/* generate at 180px for a cleaner, easier-to-scan code, but render at 100×100 */}
             src={makeQr(shortOrderUrl, 180)}
             style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
-
-
+        </div>
 
         <div
           style={{
@@ -278,12 +277,12 @@ export default function KanbanCardPreview() {
           <div style={{ fontWeight: 800, fontSize: 11, textAlign: "center" }}>Request Reorder</div>
           <img
             alt="Reorder Request QR"
-            src={makeQr(reorderScanUrl, 140)}
+            src={makeQr(reorderScanUrl, 180)}
             style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
         </div>
-      </div>
+
 
       {/* Debug panel (add ?debug=1 to URL) */}
       {typeof window !== "undefined" &&
