@@ -4,13 +4,6 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
-const APP_ORIGIN =
-  typeof window !== "undefined" && window.location?.origin
-    ? (window.location.origin.includes("netlify.app")
-        ? "https://machineschedule.netlify.app"
-        : window.location.origin)
-    : "https://machineschedule.netlify.app";
-
 const makeQr = (data, size = 160) =>
   `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&qzone=1&data=${encodeURIComponent(
     data || ""
@@ -121,10 +114,11 @@ export default function KanbanCardPreview() {
   if (!item) return <div style={{ padding: 24 }}>Loading…</div>;
 
   // Short Order QR → /kanban/go?to=... (tiny QR) → immediately redirects to vendor URL/mailto
-  // (existing)
+  // Order Page QR: DIRECT link (shortened via backend if long) — never routes through the app
   const orderTarget = item.orderMethod === "Email"
     ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
     : (item.orderUrl || "");
+
 
   // NEW: ask backend to shorten the real URL, then use that in the QR
   const [shortOrderUrl, setShortOrderUrl] = useState("");
