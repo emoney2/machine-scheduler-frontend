@@ -254,24 +254,26 @@ export default function KanbanCardPreview() {
       </div>
 
       {/* 4x6 printable card */}
-      <div
-        ref={cardRef}
-        className="card"
-        style={{
-          width: "4in",
-          height: "6in",
-          border: "2px solid #111827",
-          borderRadius: 12,
-          background: "white",
-          boxSizing: "border-box",
-          padding: "12px 12px 150px 12px", // bottom space for QR corners
-          display: "grid",
-          gridTemplateRows: "auto auto 1fr",
-          gap: 8,
-          position: "relative",
-          overflow: "hidden",
-        }}
-      >
+      <div className="printPage">
+        <div
+          ref={cardRef}
+          className="card"
+          style={{
+            width: "4in",
+            height: "6in",
+            border: "2px solid #111827",
+            borderRadius: 12,
+            background: "white",
+            boxSizing: "border-box",
+            padding: "12px 12px 150px 12px",
+            display: "grid",
+            gridTemplateRows: "auto auto 1fr",
+            gap: 8,
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+
         {/* Title */}
         <div style={{ fontWeight: 900, fontSize: 22, letterSpacing: 0.3, textAlign: "center" }}>
           KANBAN CARD
@@ -418,17 +420,44 @@ export default function KanbanCardPreview() {
       ) : null}
 
       <style>{`
-        @page { size: 4in 6in; margin: 0; }  /* ask the browser for true 4×6 no margins */
+        /* Force the printer page to Letter and remove default margins */
+        @page {
+          size: 8.5in 11in;
+          margin: 0;
+        }
 
+        /* Print-only layout: center a 4×6 card on the Letter page */
         @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0 !important; }
+          html, body {
+            width: 8.5in;
+            height: 11in;
+            margin: 0 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          /* One page sized to Letter that centers its contents */
+          .printPage {
+            width: 8.5in !important;
+            height: 11in !important;
+            display: grid !important;
+            place-items: center !important; /* centers both ways */
+            background: white !important;
+          }
+
+          /* The actual 4×6 card we print */
           .card {
-            box-shadow: none !important;
             width: 4in !important;
             height: 6in !important;
+            box-shadow: none !important;
           }
-          button, a { display: none !important; }
+
+          /* Hide UI controls in print */
+          button, a[href^="/"], .no-print {
+            display: none !important;
+          }
         }
+
 
       `}</style>
     </div>
