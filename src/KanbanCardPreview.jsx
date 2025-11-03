@@ -55,17 +55,15 @@ export default function KanbanCardPreview() {
   const [item, setItem] = useState(null);
   const [err, setErr] = useState("");
   const [shortOrderUrl, setShortOrderUrl] = useState("");
-  const cardRef = useRef(null);
+  const printRef = useRef(null);
 
   async function handlePrintAndSave() {
     try {
-      const node = cardRef.current;
+      const node = printRef.current;
       if (!node) {
-        window.print();  // fallback
+        window.print();
         return;
       }
-
-      // Render the card at high scale for crisp output
       const canvas = await html2canvas(node, {
         scale: 2,
         backgroundColor: "#ffffff",
@@ -74,51 +72,46 @@ export default function KanbanCardPreview() {
         windowWidth: node.scrollWidth,
         windowHeight: node.scrollHeight,
       });
-
       const imgData = canvas.toDataURL("image/png");
 
-      // Build a true 4×6 PDF
+      // Make a Letter PDF so the upload matches what you print
       const doc = new jsPDF({
         orientation: "portrait",
         unit: "in",
-        format: [4, 6],
+        format: [8.5, 11],
         compress: true,
       });
 
-      const pageW = 4, pageH = 6;
-      const imgW = canvas.width / 96;   // px → inches
+      const pageW = 8.5, pageH = 11;
+      const imgW = canvas.width / 96;  // px → inches
       const imgH = canvas.height / 96;
       const ratio = Math.min(pageW / imgW, pageH / imgH);
       const drawW = imgW * ratio;
       const drawH = imgH * ratio;
       const dx = (pageW - drawW) / 2;
       const dy = (pageH - drawH) / 2;
+
       doc.addImage(imgData, "PNG", dx, dy, drawW, drawH, undefined, "FAST");
 
       const pdfBlob = doc.output("blob");
       const clean = (s) => String(s || "").replace(/[\\/:*?"<>|]+/g, "").trim();
-      const fname = `${
-        clean(item?.itemName || "") || clean(item?.kanbanId || routeKanbanId || "kanban")
-      }.pdf`;
+      const fname = `${clean(item?.itemName || item?.kanbanId || routeKanbanId || "kanban")} (front+back).pdf`;
 
-      // Upload to backend -> Google Drive
       const fd = new FormData();
       fd.append("file", pdfBlob, fname);
       fd.append("filename", fname);
-      // optional: set/override a folder by name
-      // fd.append("folderName", "Kanban Cards"); 
+      // optional: fd.append("subfolder", String(item?.location || ""));
 
       await fetch(`${BACKEND}/api/kanban/upload-card`, {
         method: "POST",
         body: fd,
         credentials: "include",
-      }).catch(() => { /* ignore upload errors and still print */ });
-
+      }).catch(() => { /* ignore upload errors but still print */ });
     } finally {
-      // Always open print dialog
       window.print();
     }
   }
+
 
 
   // --- Fetch item (public) ---
@@ -151,20 +144,21 @@ export default function KanbanCardPreview() {
         };
 
         const normalized = {
-          kanbanId:        pick("Kanban ID","kanbanId") || routeKanbanId,
+          kanbanId:        pick("Kanban ID","kanbanId"),
           itemName:        pick("Item Name","itemName"),
           sku:             pick("SKU","sku"),
           location:        pick("Location","location"),
           packageSize:     pick("Package Size","packageSize"),
           leadTimeDays:    String(pick("Lead Time (days)","leadTimeDays","leadTime")).trim(),
+          costPerPkg:      pick("Cost (per pkg)","costPerPkg"),
           binQtyUnits:     pick("Bin Qty (units)","Bin Quantity (units)","binQtyUnits","binQty","binQuantity"),
           reorderQtyBasis: pick("Reorder Qty (basis)","reorderQtyBasis","reorderQty"),
           orderMethod:     pick("Order Method (Email/Online)","orderMethod"),
-          orderUrl:        pick("Order URL","orderUrl","orderURL"),
+          orderUrl:        pick("Order URL","orderUrl"),
           orderEmail:      pick("Order Email","orderEmail"),
           photoUrl:        pick("Photo URL","photoUrl"),
-          supplier:        pick("Supplier","supplier"),
         };
+
 
         if (!alive) return;
         setItem({ ...normalized, _debugRaw: raw });
@@ -247,18 +241,21 @@ export default function KanbanCardPreview() {
         >
           Edit
         </button>
-        <button onClick={handlePrintAndSave} style={btnPrimary}>Print</button>
+        <button onClick={() => window.print()} style={btnPrimary}>Print</button>
         <Link to="/kanban/queue" style={{ alignSelf: "center", marginLeft: "auto" }}>
           ← Back to Queue
         </Link>
       </div>
 
-      {/* 4x6 printable card */}
-      <div className="printPage">
-        <div
-          ref={cardRef}
-          className="card"
-          style={{
+      {/* Letter page with two 4×6 cards side-by-side */}
+      <div ref={printRef} className="printPage">
+        <div className="cardRow">
+
+          {/* FRONT CARD */}
+          <div
+            className="card"
+            style={{
+
             width: "4in",
             height: "6in",
             border: "2px solid #111827",
@@ -334,11 +331,22 @@ export default function KanbanCardPreview() {
             {showVal(item.itemName)}
           </div>
 
-          {/* Package size + Lead */}
-          <div style={{ fontSize: 12, color: "#111827", textAlign: "center" }}>
-            {showVal(item.packageSize)}
-            {item.leadTimeDays ? ` • Lead: ${String(item.leadTimeDays).trim()}d` : ""}
+          {/* Package size (left) + Price (right); lead time tucks under size if present */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "center" }}>
+            <div style={{ fontSize: 12, color: "#111827", textAlign: "left" }}>
+              {showVal(item.packageSize)}
+              {item.leadTimeDays ? ` • Lead: ${String(item.leadTimeDays).trim()}d` : ""}
+            </div>
+            <div style={{ fontSize: 12, color: "#111827", textAlign: "right", fontWeight: 800 }}>
+              {(() => {
+                const raw = String(item.costPerPkg || "").trim();
+                if (!raw) return "—";
+                const n = Number(raw.replace(/[^0-9.-]/g, ""));
+                return isNaN(n) ? raw : `$${n.toFixed(2)}`;
+              })()}
+            </div>
           </div>
+
 
           {/* Bin / Reorder */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
@@ -399,6 +407,32 @@ export default function KanbanCardPreview() {
           />
         </div>
       </div>
+          {/* BACK CARD */}
+          <div
+            className="card backCard"
+            style={{
+              width: "4in",
+              height: "6in",
+              border: "2px solid #111827",
+              borderRadius: 12,
+              background: "white",
+              boxSizing: "border-box",
+              padding: "12px",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 900 }}>🚚</div>
+              <div style={{ fontSize: 14, fontWeight: 800, marginTop: 6 }}>
+                ORDER PLACED — WAITING ON STOCK
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
 
       {/* Debug panel (add ?debug=1 to URL) */}
       {typeof window !== "undefined" &&
@@ -420,13 +454,10 @@ export default function KanbanCardPreview() {
       ) : null}
 
       <style>{`
-        /* Force the printer page to Letter and remove default margins */
         @page {
           size: 8.5in 11in;
           margin: 0;
         }
-
-        /* Print-only layout: center a 4×6 card on the Letter page */
         @media print {
           html, body {
             width: 8.5in;
@@ -435,31 +466,32 @@ export default function KanbanCardPreview() {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
-
-          /* One page sized to Letter that centers its contents */
           .printPage {
             width: 8.5in !important;
             height: 11in !important;
             display: grid !important;
-            place-items: center !important; /* centers both ways */
+            place-items: center !important; /* centers the row on the page */
             background: white !important;
           }
-
-          /* The actual 4×6 card we print */
+          .cardRow {
+            display: grid !important;
+            grid-template-columns: 4in 4in !important;
+            gap: 0.25in !important; /* small gutter between front/back */
+            align-items: center !important;
+            justify-items: center !important;
+          }
           .card {
             width: 4in !important;
             height: 6in !important;
             box-shadow: none !important;
           }
-
-          /* Hide UI controls in print */
+          /* Hide UI controls and internal links in print */
           button, a[href^="/"], .no-print {
             display: none !important;
           }
         }
-
-
       `}</style>
+
     </div>
   );
 }

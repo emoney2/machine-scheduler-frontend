@@ -43,6 +43,23 @@ export default function KanbanWizard() {
   function back() { setStep((s) => Math.max(1, s - 1)); }
 
   async function save() {
+    // Hard-required fields across steps
+    if (!String(itemName).trim())       return alert("Item Name is required.");
+    if (!String(dept).trim())           return alert("Dept is required.");
+    if (!String(packageSize).trim())    return alert("Package Size is required.");
+    if (!String(costPerPkg).trim())     return alert("Cost (per pkg) is required.");
+    if (!String(photoUrl).trim())       return alert("Photo URL is required.");
+
+    if (orderMethod === "Online" && !String(url).trim())
+      return alert("Product URL is required for Online order method.");
+    if (orderMethod === "Email" && !String(orderEmail).trim())
+      return alert("Order Email is required for Email order method.");
+
+    // Step 3 requireds (your labels already say required)
+    if (!String(binQtyUnits).trim())      return alert("Bin Qty (units) is required.");
+    if (!String(leadTimeDays).trim())     return alert("Lead Time (days) is required.");
+    if (!String(reorderQtyBasis).trim())  return alert("Reorder Qty (basis) is required.");
+
     const payload = {
       kanbanId,
       itemName,
@@ -79,7 +96,6 @@ export default function KanbanWizard() {
         const t = await r.text().catch(() => "");
         throw new Error(`Save failed (HTTP ${r.status}) ${t}`);
       }
-      // Success → go to preview for this card
       window.location.href = `/kanban/preview/${encodeURIComponent(kanbanId)}`;
     } catch (err) {
       alert(String(err?.message || err));
@@ -87,6 +103,7 @@ export default function KanbanWizard() {
       setSaving(false);
     }
   }
+
 
 
   return (
@@ -162,9 +179,9 @@ export default function KanbanWizard() {
                 <Field label="Dept (required)" value={dept} setValue={setDept} />
                 <Field label="Location (optional)" value={location} setValue={setLocation} />
                 <Field label="Package Size (required)" value={packageSize} setValue={setPackageSize} placeholder="e.g., 6 rolls/case" />
-                <Field label="SKU (optional)" value={sku} setValue={setSku} mono />
+                <Field label="Cost (per pkg) — required" value={costPerPkg} setValue={setCostPerPkg} mono />
                 <Field label="Category (optional)" value={category} setValue={setCategory} />
-                <Field label="Photo URL (optional)" value={photoUrl} setValue={setPhotoUrl} placeholder="https://image..." />
+                <Field label="Photo URL (required)" value={photoUrl} setValue={setPhotoUrl} placeholder="https://image..." />
               </div>
             </div>
           )}
@@ -194,7 +211,7 @@ export default function KanbanWizard() {
                 style={btnPrimary}
                 disabled={
                   (step === 2 && (orderMethod === "Online" ? !url : !orderEmail)) ||
-                  (step === 2 && (!itemName || !dept || !packageSize))
+                  (step === 2 && (!itemName || !dept || !packageSize || !costPerPkg || !photoUrl))
                 }
                 title="Complete required fields to continue"
               >
