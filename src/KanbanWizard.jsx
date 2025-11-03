@@ -34,6 +34,7 @@ export default function KanbanWizard() {
   const [substitutes, setSubstitutes] = useState("Y");
   const [notes, setNotes] = useState("");
   const [photoUrl, setPhotoUrl] = useState(""); // will support camera/crop next
+  const [saving, setSaving] = useState(false);
 
   const kanbanId = useMemo(() => makeKanbanId(dept, category, sku), [dept, category, sku]);
 
@@ -66,20 +67,27 @@ export default function KanbanWizard() {
       photoUrl,
     };
 
-    const r = await fetch(`${BACKEND}/api/kanban/upsert-item`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(payload),
-    });
-    if (!r.ok) {
-      const t = await r.text().catch(() => "");
-      alert(`Save failed (HTTP ${r.status}) ${t}`);
-      return;
+    try {
+      setSaving(true);
+      const r = await fetch(`${BACKEND}/api/kanban/upsert-item`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        throw new Error(`Save failed (HTTP ${r.status}) ${t}`);
+      }
+      // Success → go to preview for this card
+      window.location.href = `/kanban/preview/${encodeURIComponent(kanbanId)}`;
+    } catch (err) {
+      alert(String(err?.message || err));
+    } finally {
+      setSaving(false);
     }
-    // Go back to queue
-    window.location.href = `/kanban/preview/${encodeURIComponent(kanbanId)}`;
   }
+
 
   return (
     <div style={{ maxWidth: 960, margin: "0 auto", padding: 24 }}>
@@ -198,9 +206,28 @@ export default function KanbanWizard() {
           </div>
         </div>
       </div>
+
+      {saving && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(250, 204, 21, 0.9)", // yellow overlay
+            display: "grid",
+            placeItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div style={{ fontWeight: 900, fontSize: 24, color: "#111827" }}>
+            Saving…
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+
 
 function canContinue() {
   return true;

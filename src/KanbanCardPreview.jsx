@@ -96,7 +96,10 @@ export default function KanbanCardPreview() {
       doc.addImage(imgData, "PNG", dx, dy, drawW, drawH, undefined, "FAST");
 
       const pdfBlob = doc.output("blob");
-      const fname = `${(item?.kanbanId || routeKanbanId || "kanban")}.pdf`;
+      const clean = (s) => String(s || "").replace(/[\\/:*?"<>|]+/g, "").trim();
+      const fname = `${
+        clean(item?.itemName || "") || clean(item?.kanbanId || routeKanbanId || "kanban")
+      }.pdf`;
 
       // Upload to backend -> Google Drive
       const fd = new FormData();
@@ -415,12 +418,18 @@ export default function KanbanCardPreview() {
       ) : null}
 
       <style>{`
+        @page { size: 4in 6in; margin: 0; }  /* ask the browser for true 4×6 no margins */
+
         @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .card { box-shadow: none !important; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0 !important; }
+          .card {
+            box-shadow: none !important;
+            width: 4in !important;
+            height: 6in !important;
+          }
           button, a { display: none !important; }
-          @page { size: 4in 6in; margin: 0.25in; }
         }
+
       `}</style>
     </div>
   );
