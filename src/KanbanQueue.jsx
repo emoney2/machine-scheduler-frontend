@@ -309,9 +309,21 @@ export default function KanbanQueue() {
                           )}
 
                           <div style={{ display: "grid", gap: 4 }}>
-                            <div style={{ fontWeight: 700 }}>
-                              {r["Item Name"] || "(unnamed)"}
-                            </div>
+                            {r["Order Method"] === "Online" && r["Order URL"] ? (
+                              <a
+                                href={r["Order URL"]}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ fontWeight: 700, color: "#111827", textDecoration: "underline" }}
+                                title="Open product page"
+                              >
+                                {r["Item Name"] || "(unnamed)"}
+                              </a>
+                            ) : (
+                              <div style={{ fontWeight: 700 }}>
+                                {r["Item Name"] || "(unnamed)"}
+                              </div>
+                            )}
                             <div
                               style={{
                                 fontSize: 12,
@@ -322,7 +334,6 @@ export default function KanbanQueue() {
                             >
                               {r["SKU"]}
                             </div>
-
                             {/* metadata chips */}
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                               <Chip label="Kanban" value={r["Kanban ID"]} mono />
@@ -334,23 +345,14 @@ export default function KanbanQueue() {
                           </div>
                         </div>
 
-                        {/* link/email row */}
+                        {/* link/email row: keep email link only; Online link now lives on Item Name */}
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                          {r["Order Method"] === "Email" ? (
+                          {r["Order Method"] === "Email" && (
                             <a
                               href={`mailto:${r["Order Email"] || ""}`}
                               style={{ color: "#2563eb", textDecoration: "underline" }}
                             >
                               {r["Order Email"] || "(missing email)"}
-                            </a>
-                          ) : (
-                            <a
-                              href={r["Order URL"] || "#"}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: "#2563eb", textDecoration: "underline", wordBreak: "break-all" }}
-                            >
-                              {r["Order URL"] || "(missing link)"}
                             </a>
                           )}
                         </div>
