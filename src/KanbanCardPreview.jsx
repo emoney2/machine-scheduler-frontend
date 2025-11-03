@@ -4,10 +4,13 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
-const makeQr = (data, size = 160) =>
-  `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&qzone=1&data=${encodeURIComponent(
-    data || ""
-  )}`;
+// Simple QR generator (external API)
+const makeQr = (data, size = 180) =>
+  data
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&qzone=1&data=${encodeURIComponent(
+        data
+      )}`
+    : "";
 
 function showVal(v) {
   if (v === null || v === undefined) return "—";
@@ -42,16 +45,22 @@ function getLocationStyles(locKey) {
 }
 
 export default function KanbanCardPreview() {
-  const { kanbanId } = useParams();
+  // Support either :kanbanId or :id
+  const params = useParams();
+  const routeKanbanId = params.kanbanId || params.id || "";
   const nav = useNavigate();
+
   const [item, setItem] = useState(null);
   const [err, setErr] = useState("");
+  const [shortOrderUrl, setShortOrderUrl] = useState("");
 
+  // --- Fetch item (public) ---
   useEffect(() => {
-    const load = async () => {
+    let alive = true;
+    (async () => {
       try {
         const r = await fetch(
-          `${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(kanbanId)}`,
+          `${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(routeKanbanId)}`,
           { credentials: "omit" }
         );
         if (!r.ok) {
@@ -61,7 +70,7 @@ export default function KanbanCardPreview() {
         const j = await r.json();
         if (!j?.item) throw new Error("Item not found (empty payload)");
 
-        // Key normalizer: crush weird spaces/characters
+        // Normalize keys (case/space-proof)
         const raw = j.item;
         const normKey = (k) => String(k || "").toLowerCase().replace(/[^a-z0-9]/g, "");
         const nmap = {};
@@ -75,30 +84,58 @@ export default function KanbanCardPreview() {
         };
 
         const normalized = {
-          kanbanId:        pick("Kanban ID","kanbanId"),
+          kanbanId:        pick("Kanban ID","kanbanId") || routeKanbanId,
           itemName:        pick("Item Name","itemName"),
           sku:             pick("SKU","sku"),
           location:        pick("Location","location"),
           packageSize:     pick("Package Size","packageSize"),
           leadTimeDays:    String(pick("Lead Time (days)","leadTimeDays","leadTime")).trim(),
-
-          // 👇 Your exact headers with multiple fallbacks
           binQtyUnits:     pick("Bin Qty (units)","Bin Quantity (units)","binQtyUnits","binQty","binQuantity"),
           reorderQtyBasis: pick("Reorder Qty (basis)","reorderQtyBasis","reorderQty"),
-
           orderMethod:     pick("Order Method (Email/Online)","orderMethod"),
-          orderUrl:        pick("Order URL","orderUrl"),
+          orderUrl:        pick("Order URL","orderUrl","orderURL"),
           orderEmail:      pick("Order Email","orderEmail"),
           photoUrl:        pick("Photo URL","photoUrl"),
+          supplier:        pick("Supplier","supplier"),
         };
 
+        if (!alive) return;
         setItem({ ...normalized, _debugRaw: raw });
+
+        // Build the direct order target (mailto or vendor URL)
+        const orderTarget =
+          normalized.orderMethod === "Email"
+            ? normalized.orderEmail
+              ? `mailto:${normalized.orderEmail}`
+              : ""
+            : (normalized.orderUrl || "").trim();
+
+        // Shorten long URLs only; never route through app
+        if (orderTarget && orderTarget.length > 40 && !orderTarget.startsWith("mailto:")) {
+          try {
+            const r2 = await fetch(
+              `${BACKEND}/api/util/shorten?url=${encodeURIComponent(orderTarget)}`,
+              { credentials: "omit" }
+            );
+            const j2 = await r2.json();
+            if (!alive) return;
+            setShortOrderUrl(j2?.short || orderTarget);
+          } catch {
+            if (!alive) return;
+            setShortOrderUrl(orderTarget);
+          }
+        } else {
+          setShortOrderUrl(orderTarget);
+        }
       } catch (e) {
+        if (!alive) return;
         setErr(String(e?.message || e));
+        setItem(null);
+        setShortOrderUrl("");
       }
-    };
-    load();
-  }, [kanbanId]);
+    })();
+    return () => { alive = false; };
+  }, [routeKanbanId]);
 
   if (err) {
     return (
@@ -113,48 +150,40 @@ export default function KanbanCardPreview() {
   }
   if (!item) return <div style={{ padding: 24 }}>Loading…</div>;
 
-  // Short Order QR → /kanban/go?to=... (tiny QR) → immediately redirects to vendor URL/mailto
-  // Order Page QR: DIRECT link (shortened via backend if long) — never routes through the app
-  const orderTarget = item.orderMethod === "Email"
-    ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
-    : (item.orderUrl || "");
+  const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
+  // Final DIRECT URL for Order QR (short if available, fallback to long/mailto)
+  const orderTarget =
+    item.orderMethod === "Email"
+      ? item.orderEmail
+        ? `mailto:${item.orderEmail}`
+        : ""
+      : (item.orderUrl || "").trim();
+  const orderQrUrl = shortOrderUrl || orderTarget || "";
 
-  // NEW: ask backend to shorten the real URL, then use that in the QR
-  const [shortOrderUrl, setShortOrderUrl] = useState("");
-
-  useEffect(() => {
-    if (!orderTarget) { setShortOrderUrl(""); return; }
-    fetch(`${BACKEND}/api/util/shorten?url=${encodeURIComponent(orderTarget)}`)
-      .then(r => r.json())
-      .then(j => setShortOrderUrl(j.short || orderTarget))
-      .catch(() => setShortOrderUrl(orderTarget));
-  }, [orderTarget]);
-
-
-  // Replace placeholders with YOUR Form IDs:
-  // Google Form details for direct submit (no login)
+  // DIRECT Google Form submission URL (no app, no login)
+  // Submits a row with the Kanban ID and qty=1 by default
   const GOOGLE_FORM_ID = "1FAIpQLScsQeFaR22LNHcSZWbqwtNSBQU-j5MJdbxK1AA3cF-yBBxutA";
-
-  // Map your form fields (swap these two if you find they’re reversed)
-  const ENTRY_KANBAN = "entry.1189949378";  // Kanban ID field
-  const ENTRY_QTY    = "entry.312175649";   // Quantity field
-
-  // Direct-submit URL to Google Forms (uses /formResponse)
+  const ENTRY_KANBAN = "entry.1189949378"; // Kanban ID field
+  const ENTRY_QTY = "entry.312175649";     // Quantity field
   const reorderScanUrl =
     `https://docs.google.com/forms/d/e/${GOOGLE_FORM_ID}/formResponse` +
-    `?${ENTRY_KANBAN}=${encodeURIComponent(item.kanbanId)}` +
-    `&${ENTRY_QTY}=1` +
-    `&submit=Submit`;
-
-  const { bg: locBg, text: locText } = getLocationStyles(item.location);
+    `?${ENTRY_KANBAN}=${encodeURIComponent(item.kanbanId || routeKanbanId)}` +
+    `&${ENTRY_QTY}=1&submit=Submit`;
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <button onClick={() => nav(`/kanban/new?edit=${encodeURIComponent(kanbanId)}`)} style={btnSecondary}>Edit</button>
+        <button
+          onClick={() => nav(`/kanban/new?edit=${encodeURIComponent(item.kanbanId || routeKanbanId)}`)}
+          style={btnSecondary}
+        >
+          Edit
+        </button>
         <button onClick={() => window.print()} style={btnPrimary}>Print</button>
-        <Link to="/kanban/queue" style={{ alignSelf: "center", marginLeft: "auto" }}>← Back to Queue</Link>
+        <Link to="/kanban/queue" style={{ alignSelf: "center", marginLeft: "auto" }}>
+          ← Back to Queue
+        </Link>
       </div>
 
       {/* 4x6 printable card */}
@@ -269,14 +298,13 @@ export default function KanbanCardPreview() {
           }}
         >
           <div style={{ fontWeight: 800, fontSize: 11, textAlign: "center" }}>Order Page</div>
-          {/* generate at 180px for a cleaner, easier-to-scan code, but render at 100×100 */}
+          {/* generate at 180px for cleaner code; render smaller */}
           <img
             alt="Order QR"
-            src={makeQr(shortOrderUrl || orderTarget, 180)}
+            src={makeQr(orderQrUrl, 180)}
             style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
-
         </div>
 
         <div
@@ -300,8 +328,7 @@ export default function KanbanCardPreview() {
             onError={(e) => { e.currentTarget.style.display = "none"; }}
           />
         </div>
-
-      </div> {/* CLOSE: .card */}
+      </div>
 
       {/* Debug panel (add ?debug=1 to URL) */}
       {typeof window !== "undefined" &&
