@@ -1,6 +1,8 @@
 // src/KanbanCardPreview.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
@@ -53,6 +55,68 @@ export default function KanbanCardPreview() {
   const [item, setItem] = useState(null);
   const [err, setErr] = useState("");
   const [shortOrderUrl, setShortOrderUrl] = useState("");
+  const cardRef = useRef(null);
+
+  async function handlePrintAndSave() {
+    try {
+      const node = cardRef.current;
+      if (!node) {
+        window.print();  // fallback
+        return;
+      }
+
+      // Render the card at high scale for crisp output
+      const canvas = await html2canvas(node, {
+        scale: 2,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+        windowWidth: node.scrollWidth,
+        windowHeight: node.scrollHeight,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      // Build a true 4×6 PDF
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "in",
+        format: [4, 6],
+        compress: true,
+      });
+
+      const pageW = 4, pageH = 6;
+      const imgW = canvas.width / 96;   // px → inches
+      const imgH = canvas.height / 96;
+      const ratio = Math.min(pageW / imgW, pageH / imgH);
+      const drawW = imgW * ratio;
+      const drawH = imgH * ratio;
+      const dx = (pageW - drawW) / 2;
+      const dy = (pageH - drawH) / 2;
+      doc.addImage(imgData, "PNG", dx, dy, drawW, drawH, undefined, "FAST");
+
+      const pdfBlob = doc.output("blob");
+      const fname = `${(item?.kanbanId || routeKanbanId || "kanban")}.pdf`;
+
+      // Upload to backend -> Google Drive
+      const fd = new FormData();
+      fd.append("file", pdfBlob, fname);
+      fd.append("filename", fname);
+      // optional: set/override a folder by name
+      // fd.append("folderName", "Kanban Cards"); 
+
+      await fetch(`${BACKEND}/api/kanban/upload-card`, {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      }).catch(() => { /* ignore upload errors and still print */ });
+
+    } finally {
+      // Always open print dialog
+      window.print();
+    }
+  }
+
 
   // --- Fetch item (public) ---
   useEffect(() => {
@@ -180,7 +244,7 @@ export default function KanbanCardPreview() {
         >
           Edit
         </button>
-        <button onClick={() => window.print()} style={btnPrimary}>Print</button>
+        <button onClick={handlePrintAndSave} style={btnPrimary}>Print</button>
         <Link to="/kanban/queue" style={{ alignSelf: "center", marginLeft: "auto" }}>
           ← Back to Queue
         </Link>
@@ -188,6 +252,7 @@ export default function KanbanCardPreview() {
 
       {/* 4x6 printable card */}
       <div
+        ref={cardRef}
         className="card"
         style={{
           width: "4in",
