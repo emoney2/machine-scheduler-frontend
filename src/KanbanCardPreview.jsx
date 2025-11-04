@@ -116,12 +116,16 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         setItem({ ...normalized, _debugRaw: raw });
 
         // Build the direct order target (mailto or vendor URL)
+        // Final DIRECT URL for Order QR (short if available). If missing, fall back to app route.
         const orderTarget =
-          normalized.orderMethod === "Email"
-            ? normalized.orderEmail
-              ? `mailto:${normalized.orderEmail}`
-              : ""
-            : (normalized.orderUrl || "").trim();
+          item.orderMethod === "Email"
+            ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
+            : (item.orderUrl || "").trim();
+
+        // Fallback ensures we ALWAYS have a scannable QR (opens app route that redirects if possible)
+        const fallbackOpen = `https://machineschedule.netlify.app/kanban/open?id=${encodeURIComponent(item.kanbanId || routeKanbanId)}`;
+        const orderQrUrl = shortOrderUrl || orderTarget || fallbackOpen;
+
 
         // Shorten long URLs only; never route through app
         if (orderTarget && orderTarget.length > 40 && !orderTarget.startsWith("mailto:")) {
@@ -301,15 +305,12 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
               {/* Order QR */}
               <div className="qr qr-order">
-                {orderQrUrl ? (
-                  <img
-                    alt="Order Page QR"
-                    src={makeQr(orderQrUrl, 250)}
-                  />
-                ) : (
-                  <div style={{ fontSize: 10, color: "#9ca3af" }}>No order URL</div>
-                )}
+                <img
+                  alt="Order Page QR"
+                  src={makeQr(orderQrUrl, 250)}
+                />
               </div>
+
             </div>
 
             <div className="rightCol">
