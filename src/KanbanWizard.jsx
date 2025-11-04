@@ -2,6 +2,9 @@ import React, { useMemo, useState } from "react";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
+// Required locations list (must match your preview styling keys)
+const LOCATIONS = ["Kitchen","Cut","Fur","Print","Embroidery","Sewing","Shipping"];
+
 // Simple Kanban ID helper: K-<DEPT>-<CAT>-<SKU>-01
 function makeKanbanId(dept, category, sku) {
   const d = (dept || "GEN").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 3);
@@ -51,7 +54,7 @@ export default function KanbanWizard() {
   const [sku, setSku] = useState("");
   const [dept, setDept] = useState("Facilities");
   const [category, setCategory] = useState("");
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(LOCATIONS[0]);
   const [packageSize, setPackageSize] = useState("");
   const [binQtyUnits, setBinQtyUnits] = useState("");
   const [caseMultiple, setCaseMultiple] = useState("");
@@ -73,6 +76,11 @@ export default function KanbanWizard() {
   function back() { setStep((s) => Math.max(1, s - 1)); }
 
   async function save() {
+    if (!location || !location.trim()) {
+      alert("Location is required.");
+      setStep(2);
+      return;
+    }
     // Hard-required fields across steps
     if (!String(itemName).trim())       return alert("Item Name is required.");
     if (!String(dept).trim())           return alert("Dept is required.");
@@ -211,12 +219,7 @@ export default function KanbanWizard() {
 
                 <Field label="Item Name (required)" value={itemName} setValue={setItemName} />
                 <Field label="Dept (required)" value={dept} setValue={setDept} />
-                <Select
-                  label="Location (optional)"
-                  value={location}
-                  setValue={setLocation}
-                  options={["Kitchen","Cut","Fur","Print","Embroidery","Sewing","Shipping"]}
-                />
+                <Select label="Location (required)" value={location} setValue={setLocation} options={LOCATIONS} />
                 <Field label="Package Size (required)" value={packageSize} setValue={setPackageSize} placeholder="e.g., 6 rolls/case" />
                 <Field label="Cost (per pkg) — required" value={costPerPkg} setValue={setCostPerPkg} mono />
                 <Field label="Category (optional)" value={category} setValue={setCategory} />
