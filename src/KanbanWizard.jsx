@@ -177,7 +177,9 @@ export default function KanbanWizard() {
 
                 <Field label="Item Name (required)" value={itemName} setValue={setItemName} />
                 <Field label="Dept (required)" value={dept} setValue={setDept} />
-                <Field label="Location (optional)" value={location} setValue={setLocation} />
+                <Select label="Location (optional)" value={location} setValue={setLocation}
+                  options={["Kitchen","Cut","Fur","Print","Embroidery","Sewing","Shipping"]}
+                />
                 <Field label="Package Size (required)" value={packageSize} setValue={setPackageSize} placeholder="e.g., 6 rolls/case" />
                 <Field label="Cost (per pkg) — required" value={costPerPkg} setValue={setCostPerPkg} mono />
                 <Field label="Category (optional)" value={category} setValue={setCategory} />
