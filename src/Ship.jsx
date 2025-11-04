@@ -268,29 +268,61 @@ export default function Ship() {
   async function ensureQboAuth() {
     try {
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+
+      // Pre-open a placeholder popup synchronously (reduces popup blockers)
+      // This function MUST be called from a direct user gesture (e.g., button click).
+      const w = 720, h = 720;
+      const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
+      const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
+      let popup = window.open(
+        "about:blank",
+        "qbo_oauth",
+        `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
+      );
+
+      // 1) Initial check
       const resp = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
-      const data = await resp.json();
 
-      if (data?.ok) return true;
+      let data = null;
+      try { data = await resp.json(); } catch {}
 
+      if (resp.ok && data?.ok) {
+        // Already authorized — close the placeholder if it exists
+        if (popup && !popup.closed) popup.close();
+        return true;
+      }
+
+      // Show backend-provided error details if any
+      if (!resp.ok && data?.error && !data?.redirect) {
+        if (popup && !popup.closed) popup.close();
+        alert(`QuickBooks auth failed: ${data.detail || data.error}`);
+        return false;
+      }
+
+      // 2) If we got a redirect, navigate the pre-opened popup
       if (data?.redirect) {
-        // Centered popup for QBO login
-        const w = 720, h = 720;
-        const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
-        const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
-        const popup = window.open(
-          `${API_BASE}${data.redirect}`,
-          "qbo_oauth",
-          `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
-        );
-        if (!popup) {
-          alert("Popup blocked. Please allow popups for QuickBooks login.");
-          return false;
+        if (!popup || popup.closed) {
+          // Fallback: try to open again (may be blocked if not in user gesture)
+          popup = window.open("about:blank", "qbo_oauth",
+            `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
+          );
+          if (!popup) {
+            alert("Popup blocked. Please allow popups for QuickBooks login.");
+            return false;
+          }
         }
+
+        // Support absolute or relative redirect URLs
+        const targetUrl = data.redirect.startsWith("http")
+          ? data.redirect
+          : `${API_BASE}${data.redirect}`;
+
+        try { popup.location = targetUrl; } catch { popup.close(); return false; }
+
         // Wait until popup closes (5 min timeout)
         await new Promise((resolve, reject) => {
           const start = Date.now();
@@ -306,19 +338,35 @@ export default function Ship() {
           }, 800);
         });
 
-        // Re-check
+        // 3) Re-check after popup closes
         const re = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
         });
-        const redata = await re.json();
-        return !!redata?.ok;
+
+        let redata = null;
+        try { redata = await re.json(); } catch {}
+
+        if (re.ok && redata?.ok) {
+          return true;
+        }
+
+        if (!re.ok && redata?.error && !redata?.redirect) {
+          alert(`QuickBooks auth failed: ${redata.detail || redata.error}`);
+          return false;
+        }
+
+        // No explicit error but also not ok → treat as cancelled
+        return false;
       }
 
+      // No ok, no redirect, no error → treat as failure
+      if (popup && !popup.closed) popup.close();
       return false;
     } catch (e) {
       console.error("[ensureQboAuth] error:", e);
+      alert("QuickBooks login failed or was cancelled.");
       return false;
     }
   }
