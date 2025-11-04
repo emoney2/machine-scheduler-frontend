@@ -256,8 +256,8 @@ export default function KanbanCardPreview() {
             className="card"
             style={{
 
-            width: "4in",
-            height: "6in",
+            width: "3.5in",
+            height: "5.5in",
             border: "2px solid #111827",
             borderRadius: 12,
             background: "white",
@@ -411,8 +411,8 @@ export default function KanbanCardPreview() {
           <div
             className="card backCard"
             style={{
-              width: "4in",
-              height: "6in",
+              width: "3.5in",
+              height: "5.5in",
               border: "2px solid #111827",
               borderRadius: 12,
               background: "white",
@@ -454,68 +454,65 @@ export default function KanbanCardPreview() {
       ) : null}
 
       <style>{`
-        @page {
-          size: 8.5in 11in;
-          margin: 0;
+        :root {
+          --card-w: 3.5in;   /* SHRUNK by 0.5" from 4.0in */
+          --card-h: 5.5in;   /* SHRUNK by 0.5" from 6.0in */
+          --gap:    0.25in;
+          --padL:   0.125in; /* 1/8" left margin */
+          --padT:   0.125in; /* 1/8" top margin */
         }
 
-        /* SCREEN (live preview) — side-by-side */
-        .printPage {
-          display: grid;
-          place-items: start;
-          background: white;
+        @page {
+          size: Letter;
+          margin: 0; /* we control our own margins with padding */
         }
+
+        /* Screen layout */
+        .wrap {
+          display: grid;
+          gap: 18px;
+          padding: 24px;
+        }
+
+        /* What gets printed */
+        .printPage {
+          position: relative;
+          width: 8.5in;
+          height: 11in;
+          box-sizing: border-box;
+          padding-left: var(--padL);
+          padding-top:  var(--padT);
+        }
+
         .cardRow {
           display: grid;
-          grid-template-columns: 4in 4in;
-          gap: 0.25in;
-          align-items: start;
-          justify-items: start;
+          grid-template-columns: var(--card-w) var(--card-w);
+          gap: var(--gap);
         }
-        .card {
-          width: 4in;
-          height: 6in;
+
+        .onlyForPrint {
+          display: none;
         }
-      
-        /* PRINT — only print the cards, top-left of page */
+
         @media print {
           html, body {
-            width: 8.5in;
-            height: 11in;
-            margin: 0 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            margin: 0;
+            padding: 0;
           }
-
-          /* Hide everything except the printable area */
-          body * { visibility: hidden !important; }
-          .printPage, .printPage * { visibility: visible !important; }
-
+          /* Print only the card canvas, nothing else */
+          body * { visibility: hidden; }
+          .printPage, .printPage * { visibility: visible; }
           .printPage {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 8.5in !important;
-            height: 11in !important;
-            display: grid !important;
-            place-items: start !important;
-            background: white !important;
-            margin: 0 !important;
+            position: fixed;
+            inset: 0;
+            margin: 0;
           }
-          .cardRow {
-            display: grid !important;
-            grid-template-columns: 4in 4in !important;
-            gap: 0.25in !important;
-            align-items: start !important;
-            justify-items: start !important;
-          }
-          .card {
-            width: 4in !important;
-            height: 6in !important;
-            box-shadow: none !important;
+          .onlyForPrint {
+            display: block;
           }
         }
       `}</style>
+
 
 
     </div>

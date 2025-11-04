@@ -10,7 +10,37 @@ function makeKanbanId(dept, category, sku) {
   return `K-${d}-${c}-${s}-01`;
 }
 
+// Find the first available ID by probing /api/kanban/get-item
+async function findNextKanbanId(dept, category, sku) {
+  const base = (() => {
+    const d = (dept || "GEN").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0,3);
+    const c = (category || "GEN").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0,4);
+    const s = (sku || "SKU").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0,3);
+    return `K-${d}-${c}-${s}-`;
+  })();
+
+  for (let i = 1; i <= 99; i++) {
+    const suffix = String(i).padStart(2, "0");
+    const candidate = `${base}${suffix}`;
+    try {
+      const r = await fetch(`${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(candidate)}`, {
+        credentials: "omit",
+      });
+      if (r.status === 404) {
+        // not found → available
+        return candidate;
+      }
+      // if r.ok (200), it exists; keep trying next suffix
+    } catch {
+      // transient error → try next
+    }
+  }
+  // fallback (should never happen)
+  return `${base}${Date.now().toString().slice(-2)}`;
+}
+
 export default function KanbanWizard() {
+
   const [step, setStep] = useState(1);
   const [orderMethod, setOrderMethod] = useState("Online"); // "Online" | "Email"
 
@@ -60,8 +90,11 @@ export default function KanbanWizard() {
     if (!String(leadTimeDays).trim())     return alert("Lead Time (days) is required.");
     if (!String(reorderQtyBasis).trim())  return alert("Reorder Qty (basis) is required.");
 
+    // Compute the first free ID like K-<DEPT>-<CAT>-<SKU>-02 if ...-01 exists
+    const finalId = await findNextKanbanId(dept, category, sku);
+
     const payload = {
-      kanbanId,
+      kanbanId: finalId,
       itemName,
       sku,
       dept,
@@ -96,12 +129,13 @@ export default function KanbanWizard() {
         const t = await r.text().catch(() => "");
         throw new Error(`Save failed (HTTP ${r.status}) ${t}`);
       }
-      window.location.href = `/kanban/preview/${encodeURIComponent(kanbanId)}`;
+      window.location.href = `/kanban/preview/${encodeURIComponent(finalId)}`;
     } catch (err) {
       alert(String(err?.message || err));
     } finally {
       setSaving(false);
     }
+
   }
 
 
