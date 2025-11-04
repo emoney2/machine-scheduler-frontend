@@ -386,9 +386,11 @@ export default function KanbanCardPreview() {
                 />
               </div>
             </div>
-          </div>
-      </div>
+          </div>        {/* closes .lower */}
+        </div>          {/* closes Body */}
+      </div>            {/* closes .card.front */}
           {/* BACK CARD */}
+
           <div
             className="card backCard"
             style={{
