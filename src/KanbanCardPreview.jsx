@@ -458,6 +458,26 @@ export default function KanbanCardPreview() {
           size: 8.5in 11in;
           margin: 0;
         }
+
+        /* SCREEN (live preview) — side-by-side */
+        .printPage {
+          display: grid;
+          place-items: start;
+          background: white;
+        }
+        .cardRow {
+          display: grid;
+          grid-template-columns: 4in 4in;
+          gap: 0.25in;
+          align-items: start;
+          justify-items: start;
+        }
+        .card {
+          width: 4in;
+          height: 6in;
+        }
+      
+        /* PRINT — only print the cards, top-left of page */
         @media print {
           html, body {
             width: 8.5in;
@@ -466,31 +486,37 @@ export default function KanbanCardPreview() {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+
+          /* Hide everything except the printable area */
+          body * { visibility: hidden !important; }
+          .printPage, .printPage * { visibility: visible !important; }
+
           .printPage {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
             width: 8.5in !important;
             height: 11in !important;
             display: grid !important;
-            place-items: center !important; /* centers the row on the page */
+            place-items: start !important;
             background: white !important;
+            margin: 0 !important;
           }
           .cardRow {
             display: grid !important;
             grid-template-columns: 4in 4in !important;
-            gap: 0.25in !important; /* small gutter between front/back */
-            align-items: center !important;
-            justify-items: center !important;
+            gap: 0.25in !important;
+            align-items: start !important;
+            justify-items: start !important;
           }
           .card {
             width: 4in !important;
             height: 6in !important;
             box-shadow: none !important;
           }
-          /* Hide UI controls and internal links in print */
-          button, a[href^="/"], .no-print {
-            display: none !important;
-          }
         }
       `}</style>
+
 
     </div>
   );
