@@ -148,7 +148,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       }
     })();
     return () => { alive = false; };
-  }, [routeKanbanId]);
+  }, [effectiveId]);
 
   if (err) {
     return (
@@ -367,10 +367,8 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           </div>
 
         </div>
-      </div>
-
-
       {/* Debug panel (add ?debug=1 to URL) */}
+
       {typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("debug") === "1" ? (
         <pre
