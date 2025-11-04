@@ -455,33 +455,26 @@ export default function KanbanCardPreview() {
 
       <style>{`
         :root {
-          --card-w: 3.5in;   /* SHRUNK by 0.5" from 4.0in */
-          --card-h: 5.5in;   /* SHRUNK by 0.5" from 6.0in */
-          --gap:    0.25in;
-          --padL:   0.125in; /* 1/8" left margin */
-          --padT:   0.125in; /* 1/8" top margin */
+          --card-w: 4in;
+          --card-h: 6in;
+          --gap: 0.25in;
+          --margin-left: 0.125in;
+          --margin-top: 0.125in;
         }
 
         @page {
           size: Letter;
-          margin: 0; /* we control our own margins with padding */
+          margin: 0; /* We'll handle our own margin */
         }
 
-        /* Screen layout */
-        .wrap {
-          display: grid;
-          gap: 18px;
-          padding: 24px;
-        }
-
-        /* What gets printed */
         .printPage {
           position: relative;
           width: 8.5in;
           height: 11in;
           box-sizing: border-box;
-          padding-left: var(--padL);
-          padding-top:  var(--padT);
+          padding-left: var(--margin-left);
+          padding-top: var(--margin-top);
+          background: white;
         }
 
         .cardRow {
@@ -490,31 +483,53 @@ export default function KanbanCardPreview() {
           gap: var(--gap);
         }
 
-        .onlyForPrint {
-          display: none;
+        .card {
+          width: var(--card-w);
+          height: var(--card-h);
+          box-shadow: 0 0 0.05in rgba(0,0,0,0.2);
+
+          /* very, very light trim guide */
+          position: relative;
+          border: 0.25pt solid rgba(0,0,0,0.08); /* ultra-light grey */
+
+          /* subtle internal corner crop marks (stay inside the card) */
+          background-image:
+            linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0.08)),
+            linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.08)),
+            linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0.08)),
+            linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.08));
+          background-repeat: no-repeat;
+          /* corner tick lengths: ~0.25in; line thickness: 0.5pt */
+          background-size:
+            0.5pt 0.25in, 0.25in 0.5pt,
+            0.5pt 0.25in, 0.25in 0.5pt;
+          /* inset the ticks a hair so they’re not on the edge */
+          background-position:
+            left 0.125in top 0, left 0 top 0.125in,
+            right 0.125in bottom 0, right 0 bottom 0.125in;
         }
+
 
         @media print {
           html, body {
             margin: 0;
             padding: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
-          /* Print only the card canvas, nothing else */
+          /* Hide everything except cards */
           body * { visibility: hidden; }
           .printPage, .printPage * { visibility: visible; }
+
           .printPage {
             position: fixed;
             inset: 0;
             margin: 0;
-          }
-          .onlyForPrint {
-            display: block;
+            padding-left: var(--margin-left);
+            padding-top: var(--margin-top);
           }
         }
       `}</style>
-
-
-
     </div>
   );
 }
