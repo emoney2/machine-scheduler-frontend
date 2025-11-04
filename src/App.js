@@ -32,6 +32,7 @@ import KanbanScan from "./KanbanScan";
 import KanbanOpen from "./KanbanOpen";
 import KanbanGo from "./KanbanGo";
 import KanbanScanPublic from "./KanbanScanPublic";
+import KanbanPrint from "./KanbanPrint";
 
 
 
@@ -1883,6 +1884,7 @@ useEffect(() => {
           <Route path="/kanban/open" element={<KanbanOpen />} />
           <Route path="/kanban/go" element={<KanbanGo />} />
           <Route path="/kanban/scan-public" element={<KanbanScanPublic />} />
+          <Route path="/kanban/print" element={<KanbanPrint />} />
 
 
           {/* 👇 New routes */}

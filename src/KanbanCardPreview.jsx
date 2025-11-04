@@ -46,10 +46,11 @@ function getLocationStyles(locKey) {
   return { bg, text };
 }
 
-export default function KanbanCardPreview() {
+export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   // Support either :kanbanId or :id
   const params = useParams();
   const routeKanbanId = params.kanbanId || params.id || "";
+  const effectiveId = idOverride || routeKanbanId;
   const nav = useNavigate();
 
   const [item, setItem] = useState(null);
@@ -241,7 +242,15 @@ export default function KanbanCardPreview() {
         >
           Edit
         </button>
-        <button onClick={() => window.print()} style={btnPrimary}>Print</button>
+        <button
+          onClick={() => {
+            window.open(`/kanban/print/${encodeURIComponent(effectiveId)}`, "_blank", "noopener,noreferrer");
+          }}
+          style={btnPrimary}
+        >
+          Print
+        </button>
+
         <Link to="/kanban/queue" style={{ alignSelf: "center", marginLeft: "auto" }}>
           ← Back to Queue
         </Link>
@@ -255,8 +264,8 @@ export default function KanbanCardPreview() {
           <div
             className="card front"
             style={{
-              width: "3.5in",
-              height: "5.5in",
+              width: "4in",
+              height: "6in",
               border: "2px solid #111827",
               borderRadius: 12,
               background: "white",
@@ -269,6 +278,7 @@ export default function KanbanCardPreview() {
               overflow: "hidden",
             }}
           >
+
 
 
         {/* Title */}
@@ -394,8 +404,8 @@ export default function KanbanCardPreview() {
           <div
             className="card backCard"
             style={{
-              width: "3.5in",
-              height: "5.5in",
+              width: "4in",
+              height: "6in",
               border: "2px solid #111827",
               borderRadius: 12,
               background: "white",
@@ -405,6 +415,7 @@ export default function KanbanCardPreview() {
               placeItems: "center",
             }}
           >
+
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 900 }}>🚚</div>
               <div style={{ fontSize: 14, fontWeight: 800, marginTop: 6 }}>
