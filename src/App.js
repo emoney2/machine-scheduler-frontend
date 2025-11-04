@@ -1885,7 +1885,7 @@ useEffect(() => {
           <Route path="/kanban/open" element={<KanbanOpen />} />
           <Route path="/kanban/go" element={<KanbanGo />} />
           <Route path="/kanban/scan-public" element={<KanbanScanPublic />} />
-          <Route path="/kanban/print" element={<KanbanPrint />} />
+          <Route path="/kanban/print/:id" element={<KanbanPrint />} />
 
 
           {/* 👇 New routes */}

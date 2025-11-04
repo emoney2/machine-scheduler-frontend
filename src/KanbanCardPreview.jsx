@@ -72,7 +72,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
     (async () => {
       try {
         const r = await fetch(
-          `${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(routeKanbanId)}`,
+          `${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(effectiveId)}`,
           { credentials: "omit" }
         );
         if (!r.ok) {
@@ -204,26 +204,25 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
       {/* Letter page with two 4×6 cards side-by-side */}
       <div ref={printRef} className="printPage">
-        <div className="cardRow">
 
-          {/* FRONT CARD */}
-          <div
-            className="card front"
-            style={{
-              width: "4in",
-              height: "6in",
-              border: "2px solid #111827",
-              borderRadius: 12,
-              background: "white",
-              boxSizing: "border-box",
-              padding: "12px",
-              display: "grid",
-              gridTemplateRows: "auto auto 1fr",
-              gap: 8,
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
+        {/* FRONT CARD */}
+        <div
+          className="card front"
+          style={{
+            width: "4in",
+            height: "6in",
+            border: "2px solid #111827",
+            borderRadius: 12,
+            background: "white",
+            boxSizing: "border-box",
+            padding: "12px",
+            display: "grid",
+            gridTemplateRows: "auto auto 1fr",
+            gap: 8,
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
         {/* Title */}
         <div style={{ fontWeight: 900, fontSize: 22, letterSpacing: 0.3, textAlign: "center" }}>
           KANBAN CARD
@@ -343,7 +342,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         </div>          {/* closes Body */}
       </div>            {/* closes .card.front */}
           {/* BACK CARD */}
-
           <div
             className="card backCard"
             style={{
