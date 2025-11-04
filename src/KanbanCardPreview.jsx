@@ -437,37 +437,37 @@ export default function KanbanCardPreview() {
       ) : null}
 
       <style>{`
-        :root {
-          /* PHYSICAL sizes */
-          --card-w: 4in;      /* exact 4" */
-          --card-h: 6in;      /* exact 6" */
-          --gap:    0.25in;   /* gutter between cards */
-          --padL:   0.125in;  /* 1/8" left margin */
-          --padT:   0.125in;  /* 1/8" top margin */
-
+        /* ====== PHYSICAL SIZING IN POINTS (72 pt = 1 inch) ====== */
+        :root{
+          --page-w: 612pt;   /* 8.5in */
+          --page-h: 792pt;   /* 11in */
+          --card-w: 288pt;   /* 4in */
+          --card-h: 432pt;   /* 6in */
+          --gap:     18pt;   /* 0.25in between cards */
+          --padL:     9pt;   /* 0.125in left offset */
+          --padT:     9pt;   /* 0.125in top offset */
           --cut: rgba(0,0,0,0.22);
           --cut-tick: rgba(0,0,0,0.22);
         }
 
-        /* Tell the browser EXACT paper & zero margins */
-        @page {
-          size: 8.5in 11in;
+        /* Lock the physical page and remove printer margins */
+        @page{
+          size: var(--page-w) var(--page-h);
           margin: 0;
         }
 
-        /* SCREEN (so preview looks side-by-side too) */
-        .printPage {
-          width: 8.5in;
-          height: 11in;
+        /* SCREEN (preview) — match print geometry so WYSIWYG */
+        .printPage{
+          width: var(--page-w);
+          height: var(--page-h);
           box-sizing: border-box;
-          background: white;
+          background: #fff;
           padding-left: var(--padL);
           padding-top:  var(--padT);
           display: grid;
           place-items: start;
         }
-
-        .cardRow {
+        .cardRow{
           display: grid;
           grid-template-columns: var(--card-w) var(--card-w);
           gap: var(--gap);
@@ -475,15 +475,15 @@ export default function KanbanCardPreview() {
           justify-items: start;
         }
 
-        .card {
+        .card{
           width: var(--card-w);
           height: var(--card-h);
-          box-sizing: border-box;        /* border INCLUDED in 4x6 */
+          box-sizing: border-box; /* border included in 4x6 */
           position: relative;
           background: #fff;
           border: 0.4pt solid var(--cut);
 
-          /* very light corner ticks (inside the card) */
+          /* very light corner ticks inside the card */
           background-image:
             linear-gradient(to right, var(--cut-tick), var(--cut-tick)),
             linear-gradient(to bottom, var(--cut-tick), var(--cut-tick)),
@@ -491,82 +491,72 @@ export default function KanbanCardPreview() {
             linear-gradient(to bottom, var(--cut-tick), var(--cut-tick));
           background-repeat: no-repeat;
           background-size:
-            0.6pt 0.28in, 0.28in 0.6pt,
-            0.6pt 0.28in, 0.28in 0.6pt;
+            0.6pt 20pt, 20pt 0.6pt,
+            0.6pt 20pt, 20pt 0.6pt;
           background-position:
-            left 0.12in top 0, left 0 top 0.12in,
-            right 0.12in bottom 0, right 0 bottom 0.12in;
-
+            left 9pt top 0, left 0 top 9pt,
+            right 9pt bottom 0, right 0 bottom 9pt;
           overflow: hidden;
         }
 
-        /* FRONT lower area: 2 columns so text never hides behind QRs */
-        .front .lower {
+        /* FRONT lower area: two columns (text lane | QR lane) */
+        .front .lower{
           display: grid;
-          grid-template-columns: 1fr 1.45in; /* text lane | QR lane */
-          column-gap: 0.15in;
+          grid-template-columns: 1fr 104pt; /* 1.45in ≈ 104pt */
+          column-gap: 11pt; /* ~0.15in */
           align-items: start;
         }
+        .front .lower .leftCol{ display: grid; row-gap: 4pt; }
+        .front .lower .rightCol{ display: grid; row-gap: 4pt; justify-items: end; }
 
-        .front .lower .leftCol {
-          display: grid;
-          row-gap: 0.06in;
-        }
-
-        .front .lower .rightCol {
-          display: grid;
-          row-gap: 0.06in;
-          justify-items: end;
-        }
-
-        .statRow {
+        .statRow{
           display: grid;
           grid-template-columns: auto 1fr;
-          column-gap: 0.06in;
+          column-gap: 4pt;
           align-items: baseline;
           font-size: 10pt;
           line-height: 1.15;
         }
+        .statRow .label{ font-weight: 700; }
+        .statRow .value{ font-weight: 600; }
+        .qr img{ width: 97pt; height: 97pt; object-fit: contain; display: block; } /* ~1.35in */
 
-        .statRow .label { font-weight: 700; }
-        .statRow .value { font-weight: 600; }
-
-        .qr img {
-          width: 1.35in;
-          height: 1.35in;
-          object-fit: contain;
-          display: block;
-        }
-
-        @media print {
-          html, body {
-            width: 8.5in;
-            height: 11in;
-            margin: 0 !important;
-            padding: 0 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+        /* ====== PRINT RESET — kill any scaling/shrink-to-fit ====== */
+        @media print{
+          html, body{
+            width: var(--page-w); height: var(--page-h);
+            margin: 0 !important; padding: 0 !important;
+            max-width: none !important; max-height: none !important;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
           }
 
-          /* Print ONLY the cards */
-          body * { visibility: hidden !important; }
-          .printPage, .printPage * { visibility: visible !important; }
+          /* Hide everything except the printable canvas */
+          body *{ visibility: hidden !important; }
+          .printPage, .printPage *{ visibility: visible !important; }
 
-          .printPage {
-            position: fixed;
-            inset: 0;
+          .printPage{
+            position: fixed; inset: 0;
+            width: var(--page-w); height: var(--page-h);
             margin: 0 !important;
-            padding-left: var(--padL);
-            padding-top:  var(--padT);
-            width: 8.5in;
-            height: 11in;
-            transform: none !important;   /* guard against accidental scaling */
+            padding-left: var(--padL); padding-top: var(--padT);
+            transform: none !important;
+            -webkit-transform: none !important;
+            zoom: 1 !important;              /* neutralize zoom */
+            -webkit-text-size-adjust: 100% !important;
+            text-size-adjust: 100% !important;
           }
 
-          /* Extra safeguard for Chrome's print margins */
-          @page { margin: 0 !important; }
+          /* global nuke of transforms/zooms that could be inherited */
+          *{
+            transform: none !important;
+            -webkit-transform: none !important;
+            zoom: 1 !important;
+          }
+
+          @page{ margin: 0 !important; }
         }
       `}</style>
+
     </div>
   );
 }
