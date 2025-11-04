@@ -58,60 +58,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const [shortOrderUrl, setShortOrderUrl] = useState("");
   const printRef = useRef(null);
 
-  async function handlePrintAndSave() {
-    try {
-      const node = printRef.current;
-      if (!node) {
-        window.print();
-        return;
-      }
-      const canvas = await html2canvas(node, {
-        scale: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-        windowWidth: node.scrollWidth,
-        windowHeight: node.scrollHeight,
-      });
-      const imgData = canvas.toDataURL("image/png");
-
-      // Make a Letter PDF so the upload matches what you print
-      const doc = new jsPDF({
-        orientation: "portrait",
-        unit: "in",
-        format: [8.5, 11],
-        compress: true,
-      });
-
-      const pageW = 8.5, pageH = 11;
-      const imgW = canvas.width / 96;  // px → inches
-      const imgH = canvas.height / 96;
-      const ratio = Math.min(pageW / imgW, pageH / imgH);
-      const drawW = imgW * ratio;
-      const drawH = imgH * ratio;
-      const dx = (pageW - drawW) / 2;
-      const dy = (pageH - drawH) / 2;
-
-      doc.addImage(imgData, "PNG", dx, dy, drawW, drawH, undefined, "FAST");
-
-      const pdfBlob = doc.output("blob");
-      const clean = (s) => String(s || "").replace(/[\\/:*?"<>|]+/g, "").trim();
-      const fname = `${clean(item?.itemName || item?.kanbanId || routeKanbanId || "kanban")} (front+back).pdf`;
-
-      const fd = new FormData();
-      fd.append("file", pdfBlob, fname);
-      fd.append("filename", fname);
-      // optional: fd.append("subfolder", String(item?.location || ""));
-
-      await fetch(`${BACKEND}/api/kanban/upload-card`, {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-      }).catch(() => { /* ignore upload errors but still print */ });
-    } finally {
-      window.print();
-    }
+  function handlePrintAndSave() {
+    // Print the live DOM at true size; no canvas, no PDF scaling
+    window.print();
   }
+
 
 
 
@@ -242,12 +193,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         >
           Edit
         </button>
-        <button
-          onClick={() => {
-            window.open(`/kanban/print/${encodeURIComponent(effectiveId)}`, "_blank", "noopener,noreferrer");
-          }}
-          style={btnPrimary}
-        >
+        <button onClick={() => window.print()} style={btnPrimary}>
           Print
         </button>
 
@@ -278,9 +224,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
               overflow: "hidden",
             }}
           >
-
-
-
         {/* Title */}
         <div style={{ fontWeight: 900, fontSize: 22, letterSpacing: 0.3, textAlign: "center" }}>
           KANBAN CARD
@@ -416,6 +359,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             }}
           >
 
+
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 900 }}>🚚</div>
               <div style={{ fontSize: 14, fontWeight: 800, marginTop: 6 }}>
@@ -448,126 +392,54 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       ) : null}
 
       <style>{`
-        /* ====== PHYSICAL SIZING IN POINTS (72 pt = 1 inch) ====== */
-        :root{
-          --page-w: 612pt;   /* 8.5in */
-          --page-h: 792pt;   /* 11in */
-          --card-w: 288pt;   /* 4in */
-          --card-h: 432pt;   /* 6in */
-          --gap:     18pt;   /* 0.25in between cards */
-          --padL:     9pt;   /* 0.125in left offset */
-          --padT:     9pt;   /* 0.125in top offset */
-          --cut: rgba(0,0,0,0.22);
-          --cut-tick: rgba(0,0,0,0.22);
-        }
-
-        /* Lock the physical page and remove printer margins */
-        @page{
-          size: var(--page-w) var(--page-h);
+        @page {
+          size: 8.5in 11in;
           margin: 0;
         }
 
-        /* SCREEN (preview) — match print geometry so WYSIWYG */
-        .printPage{
-          width: var(--page-w);
-          height: var(--page-h);
-          box-sizing: border-box;
-          background: #fff;
-          padding-left: var(--padL);
-          padding-top:  var(--padT);
+        .printPage {
+          width: 8.5in;
+          height: 11in;
           display: grid;
+          grid-template-columns: 4in 4in;
+          column-gap: 0.25in;
+          padding-top: 0.125in;
+          padding-left: 0.125in;
+          background: white;
+          box-sizing: border-box;
           place-items: start;
         }
-        .cardRow{
-          display: grid;
-          grid-template-columns: var(--card-w) var(--card-w);
-          gap: var(--gap);
-          align-items: start;
-          justify-items: start;
+
+        .card {
+          width: 4in;
+          height: 6in;
+          border: 0.4pt solid rgba(0,0,0,0.25);
+          box-sizing: border-box;
+          background: white;
         }
 
-        .card{
-          width: var(--card-w);
-          height: var(--card-h);
-          box-sizing: border-box; /* border included in 4x6 */
-          position: relative;
-          background: #fff;
-          border: 0.4pt solid var(--cut);
-
-          /* very light corner ticks inside the card */
-          background-image:
-            linear-gradient(to right, var(--cut-tick), var(--cut-tick)),
-            linear-gradient(to bottom, var(--cut-tick), var(--cut-tick)),
-            linear-gradient(to right, var(--cut-tick), var(--cut-tick)),
-            linear-gradient(to bottom, var(--cut-tick), var(--cut-tick));
-          background-repeat: no-repeat;
-          background-size:
-            0.6pt 20pt, 20pt 0.6pt,
-            0.6pt 20pt, 20pt 0.6pt;
-          background-position:
-            left 9pt top 0, left 0 top 9pt,
-            right 9pt bottom 0, right 0 bottom 9pt;
-          overflow: hidden;
-        }
-
-        /* FRONT lower area: two columns (text lane | QR lane) */
-        .front .lower{
-          display: grid;
-          grid-template-columns: 1fr 104pt; /* 1.45in ≈ 104pt */
-          column-gap: 11pt; /* ~0.15in */
-          align-items: start;
-        }
-        .front .lower .leftCol{ display: grid; row-gap: 4pt; }
-        .front .lower .rightCol{ display: grid; row-gap: 4pt; justify-items: end; }
-
-        .statRow{
-          display: grid;
-          grid-template-columns: auto 1fr;
-          column-gap: 4pt;
-          align-items: baseline;
-          font-size: 10pt;
-          line-height: 1.15;
-        }
-        .statRow .label{ font-weight: 700; }
-        .statRow .value{ font-weight: 600; }
-        .qr img{ width: 97pt; height: 97pt; object-fit: contain; display: block; } /* ~1.35in */
-
-        /* ====== PRINT RESET — kill any scaling/shrink-to-fit ====== */
-        @media print{
-          html, body{
-            width: var(--page-w); height: var(--page-h);
-            margin: 0 !important; padding: 0 !important;
-            max-width: none !important; max-height: none !important;
-            -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        @media print {
+          html, body {
+            width: 8.5in;
+            height: 11in;
+            margin: 0;
+            padding: 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
 
-          /* Hide everything except the printable canvas */
-          body *{ visibility: hidden !important; }
-          .printPage, .printPage *{ visibility: visible !important; }
+          /* hide everything except the cards */
+          body * { visibility: hidden; }
+          .printPage, .printPage * { visibility: visible; }
 
-          .printPage{
-            position: fixed; inset: 0;
-            width: var(--page-w); height: var(--page-h);
-            margin: 0 !important;
-            padding-left: var(--padL); padding-top: var(--padT);
+          .printPage {
+            position: fixed;
+            inset: 0;
+            margin: 0;
             transform: none !important;
-            -webkit-transform: none !important;
-            zoom: 1 !important;              /* neutralize zoom */
-            -webkit-text-size-adjust: 100% !important;
-            text-size-adjust: 100% !important;
           }
-
-          /* global nuke of transforms/zooms that could be inherited */
-          *{
-            transform: none !important;
-            -webkit-transform: none !important;
-            zoom: 1 !important;
-          }
-
-          @page{ margin: 0 !important; }
         }
       `}</style>
-
     </div>
   );
 }

@@ -1880,6 +1880,7 @@ useEffect(() => {
           <Route path="/kanban/queue" element={<KanbanQueue />} />
           <Route path="/kanban/new" element={<KanbanWizard />} />
           <Route path="/kanban/preview/:kanbanId" element={<KanbanCardPreview />} />
+
           <Route path="/kanban/scan" element={<KanbanScan />} />
           <Route path="/kanban/open" element={<KanbanOpen />} />
           <Route path="/kanban/go" element={<KanbanGo />} />
