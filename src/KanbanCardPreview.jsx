@@ -253,23 +253,23 @@ export default function KanbanCardPreview() {
 
           {/* FRONT CARD */}
           <div
-            className="card"
+            className="card front"
             style={{
+              width: "3.5in",
+              height: "5.5in",
+              border: "2px solid #111827",
+              borderRadius: 12,
+              background: "white",
+              boxSizing: "border-box",
+              padding: "12px",
+              display: "grid",
+              gridTemplateRows: "auto auto 1fr",
+              gap: 8,
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
 
-            width: "3.5in",
-            height: "5.5in",
-            border: "2px solid #111827",
-            borderRadius: 12,
-            background: "white",
-            boxSizing: "border-box",
-            padding: "12px 12px 150px 12px",
-            display: "grid",
-            gridTemplateRows: "auto auto 1fr",
-            gap: 8,
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
 
         {/* Title */}
         <div style={{ fontWeight: 900, fontSize: 22, letterSpacing: 0.3, textAlign: "center" }}>
@@ -331,81 +331,62 @@ export default function KanbanCardPreview() {
             {showVal(item.itemName)}
           </div>
 
-          {/* Package size (left) + Price (right); lead time tucks under size if present */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, alignItems: "center" }}>
-            <div style={{ fontSize: 12, color: "#111827", textAlign: "left" }}>
-              {showVal(item.packageSize)}
-              {item.leadTimeDays ? ` • Lead: ${String(item.leadTimeDays).trim()}d` : ""}
+          {/* LOWER: 2 columns — LEFT (Package Size, Bin Qty, Order QR) / RIGHT (Price, Reorder Qty, Reorder QR) */}
+          <div className="lower">
+            <div className="leftCol">
+              <div className="statRow">
+                <span className="label">Package Size:</span>
+                <span className="value">
+                  {showVal(item.packageSize)}
+                  {item.leadTimeDays ? ` • Lead: ${String(item.leadTimeDays).trim()}d` : ""}
+                </span>
+              </div>
+
+              <div className="statRow">
+                <span className="label">Bin Qty (units):</span>
+                <span className="value">{showVal(item.binQtyUnits)}</span>
+              </div>
+
+              {/* Order QR */}
+              <div className="qr qr-order">
+                {orderQrUrl ? (
+                  <img
+                    alt="Order Page QR"
+                    src={makeQr(orderQrUrl, 250)}
+                  />
+                ) : (
+                  <div style={{ fontSize: 10, color: "#9ca3af" }}>No order URL</div>
+                )}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: "#111827", textAlign: "right", fontWeight: 800 }}>
-              {(() => {
-                const raw = String(item.costPerPkg || "").trim();
-                if (!raw) return "—";
-                const n = Number(raw.replace(/[^0-9.-]/g, ""));
-                return isNaN(n) ? raw : `$${n.toFixed(2)}`;
-              })()}
+
+            <div className="rightCol">
+              <div className="statRow">
+                <span className="label">Price:</span>
+                <span className="value">
+                  {(() => {
+                    const raw = String(item.costPerPkg || "").trim();
+                    if (!raw) return "—";
+                    const n = Number(raw.replace(/[^0-9.-]/g, ""));
+                    return isNaN(n) ? raw : `$${n.toFixed(2)}`;
+                  })()}
+                </span>
+              </div>
+
+              <div className="statRow">
+                <span className="label">Reorder Qty (basis):</span>
+                <span className="value">{showVal(item.reorderQtyBasis)}</span>
+              </div>
+
+              {/* Reorder QR */}
+              <div className="qr qr-reorder">
+                <img
+                  alt="Reorder Request QR"
+                  src={makeQr(reorderScanUrl, 250)}
+                />
+              </div>
             </div>
           </div>
-
-
-          {/* Bin / Reorder */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 4 }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 12, color: "#6b7280" }}>Bin Qty (units)</div>
-              <div style={{ fontSize: 20, fontWeight: 900 }}>{showVal(item.binQtyUnits)}</div>
-            </div>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 12, color: "#6b7280" }}>Reorder Qty (basis)</div>
-              <div style={{ fontSize: 20, fontWeight: 900 }}>{showVal(item.reorderQtyBasis)}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Corner QRs */}
-        <div
-          style={{
-            position: "absolute",
-            left: 10,
-            bottom: 10,
-            border: "1px solid #e5e7eb",
-            borderRadius: 8,
-            padding: 6,
-            background: "white",
-            width: 120,
-            zIndex: 5,
-          }}
-        >
-          <div style={{ fontWeight: 800, fontSize: 11, textAlign: "center" }}>Order Page</div>
-          {/* generate at 180px for cleaner code; render smaller */}
-          <img
-            alt="Order QR"
-            src={makeQr(orderQrUrl, 180)}
-            style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
-        </div>
-
-        <div
-          style={{
-            position: "absolute",
-            right: 10,
-            bottom: 10,
-            border: "1px solid #e5e7eb",
-            borderRadius: 8,
-            padding: 6,
-            background: "white",
-            width: 120,
-            zIndex: 5,
-          }}
-        >
-          <div style={{ fontWeight: 800, fontSize: 11, textAlign: "center" }}>Request Reorder</div>
-          <img
-            alt="Reorder Request QR"
-            src={makeQr(reorderScanUrl, 180)}
-            style={{ width: 100, height: 100, display: "block", margin: "6px auto 0" }}
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
-        </div>
       </div>
           {/* BACK CARD */}
           <div
@@ -454,80 +435,103 @@ export default function KanbanCardPreview() {
       ) : null}
 
       <style>{`
-        :root {
-          --card-w: 4in;
-          --card-h: 6in;
-          --gap: 0.25in;
-          --margin-left: 0.125in;
-          --margin-top: 0.125in;
+        :root{
+          /* card size and spacing */
+          --card-w: 3.5in;   /* physical size */
+          --card-h: 5.5in;   /* physical size */
+          --gap:    0.25in;
+          --padL:   0.125in; /* top-left margin for cutting */
+          --padT:   0.125in;
+
+          /* cut line color: slightly darker */
+          --cut: rgba(0,0,0,0.22);
+          --cut-tick: rgba(0,0,0,0.22);
         }
 
-        @page {
-          size: Letter;
-          margin: 0; /* We'll handle our own margin */
-        }
+        @page{ size: Letter; margin: 0; }
 
-        .printPage {
-          position: relative;
+        /* SCREEN (preview) */
+        .printPage{
           width: 8.5in;
           height: 11in;
           box-sizing: border-box;
-          padding-left: var(--margin-left);
-          padding-top: var(--margin-top);
           background: white;
+          padding-left: var(--padL);
+          padding-top:  var(--padT);
+          display: grid;
+          place-items: start;
         }
-
-        .cardRow {
+        .cardRow{
           display: grid;
           grid-template-columns: var(--card-w) var(--card-w);
           gap: var(--gap);
+          align-items: start;
+          justify-items: start;
         }
-
-        .card {
+        .card{
           width: var(--card-w);
           height: var(--card-h);
-          box-shadow: 0 0 0.05in rgba(0,0,0,0.2);
-
-          /* very, very light trim guide */
           position: relative;
-          border: 0.25pt solid rgba(0,0,0,0.08); /* ultra-light grey */
+          box-shadow: 0 0 0.05in rgba(0,0,0,0.15);
+          /* clearer cut line */
+          border: 0.4pt solid var(--cut);
+          background-clip: padding-box;
 
-          /* subtle internal corner crop marks (stay inside the card) */
+          /* corner ticks (very light) */
           background-image:
-            linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0.08)),
-            linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.08)),
-            linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0.08)),
-            linear-gradient(to bottom, rgba(0,0,0,0.08), rgba(0,0,0,0.08));
+            linear-gradient(to right, var(--cut-tick), var(--cut-tick)),
+            linear-gradient(to bottom, var(--cut-tick), var(--cut-tick)),
+            linear-gradient(to right, var(--cut-tick), var(--cut-tick)),
+            linear-gradient(to bottom, var(--cut-tick), var(--cut-tick));
           background-repeat: no-repeat;
-          /* corner tick lengths: ~0.25in; line thickness: 0.5pt */
-          background-size:
-            0.5pt 0.25in, 0.25in 0.5pt,
-            0.5pt 0.25in, 0.25in 0.5pt;
-          /* inset the ticks a hair so they’re not on the edge */
+          background-size: 0.6pt 0.28in, 0.28in 0.6pt, 0.6pt 0.28in, 0.28in 0.6pt;
           background-position:
-            left 0.125in top 0, left 0 top 0.125in,
-            right 0.125in bottom 0, right 0 bottom 0.125in;
+            left 0.12in top 0, left 0 top 0.12in,
+            right 0.12in bottom 0, right 0 bottom 0.12in;
         }
 
+        /* FRONT lower area = 2 columns so text never hides behind QRs */
+        .front .lower{
+          display: grid;
+          grid-template-columns: 1fr 1.45in; /* left info, right QR lane */
+          column-gap: 0.15in;
+          align-items: start;
+        }
+        .front .lower .leftCol{ display: grid; row-gap: 0.06in; }
+        .front .lower .rightCol{ display: grid; row-gap: 0.06in; justify-items: end; }
 
-        @media print {
-          html, body {
-            margin: 0;
-            padding: 0;
+        .statRow{
+          display: grid;
+          grid-template-columns: auto 1fr;
+          column-gap: 0.06in;
+          align-items: baseline;
+          font-size: 10pt;
+          line-height: 1.15;
+        }
+        .statRow .label{ font-weight: 700; }
+        .statRow .value{ font-weight: 600; }
+
+        /* keep QR images contained */
+        .qr img{ width: 1.35in; height: 1.35in; object-fit: contain; display: block; }
+
+        @media print{
+          html, body{
+            margin: 0; padding: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
-          /* Hide everything except cards */
-          body * { visibility: hidden; }
-          .printPage, .printPage * { visibility: visible; }
+          /* Print ONLY the cards */
+          body *{ visibility: hidden !important; }
+          .printPage, .printPage *{ visibility: visible !important; }
 
-          .printPage {
-            position: fixed;
-            inset: 0;
-            margin: 0;
-            padding-left: var(--margin-left);
-            padding-top: var(--margin-top);
+          .printPage{
+            position: fixed; inset: 0; margin: 0;
+            padding-left: var(--padL);
+            padding-top:  var(--padT);
+            width: 8.5in; height: 11in;
+            transform: none !important;  /* avoid any scaling */
           }
+          .card{ break-inside: avoid; }
         }
       `}</style>
     </div>
