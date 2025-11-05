@@ -397,7 +397,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       ) : null}
 
       <style>{`
-        /* Hard-set physical page to US Letter with zero margins */
+        /* Lock physical page to US Letter with zero margins */
         @page {
           size: 8.5in 11in;
           margin: 0;
@@ -408,45 +408,51 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           width: 8.5in;
           height: 11in;
           display: grid;
-          grid-template-columns: 4in 4in;   /* two columns of 4in each */
-          column-gap: 0.25in;
-          padding-top: 0.125in;
+          grid-template-columns: 4in 4in;   /* two columns: each 4.00in wide */
+          column-gap: 0.25in;               /* gutter between the two cards */
+          padding-top: 0.125in;             /* small top/left inset so nothing clips */
           padding-left: 0.125in;
           background: white;
           box-sizing: border-box;
           place-items: start;
         }
 
-        /* Each card is exactly 4in x 6in */
+        /* Each card is EXACTLY 4.00in x 6.00in (do not let borders change size) */
         .card {
-          position: relative;               /* enables cutframe positioning */
+          position: relative;               /* enable absolute cut line overlay */
           width: 4in;
           height: 6in;
           box-sizing: border-box;
           background: white;
-          border: 0.4pt solid rgba(0,0,0,0.15); /* optional hairline */
+          border: none;                     /* visual hairline removed (we'll use dotted frame) */
         }
 
-        /* Light grey dotted CUT LINE (prints, doesn't change size) */
+        /* Light grey dotted CUT LINE that prints clearly and DOES NOT affect size */
         .cutframe {
           position: absolute;
-          inset: 0;                         /* matches card edge exactly */
+          inset: 0;                         /* matches the card edge exactly */
           box-sizing: border-box;
-          border: 1pt dotted #d1d5db;       /* light gray dotted guideline */
+          border: 1.25pt dotted #9ca3af;    /* slightly darker/thicker so it survives PDF renderers */
           pointer-events: none;
         }
 
         @media print {
+          /* Make all elements honor exact colors and sizes while printing */
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+
           html, body {
             width: 8.5in;
             height: 11in;
             margin: 0;
             padding: 0;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
 
-          /* show only the cards on print */
+          /* Show only the printable page */
           body * { visibility: hidden; }
           .printPage, .printPage * { visibility: visible; }
 
@@ -454,11 +460,10 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             position: fixed;
             inset: 0;
             margin: 0;
-            transform: none !important;     /* prevent any print scaling */
+            transform: none !important;     /* prevent any scaling transform */
           }
         }
       `}</style>
-
 
       {/* Debug panel toggle via ?debug=1 */}
       {(() => {
