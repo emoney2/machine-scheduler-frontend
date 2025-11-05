@@ -92,33 +92,20 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         }
         const j = await r.json();
         if (!j?.item) throw new Error("Item not found (empty payload)");
+
+        // Use server-provided keys directly
         const raw = j.item;
         if (!alive) return;
         setItem({ ...raw, _debugRaw: raw });
 
-        // Normalize keys (case/space-proof)
-        // Use server-provided keys directly (already match the JSX)
-        const raw = j.item;
-        if (!alive) return;
-        setItem({ ...raw, _debugRaw: raw });
+        // Build the direct order target (from the freshly fetched raw)
+        const method     = String(raw?.orderMethod || "").trim();
+        const emailValue = String(raw?.orderEmail  || "").trim();
+        const urlValue   = String(raw?.orderUrl    || "").trim();
 
-
-        // Build the direct order target (mailto or vendor URL)
-        // Null-safe getters (item can be null on first render)
-        const method      = (item?.orderMethod || "").trim();
-        const emailValue  = (item?.orderEmail  || "").trim();
-        const urlValue    = (item?.orderUrl    || "").trim();
-
-        // Choose direct target (mailto for Email method, else URL)
         const orderTarget = method === "Email"
           ? (emailValue ? `mailto:${emailValue}` : "")
           : urlValue;
-
-        // Always have a fallback that your app can open/redirect from
-        const fallbackOpen = `https://machineschedule.netlify.app/kanban/open?id=${encodeURIComponent(item?.kanbanId || routeKanbanId || "")}`;
-
-        const orderQrUrl = shortOrderUrl || orderTarget || fallbackOpen;
-
 
         // Shorten long URLs only; never route through app
         if (orderTarget && orderTarget.length > 40 && !orderTarget.startsWith("mailto:")) {
@@ -137,6 +124,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         } else {
           setShortOrderUrl(orderTarget);
         }
+
       } catch (e) {
         if (!alive) return;
         setErr(String(e?.message || e));
