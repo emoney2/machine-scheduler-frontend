@@ -194,9 +194,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         <div
           className="card front"
           style={{
-            width: "4in",
-            height: "6in",
-            border: "2px solid #111827",
             borderRadius: 12,
             background: "white",
             boxSizing: "border-box",
@@ -208,6 +205,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             overflow: "hidden",
           }}
         >
+
         {/* Title */}
         <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: 0.3, textAlign: "center" }}>
           KANBAN CARD
@@ -349,9 +347,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       <div
         className="card backCard"
         style={{
-          width: "4in",
-          height: "6in",
-          border: "2px solid #111827",
           borderRadius: 12,
           background: "white",
           boxSizing: "border-box",
@@ -360,8 +355,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           placeItems: "center",
         }}
       >
-
-
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 900 }}>🚚</div>
               <div style={{ fontSize: 14, fontWeight: 800, marginTop: 6 }}>
