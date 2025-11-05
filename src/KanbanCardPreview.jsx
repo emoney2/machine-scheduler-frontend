@@ -311,17 +311,19 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                             </span>
                           </div>
                         </div>
+                        </div>   {/* <-- CLOSES the TOP third wrapper */}
 
 
-                {/* MIDDLE THIRD: Bin Qty (left) + Reorder Qty (right) */}
-                <div
-                        style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: 16,
-                                alignContent: "center",
-                        }}
-                >
+                        {/* MIDDLE THIRD: Bin Qty (left) + Reorder Qty (right) */}
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: 16,
+                            alignContent: "center",
+                          }}
+                        >
+
                         {/* Left stat (label, then quantity underneath) */}
                         <div
                           className="statCol"
@@ -358,24 +360,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                           <div style={{ fontWeight: 800, fontSize: "clamp(22px, 2.6vw, 30px)" }}>
                             {String(item.reorderQtyBasis ?? "—")}
                           </div>
-                        </div>
-
-
-                        <div
-                                className="statRow"
-                                style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        gap: 12,
-                                        fontSize: "clamp(16px, 2vw, 22px)",
-                                }}
-                        >
-                                <span className="label" style={{ opacity: 0.8 }}>
-                                        Reorder Qty (basis):
-                                </span>
-                                <span className="value" style={{ fontWeight: 700 }}>
-                                        {String(item.reorderQtyBasis ?? "—")}
-                                </span>
                         </div>
                 </div>
 
@@ -467,9 +451,9 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             {/* dotted cut line frame */}
             <div className="cutframe" aria-hidden="true" />
 
-          </div>
+      </div>            {/* closes .card.backCard */}
+    </div>              {/* closes .printPage */}
 
-        </div>
 
       {/* Debug panel (add ?debug=1 to URL) */}
 
