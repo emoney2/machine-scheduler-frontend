@@ -389,30 +389,44 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       ) : null}
 
       <style>{`
+        /* Hard-set the physical page to US Letter with zero margins */
         @page {
           size: 8.5in 11in;
           margin: 0;
         }
 
+        /* The printable canvas is exactly Letter size in inches */
         .printPage {
           width: 8.5in;
           height: 11in;
           display: grid;
-          grid-template-columns: 4in 4in;
+          grid-template-columns: 4in 4in;   /* two 4x6 cards side-by-side */
           column-gap: 0.25in;
-          padding-top: 0.125in;
+          padding-top: 0.125in;             /* small top/left padding to center a bit */
           padding-left: 0.125in;
           background: white;
           box-sizing: border-box;
           place-items: start;
         }
 
+        /* Each card is exactly 4in x 6in. Don't let borders change size. */
         .card {
+          position: relative;               /* enable ::after cut line positioning */
           width: 4in;
           height: 6in;
-          border: 0.4pt solid rgba(0,0,0,0.25);
           box-sizing: border-box;
           background: white;
+          border: 0.4pt solid rgba(0,0,0,0.15); /* a very thin visual border (optional) */
+        }
+
+        /* Light grey dotted CUT LINE that does NOT affect layout size */
+        .card::after {
+          content: "";
+          position: absolute;
+          inset: 0;                         /* exactly the card's edge */
+          box-sizing: border-box;
+          border: 1pt dotted #d1d5db;       /* light grey dotted line */
+          pointer-events: none;
         }
 
         @media print {
@@ -433,7 +447,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             position: fixed;
             inset: 0;
             margin: 0;
-            transform: none !important;
+            transform: none !important;     /* prevent any print scaling transforms */
           }
         }
       `}</style>
