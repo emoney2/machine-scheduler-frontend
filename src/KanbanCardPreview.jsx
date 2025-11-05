@@ -338,25 +338,28 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                 </div>
               </div>
             </div>
-
           </div>        {/* closes .lower */}
+
+          {/* dotted cut line frame */}
+          <div className="cutframe" aria-hidden="true" />
+
         </div>          {/* closes Body */}
       </div>            {/* closes .card.front */}
-          {/* BACK CARD */}
-          <div
-            className="card backCard"
-            style={{
-              width: "4in",
-              height: "6in",
-              border: "2px solid #111827",
-              borderRadius: 12,
-              background: "white",
-              boxSizing: "border-box",
-              padding: "12px",
-              display: "grid",
-              placeItems: "center",
-            }}
-          >
+      {/* BACK CARD */}
+      <div
+        className="card backCard"
+        style={{
+          width: "4in",
+          height: "6in",
+          border: "2px solid #111827",
+          borderRadius: 12,
+          background: "white",
+          boxSizing: "border-box",
+          padding: "12px",
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
 
 
             <div style={{ textAlign: "center" }}>
@@ -365,9 +368,14 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                 ORDER PLACED — WAITING ON STOCK
               </div>
             </div>
+
+            {/* dotted cut line frame */}
+            <div className="cutframe" aria-hidden="true" />
+
           </div>
 
         </div>
+
       {/* Debug panel (add ?debug=1 to URL) */}
 
       {typeof window !== "undefined" &&
@@ -389,43 +397,42 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       ) : null}
 
       <style>{`
-        /* Hard-set the physical page to US Letter with zero margins */
+        /* Hard-set physical page to US Letter with zero margins */
         @page {
           size: 8.5in 11in;
           margin: 0;
         }
 
-        /* The printable canvas is exactly Letter size in inches */
+        /* Two 4×6 cards on a Letter sheet */
         .printPage {
           width: 8.5in;
           height: 11in;
           display: grid;
-          grid-template-columns: 4in 4in;   /* two 4x6 cards side-by-side */
+          grid-template-columns: 4in 4in;   /* two columns of 4in each */
           column-gap: 0.25in;
-          padding-top: 0.125in;             /* small top/left padding to center a bit */
+          padding-top: 0.125in;
           padding-left: 0.125in;
           background: white;
           box-sizing: border-box;
           place-items: start;
         }
 
-        /* Each card is exactly 4in x 6in. Don't let borders change size. */
+        /* Each card is exactly 4in x 6in */
         .card {
-          position: relative;               /* enable ::after cut line positioning */
+          position: relative;               /* enables cutframe positioning */
           width: 4in;
           height: 6in;
           box-sizing: border-box;
           background: white;
-          border: 0.4pt solid rgba(0,0,0,0.15); /* a very thin visual border (optional) */
+          border: 0.4pt solid rgba(0,0,0,0.15); /* optional hairline */
         }
 
-        /* Light grey dotted CUT LINE that does NOT affect layout size */
-        .card::after {
-          content: "";
+        /* Light grey dotted CUT LINE (prints, doesn't change size) */
+        .cutframe {
           position: absolute;
-          inset: 0;                         /* exactly the card's edge */
+          inset: 0;                         /* matches card edge exactly */
           box-sizing: border-box;
-          border: 1pt dotted #d1d5db;       /* light grey dotted line */
+          border: 1pt dotted #d1d5db;       /* light gray dotted guideline */
           pointer-events: none;
         }
 
@@ -439,7 +446,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             print-color-adjust: exact;
           }
 
-          /* hide everything except the cards */
+          /* show only the cards on print */
           body * { visibility: hidden; }
           .printPage, .printPage * { visibility: visible; }
 
@@ -447,10 +454,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             position: fixed;
             inset: 0;
             margin: 0;
-            transform: none !important;     /* prevent any print scaling transforms */
+            transform: none !important;     /* prevent any print scaling */
           }
         }
       `}</style>
+
 
       {/* Debug panel toggle via ?debug=1 */}
       {(() => {
