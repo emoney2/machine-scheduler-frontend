@@ -83,37 +83,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         if (!j?.item) throw new Error("Item not found (empty payload)");
 
         // Normalize keys (case/space-proof)
+        // Use server-provided keys directly (already match the JSX)
         const raw = j.item;
-        const normKey = (k) => String(k || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-        const nmap = {};
-        Object.keys(raw).forEach((k) => { nmap[normKey(k)] = raw[k]; });
-        const pick = (...aliases) => {
-          for (const a of aliases) {
-            const v = nmap[normKey(a)];
-            if (v !== undefined && v !== null && String(v).trim() !== "") return v;
-          }
-          return "";
-        };
-
-        const normalized = {
-          kanbanId:        pick("Kanban ID","kanbanId"),
-          itemName:        pick("Item Name","itemName"),
-          sku:             pick("SKU","sku"),
-          location:        pick("Location","location"),
-          packageSize:     pick("Package Size","packageSize"),
-          leadTimeDays:    String(pick("Lead Time (days)","leadTimeDays","leadTime")).trim(),
-          costPerPkg:      pick("Cost (per pkg)","costPerPkg"),
-          binQtyUnits:     pick("Bin Qty (units)","Bin Quantity (units)","binQtyUnits","binQty","binQuantity"),
-          reorderQtyBasis: pick("Reorder Qty (basis)","reorderQtyBasis","reorderQty"),
-          orderMethod:     pick("Order Method (Email/Online)","orderMethod"),
-          orderUrl:        pick("Order URL","orderUrl"),
-          orderEmail:      pick("Order Email","orderEmail"),
-          photoUrl:        pick("Photo URL","photoUrl"),
-        };
-
-
         if (!alive) return;
-        setItem({ ...normalized, _debugRaw: raw });
+        setItem({ ...raw, _debugRaw: raw });
+
 
         // Build the direct order target (mailto or vendor URL)
         // Null-safe getters (item can be null on first render)
