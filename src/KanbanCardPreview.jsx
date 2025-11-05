@@ -397,73 +397,56 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       ) : null}
 
       <style>{`
-        /* Lock physical page to US Letter with zero margins */
-        @page {
-          size: 8.5in 11in;
-          margin: 0;
+        /* Let the browser own the physical page; we'll fill it edge-to-edge with padding */
+        @page { size: 8.5in 11in; margin: 0; }
+
+        /* Full-width two-column layout that scales with the page */
+        .printPage {
+          width: 100vw;                 /* fill page width */
+          height: 100vh;                /* fill page height */
+          display: grid;
+          grid-template-columns: 1fr 1fr; /* two equal columns */
+          gap: 0.5in;                   /* gutter between cards */
+          padding: 0.5in;               /* page margin */
+          background: white;
+          box-sizing: border-box;
+          place-items: start;
         }
 
-        /* Two 4×6 cards on a Letter sheet */
-          .printPage {
-            width: 100%;
-            height: 100vh;
-            display: grid;
-            grid-template-columns: 1fr 1fr;   /* two cards share the full page width */
-            gap: 0.5in;                       /* space between cards */
-            padding: 0.5in;
-            background: white;
-            box-sizing: border-box;
-          }
+        /* Cards scale to their grid column, keeping a tall rectangular shape */
+        .card {
+          position: relative;
+          width: 100%;
+          height: auto;
+          aspect-ratio: 3 / 4;          /* similar proportions to your sample */
+          box-sizing: border-box;
+          background: white;
+          border-radius: 14px;
+          border: 0.9pt solid #9ca3af;  /* visible grey frame */
+        }
 
-          .card {
-            position: relative;
-            width: 100%;
-            height: auto;
-            aspect-ratio: 3 / 4;              /* keeps proportions similar */
-            box-sizing: border-box;
-            background: white;
-            border-radius: 0.2in;
-            border: 0.75pt solid #9ca3af;     /* slightly darker grey frame */
-          }
-
-
-        /* Light grey dotted CUT LINE that prints clearly and DOES NOT affect size */
+        /* Faint dotted guideline around each card (optional; keep or remove) */
         .cutframe {
           position: absolute;
-          inset: 0;                         /* matches the card edge exactly */
+          inset: 0;
           box-sizing: border-box;
-          border: 1.25pt dotted #9ca3af;    /* slightly darker/thicker so it survives PDF renderers */
+          border: 1pt dotted #e5e7eb;   /* lighter grey */
           pointer-events: none;
+          border-radius: 14px;
         }
+
+        /* Make inner content responsive so it shrinks with the card */
+        .card img { max-width: 100%; height: auto; }
 
         @media print {
-          /* Make all elements honor exact colors and sizes while printing */
-          * {
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          html, body {
-            width: 8.5in;
-            height: 11in;
-            margin: 0;
-            padding: 0;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-          }
-
-          /* Show only the printable page */
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          html, body { margin: 0; padding: 0; }
           body * { visibility: hidden; }
           .printPage, .printPage * { visibility: visible; }
-
-          .printPage {
-            position: fixed;
-            inset: 0;
-            margin: 0;
-            transform: none !important;     /* prevent any scaling transform */
-          }
+          .printPage { position: fixed; inset: 0; transform: none !important; }
         }
       `}</style>
+
 
       {/* Debug panel toggle via ?debug=1 */}
       {(() => {
