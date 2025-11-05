@@ -267,26 +267,74 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             {showVal(item.itemName)}
           </div>
 
-          {/* LOWER: 2 columns — LEFT (Package Size, Bin Qty, Order QR) / RIGHT (Price, Reorder Qty, Reorder QR) */}
-          <div className="lower">
-            <div className="leftCol">
-              <div className="statRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, fontSize: "clamp(14px, 1.7vw, 20px)" }}>
-                <span className="label" style={{ opacity: 0.8 }}>Price:</span>
-                <span className="value" style={{ fontWeight: 700 }}>...</span>
-              </div>
-
-
-              <div className="statRow">
-                <span className="label">Bin Qty (units):</span>
-                <span className="value">{showVal(item.binQtyUnits)}</span>
-              </div>
-
+          <div
+            className="lower"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1.2fr",
+              gap: 16,
+              alignItems: "start",
+            }}
+          >
+            {/* LEFT: LARGE IMAGE */}
+            <div className="mediaCol" style={{ display: "grid", alignContent: "start" }}>
+              {item.photoUrl ? (
+                <img
+                  src={item.photoUrl}
+                  alt=""
+                  style={{
+                    width: "100%",              // doubled vs old layout
+                    height: "auto",
+                    aspectRatio: "1 / 1",
+                    objectFit: "cover",
+                    borderRadius: 12,
+                    border: "1px solid #e5e7eb",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    aspectRatio: "1 / 1",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 12,
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#9ca3af",
+                    fontSize: "clamp(12px, 1.2vw, 14px)",
+                  }}
+                >
+                  No Photo
+                </div>
+              )}
             </div>
 
-            <div className="rightCol">
-              <div className="statRow" style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span className="label">Price:</span>
-                <span className="value">
+            {/* RIGHT: NAME + PRICE, THEN TWO COLUMNS (STATS + QRs) */}
+            <div className="infoCol" style={{ display: "grid", rowGap: 14 }}>
+              {/* Row 1: Item Name (double size) */}
+              <div
+                className="itemName"
+                style={{
+                  fontWeight: 900,
+                  fontSize: "clamp(24px, 3vw, 36px)", // larger headline
+                  lineHeight: 1.15,
+                }}
+              >
+                {String(item.itemName || "—")}
+              </div>
+
+              {/* Row 2: Price formatted like "Price: $7.99" */}
+              <div
+                className="priceRow"
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  alignItems: "baseline",
+                  fontSize: "clamp(16px, 2vw, 24px)",
+                }}
+              >
+                <span style={{ opacity: 0.85 }}>Price:</span>
+                <span style={{ fontWeight: 800 }}>
                   {(() => {
                     const raw = String(item.costPerPkg || "").trim();
                     if (!raw) return "—";
@@ -296,37 +344,103 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                 </span>
               </div>
 
-              <div className="statRow" style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                <span className="label">Reorder Qty (basis):</span>
-                <span className="value">{showVal(item.reorderQtyBasis)}</span>
-              </div>
+              {/* Row 3: Two columns */}
+              <div
+                className="statsAndQrs"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 16,
+                  alignItems: "start",
+                }}
+              >
+                {/* LEFT COLUMN: Bin Qty, then Product Link QR */}
+                <div style={{ display: "grid", rowGap: 12 }}>
+                  <div
+                    className="statRow"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      fontSize: "clamp(14px, 1.7vw, 20px)",
+                    }}
+                  >
+                    <span className="label" style={{ opacity: 0.8 }}>
+                      Bin Qty (units):
+                    </span>
+                    <span className="value" style={{ fontWeight: 700 }}>
+                      {String(item.binQtyUnits ?? "—")}
+                    </span>
+                  </div>
 
-              {/* QRs row: Order + Reorder side-by-side (smaller so both fit) */}
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 8,
-                marginTop: 6,
-                justifyItems: "center"
-              }}>
-                {/* Order QR (left) */}
-                <div style={{ display: "grid", justifyItems: "center", rowGap: 4 }}>
-                  <img alt="Order Page QR" src={makeQr(orderQrUrl, 320)} style={{ width: "48%", height: "auto", aspectRatio: "1 / 1" }} />
-                  <div style={{ fontSize: 11, fontWeight: 700, textAlign: "center" }}>
-                    Order Page QR
+                  <div style={{ display: "grid", justifyItems: "center", rowGap: 6 }}>
+                    <img
+                      alt="Product Link"
+                      src={makeQr(orderQrUrl, 480)}        {/* 1.5× bigger QR generation */}
+                      style={{
+                        width: "100%",                     // fills column
+                        maxWidth: 280,                     // keeps it tasteful
+                        height: "auto",
+                        aspectRatio: "1 / 1",
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontSize: "clamp(12px, 1.4vw, 16px)",
+                        fontWeight: 700,
+                        textAlign: "center",
+                      }}
+                    >
+                      Product Link
+                    </div>
                   </div>
                 </div>
 
-                {/* Reorder QR (right) */}
-                <div style={{ display: "grid", justifyItems: "center", rowGap: 4 }}>
-                  <img alt="Reorder Request QR" src={makeQr(reorderScanUrl, 320)} style={{ width: "48%", height: "auto", aspectRatio: "1 / 1" }} />
-                  <div style={{ fontSize: 11, fontWeight: 700, textAlign: "center" }}>
-                    Reorder Request QR
+                {/* RIGHT COLUMN: Reorder Qty, then Reorder Request QR */}
+                <div style={{ display: "grid", rowGap: 12 }}>
+                  <div
+                    className="statRow"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      fontSize: "clamp(14px, 1.7vw, 20px)",
+                    }}
+                  >
+                    <span className="label" style={{ opacity: 0.8 }}>
+                      Reorder Qty (basis):
+                    </span>
+                    <span className="value" style={{ fontWeight: 700 }}>
+                      {String(item.reorderQtyBasis ?? "—")}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "grid", justifyItems: "center", rowGap: 6 }}>
+                    <img
+                      alt="Reorder Request QR"
+                      src={makeQr(reorderScanUrl, 480)}    {/* 1.5× bigger QR generation */}
+                      style={{
+                        width: "100%",
+                        maxWidth: 280,
+                        height: "auto",
+                        aspectRatio: "1 / 1",
+                      }}
+                    />
+                    <div
+                      style={{
+                        fontSize: "clamp(12px, 1.4vw, 16px)",
+                        fontWeight: 700,
+                        textAlign: "center",
+                      }}
+                    >
+                      Reorder Request QR
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>        {/* closes .lower */}
+
 
           {/* dotted cut line frame */}
           <div className="cutframe" aria-hidden="true" />
