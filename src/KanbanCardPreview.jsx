@@ -218,13 +218,14 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             color: locText,
             textAlign: "center",
             fontWeight: 900,
-            fontSize: 14,
-            padding: "4px 8px",
-            borderRadius: 8,
+            fontSize: "clamp(18px, 2.4vw, 28px)", // bigger text
+            padding: "10px 12px",                // ~2x taller bar
+            borderRadius: 10,
           }}
         >
           {item.location || "—"}
         </div>
+
 
         {/* Body — divided into three equal rows (top/middle/bottom) */}
         <div
@@ -278,38 +279,39 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                 )}
                         </div>
 
-                        {/* Right: Item name (big) + Price row */}
-                        <div style={{ display: "grid", rowGap: 10 }}>
-                                <div
-                                        style={{
-                                                fontWeight: 900,
-                                                fontSize: "clamp(26px, 3.2vw, 40px)",
-                                                lineHeight: 1.1,
-                                        }}
-                                >
-                                        {String(item.itemName || "—")}
-                                </div>
+                        {/* Right: Item name (big) + Price row (both centered) */}
+                        <div style={{ display: "grid", rowGap: 12, textAlign: "center", justifyItems: "center" }}>
+                          <div
+                            style={{
+                              fontWeight: 900,
+                              fontSize: "clamp(28px, 3.4vw, 42px)",
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            {String(item.itemName || "—")}
+                          </div>
 
-                                <div
-                                        style={{
-                                                display: "flex",
-                                                gap: 10,
-                                                alignItems: "baseline",
-                                                fontSize: "clamp(16px, 2vw, 24px)",
-                                        }}
-                                >
-                                        <span style={{ opacity: 0.85 }}>Price:</span>
-                                        <span style={{ fontWeight: 800 }}>
-                                                {(() => {
-                                                        const raw = String(item.costPerPkg || "").trim();
-                                                        if (!raw) return "—";
-                                                        const n = Number(raw.replace(/[^0-9.-]/g, ""));
-                                                        return isNaN(n) ? raw : `$${n.toFixed(2)}`;
-                                                })()}
-                                        </span>
-                                </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 10,
+                              alignItems: "baseline",
+                              justifyContent: "center",
+                              fontSize: "clamp(18px, 2.2vw, 26px)",
+                            }}
+                          >
+                            <span style={{ opacity: 0.85 }}>Price:</span>
+                            <span style={{ fontWeight: 800 }}>
+                              {(() => {
+                                const raw = String(item.costPerPkg || "").trim();
+                                if (!raw) return "—";
+                                const n = Number(raw.replace(/[^0-9.-]/g, ""));
+                                return isNaN(n) ? raw : `$${n.toFixed(2)}`;
+                              })()}
+                            </span>
+                          </div>
                         </div>
-                </div>
+
 
                 {/* MIDDLE THIRD: Bin Qty (left) + Reorder Qty (right) */}
                 <div
@@ -320,22 +322,44 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                 alignContent: "center",
                         }}
                 >
+                        {/* Left stat (label, then quantity underneath) */}
                         <div
-                                className="statRow"
-                                style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        gap: 12,
-                                        fontSize: "clamp(16px, 2vw, 22px)",
-                                }}
+                          className="statCol"
+                          style={{
+                            display: "grid",
+                            alignContent: "center",
+                            justifyItems: "center",
+                            rowGap: 6,
+                            textAlign: "center",
+                          }}
                         >
-                                <span className="label" style={{ opacity: 0.8 }}>
-                                        Bin Qty (units):
-                                </span>
-                                <span className="value" style={{ fontWeight: 700 }}>
-                                        {String(item.binQtyUnits ?? "—")}
-                                </span>
+                          <div style={{ opacity: 0.8, fontSize: "clamp(16px, 2vw, 22px)" }}>
+                            Bin Qty (units):
+                          </div>
+                          <div style={{ fontWeight: 800, fontSize: "clamp(22px, 2.6vw, 30px)" }}>
+                            {String(item.binQtyUnits ?? "—")}
+                          </div>
                         </div>
+
+                        {/* Right stat (label, then quantity underneath) */}
+                        <div
+                          className="statCol"
+                          style={{
+                            display: "grid",
+                            alignContent: "center",
+                            justifyItems: "center",
+                            rowGap: 6,
+                            textAlign: "center",
+                          }}
+                        >
+                          <div style={{ opacity: 0.8, fontSize: "clamp(16px, 2vw, 22px)" }}>
+                            Reorder Qty (basis):
+                          </div>
+                          <div style={{ fontWeight: 800, fontSize: "clamp(22px, 2.6vw, 30px)" }}>
+                            {String(item.reorderQtyBasis ?? "—")}
+                          </div>
+                        </div>
+
 
                         <div
                                 className="statRow"
@@ -366,15 +390,18 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         {/* Left QR: Product Link */}
                         <div style={{ justifySelf: "start", display: "grid", rowGap: 6, justifyItems: "center" }}>
                                 <img
-                                        alt="Product Link"
-                                        src={makeQr(orderQrUrl, 480)}
-                                        style={{
-                                                width: "80%",
-                                                maxWidth: 320,
-                                                height: "auto",
-                                                aspectRatio: "1 / 1",
-                                        }}
+                                  alt="Product Link"
+                                  src={makeQr(orderQrUrl, 480)}
+                                  style={{
+                                    width: "78%",
+                                    maxWidth: 300,
+                                    height: "auto",
+                                    aspectRatio: "1 / 1",
+                                    boxSizing: "border-box",
+                                    paddingBottom: 2,
+                                  }}
                                 />
+
                                 <div
                                         style={{
                                                 fontSize: "clamp(12px, 1.4vw, 16px)",
@@ -389,15 +416,18 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         {/* Right QR: Reorder Request */}
                         <div style={{ justifySelf: "end", display: "grid", rowGap: 6, justifyItems: "center" }}>
                                 <img
-                                        alt="Reorder Request QR"
-                                        src={makeQr(reorderScanUrl, 480)}
-                                        style={{
-                                                width: "80%",
-                                                maxWidth: 320,
-                                                height: "auto",
-                                                aspectRatio: "1 / 1",
-                                        }}
+                                  alt="Reorder Request QR"
+                                  src={makeQr(reorderScanUrl, 480)}
+                                  style={{
+                                    width: "78%",
+                                    maxWidth: 300,
+                                    height: "auto",
+                                    aspectRatio: "1 / 1",
+                                    boxSizing: "border-box",
+                                    paddingBottom: 2,
+                                  }}
                                 />
+
                                 <div
                                         style={{
                                                 fontSize: "clamp(12px, 1.4vw, 16px)",
