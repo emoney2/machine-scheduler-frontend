@@ -231,18 +231,18 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           {/* Big centered image */}
           <div style={{ display: "grid", justifyItems: "center" }}>
             {item.photoUrl ? (
+              {/* 1.5× bigger QR generation */}
               <img
-                alt=""
-                src={item.photoUrl}
+                alt="Product Link"
+                src={makeQr(orderQrUrl, 480)}
                 style={{
-                  width: 140,
-                  height: 140,
-                  objectFit: "cover",
-                  borderRadius: 10,
-                  border: "1px solid #e5e7eb",
+                  width: "100%",
+                  maxWidth: 280,
+                  height: "auto",
+                  aspectRatio: "1 / 1",
                 }}
-
               />
+
             ) : (
               <div
                 style={{
@@ -416,9 +416,10 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                   </div>
 
                   <div style={{ display: "grid", justifyItems: "center", rowGap: 6 }}>
+                    {/* 1.5× bigger QR generation */}
                     <img
                       alt="Reorder Request QR"
-                      src={makeQr(reorderScanUrl, 480)}    {/* 1.5× bigger QR generation */}
+                      src={makeQr(reorderScanUrl, 480)}
                       style={{
                         width: "100%",
                         maxWidth: 280,
@@ -426,6 +427,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         aspectRatio: "1 / 1",
                       }}
                     />
+
                     <div
                       style={{
                         fontSize: "clamp(12px, 1.4vw, 16px)",
