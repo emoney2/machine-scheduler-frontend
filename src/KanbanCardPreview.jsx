@@ -150,14 +150,14 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
-  // Final DIRECT URL for Order QR (short if available, fallback to long/mailto)
+  // Final DIRECT URL for Order QR (short if available) — with safe fallback
   const orderTarget =
     item.orderMethod === "Email"
-      ? item.orderEmail
-        ? `mailto:${item.orderEmail}`
-        : ""
+      ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
       : (item.orderUrl || "").trim();
-  const orderQrUrl = shortOrderUrl || orderTarget || "";
+
+  const fallbackOpen = `https://machineschedule.netlify.app/kanban/open?id=${encodeURIComponent(item.kanbanId || routeKanbanId)}`;
+  const orderQrUrl = shortOrderUrl || orderTarget || fallbackOpen;
 
   // DIRECT Google Form submission URL (no app, no login)
   // Submits a row with the Kanban ID and qty=1 by default
@@ -310,6 +310,13 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
               <div className="statRow">
                 <span className="label">Reorder Qty (basis):</span>
                 <span className="value">{showVal(item.reorderQtyBasis)}</span>
+              </div>
+              {/* Order QR */}
+              <div className="qr qr-order" style={{ marginTop: 8 }}>
+                <img
+                  alt="Order Page QR"
+                  src={makeQr(orderQrUrl, 250)}
+                />
               </div>
 
               {/* Reorder QR */}
