@@ -404,28 +404,28 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         }
 
         /* Two 4×6 cards on a Letter sheet */
-        .printPage {
-          width: 8.5in;
-          height: 11in;
-          display: grid;
-          grid-template-columns: 4in 4in;   /* two columns: each 4.00in wide */
-          column-gap: 0.25in;               /* gutter between the two cards */
-          padding-top: 0.125in;             /* small top/left inset so nothing clips */
-          padding-left: 0.125in;
-          background: white;
-          box-sizing: border-box;
-          place-items: start;
-        }
+          .printPage {
+            width: 100%;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;   /* two cards share the full page width */
+            gap: 0.5in;                       /* space between cards */
+            padding: 0.5in;
+            background: white;
+            box-sizing: border-box;
+          }
 
-        /* Each card is EXACTLY 4.00in x 6.00in (do not let borders change size) */
-        .card {
-          position: relative;               /* enable absolute cut line overlay */
-          width: 4in;
-          height: 6in;
-          box-sizing: border-box;
-          background: white;
-          border: none;                     /* visual hairline removed (we'll use dotted frame) */
-        }
+          .card {
+            position: relative;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 3 / 4;              /* keeps proportions similar */
+            box-sizing: border-box;
+            background: white;
+            border-radius: 0.2in;
+            border: 0.75pt solid #9ca3af;     /* slightly darker grey frame */
+          }
+
 
         /* Light grey dotted CUT LINE that prints clearly and DOES NOT affect size */
         .cutframe {
