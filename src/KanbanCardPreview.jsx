@@ -58,6 +58,17 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const [shortOrderUrl, setShortOrderUrl] = useState("");
   const printRef = useRef(null);
 
+  // Debug panel toggle via ?debug=1
+  const debugOn = (() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      return sp.get("debug") === "1";
+    } catch {
+      return false;
+    }
+  })();
+
+
   function handlePrintAndSave() {
     // Print the live DOM at true size; no canvas, no PDF scaling
     window.print();
@@ -81,6 +92,9 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         }
         const j = await r.json();
         if (!j?.item) throw new Error("Item not found (empty payload)");
+        const raw = j.item;
+        if (!alive) return;
+        setItem({ ...raw, _debugRaw: raw });
 
         // Normalize keys (case/space-proof)
         // Use server-provided keys directly (already match the JSX)
@@ -416,9 +430,55 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           }
         }
       `}</style>
+
+      {/* Debug panel toggle via ?debug=1 */}
+      {(() => {
+        try {
+          const sp = new URLSearchParams(window.location.search);
+          if (sp.get("debug") === "1") {
+            return (
+              <div
+                style={{
+                  marginTop: 16,
+                  padding: 12,
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 8,
+                  background: "#f9fafb",
+                  fontFamily:
+                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+                  fontSize: 12,
+                  whiteSpace: "pre-wrap",
+                  overflow: "auto",
+                  maxHeight: 320,
+                }}
+              >
+                <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                  🔎 Debug (add ?debug=1 to the URL to show/hide)
+                </div>
+                <div>
+                  <strong>effectiveId:</strong>{" "}
+                  {String(idOverride || (params?.kanbanId || params?.id || ""))}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <strong>item keys:</strong>{" "}
+                  {item ? Object.keys(item).join(", ") : "(no item)"}
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <strong>item JSON:</strong>
+                  <pre style={{ margin: 0 }}>
+                    {JSON.stringify(item?._debugRaw ?? item ?? null, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            );
+          }
+        } catch {}
+        return null;
+      })()}
     </div>
   );
 }
+
 
 const btnPrimary = {
   padding: "8px 12px",
