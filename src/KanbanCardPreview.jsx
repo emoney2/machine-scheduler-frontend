@@ -197,14 +197,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             borderRadius: 12,
             background: "white",
             boxSizing: "border-box",
-            padding: "12px",
+            padding: "12px 12px 16px",   // add bottom padding
             display: "grid",
             gridTemplateRows: "auto auto 1fr",
             gap: 8,
             position: "relative",
-            overflow: "hidden",
+            overflow: "visible",         // stop clipping content
           }}
         >
+
 
         {/* Title */}
         <div style={{ fontWeight: 900, fontSize: "clamp(20px, 2.4vw, 28px)", letterSpacing: 0.3, textAlign: "center" }}>
@@ -365,26 +366,30 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
                 {/* BOTTOM THIRD: QRs — far left and far right */}
                 <div
-                        style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                alignItems: "end",
-                        }}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    alignItems: "center",      // avoid pushing into the bottom edge
+                    padding: "0 10px 8px",     // a bit of inner breathing room
+                    boxSizing: "border-box",
+                  }}
                 >
+
                         {/* Left QR: Product Link */}
                         <div style={{ justifySelf: "start", display: "grid", rowGap: 6, justifyItems: "center" }}>
                                 <img
                                   alt="Product Link"
                                   src={makeQr(orderQrUrl, 480)}
                                   style={{
-                                    width: "78%",
-                                    maxWidth: 300,
+                                    width: "72%",              // slightly smaller to stay clear of the frame
+                                    maxWidth: 260,             // hard cap for small cards/printers
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
-                                    paddingBottom: 2,
+                                    marginBottom: 4,           // tiny buffer from the frame bottom
                                   }}
                                 />
+
 
                                 <div
                                         style={{
@@ -403,14 +408,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                   alt="Reorder Request QR"
                                   src={makeQr(reorderScanUrl, 480)}
                                   style={{
-                                    width: "78%",
-                                    maxWidth: 300,
+                                    width: "72%",
+                                    maxWidth: 260,
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
-                                    paddingBottom: 2,
+                                    marginBottom: 4,
                                   }}
                                 />
+
 
                                 <div
                                         style={{
