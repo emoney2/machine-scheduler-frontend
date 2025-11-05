@@ -370,12 +370,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1fr 1fr",
-                    alignItems: "start",       // pin blocks to the TOP of the bottom third
-                    padding: "8px 10px 0",     // move them UP (top pad), no bottom pad
+                    alignItems: "start",
+                    padding: "10px 10px 0",    // a bit more top pad
                     boxSizing: "border-box",
                     gap: 8,
+                    position: "relative",
+                    top: "-12px",              // LIFT the whole bottom third up
                   }}
                 >
+
 
 
                         {/* Left QR: Product Link */}
@@ -384,14 +387,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                   alt="Product Link"
                                   src={makeQr(orderQrUrl, 480)}
                                   style={{
-                                    width: "68%",            // a touch smaller to stay inside 2:3 frame
-                                    maxWidth: 240,           // hard cap
+                                    width: "64%",          // slightly smaller
+                                    maxWidth: 228,         // tighter cap
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
-                                    marginTop: 4,            // slight lift from bottom of the third
+                                    marginTop: 2,          // tiny lift
                                   }}
                                 />
+
 
 
                                 <div
@@ -411,23 +415,26 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                   alt="Reorder Request QR"
                                   src={makeQr(reorderScanUrl, 480)}
                                   style={{
-                                    width: "68%",
-                                    maxWidth: 240,
+                                    width: "64%",
+                                    maxWidth: 228,
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
-                                    marginTop: 4,
+                                    marginTop: 2,
                                   }}
                                 />
 
 
 
+
                                 <div
                                         style={{
-                                          fontSize: "clamp(11px, 1.25vw, 15px)",  // slightly tighter
+                                          fontSize: "clamp(11px, 1.25vw, 15px)",
+                                          lineHeight: 1.1,           // tighter label height
                                           fontWeight: 700,
                                           textAlign: "center",
                                         }}
+
 
                                 >
                                         Reorder Request QR
