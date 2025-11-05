@@ -371,13 +371,14 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                     display: "grid",
                     gridTemplateColumns: "1fr 1fr",
                     alignItems: "start",
-                    padding: "10px 10px 0",    // a bit more top pad
+                    padding: "10px 10px 0",
                     boxSizing: "border-box",
                     gap: 8,
                     position: "relative",
-                    top: "-12px",              // LIFT the whole bottom third up
+                    top: "-0.625in",   // lift by 5/8"
                   }}
                 >
+
 
 
 
