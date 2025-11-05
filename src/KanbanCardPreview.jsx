@@ -197,14 +197,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             borderRadius: 12,
             background: "white",
             boxSizing: "border-box",
-            padding: "12px 12px 16px",   // add bottom padding
+            padding: "12px 12px 16px",
             display: "grid",
             gridTemplateRows: "auto auto 1fr",
             gap: 8,
             position: "relative",
-            overflow: "visible",         // stop clipping content
+            overflow: "hidden",          // lock aspect ratio so shape can't stretch
           }}
         >
+
 
 
         {/* Title */}
@@ -503,7 +504,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           position: relative;
           width: 100%;
           height: auto;
-          aspect-ratio: 3 / 4;          /* similar proportions to your sample */
+          aspect-ratio: 2 / 3;           /* similar proportions to your sample */
           box-sizing: border-box;
           background: white;
           border-radius: 14px;
