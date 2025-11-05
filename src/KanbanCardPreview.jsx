@@ -207,7 +207,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         >
 
         {/* Title */}
-        <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: 0.3, textAlign: "center" }}>
+        <div style={{ fontWeight: 900, fontSize: "clamp(20px, 2.4vw, 28px)", letterSpacing: 0.3, textAlign: "center" }}>
           KANBAN CARD
         </div>
 
@@ -227,7 +227,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         </div>
 
         {/* Body */}
-        <div style={{ display: "grid", gap: 6, fontSize: 12 }}>
+        <div style={{ display: "grid", gap: 10, fontSize: "clamp(14px, 1.9vw, 20px)" }}>
           {/* Big centered image */}
           <div style={{ display: "grid", justifyItems: "center" }}>
             {item.photoUrl ? (
@@ -270,13 +270,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           {/* LOWER: 2 columns — LEFT (Package Size, Bin Qty, Order QR) / RIGHT (Price, Reorder Qty, Reorder QR) */}
           <div className="lower">
             <div className="leftCol">
-              <div className="statRow">
-                <span className="label">Package Size:</span>
-                <span className="value">
-                  {showVal(item.packageSize)}
-                  {item.leadTimeDays ? ` • Lead: ${String(item.leadTimeDays).trim()}d` : ""}
-                </span>
+              <div className="statRow" style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, fontSize: "clamp(14px, 1.7vw, 20px)" }}>
+                <span className="label" style={{ opacity: 0.8 }}>Price:</span>
+                <span className="value" style={{ fontWeight: 700 }}>...</span>
               </div>
+
 
               <div className="statRow">
                 <span className="label">Bin Qty (units):</span>
@@ -313,11 +311,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
               }}>
                 {/* Order QR (left) */}
                 <div style={{ display: "grid", justifyItems: "center", rowGap: 4 }}>
-                  <img
-                    alt="Order Page QR"
-                    src={makeQr(orderQrUrl, 160)}
-                    style={{ width: 120, height: 120 }}
-                  />
+                  <img alt="Order Page QR" src={makeQr(orderQrUrl, 320)} style={{ width: "48%", height: "auto", aspectRatio: "1 / 1" }} />
                   <div style={{ fontSize: 11, fontWeight: 700, textAlign: "center" }}>
                     Order Page QR
                   </div>
@@ -325,11 +319,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
                 {/* Reorder QR (right) */}
                 <div style={{ display: "grid", justifyItems: "center", rowGap: 4 }}>
-                  <img
-                    alt="Reorder Request QR"
-                    src={makeQr(reorderScanUrl, 160)}
-                    style={{ width: 120, height: 120 }}
-                  />
+                  <img alt="Reorder Request QR" src={makeQr(reorderScanUrl, 320)} style={{ width: "48%", height: "auto", aspectRatio: "1 / 1" }} />
                   <div style={{ fontSize: 11, fontWeight: 700, textAlign: "center" }}>
                     Reorder Request QR
                   </div>
@@ -357,7 +347,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
       >
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 28, lineHeight: 1.15, fontWeight: 900 }}>🚚</div>
-              <div style={{ fontSize: 14, fontWeight: 800, marginTop: 6 }}>
+              <div style={{ fontSize: "clamp(16px, 2.0vw, 24px)", fontWeight: 800, marginTop: 8, textAlign: "center" }}>
                 ORDER PLACED — WAITING ON STOCK
               </div>
             </div>
