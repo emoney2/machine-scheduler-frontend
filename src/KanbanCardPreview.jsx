@@ -228,45 +228,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
         {/* Body */}
         <div style={{ display: "grid", gap: 10, fontSize: "clamp(14px, 1.9vw, 20px)" }}>
-          {/* Big centered image */}
-          <div style={{ display: "grid", justifyItems: "center" }}>
-            {item.photoUrl ? (
-              {/* 1.5× bigger QR generation */}
-              <img
-                alt="Product Link"
-                src={makeQr(orderQrUrl, 480)}
-                style={{
-                  width: "100%",
-                  maxWidth: 280,
-                  height: "auto",
-                  aspectRatio: "1 / 1",
-                }}
-              />
-
-            ) : (
-              <div
-                style={{
-                  width: 180,
-                  height: 180,
-                  borderRadius: 10,
-                  border: "1px dashed #e5e7eb",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#9ca3af",
-                  fontSize: 12,
-                }}
-              >
-                No Photo
-              </div>
-            )}
-          </div>
-
-          {/* Item name */}
-          <div style={{ fontWeight: 900, fontSize: 16, textAlign: "center" }}>
-            {showVal(item.itemName)}
-          </div>
-
           <div
             className="lower"
             style={{
@@ -283,7 +244,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                   src={item.photoUrl}
                   alt=""
                   style={{
-                    width: "100%",              // doubled vs old layout
+                    width: "100%",
                     height: "auto",
                     aspectRatio: "1 / 1",
                     objectFit: "cover",
@@ -316,7 +277,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                 className="itemName"
                 style={{
                   fontWeight: 900,
-                  fontSize: "clamp(24px, 3vw, 36px)", // larger headline
+                  fontSize: "clamp(24px, 3vw, 36px)",
                   lineHeight: 1.15,
                 }}
               >
@@ -376,10 +337,10 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                   <div style={{ display: "grid", justifyItems: "center", rowGap: 6 }}>
                     <img
                       alt="Product Link"
-                      src={makeQr(orderQrUrl, 480)}        {/* 1.5× bigger QR generation */}
+                      src={makeQr(orderQrUrl, 480)}
                       style={{
-                        width: "100%",                     // fills column
-                        maxWidth: 280,                     // keeps it tasteful
+                        width: "100%",
+                        maxWidth: 280,
                         height: "auto",
                         aspectRatio: "1 / 1",
                       }}
@@ -416,7 +377,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                   </div>
 
                   <div style={{ display: "grid", justifyItems: "center", rowGap: 6 }}>
-                    {/* 1.5× bigger QR generation */}
                     <img
                       alt="Reorder Request QR"
                       src={makeQr(reorderScanUrl, 480)}
@@ -427,7 +387,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         aspectRatio: "1 / 1",
                       }}
                     />
-
                     <div
                       style={{
                         fontSize: "clamp(12px, 1.4vw, 16px)",
@@ -442,12 +401,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
               </div>
             </div>
           </div>        {/* closes .lower */}
-
-
-          {/* dotted cut line frame */}
-          <div className="cutframe" aria-hidden="true" />
-
         </div>          {/* closes Body */}
+
+        {/* dotted cut line frame */}
+        <div className="cutframe" aria-hidden="true" />
+
       </div>            {/* closes .card.front */}
       {/* BACK CARD */}
       <div
