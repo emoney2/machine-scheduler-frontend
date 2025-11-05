@@ -226,181 +226,189 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
           {item.location || "—"}
         </div>
 
-        {/* Body */}
-        <div style={{ display: "grid", gap: 10, fontSize: "clamp(14px, 1.9vw, 20px)" }}>
-          <div
-            className="lower"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1.2fr",
-              gap: 16,
-              alignItems: "start",
-            }}
-          >
-            {/* LEFT: LARGE IMAGE */}
-            <div className="mediaCol" style={{ display: "grid", alignContent: "start" }}>
-              {item.photoUrl ? (
-                <img
-                  src={item.photoUrl}
-                  alt=""
-                  style={{
-                    width: "100%",
-                    height: "auto",
-                    aspectRatio: "1 / 1",
-                    objectFit: "cover",
-                    borderRadius: 12,
-                    border: "1px solid #e5e7eb",
-                  }}
-                />
-              ) : (
+        {/* Body — divided into three equal rows (top/middle/bottom) */}
+        <div
+                style={{
+                        display: "grid",
+                        gridTemplateRows: "1fr 1fr 1fr",
+                        gap: 12,
+                        height: "100%",
+                        fontSize: "clamp(14px, 1.9vw, 20px)",
+                }}
+        >
+                {/* TOP THIRD: image (left) + item name & price (right) */}
                 <div
-                  style={{
-                    width: "100%",
-                    aspectRatio: "1 / 1",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 12,
-                    display: "grid",
-                    placeItems: "center",
-                    color: "#9ca3af",
-                    fontSize: "clamp(12px, 1.2vw, 14px)",
-                  }}
+                        style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: 12,
+                                alignItems: "center",
+                        }}
                 >
-                  No Photo
-                </div>
-              )}
-            </div>
+                        {/* Left: big product image */}
+                        <div style={{ display: "grid", alignContent: "start" }}>
+                                {item.photoUrl ? (
+                                        <img
+                                                src={item.photoUrl}
+                                                alt=""
+                                                style={{
+                                                        width: "100%",
+                                                        height: "auto",
+                                                        aspectRatio: "1 / 1",
+                                                        objectFit: "cover",
+                                                        borderRadius: 12,
+                                                        border: "1px solid #e5e7eb",
+                                                }}
+                                        />
+                                ) : (
+                                        <div
+                                                style={{
+                                                        width: "100%",
+                                                        aspectRatio: "1 / 1",
+                                                        border: "1px solid #e5e7eb",
+                                                        borderRadius: 12,
+                                                        display: "grid",
+                                                        placeItems: "center",
+                                                        color: "#9ca3af",
+                                                        fontSize: "clamp(12px, 1.2vw, 14px)",
+                                                }}
+                                        >
+                                                No Photo
+                                        </div>
+                                )}
+                        </div>
 
-            {/* RIGHT: NAME + PRICE, THEN TWO COLUMNS (STATS + QRs) */}
-            <div className="infoCol" style={{ display: "grid", rowGap: 14 }}>
-              {/* Row 1: Item Name (double size) */}
-              <div
-                className="itemName"
-                style={{
-                  fontWeight: 900,
-                  fontSize: "clamp(24px, 3vw, 36px)",
-                  lineHeight: 1.15,
-                }}
-              >
-                {String(item.itemName || "—")}
-              </div>
+                        {/* Right: Item name (big) + Price row */}
+                        <div style={{ display: "grid", rowGap: 10 }}>
+                                <div
+                                        style={{
+                                                fontWeight: 900,
+                                                fontSize: "clamp(26px, 3.2vw, 40px)",
+                                                lineHeight: 1.1,
+                                        }}
+                                >
+                                        {String(item.itemName || "—")}
+                                </div>
 
-              {/* Row 2: Price formatted like "Price: $7.99" */}
-              <div
-                className="priceRow"
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "baseline",
-                  fontSize: "clamp(16px, 2vw, 24px)",
-                }}
-              >
-                <span style={{ opacity: 0.85 }}>Price:</span>
-                <span style={{ fontWeight: 800 }}>
-                  {(() => {
-                    const raw = String(item.costPerPkg || "").trim();
-                    if (!raw) return "—";
-                    const n = Number(raw.replace(/[^0-9.-]/g, ""));
-                    return isNaN(n) ? raw : `$${n.toFixed(2)}`;
-                  })()}
-                </span>
-              </div>
-
-              {/* Row 3: Two columns */}
-              <div
-                className="statsAndQrs"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: 16,
-                  alignItems: "start",
-                }}
-              >
-                {/* LEFT COLUMN: Bin Qty, then Product Link QR */}
-                <div style={{ display: "grid", rowGap: 12 }}>
-                  <div
-                    className="statRow"
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      fontSize: "clamp(14px, 1.7vw, 20px)",
-                    }}
-                  >
-                    <span className="label" style={{ opacity: 0.8 }}>
-                      Bin Qty (units):
-                    </span>
-                    <span className="value" style={{ fontWeight: 700 }}>
-                      {String(item.binQtyUnits ?? "—")}
-                    </span>
-                  </div>
-
-                  <div style={{ display: "grid", justifyItems: "center", rowGap: 6 }}>
-                    <img
-                      alt="Product Link"
-                      src={makeQr(orderQrUrl, 480)}
-                      style={{
-                        width: "100%",
-                        maxWidth: 280,
-                        height: "auto",
-                        aspectRatio: "1 / 1",
-                      }}
-                    />
-                    <div
-                      style={{
-                        fontSize: "clamp(12px, 1.4vw, 16px)",
-                        fontWeight: 700,
-                        textAlign: "center",
-                      }}
-                    >
-                      Product Link
-                    </div>
-                  </div>
+                                <div
+                                        style={{
+                                                display: "flex",
+                                                gap: 10,
+                                                alignItems: "baseline",
+                                                fontSize: "clamp(16px, 2vw, 24px)",
+                                        }}
+                                >
+                                        <span style={{ opacity: 0.85 }}>Price:</span>
+                                        <span style={{ fontWeight: 800 }}>
+                                                {(() => {
+                                                        const raw = String(item.costPerPkg || "").trim();
+                                                        if (!raw) return "—";
+                                                        const n = Number(raw.replace(/[^0-9.-]/g, ""));
+                                                        return isNaN(n) ? raw : `$${n.toFixed(2)}`;
+                                                })()}
+                                        </span>
+                                </div>
+                        </div>
                 </div>
 
-                {/* RIGHT COLUMN: Reorder Qty, then Reorder Request QR */}
-                <div style={{ display: "grid", rowGap: 12 }}>
-                  <div
-                    className="statRow"
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      fontSize: "clamp(14px, 1.7vw, 20px)",
-                    }}
-                  >
-                    <span className="label" style={{ opacity: 0.8 }}>
-                      Reorder Qty (basis):
-                    </span>
-                    <span className="value" style={{ fontWeight: 700 }}>
-                      {String(item.reorderQtyBasis ?? "—")}
-                    </span>
-                  </div>
+                {/* MIDDLE THIRD: Bin Qty (left) + Reorder Qty (right) */}
+                <div
+                        style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: 16,
+                                alignContent: "center",
+                        }}
+                >
+                        <div
+                                className="statRow"
+                                style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        gap: 12,
+                                        fontSize: "clamp(16px, 2vw, 22px)",
+                                }}
+                        >
+                                <span className="label" style={{ opacity: 0.8 }}>
+                                        Bin Qty (units):
+                                </span>
+                                <span className="value" style={{ fontWeight: 700 }}>
+                                        {String(item.binQtyUnits ?? "—")}
+                                </span>
+                        </div>
 
-                  <div style={{ display: "grid", justifyItems: "center", rowGap: 6 }}>
-                    <img
-                      alt="Reorder Request QR"
-                      src={makeQr(reorderScanUrl, 480)}
-                      style={{
-                        width: "100%",
-                        maxWidth: 280,
-                        height: "auto",
-                        aspectRatio: "1 / 1",
-                      }}
-                    />
-                    <div
-                      style={{
-                        fontSize: "clamp(12px, 1.4vw, 16px)",
-                        fontWeight: 700,
-                        textAlign: "center",
-                      }}
-                    >
-                      Reorder Request QR
-                    </div>
-                  </div>
+                        <div
+                                className="statRow"
+                                style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        gap: 12,
+                                        fontSize: "clamp(16px, 2vw, 22px)",
+                                }}
+                        >
+                                <span className="label" style={{ opacity: 0.8 }}>
+                                        Reorder Qty (basis):
+                                </span>
+                                <span className="value" style={{ fontWeight: 700 }}>
+                                        {String(item.reorderQtyBasis ?? "—")}
+                                </span>
+                        </div>
                 </div>
-              </div>
-            </div>
-          </div>        {/* closes .lower */}
+
+                {/* BOTTOM THIRD: QRs — far left and far right */}
+                <div
+                        style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                alignItems: "end",
+                        }}
+                >
+                        {/* Left QR: Product Link */}
+                        <div style={{ justifySelf: "start", display: "grid", rowGap: 6, justifyItems: "center" }}>
+                                <img
+                                        alt="Product Link"
+                                        src={makeQr(orderQrUrl, 480)}
+                                        style={{
+                                                width: "80%",
+                                                maxWidth: 320,
+                                                height: "auto",
+                                                aspectRatio: "1 / 1",
+                                        }}
+                                />
+                                <div
+                                        style={{
+                                                fontSize: "clamp(12px, 1.4vw, 16px)",
+                                                fontWeight: 700,
+                                                textAlign: "center",
+                                        }}
+                                >
+                                        Product Link
+                                </div>
+                        </div>
+
+                        {/* Right QR: Reorder Request */}
+                        <div style={{ justifySelf: "end", display: "grid", rowGap: 6, justifyItems: "center" }}>
+                                <img
+                                        alt="Reorder Request QR"
+                                        src={makeQr(reorderScanUrl, 480)}
+                                        style={{
+                                                width: "80%",
+                                                maxWidth: 320,
+                                                height: "auto",
+                                                aspectRatio: "1 / 1",
+                                        }}
+                                />
+                                <div
+                                        style={{
+                                                fontSize: "clamp(12px, 1.4vw, 16px)",
+                                                fontWeight: 700,
+                                                textAlign: "center",
+                                        }}
+                                >
+                                        Reorder Request QR
+                                </div>
+                        </div>
+                </div>
         </div>          {/* closes Body */}
 
         {/* dotted cut line frame */}
