@@ -187,10 +187,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const GOOGLE_FORM_ID = "1FAIpQLScsQeFaR22LNHcSZWbqwtNSBQU-j5MJdbxK1AA3cF-yBBxutA";
   const ENTRY_KANBAN = "entry.1189949378"; // Kanban ID field
   const ENTRY_QTY = "entry.312175649";     // Quantity field
-  const reorderScanUrl =
-    `https://machine-scheduler-backend.onrender.com/kanban/scan?id=${encodeURIComponent(
-      item.kanbanId || routeKanbanId
-    )}&qty=1`;
+  // Use backend route instead of frontend or Google Form
+  const reorderScanUrl = `https://machine-scheduler-backend.onrender.com/kanban/scan?id=${encodeURIComponent(
+    item.kanbanId || routeKanbanId
+  )}&qty=1`;
+
 
 
   return (
