@@ -159,9 +159,10 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
   // ✅ Add this: build the scan QR URL manually
-  const scanUrl = `https://machinescheduler.netlify.app/kanban/scan?id=${encodeURIComponent(
+  const scanUrl = `https://machine-scheduler-backend.onrender.com/kanban/scan?id=${encodeURIComponent(
     item.kanbanId
   )}&qty=1`;
+
   const scanQr = makeQr(scanUrl);
 
 
