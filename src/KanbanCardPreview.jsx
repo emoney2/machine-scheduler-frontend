@@ -159,11 +159,13 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
   // ✅ Add this: build the scan QR URL manually
+  // Use correct field name from your sheet ("Kanban ID")
   const scanUrl = `https://machine-scheduler-backend.onrender.com/kanban/scan?id=${encodeURIComponent(
-    item.kanbanId
+    item["Kanban ID"] || routeKanbanId
   )}&qty=1`;
 
   const scanQr = makeQr(scanUrl);
+
 
 
   // Final DIRECT URL for Order QR (short if available) — with safe fallback
