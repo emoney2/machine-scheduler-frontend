@@ -7,12 +7,20 @@ import jsPDF from "jspdf";
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
 // Simple QR generator (external API)
-const makeQr = (data, size = 180) =>
-  data
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&qzone=1&data=${encodeURIComponent(
-        data
-      )}`
-    : "";
+const makeQr = (data, size = 180) => {
+  if (!data) {
+    console.warn("⚠️ QR generation failed — data is empty");
+    return "about:blank"; // prevents invalid URL QR
+  }
+  const normalized = String(data).trim();
+  if (!/^https?:\/\//i.test(normalized) && !/^mailto:/i.test(normalized)) {
+    console.warn("⚠️ QR generation received non-absolute URL:", normalized);
+  }
+  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&qzone=1&data=${encodeURIComponent(
+    normalized
+  )}`;
+};
+
 
 function showVal(v) {
   if (v === null || v === undefined) return "—";
@@ -151,10 +159,18 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
   // Final DIRECT URL for Order QR (short if available) — with safe fallback
-  const orderTarget =
-    item.orderMethod === "Email"
-      ? (item.orderEmail ? `mailto:${item.orderEmail}` : "")
-      : (item.orderUrl || "").trim();
+  // Normalize order target safely
+  let orderTarget = "";
+  if (item.orderMethod === "Email") {
+    if (item.orderEmail && item.orderEmail.includes("@")) {
+      orderTarget = `mailto:${item.orderEmail.trim()}`;
+    }
+  } else if (item.orderUrl) {
+    const u = item.orderUrl.trim();
+    // prepend https:// if missing
+    orderTarget = /^https?:\/\//i.test(u) ? u : `https://${u}`;
+  }
+
 
   const fallbackOpen = `https://machineschedule.netlify.app/kanban/open?id=${encodeURIComponent(item.kanbanId || routeKanbanId)}`;
   const orderQrUrl = shortOrderUrl || orderTarget || fallbackOpen;
