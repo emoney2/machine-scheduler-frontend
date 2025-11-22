@@ -188,9 +188,10 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const ENTRY_KANBAN = "entry.1189949378"; // Kanban ID field
   const ENTRY_QTY = "entry.312175649";     // Quantity field
   const reorderScanUrl =
-    `https://docs.google.com/forms/d/e/${GOOGLE_FORM_ID}/formResponse` +
-    `?${ENTRY_KANBAN}=${encodeURIComponent(item.kanbanId || routeKanbanId)}` +
-    `&${ENTRY_QTY}=1&submit=Submit`;
+    `https://machinescheduler.netlify.app/kanban/scan?id=${encodeURIComponent(
+      item.kanbanId || routeKanbanId
+    )}&qty=1`;
+
 
   return (
     <div style={{ padding: 24 }}>
