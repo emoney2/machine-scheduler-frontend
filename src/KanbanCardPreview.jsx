@@ -158,6 +158,13 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
+  // ✅ Add this: build the scan QR URL manually
+  const scanUrl = `https://machinescheduler.netlify.app/kanban/scan?id=${encodeURIComponent(
+    item.kanbanId
+  )}&qty=1`;
+  const scanQr = makeQr(scanUrl);
+
+
   // Final DIRECT URL for Order QR (short if available) — with safe fallback
   // Normalize order target safely
   let orderTarget = "";
@@ -430,7 +437,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         <div style={{ justifySelf: "end", display: "grid", rowGap: 6, justifyItems: "center" }}>
                                 <img
                                   alt="Reorder Request QR"
-                                  src={makeQr(reorderScanUrl, 480)}
+                                  src={scanQr}
                                   style={{
                                     width: "64%",
                                     maxWidth: 228,
@@ -440,10 +447,6 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                     marginTop: 2,
                                   }}
                                 />
-
-
-
-
                                 <div
                                         style={{
                                           fontSize: "clamp(11px, 1.25vw, 15px)",
