@@ -52,7 +52,7 @@ export default function KanbanQueue() {
   const orderedCount = grouped.ordered.length;
 
   async function markOrdered(eventId) {
-    const qtyStr = prompt("Ordered qty (cases/units)?", "1");
+    const qtyStr = r["Reorder Qty Basis"] || r["Reorder Qty"] || "1";
     if (!qtyStr) return;
     const qty = Number(qtyStr);
     if (!Number.isFinite(qty) || qty <= 0) {
@@ -370,7 +370,7 @@ export default function KanbanQueue() {
                       >
                         {status === "open" && (
                           <button
-                            onClick={() => markOrdered(r["Event ID"])}
+                            onClick={() => markOrdered(r["Event ID"], r)}
                             title="Append ORDERED row and mark this request as Ordered"
                             style={{
                               padding: "8px 12px",
