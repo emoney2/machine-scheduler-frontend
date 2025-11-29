@@ -627,37 +627,74 @@ export default function FurList() {
                   </div>
                 </div>
 
-                <div style={cellBase}>{company}</div>
-                {/* Design (shrinks + ellipsis) */}
-                <div style={{ ...cellBase, maxWidth: 140 }}>{design}</div>
+                {/* Company Name (shorter + ellipsis) */}
+                <div style={{ 
+                  ...cellBase, 
+                  maxWidth: 100, 
+                  overflow: "hidden", 
+                  textOverflow: "ellipsis", 
+                  whiteSpace: "nowrap" 
+                }}>
+                  {company}
+                </div>
 
-                {/* Qty */}
+                {/* Design (usually long, trim) */}
+                <div style={{ 
+                  ...cellBase, 
+                  maxWidth: 120, 
+                  overflow: "hidden", 
+                  textOverflow: "ellipsis", 
+                  whiteSpace: "nowrap" 
+                }}>
+                  {design}
+                </div>
+
+                {/* Qty — small */}
                 <div style={{ ...cellBase, width: 40 }}>{qty}</div>
 
-                {/* Product (shrinks + ellipsis) */}
-                <div style={{ ...cellBase, maxWidth: 110 }}>{product}</div>
+                {/* Product — shorten */}
+                <div style={{ 
+                  ...cellBase, 
+                  maxWidth: 90, 
+                  overflow: "hidden", 
+                  textOverflow: "ellipsis", 
+                  whiteSpace: "nowrap" 
+                }}>
+                  {product}
+                </div>
 
                 {/* Stage */}
-                <div style={{ ...cellBase, width: 70 }}>{stage}</div>
+                <div style={{ ...cellBase, width: 65 }}>{stage}</div>
 
-                {/* Print status if not compact */}
+                {/* Print (if visible) */}
                 {!compact && (
-                  <div style={{ ...cellBase, width: 70 }}>{print}</div>
+                  <div style={{ ...cellBase, width: 50 }}>{print}</div>
                 )}
 
                 {/* Fur Color */}
-                <div style={{ ...cellBase, width: 80 }}>{color}</div>
+                <div style={{ 
+                  ...cellBase, 
+                  maxWidth: 90, 
+                  overflow: "hidden", 
+                  textOverflow: "ellipsis", 
+                  whiteSpace: "nowrap" 
+                }}>
+                  {color}
+                </div>
 
                 {/* Ship Date */}
-                <div style={{ ...cellBase, width: 65 }}>{fmtMMDD(ship)}</div>
+                <div style={{ ...cellBase, width: 60 }}>{fmtMMDD(ship)}</div>
 
-                {/* Due Date */}
-                <div style={{ ...cellBase, width: 65 }}>{fmtMMDD(due)}</div>
+                {/* Due Date (slightly bold) */}
+                <div style={{ ...cellBase, width: 60, fontWeight: "bold" }}>
+                  {fmtMMDD(due)}
+                </div>
 
-                {/* Hard/Soft only if full mode */}
+                {/* Hard/Soft */}
                 {!compact && (
-                  <div style={{ ...cellBase, width: 80 }}>{hardSoft}</div>
+                  <div style={{ ...cellBase, width: 75 }}>{hardSoft}</div>
                 )}
+
 
 
                 {/* Complete (final sticky cell). Stop click from toggling the card */}
