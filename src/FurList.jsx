@@ -643,15 +643,15 @@ export default function FurList() {
                 <div
                   style={{
                     display: "flex",
-                    gap: "6px",
-                    marginTop: "6px",
-                    marginBottom: "6px",
+                    gap: "10px",
+                    width: "300px",        // ⭐ fixed space reserved for all buttons
+                    flexShrink: 0,         // ⭐ prevents shrinking when screen gets tight
+                    justifyContent: "flex-end",
                     alignItems: "center",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    justifyContent: "flex-start"
+                    whiteSpace: "nowrap"
                   }}
                 >
+
 
                   {/* Open */}
                   <button
