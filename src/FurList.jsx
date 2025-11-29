@@ -170,6 +170,12 @@ export default function FurList() {
   const [saving, setSaving] = useState({});   // { [orderId]: true }
   const [selected, setSelected] = useState({}); // { [orderId]: true }
 
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printOrder, setPrintOrder] = useState(null);
+  const [printServiceOnline, setPrintServiceOnline] = useState(true);
+
+
+
   // responsive compact mode for narrow screens
   const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
   useEffect(() => {
@@ -210,6 +216,23 @@ export default function FurList() {
     const t = setInterval(() => { if (!canceled) fetchOrders({ refresh: true }); }, 60000);
     return () => { canceled = true; clearInterval(t); };
   }, [fetchOrders]);
+
+  // 🆕 Check if Print Service is up
+  useEffect(() => {
+    async function checkService() {
+      try {
+        await fetch("http://127.0.0.1:5009/print", { method: "OPTIONS" });
+        setPrintServiceOnline(true);
+      } catch {
+        setPrintServiceOnline(false);
+      }
+    }
+
+    checkService();
+    const interval = setInterval(checkService, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
 
   // Filter + sort (+partition)
   const cards = useMemo(() => {
@@ -317,6 +340,38 @@ export default function FurList() {
     setSelected(next);
   }
 
+  // 🆕 Print handler function
+  async function handlePrint(mode) {
+    try {
+      await fetch("http://127.0.0.1:5009/print", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order: printOrder,
+          mode,
+          requiresProcessSheetUpdate: mode === "process" || mode === "both"
+        })
+      });
+
+      // 🆕 Immediately mark as printed in UI if needed
+      if (mode === "process" || mode === "both") {
+        setOrders(prev =>
+          prev.map(o =>
+            String(o["Order #"]) === String(printOrder)
+              ? { ...o, "Process Sheet Printed": o["Process Sheet Printed"] || "printed" }
+              : o
+          )
+        );
+      }
+
+      showToast(`Print sent (${mode})`, "success");
+    } catch (err) {
+      showToast("Print service not running", "error", 2600);
+    }
+
+    setShowPrintModal(false);
+  }
+
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
   // [Order#, Preview, Company, Design, Qty, Product, Stage, Due, (Print), Fur Color, Ship, (Hard/Soft), Complete]
@@ -336,6 +391,8 @@ export default function FurList() {
 
 
   const selectedCount = Object.values(selected).filter(Boolean).length;
+
+
 
   return (
     <div style={{ padding: 12, fontSize: 12, lineHeight: 1.2 }}>
@@ -454,6 +511,7 @@ export default function FurList() {
             const imageUrl= orderThumbUrl(order);
             const isSaving = !!saving[orderId];
             const sel = !!selected[orderId];
+            const processSheetPrinted = order["Process Sheet Printed"] || "";
 
             // Card background from Fur Color (with readable text)
             const bg = (() => {
@@ -581,14 +639,55 @@ export default function FurList() {
                 {!compact && <div style={cellBase}>{hardSoft}</div>}
 
                 {/* Complete (final sticky cell). Stop click from toggling the card */}
-                <div style={{ ...stickyRight(0, bg), textAlign: "right" }}>
+                {/* Actions (Print, Open, Complete). Stop click from toggling the card */}
+                <div style={{ ...stickyRight(0, bg), textAlign: "right", display: "flex", gap: 6, justifyContent: "flex-end" }}>
+  
+                  <button
+                    disabled={!printServiceOnline}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPrintOrder(orderId);
+                      setShowPrintModal(true);
+                    }}
+                    className="btn"
+                    style={{
+                      background: printServiceOnline ? "#f0f0f0" : "#ddd",
+                      borderColor: printServiceOnline ? "#ccc" : "#999",
+                      opacity: printServiceOnline ? 1 : 0.5,
+                      cursor: printServiceOnline ? "pointer" : "not-allowed"
+                    }}
+                    title={printServiceOnline ? "Print this order" : "Print Service Offline"}
+                  >
+                    {printServiceOnline
+                      ? (processSheetPrinted ? "Reprint" : "Print")
+                      : "Offline"}
+                  </button>
+
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const url = `https://machineschedule.netlify.app/scan?dept=fur&order=${orderId}`;
+                      window.open(url, "_self");
+                    }}
+                    className="btn"
+                    style={{ background: "#eef6ff", borderColor: "#8cb4ff" }}
+                    title="Open job in app"
+                  >
+                    Open
+                  </button>
+
+
                   <button
                     onClick={(e) => { e.stopPropagation(); markComplete(order); }}
                     disabled={isSaving}
                     className="btn"
                     style={{
                       background: isSaving ? "rgba(255,255,255,0.8)" : "#ffffff",
-                      color: "#222", display: "inline-flex", alignItems: "center", gap: 8,
+                      color: "#222",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
                       opacity: isSaving ? 0.9 : 1
                     }}
                     title="Write Quantity to Fur List → Quantity Made, then hide"
@@ -596,8 +695,15 @@ export default function FurList() {
                   >
                     {isSaving && (
                       <span
-                        className="spin" aria-hidden="true"
-                        style={{ width: 12, height: 12, border: "2px solid #999", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block" }}
+                        className="spin"
+                        aria-hidden="true"
+                        style={{
+                          width: 12, height: 12,
+                          border: "2px solid #999",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          display: "inline-block"
+                        }}
                       />
                     )}
                     {isSaving ? "Saving…" : "Complete"}
@@ -609,7 +715,67 @@ export default function FurList() {
         </div>
       )}
 
+      {/* 🆕 Print Options Modal */}
+      {showPrintModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999
+          }}
+          onClick={() => setShowPrintModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              padding: 24,
+              borderRadius: 12,
+              width: 360,
+              textAlign: "center",
+              fontWeight: 700,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12
+            }}
+          >
+            <div style={{ fontSize: 18, marginBottom: 12 }}>
+              Print Order #{printOrder}
+            </div>
+
+            <button
+              className="btn"
+              style={{ padding: "14px 10px" }}
+              onClick={() => handlePrint("both")}
+            >
+              Process Sheet + Bin Sheet
+            </button>
+
+            <button
+              className="btn"
+              style={{ padding: "14px 10px" }}
+              onClick={() => handlePrint("process")}
+            >
+              Process Sheet Only
+            </button>
+
+            <button
+              className="btn"
+              style={{ padding: "14px 10px" }}
+              onClick={() => handlePrint("binsheet")}
+            >
+              Bin Sheet Only
+            </button>
+          </div>
+        </div>
+      )}
+
       <Toast kind={toastKind} message={toastMsg} onClose={() => setToastMsg("")} />
     </div>
   );
 }
+
