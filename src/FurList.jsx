@@ -644,11 +644,15 @@ export default function FurList() {
                   style={{
                     display: "flex",
                     gap: "6px",
-                    flexWrap: "wrap",
                     marginTop: "6px",
-                    marginBottom: "6px"
+                    marginBottom: "6px",
+                    alignItems: "center",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    justifyContent: "flex-start"
                   }}
                 >
+
                   {/* Open */}
                   <button
                     onClick={(e) => {
