@@ -40,63 +40,50 @@ async function fetchFastOrder(orderId) {
   return j?.order || null;
 }
 
-function normalizeFast(o, fallbackOrderId) {
-  if (!o) {
-    return {
-      order: fallbackOrderId ?? "—",
-      company: "—",
-      title: "",
-      product: "",
-      stage: "",
-      dueDate: "",
-      furColor: "",
-      quantity: "—",
-      thumbnailUrl: null,
-      images: [],
-      imagesLabeled: []
-    };
+function normalizeFast(o) {
+  if (!o || typeof o !== "object") return o;
+
+  // normalize fields
+  const result = { ...o };
+
+  // standardize raw fields
+  const imagesLabeled = Array.isArray(o.imagesLabeled) ? o.imagesLabeled : [];
+  const images = Array.isArray(o.images) ? o.images : [];
+  const imageUrls = Array.isArray(o.imageUrls) ? o.imageUrls : [];
+  const imageUrl = o.imageUrl || o.thumbnailUrl || null;
+  const thumbnail = o.thumbnailUrl || imageUrl || null;
+
+  // ---- build a normalized image array object format ----
+  let normalizedImages = [];
+
+  // 1️⃣ Preferred: labeled objects
+  if (imagesLabeled.length) {
+    normalizedImages = imagesLabeled.map(img =>
+      typeof img === "string" ? { src: img, label: "" } : { src: img.src, label: img.label || "" }
+    );
+  }
+  // 2️⃣ fallback: raw images
+  else if (images.length) {
+    normalizedImages = images.map(img =>
+      typeof img === "string" ? { src: img, label: "" } : { src: img.src, label: img.label || "" }
+    );
+  }
+  // 3️⃣ fallback: raw URLs list
+  else if (imageUrls.length) {
+    normalizedImages = imageUrls.map(u => ({ src: u, label: "" }));
+  }
+  // 4️⃣ fallback: single thumbnail
+  else if (thumbnail) {
+    normalizedImages = [{ src: thumbnail, label: "" }];
   }
 
-  // ---- Thumbnail selection priority ----
-  const thumbnailUrl =
-    o.thumbnailUrl ||
-    o.imageUrl ||   // <-- backend most commonly sends THIS
-    null;
+  // store normalized field
+  result.imagesNormalized = normalizedImages;
+  result.thumbnail = thumbnail;
+  result.hasImages = normalizedImages.length > 0;
 
-  // ---- Image array building logic ----
-  let images = [];
-
-  if (Array.isArray(o.imagesLabeled) && o.imagesLabeled.length > 0) {
-    images = o.imagesLabeled;
-  } else if (Array.isArray(o.images) && o.images.length > 0) {
-    images = o.images.map(u =>
-      typeof u === "string" ? { src: u, label: "" } : u
-    );
-  } else if (Array.isArray(o.imageUrls) && o.imageUrls.length > 0) {
-    images = o.imageUrls.map(u =>
-      typeof u === "string" ? { src: u, label: "" } : u
-    );
-  } else if (o.imageUrl) {
-    images = [{ src: o.imageUrl, label: "" }]; // <-- fallback to single URL
-  }
-
-  return {
-    order: String(
-      o["Order #"] ?? o.order ?? fallbackOrderId ?? "—"
-    ),
-    company: o["Company Name"] ?? o.company ?? "",
-    title: o.Design ?? o.title ?? "",
-    product: o.Product ?? o.product ?? "",
-    stage: o.Stage ?? o.stage ?? "",
-    dueDate: o["Due Date"] ?? o.dueDate ?? "",
-    furColor: o["Fur Color"] ?? o.furColor ?? "",
-    quantity: o.Quantity ?? o.quantity ?? "—",
-    thumbnailUrl,
-    images,
-    imagesLabeled: Array.isArray(o.imagesLabeled) ? o.imagesLabeled : []
-  };
+  return result;
 }
-
 
 
 
