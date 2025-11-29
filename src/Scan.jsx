@@ -126,106 +126,84 @@ export default function Scan() {
     setTimeout(() => setFlash("idle"), 600);
   }
 
-  async function fetchOrder(orderId) {
-    if (!deptValid) return flashError("Invalid department");
-    setPendingOrderId(orderId);
-    setLoading(true);
-    setErrMsg("");
+async function fetchOrder(orderId) {
+  if (!deptValid) return flashError("Invalid department");
+  setPendingOrderId(orderId);
+  setLoading(true);
+  setErrMsg("");
 
+  try {
+    // ---- 1) FAST PATH (paint UI instantly) ----
     try {
-      // 1) FAST PATH: use /order_fast to paint UI quickly
-      try {
-        const fastRow = await fetch(`${API_ROOT}/order_fast?orderNumber=${orderId}`, {
-          credentials: "include"
-        }).then(r => r.ok ? r.json() : null);
+      const urlFast = `${API_ROOT}/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
+      const fastRes = await fetch(urlFast, { credentials: "include" });
+      const fastJson = fastRes.ok ? await fastRes.json() : null;
 
-        if (fastRow?.order) {
-          const quick = normalizeFast(fastRow.order, orderId);
-          setOrderData(quick);
-          setLoading(false);
-        }
-      } catch (e) {
-        console.warn("[Scan] fast order lookup failed", e);
+      if (fastJson?.order) {
+        const quick = normalizeFast(fastJson.order, orderId);
+        setOrderData(quick);
+        setLoading(false);
       }
-
-
-      // 2) FULL SUMMARY (runs in background - does NOT block UI)
-      (async () => {
-        try {
-          const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
-            dept
-          )}&order=${encodeURIComponent(orderId)}`;
-
-          const r = await fetch(url, { credentials: "include" });
-          if (!r.ok) return;
-          const data = await r.json();
-
-          // update with richer info once available
-          setOrderData(prev => ({
-            ...prev,
-            product: data.product ?? prev.product,
-            stage: data.stage ?? prev.stage,
-            dueDate: data.dueDate ?? prev.dueDate,
-            furColor: data.furColor ?? prev.furColor,
-            thumbnailUrl: data.thumbnailUrl || prev.thumbnailUrl,
-            images:
-              Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
-                ? data.imagesLabeled
-                : Array.isArray(data.images) && data.images.length > 0
-                ? data.images.map(u => typeof u === "string" ? { src: u, label: "" } : u)
-                : prev.images,
-          }));
-        } catch (err) {
-          console.warn("Background full summary failed", err);
-        }
-      })();
-
-      if (!r.ok) {
-        const j = await safeJson(r);
-        throw new Error(j?.error || `HTTP ${r.status}`);
-      }
-      const data = await r.json();
-
-      const normalized = {
-        order: data.order ?? orderId,
-        company: data.company ?? "—",
-        title: data.title ?? "",
-        product: data.product ?? "",
-        stage: data.stage ?? "",
-        dueDate: data.dueDate ?? "",
-        furColor: data.furColor ?? "",
-        quantity: data.quantity ?? "—",
-        thumbnailUrl: data.thumbnailUrl || null,
-        images:
-          Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
-            ? data.imagesLabeled
-            : Array.isArray(data.images) && data.images.length > 0
-            ? data.images.map((u) =>
-                typeof u === "string" ? { src: u, label: "" } : u
-              )
-            : data.thumbnailUrl
-            ? [{ src: data.thumbnailUrl, label: "" }]
-            : [],
-      };
-
-      setOrderData(normalized);
-      flashOk();
     } catch (e) {
-      console.warn("[Scan] Full order fetch failed:", e);
-
-      // If fast load already gave us data, do NOT wipe it or show an error.
-      if (orderData) {
-        console.log("[Scan] Fast data already loaded — skipping failure toast");
-      } else {
-        // True failure: no fast data AND full lookup failed
-        setOrderData(null);
-        flashError("Order not found or server error");
-      }
-    } finally {
-      setPendingOrderId("");
-      setLoading(false);
+      console.warn("[Scan] fast order lookup failed → continuing", e);
     }
-  }  // <-- this brace closes fetchOrder()
+
+    // ---- 2) FULL SUMMARY (async upgrade, does NOT block UI) ----
+    (async () => {
+      try {
+        const fullUrl = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
+          dept
+        )}&order=${encodeURIComponent(orderId)}`;
+
+        const fullRes = await fetch(fullUrl, { credentials: "include" });
+        if (!fullRes.ok) return; // don't break fast UI
+        const fullJson = await fullRes.json();
+
+        setOrderData(prev => ({
+          ...prev,
+          product: fullJson.product ?? prev.product,
+          stage: fullJson.stage ?? prev.stage,
+          dueDate: fullJson.dueDate ?? prev.dueDate,
+          furColor: fullJson.furColor ?? prev.furColor,
+          thumbnailUrl: fullJson.thumbnailUrl || prev.thumbnailUrl,
+          images:
+            Array.isArray(fullJson.imagesLabeled) && fullJson.imagesLabeled.length > 0
+              ? fullJson.imagesLabeled
+              : Array.isArray(fullJson.images) && fullJson.images.length > 0
+              ? fullJson.images.map(u => typeof u === "string" ? { src: u, label: "" } : u)
+              : prev.images,
+        }));
+      } catch (err) {
+        console.warn("[Scan] full summary failed (non blocking)", err);
+      }
+    })();
+
+    // ---- 3) FULL ORDER DETAILS (blocking only if fast failed) ----
+    const fullOrderUrl = `${API_ROOT}/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
+    const r = await fetch(fullOrderUrl, { credentials: "include" }); // <--- YOU WERE MISSING THIS
+    const data = await r.json();
+
+    if (!r.ok || !data?.order) {
+      throw new Error(data?.error || "Order not found");
+    }
+
+    setOrderData(normalizeFast(data.order, orderId));
+    flashOk();
+
+  } catch (e) {
+    console.warn("[Scan] Full order fetch failed:", e);
+
+    if (orderData) {
+      console.log("[Scan] Fast data already applied — suppressing toast");
+    } else {
+      setOrderData(null);
+      flashError("Order not found");
+    }
+  } finally {
+    setPendingOrderId("");
+    setLoading(false);
+  }
+}
 
 
 
