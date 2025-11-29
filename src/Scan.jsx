@@ -194,40 +194,6 @@ async function fetchOrder(orderId) {
       console.warn("[Scan] fast order lookup failed → continuing", e);
     }
 
-    // ---- 2) FULL SUMMARY (async upgrade, does NOT block UI) ----
-    (async () => {
-      try {
-        const fullUrl = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
-          dept
-        )}&order=${encodeURIComponent(orderId)}`;
-
-        console.log("[Scan] full summary URL →", fullUrl);
-
-        const fullRes = await fetch(fullUrl, { credentials: "include" });
-        if (!fullRes.ok) return; // don't break fast UI
-        const fullJson = await fullRes.json();
-
-        console.log("[Scan] full summary payload →", fullJson);
-
-        setOrderData(prev => ({
-          ...prev,
-          product: fullJson.product ?? prev?.product,
-          stage: fullJson.stage ?? prev?.stage,
-          dueDate: fullJson.dueDate ?? prev?.dueDate,
-          furColor: fullJson.furColor ?? prev?.furColor,
-          thumbnailUrl: fullJson.thumbnailUrl || prev?.thumbnailUrl,
-          images:
-            Array.isArray(fullJson.imagesLabeled) && fullJson.imagesLabeled.length > 0
-              ? fullJson.imagesLabeled
-              : Array.isArray(fullJson.images) && fullJson.images.length > 0
-              ? fullJson.images.map(u => typeof u === "string" ? { src: u, label: "" } : u)
-              : prev?.images || [],
-        }));
-      } catch (err) {
-        console.warn("[Scan] full summary failed (non blocking)", err);
-      }
-    })();
-
     flashOk();
   } catch (e) {
     console.warn("[Scan] Full order fetch failed:", e);
