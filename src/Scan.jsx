@@ -51,7 +51,8 @@ function normalizeFast(o, fallbackOrderId) {
     furColor: "",
     quantity: "—",
     thumbnailUrl: null,
-    images: []
+    images: [],
+    imagesLabeled: []
   };
 
   return {
@@ -97,7 +98,23 @@ function normalizeFast(o, fallbackOrderId) {
       "—"
     ),
     thumbnailUrl: o.thumbnailUrl || null,
-    images: []
+
+    // ⭐ These two lines make the quadrant load instantly
+    imagesLabeled: Array.isArray(o.imagesLabeled) ? o.imagesLabeled : [],
+
+    images: Array.isArray(o.imageUrls)
+      ? o.imageUrls.map(u =>
+          typeof u === "string"
+            ? { src: u, label: "" }
+            : u
+        )
+      : (Array.isArray(o.images)
+         ? o.images.map(u =>
+             typeof u === "string"
+               ? { src: u, label: "" }
+               : u
+           )
+         : [])
   };
 }
 
