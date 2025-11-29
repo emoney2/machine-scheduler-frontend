@@ -466,9 +466,18 @@ function openInLightBurn(bomNameOrPath) {
       >
         <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
           <Quadrant
-            images={orderData?.imagesLabeled || orderData?.images || []}
+            images={
+              (Array.isArray(orderData?.imagesLabeled) && orderData.imagesLabeled.length > 0)
+                ? orderData.imagesLabeled
+                : (Array.isArray(orderData?.images) && orderData.images.length > 0)
+                ? orderData.images
+                : orderData?.thumbnailUrl
+                ? [{ src: orderData.thumbnailUrl, label: "" }]
+                : []
+            }
             onClickItem={handleImageClick}
           />
+
         </div>
       </div>
 
