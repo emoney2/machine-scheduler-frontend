@@ -17,7 +17,8 @@ const IDLE_TIMEOUT_MS = 600;
 
 // --- FAST ORDER HELPERS ---
 async function fetchFastOrder(orderId) {
-  const url = `${API_ROOT}/api/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
+  const url = `${API_ROOT}/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
+  console.log("[Scan] fetchFastOrder →", url);
   const r = await fetch(url, { credentials: "include" });
 
   // ❗ fast endpoint may return 404 when cache is cold — treat that as "no fast result,"
@@ -181,14 +182,16 @@ async function fetchOrder(orderId) {
   try {
     // ---- 1) FAST PATH (paint UI instantly) ----
     try {
-      const urlFast = `${API_ROOT}/api/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
-      const fastRes = await fetch(urlFast, { credentials: "include" });
-      const fastJson = fastRes.ok ? await fastRes.json() : null;
+      console.log("[Scan] fast path for order", orderId);
+      const fastRow = await fetchFastOrder(orderId);
 
-      if (fastJson?.order) {
-        const quick = normalizeFast(fastJson.order, orderId);
+      if (fastRow) {
+        const quick = normalizeFast(fastRow, orderId);
+        console.log("[Scan] fast HIT →", quick);
         setOrderData(quick);
         setLoading(false);
+      } else {
+        console.log("[Scan] fast MISS (no cached row for", orderId, ")");
       }
     } catch (e) {
       console.warn("[Scan] fast order lookup failed → continuing", e);
@@ -201,37 +204,34 @@ async function fetchOrder(orderId) {
           dept
         )}&order=${encodeURIComponent(orderId)}`;
 
+        console.log("[Scan] full summary URL →", fullUrl);
+
         const fullRes = await fetch(fullUrl, { credentials: "include" });
         if (!fullRes.ok) return; // don't break fast UI
         const fullJson = await fullRes.json();
 
+        console.log("[Scan] full summary payload →", fullJson);
+
         setOrderData(prev => ({
           ...prev,
-          product: fullJson.product ?? prev.product,
-          stage: fullJson.stage ?? prev.stage,
-          dueDate: fullJson.dueDate ?? prev.dueDate,
-          furColor: fullJson.furColor ?? prev.furColor,
-          thumbnailUrl: fullJson.thumbnailUrl || prev.thumbnailUrl,
+          product: fullJson.product ?? prev?.product,
+          stage: fullJson.stage ?? prev?.stage,
+          dueDate: fullJson.dueDate ?? prev?.dueDate,
+          furColor: fullJson.furColor ?? prev?.furColor,
+          thumbnailUrl: fullJson.thumbnailUrl || prev?.thumbnailUrl,
           images:
             Array.isArray(fullJson.imagesLabeled) && fullJson.imagesLabeled.length > 0
               ? fullJson.imagesLabeled
               : Array.isArray(fullJson.images) && fullJson.images.length > 0
               ? fullJson.images.map(u => typeof u === "string" ? { src: u, label: "" } : u)
-              : prev.images,
+              : prev?.images || [],
         }));
       } catch (err) {
         console.warn("[Scan] full summary failed (non blocking)", err);
       }
     })();
 
-    // ---- 3) FULL ORDER DETAILS (blocking only if fast failed) ----
-    if (!r.ok || !data?.order) {
-      throw new Error(data?.error || "Order not found");
-    }
-
-    setOrderData(normalizeFast(data.order, orderId));
     flashOk();
-
   } catch (e) {
     console.warn("[Scan] Full order fetch failed:", e);
 
@@ -246,6 +246,7 @@ async function fetchOrder(orderId) {
     setLoading(false);
   }
 }
+
 
 
 
