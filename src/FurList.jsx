@@ -696,8 +696,6 @@ export default function FurList() {
                     {isSaving ? "Saving..." : "Complete"}
                   </button>
                 </div>
-
-                </div>
               </div>
             );
           })}
