@@ -628,15 +628,37 @@ export default function FurList() {
                 </div>
 
                 <div style={cellBase}>{company}</div>
-                <div style={cellBase}>{design}</div>
-                <div style={cellBase}>{qty}</div>
-                <div style={cellBase}>{product}</div>
-                <div style={cellBase}>{stage}</div>
-                {!compact && <div style={cellBase}>{print}</div>}
-                <div style={cellBase}>{color}</div>
-                <div style={cellBase}>{fmtMMDD(ship)}</div>
-                <div style={cellBase}>{fmtMMDD(due)}</div>
-                {!compact && <div style={cellBase}>{hardSoft}</div>}
+                {/* Design (shrinks + ellipsis) */}
+                <div style={{ ...cellBase, maxWidth: 140 }}>{design}</div>
+
+                {/* Qty */}
+                <div style={{ ...cellBase, width: 40 }}>{qty}</div>
+
+                {/* Product (shrinks + ellipsis) */}
+                <div style={{ ...cellBase, maxWidth: 110 }}>{product}</div>
+
+                {/* Stage */}
+                <div style={{ ...cellBase, width: 70 }}>{stage}</div>
+
+                {/* Print status if not compact */}
+                {!compact && (
+                  <div style={{ ...cellBase, width: 70 }}>{print}</div>
+                )}
+
+                {/* Fur Color */}
+                <div style={{ ...cellBase, width: 80 }}>{color}</div>
+
+                {/* Ship Date */}
+                <div style={{ ...cellBase, width: 65 }}>{fmtMMDD(ship)}</div>
+
+                {/* Due Date */}
+                <div style={{ ...cellBase, width: 65 }}>{fmtMMDD(due)}</div>
+
+                {/* Hard/Soft only if full mode */}
+                {!compact && (
+                  <div style={{ ...cellBase, width: 80 }}>{hardSoft}</div>
+                )}
+
 
                 {/* Complete (final sticky cell). Stop click from toggling the card */}
                 {/* Actions (Print, Open, Complete). Stop click from toggling the card */}
