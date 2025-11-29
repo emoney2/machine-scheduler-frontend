@@ -179,10 +179,6 @@ async function fetchOrder(orderId) {
     })();
 
     // ---- 3) FULL ORDER DETAILS (blocking only if fast failed) ----
-    const fullOrderUrl = `${API_ROOT}/api/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
-    const r = await fetch(fullOrderUrl, { credentials: "include" }); // <--- YOU WERE MISSING THIS
-    const data = await r.json();
-
     if (!r.ok || !data?.order) {
       throw new Error(data?.error || "Order not found");
     }
