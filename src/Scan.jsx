@@ -40,20 +40,66 @@ async function fetchFastOrder(orderId) {
 }
 
 function normalizeFast(o, fallbackOrderId) {
-  // Keep this defensive — fast row may not have every field your summary returns
-  return {
-    order: String(o?.["Order #"] ?? fallbackOrderId ?? "—"),
-    company: o?.["Company Name"] ?? o?.company ?? "—",
-    title: o?.Design ?? o?.title ?? "",
-    product: o?.Product ?? o?.product ?? "",
-    stage: o?.Stage ?? o?.stage ?? "",
-    dueDate: o?.["Due Date"] ?? o?.dueDate ?? "",
-    furColor: o?.["Fur Color"] ?? o?.furColor ?? "",
-    quantity: o?.Quantity ?? o?.quantity ?? "—",
+  if (!o) return {
+    order: fallbackOrderId ?? "—",
+    company: "—",
+    title: "",
+    product: "",
+    stage: "",
+    dueDate: "",
+    furColor: "",
+    quantity: "—",
     thumbnailUrl: null,
-    images: [], // enrich later via /order-summary
+    images: []
+  };
+
+  return {
+    order: String(
+      o["Order #"] ??
+      o.order ??
+      fallbackOrderId ??
+      "—"
+    ),
+    company: (
+      o["Company Name"] ??
+      o.company ??
+      ""
+    ),
+    title: (
+      o.Design ??
+      o.title ??
+      ""
+    ),
+    product: (
+      o.Product ??
+      o.product ??
+      ""
+    ),
+    stage: (
+      o.Stage ??
+      o.stage ??
+      ""
+    ),
+    dueDate: (
+      o["Due Date"] ??
+      o.dueDate ??
+      ""
+    ),
+    furColor: (
+      o["Fur Color"] ??
+      o.furColor ??
+      ""
+    ),
+    quantity: (
+      o.Quantity ??
+      o.quantity ??
+      "—"
+    ),
+    thumbnailUrl: o.thumbnailUrl || null,
+    images: []
   };
 }
+
 
 
 function extractOrderId(raw) {
