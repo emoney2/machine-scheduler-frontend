@@ -2,6 +2,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+const requestCache = {};
+
+async function fetchOnce(url) {
+  if (!requestCache[url]) {
+    requestCache[url] = fetch(url).then(res => res.json());
+  }
+  return requestCache[url];
+}
+
+
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 const IDLE_TIMEOUT_MS = 600;
 
@@ -111,33 +121,23 @@ export default function Scan() {
     setErrMsg("");
 
     try {
-      // 1) FAST, LIGHTWEIGHT SUMMARY (no Drive calls)
-      const liteUrl = `${API_ROOT}/order-summary-lite?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(orderId)}`;
+      // 1) FAST PATH: use /api/order_fast to paint UI quickly
       try {
-        const lr = await fetch(liteUrl, { credentials: "include" });
-        if (lr.ok) {
-          const ld = await lr.json();
-          const quick = {
-            order: ld.order ?? orderId,
-            company: ld.company ?? "—",
-            title: ld.title ?? "",
-            product: ld.product ?? "",
-            stage: ld.stage ?? "",
-            dueDate: ld.dueDate ?? "",
-            furColor: ld.furColor ?? "",
-            quantity: ld.quantity ?? "—",
-            thumbnailUrl: null,
-            images: [],
-          };
-          setOrderData(quick); // paint immediately
+        const fastRow = await fetchFastOrder(orderId);
+        if (fastRow) {
+          const quick = normalizeFast(fastRow, orderId);
+          setOrderData(quick);
+          // As soon as we have a basic summary, hide the big yellow overlay
+          setLoading(false);
         }
       } catch (e) {
-        // ignore lite failures; full summary below will handle it
-        console.warn("[Scan] lite summary failed", e);
+        console.warn("[Scan] fast order lookup failed", e);
       }
 
-      // 2) FULL SUMMARY (images/thumbnails etc.)
-      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(orderId)}`;
+      // 2) FULL SUMMARY (images, thumbnails, richer info)
+      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
+        dept
+      )}&order=${encodeURIComponent(orderId)}`;
       const r = await fetch(url, { credentials: "include" });
       if (!r.ok) {
         const j = await safeJson(r);
@@ -159,8 +159,12 @@ export default function Scan() {
           Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
             ? data.imagesLabeled
             : Array.isArray(data.images) && data.images.length > 0
-              ? data.images.map(u => (typeof u === "string" ? { src: u, label: "" } : u))
-              : (data.thumbnailUrl ? [{ src: data.thumbnailUrl, label: "" }] : []),
+            ? data.images.map((u) =>
+                typeof u === "string" ? { src: u, label: "" } : u
+              )
+            : data.thumbnailUrl
+            ? [{ src: data.thumbnailUrl, label: "" }]
+            : [],
       };
 
       setOrderData(normalized);
@@ -170,10 +174,12 @@ export default function Scan() {
       setOrderData(null);
       flashError("Order not found or server error");
     } finally {
-      setLoading(false);
       setPendingOrderId("");
+      // safe to call even if we already turned loading off after fast response
+      setLoading(false);
     }
   }
+
 
 
 
