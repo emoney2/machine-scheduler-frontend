@@ -640,8 +640,29 @@ export default function FurList() {
 
                 {/* Complete (final sticky cell). Stop click from toggling the card */}
                 {/* Actions (Print, Open, Complete). Stop click from toggling the card */}
-                <div style={{ ...stickyRight(0, bg), textAlign: "right", display: "flex", gap: 6, justifyContent: "flex-end" }}>
-  
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "6px",
+                    flexWrap: "wrap",
+                    marginTop: "6px",
+                    marginBottom: "6px"
+                  }}
+                >
+                  {/* Open */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const url = `https://machineschedule.netlify.app/scan?dept=fur&order=${orderId}`;
+                      window.open(url, "_self");
+                    }}
+                    className="btn"
+                    style={{ background: "#eef6ff", borderColor: "#8cb4ff" }}
+                  >
+                    Open
+                  </button>
+
+                  {/* Print / Reprint */}
                   <button
                     disabled={!printServiceOnline}
                     onClick={(e) => {
@@ -656,58 +677,26 @@ export default function FurList() {
                       opacity: printServiceOnline ? 1 : 0.5,
                       cursor: printServiceOnline ? "pointer" : "not-allowed"
                     }}
-                    title={printServiceOnline ? "Print this order" : "Print Service Offline"}
                   >
                     {printServiceOnline
                       ? (processSheetPrinted ? "Reprint" : "Print")
                       : "Offline"}
                   </button>
 
-
+                  {/* Complete */}
                   <button
+                    disabled={isSaving}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const url = `https://machineschedule.netlify.app/scan?dept=fur&order=${orderId}`;
-                      window.open(url, "_self");
+                      markComplete(order);
                     }}
                     className="btn"
-                    style={{ background: "#eef6ff", borderColor: "#8cb4ff" }}
-                    title="Open job in app"
+                    style={{ background: "#e6ffe6", borderColor: "#8ce68c" }}
                   >
-                    Open
+                    {isSaving ? "Saving..." : "Complete"}
                   </button>
+                </div>
 
-
-                  <button
-                    onClick={(e) => { e.stopPropagation(); markComplete(order); }}
-                    disabled={isSaving}
-                    className="btn"
-                    style={{
-                      background: isSaving ? "rgba(255,255,255,0.8)" : "#ffffff",
-                      color: "#222",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      opacity: isSaving ? 0.9 : 1
-                    }}
-                    title="Write Quantity to Fur List → Quantity Made, then hide"
-                    aria-busy={isSaving ? "true" : "false"}
-                  >
-                    {isSaving && (
-                      <span
-                        className="spin"
-                        aria-hidden="true"
-                        style={{
-                          width: 12, height: 12,
-                          border: "2px solid #999",
-                          borderTopColor: "transparent",
-                          borderRadius: "50%",
-                          display: "inline-block"
-                        }}
-                      />
-                    )}
-                    {isSaving ? "Saving…" : "Complete"}
-                  </button>
                 </div>
               </div>
             );

@@ -275,6 +275,15 @@ function openInLightBurn(bomNameOrPath) {
     /* eslint-disable-next-line */
   }, [dept]);
 
+  // 🆕 Auto-load order if URL contains ?order=####
+  useEffect(() => {
+    const urlOrder = params.get("order");
+    if (urlOrder && /^\d+$/.test(urlOrder)) {
+      fetchOrder(urlOrder);
+    }
+  }, []); 
+
+
   return (
     <div style={{ minHeight: "100vh", width: "100%", background: "#ffffff", color: "#111" }}>
       {/* focus catcher */}
