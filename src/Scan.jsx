@@ -199,15 +199,21 @@ export default function Scan() {
       setOrderData(normalized);
       flashOk();
     } catch (e) {
-      console.error("[Scan] order fetch failed:", e);
-      setOrderData(null);
-      flashError("Order not found or server error");
+      console.warn("[Scan] Full order fetch failed:", e);
+
+      // If fast load already gave us data, do NOT wipe it or show an error.
+      if (orderData) {
+        console.log("[Scan] Fast data already loaded — skipping failure toast");
+      } else {
+        // True failure: no fast data AND full lookup failed
+        setOrderData(null);
+        flashError("Order not found or server error");
+      }
     } finally {
       setPendingOrderId("");
-      // safe to call even if we already turned loading off after fast response
       setLoading(false);
     }
-  }
+
 
 
 
