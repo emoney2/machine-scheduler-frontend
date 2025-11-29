@@ -19,14 +19,26 @@ const IDLE_TIMEOUT_MS = 600;
 async function fetchFastOrder(orderId) {
   const url = `${API_ROOT}/api/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
   const r = await fetch(url, { credentials: "include" });
+
+  // ❗ fast endpoint may return 404 when cache is cold — treat that as "no fast result,"
+  // NOT an error
+  if (r.status === 404) {
+    return null;
+  }
+
+  // handle other failures normally
   if (!r.ok) {
     let j = null;
     try { j = await r.json(); } catch {}
     throw new Error(j?.error || `HTTP ${r.status}`);
   }
+
   const j = await r.json();
-  return j?.order || null; // raw row dict from server
+
+  // Expect { order: {...}, cached: true/false }
+  return j?.order || null;
 }
+
 function normalizeFast(o, fallbackOrderId) {
   // Keep this defensive — fast row may not have every field your summary returns
   return {
