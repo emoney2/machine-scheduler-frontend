@@ -213,8 +213,7 @@ export default function Scan() {
       setPendingOrderId("");
       setLoading(false);
     }
-
-
+  }  // <-- this brace closes fetchOrder()
 
 
 
