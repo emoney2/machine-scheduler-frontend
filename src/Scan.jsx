@@ -121,18 +121,21 @@ export default function Scan() {
     setErrMsg("");
 
     try {
-      // 1) FAST PATH: use /api/order_fast to paint UI quickly
+      // 1) FAST PATH: use /order_fast to paint UI quickly
       try {
-        const fastRow = await fetchFastOrder(orderId);
-        if (fastRow) {
-          const quick = normalizeFast(fastRow, orderId);
+        const fastRow = await fetch(`${API_ROOT}/order_fast?orderNumber=${orderId}`, {
+          credentials: "include"
+        }).then(r => r.ok ? r.json() : null);
+
+        if (fastRow?.order) {
+          const quick = normalizeFast(fastRow.order, orderId);
           setOrderData(quick);
-          // As soon as we have a basic summary, hide the big yellow overlay
           setLoading(false);
         }
       } catch (e) {
         console.warn("[Scan] fast order lookup failed", e);
       }
+
 
       // 2) FULL SUMMARY (images, thumbnails, richer info)
       const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
