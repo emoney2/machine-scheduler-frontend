@@ -137,11 +137,37 @@ export default function Scan() {
       }
 
 
-      // 2) FULL SUMMARY (images, thumbnails, richer info)
-      const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
-        dept
-      )}&order=${encodeURIComponent(orderId)}`;
-      const r = await fetch(url, { credentials: "include" });
+      // 2) FULL SUMMARY (runs in background - does NOT block UI)
+      (async () => {
+        try {
+          const url = `${API_ROOT}/order-summary?dept=${encodeURIComponent(
+            dept
+          )}&order=${encodeURIComponent(orderId)}`;
+
+          const r = await fetch(url, { credentials: "include" });
+          if (!r.ok) return;
+          const data = await r.json();
+
+          // update with richer info once available
+          setOrderData(prev => ({
+            ...prev,
+            product: data.product ?? prev.product,
+            stage: data.stage ?? prev.stage,
+            dueDate: data.dueDate ?? prev.dueDate,
+            furColor: data.furColor ?? prev.furColor,
+            thumbnailUrl: data.thumbnailUrl || prev.thumbnailUrl,
+            images:
+              Array.isArray(data.imagesLabeled) && data.imagesLabeled.length > 0
+                ? data.imagesLabeled
+                : Array.isArray(data.images) && data.images.length > 0
+                ? data.images.map(u => typeof u === "string" ? { src: u, label: "" } : u)
+                : prev.images,
+          }));
+        } catch (err) {
+          console.warn("Background full summary failed", err);
+        }
+      })();
+
       if (!r.ok) {
         const j = await safeJson(r);
         throw new Error(j?.error || `HTTP ${r.status}`);
