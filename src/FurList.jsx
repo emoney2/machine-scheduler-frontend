@@ -645,7 +645,7 @@ export default function FurList() {
 
                 {/* Preview */}
                 <div style={{ display: "grid", placeItems: "center" }}>
-                  <div style={{ width: 50, height: 34, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
+                  <div style={{ width: 72, height: 52, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
                     {imageUrl ? (
                       <img
                         loading="lazy" decoding="async" src={imageUrl} alt="preview"
