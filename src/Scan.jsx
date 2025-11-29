@@ -41,82 +41,62 @@ async function fetchFastOrder(orderId) {
 }
 
 function normalizeFast(o, fallbackOrderId) {
-  if (!o) return {
-    order: fallbackOrderId ?? "—",
-    company: "—",
-    title: "",
-    product: "",
-    stage: "",
-    dueDate: "",
-    furColor: "",
-    quantity: "—",
-    thumbnailUrl: null,
-    images: [],
-    imagesLabeled: []
-  };
+  if (!o) {
+    return {
+      order: fallbackOrderId ?? "—",
+      company: "—",
+      title: "",
+      product: "",
+      stage: "",
+      dueDate: "",
+      furColor: "",
+      quantity: "—",
+      thumbnailUrl: null,
+      images: [],
+      imagesLabeled: []
+    };
+  }
+
+  // ---- Thumbnail selection priority ----
+  const thumbnailUrl =
+    o.thumbnailUrl ||
+    o.imageUrl ||   // <-- backend most commonly sends THIS
+    null;
+
+  // ---- Image array building logic ----
+  let images = [];
+
+  if (Array.isArray(o.imagesLabeled) && o.imagesLabeled.length > 0) {
+    images = o.imagesLabeled;
+  } else if (Array.isArray(o.images) && o.images.length > 0) {
+    images = o.images.map(u =>
+      typeof u === "string" ? { src: u, label: "" } : u
+    );
+  } else if (Array.isArray(o.imageUrls) && o.imageUrls.length > 0) {
+    images = o.imageUrls.map(u =>
+      typeof u === "string" ? { src: u, label: "" } : u
+    );
+  } else if (o.imageUrl) {
+    images = [{ src: o.imageUrl, label: "" }]; // <-- fallback to single URL
+  }
 
   return {
     order: String(
-      o["Order #"] ??
-      o.order ??
-      fallbackOrderId ??
-      "—"
+      o["Order #"] ?? o.order ?? fallbackOrderId ?? "—"
     ),
-    company: (
-      o["Company Name"] ??
-      o.company ??
-      ""
-    ),
-    title: (
-      o.Design ??
-      o.title ??
-      ""
-    ),
-    product: (
-      o.Product ??
-      o.product ??
-      ""
-    ),
-    stage: (
-      o.Stage ??
-      o.stage ??
-      ""
-    ),
-    dueDate: (
-      o["Due Date"] ??
-      o.dueDate ??
-      ""
-    ),
-    furColor: (
-      o["Fur Color"] ??
-      o.furColor ??
-      ""
-    ),
-    quantity: (
-      o.Quantity ??
-      o.quantity ??
-      "—"
-    ),
-    thumbnailUrl: o.thumbnailUrl || null,
-
-    // ⭐ These two lines make the quadrant load instantly
-    imagesLabeled: Array.isArray(o.imagesLabeled) ? o.imagesLabeled : [],
-
-    images: Array.isArray(o.imageUrls)
-      ? o.imageUrls.map(u =>
-          typeof u === "string"
-            ? { src: u, label: "" }
-            : u
-        )
-      : (Array.isArray(o.images)
-         ? o.images.map(u =>
-             typeof u === "string"
-               ? { src: u, label: "" }
-               : u
-           )
-         : [])
+    company: o["Company Name"] ?? o.company ?? "",
+    title: o.Design ?? o.title ?? "",
+    product: o.Product ?? o.product ?? "",
+    stage: o.Stage ?? o.stage ?? "",
+    dueDate: o["Due Date"] ?? o.dueDate ?? "",
+    furColor: o["Fur Color"] ?? o.furColor ?? "",
+    quantity: o.Quantity ?? o.quantity ?? "—",
+    thumbnailUrl,
+    images,
+    imagesLabeled: Array.isArray(o.imagesLabeled) ? o.imagesLabeled : []
   };
 }
+
 
 
 
