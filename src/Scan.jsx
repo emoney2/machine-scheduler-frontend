@@ -135,7 +135,7 @@ async function fetchOrder(orderId) {
   try {
     // ---- 1) FAST PATH (paint UI instantly) ----
     try {
-      const urlFast = `${API_ROOT}/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
+      const urlFast = `${API_ROOT}/api/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
       const fastRes = await fetch(urlFast, { credentials: "include" });
       const fastJson = fastRes.ok ? await fastRes.json() : null;
 
@@ -179,7 +179,7 @@ async function fetchOrder(orderId) {
     })();
 
     // ---- 3) FULL ORDER DETAILS (blocking only if fast failed) ----
-    const fullOrderUrl = `${API_ROOT}/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
+    const fullOrderUrl = `${API_ROOT}/api/order_fast?orderNumber=${encodeURIComponent(orderId)}`;
     const r = await fetch(fullOrderUrl, { credentials: "include" }); // <--- YOU WERE MISSING THIS
     const data = await r.json();
 
