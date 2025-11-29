@@ -375,8 +375,41 @@ export default function FurList() {
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
   // [Order#, Preview, Company, Design, Qty, Product, Stage, Due, (Print), Fur Color, Ship, (Hard/Soft), Complete]
-  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 68px 100px 78px 78px 110px 92px";
-  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 96px 74px 74px 92px"; // compact: no Print, no Hard/Soft
+  // Added 3 dedicated action columns: Open | Print | Complete
+  const gridFull = `
+    62px   /* Order */
+    56px   /* Preview */
+    140px  /* Company */
+    160px  /* Design */
+    50px   /* Qty */
+    100px  /* Product */
+    80px   /* Stage */
+    60px   /* Print column */
+    100px  /* Fur Color */
+    70px   /* Ship */
+    70px   /* Due */
+    90px   /* Hard/Soft */
+    90px   /* Open button */
+    110px  /* Print button */
+    120px  /* Complete button */
+  `;
+
+  const gridCompact = `
+    62px   /* Order */
+    56px   /* Preview */
+    150px  /* Company */
+    140px  /* Design */
+    50px   /* Qty */
+    100px  /* Product */
+    80px   /* Stage */
+    100px  /* Fur Color */
+    70px   /* Ship */
+    70px   /* Due */
+    90px   /* Open button */
+    110px  /* Print button */
+    120px  /* Complete button */
+  `;
+
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const cellBase = {
