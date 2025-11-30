@@ -40,6 +40,22 @@ async function fetchFastOrder(orderId) {
   return j?.order || null;
 }
 
+function colorFromName(name = "") {
+  const map = {
+    "navy blue": "#001F5B",
+    "light grey": "#D3D3D3",
+    "black": "#000000",
+    "white": "#FFFFFF",
+    "red": "#B22222",
+    "royal blue": "#4169E1",
+    "hunter green": "#355E3B",
+    "tan": "#D2B48C",
+  };
+  const key = name.toLowerCase().replace("fur", "").trim();
+  return map[key] || "#CCCCCC";
+}
+
+
 function normalizeFast(o) {
   if (!o || typeof o !== "object") return o;
 
@@ -411,32 +427,77 @@ function openInLightBurn(bomNameOrPath) {
         }}
       >
         <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
-          {console.log("[Scan] quadrant render check",
-            Array.isArray(orderData?.imagesNormalized)
-              ? `imagesNormalized length=${orderData.imagesNormalized.length}`
-              : "no imagesNormalized",
-            Array.isArray(orderData?.images)
-              ? `images length=${orderData.images.length}`
-              : "no images",
-            orderData
-          )}
-
           <Quadrant
             images={
-              Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length >= 1
-                ? orderData.imagesNormalized
-                : Array.isArray(orderData?.images) && orderData.images.length > 1
-                ? orderData.images
+              Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
+                ? orderData.imagesNormalized.map(img => ({
+                    ...img,
+                    tint:
+                      img.label?.toLowerCase().includes("fur") && orderData?.furColor
+                        ? colorFromName(orderData.furColor)
+                        : null,
+                  }))
                 : [
-                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Outside" },
-                    orderData?.foamImg && { src: orderData.foamImg, label: "Inside Foam" },
-                    orderData?.furImg && { src: orderData.furImg, label: "Inside Fur" },
+                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
+                    orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
+                    orderData?.furImg && {
+                      src: orderData.furImg,
+                      label: "Fur",
+                      tint: orderData?.furColor ? colorFromName(orderData.furColor) : null,
+                    },
+                    ...(Array.isArray(orderData?.imagesLabeled)
+                      ? orderData.imagesLabeled.map(img => ({
+                          src: img.src,
+                          label: img.label || "Extra",
+                        }))
+                      : []),
                   ].filter(Boolean)
             }
             onClickItem={handleImageClick}
+            renderItem={(img, index) => (
+              <div
+                key={index}
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: img.tint || "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                <img
+                  src={img.src}
+                  alt={img.label}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    mixBlendMode: img.tint ? "multiply" : "normal",
+                    filter: img.tint ? "brightness(0) invert(1)" : "none",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 8,
+                    left: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#222",
+                    textShadow: "0 0 4px rgba(255,255,255,0.6)",
+                  }}
+                >
+                  {img.label}
+                </div>
+              </div>
+            )}
           />
         </div>
       </div>
+
 
       {/* Manual dialog */}
       {showManual && (
