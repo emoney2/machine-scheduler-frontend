@@ -794,15 +794,30 @@ function Img({ src, style }) {
   useEffect(() => setOk(true), [src]); // reset state when URL changes
   if (!src) return null;
 
+  // 🔧 Extract Google Drive file ID and rebuild proper thumbnail URL
+  function toThumbnail(url) {
+    try {
+      const s = String(url);
+      const m = s.match(/\/d\/([A-Za-z0-9_-]+)/);
+      if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+      const m2 = s.match(/id=([A-Za-z0-9_-]+)/);
+      if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
+      return s;
+    } catch {
+      return url;
+    }
+  }
+
+  const thumb = toThumbnail(src);
+
   return ok ? (
     <img
-      src={src}
+      src={thumb}
       alt=""
       style={style || { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-
-      onLoad={() => console.debug("[Img] loaded:", src)}
+      onLoad={() => console.debug("[Img] loaded:", thumb)}
       onError={() => {
-        console.debug("[Img] error:", src);
+        console.debug("[Img] error:", thumb);
         setOk(false);
       }}
       draggable={false}
