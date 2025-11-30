@@ -55,6 +55,24 @@ function colorFromName(name = "") {
   return map[key] || "#CCCCCC";
 }
 
+function getHueFromHex(hex) {
+  // Convert hex (#RRGGBB) to approximate hue rotation
+  const rgb = hex
+    .replace("#", "")
+    .match(/.{1,2}/g)
+    .map((x) => parseInt(x, 16) / 255);
+
+  const [r, g, b] = rgb;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h;
+  if (max === min) h = 0;
+  else if (max === r) h = (60 * ((g - b) / (max - min)) + 360) % 360;
+  else if (max === g) h = 60 * ((b - r) / (max - min)) + 120;
+  else h = 60 * ((r - g) / (max - min)) + 240;
+  return Math.round(h);
+}
+
 
 function normalizeFast(o) {
   if (!o || typeof o !== "object") return o;
@@ -859,7 +877,7 @@ function Img({ src, style, tint }) {
   useEffect(() => setOk(true), [src]);
   if (!src) return null;
 
-  // Convert Drive URLs to thumbnails
+  // Convert Google Drive URLs into thumbnails
   function toThumbnail(url) {
     try {
       const s = String(url);
@@ -883,7 +901,7 @@ function Img({ src, style, tint }) {
         position: "relative",
         width: "100%",
         height: "100%",
-        backgroundColor: tint || "#fff",
+        backgroundColor: "#fff", // keep white background behind transparent PNG
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -896,8 +914,12 @@ function Img({ src, style, tint }) {
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          mixBlendMode: tint ? "multiply" : "normal",
-          filter: tint ? "brightness(0) invert(1)" : "none",
+          filter: tint
+            ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
+                tint
+              )}deg) saturate(400%) brightness(1)`
+            : "none",
+          transition: "filter 0.2s ease",
           ...style,
         }}
         onLoad={() => console.debug("[Img] loaded:", thumb)}
