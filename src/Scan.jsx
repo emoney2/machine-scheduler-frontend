@@ -438,301 +438,180 @@ function openInLightBurn(bomNameOrPath) {
 
       {/* CENTERED QUADRANT */}
       <div
-        style={{
-          padding: "12px 20px 28px",
-          display: "flex",
-          justifyContent: "center",
-        }}
+            style={{
+                  padding: "12px 20px 28px",
+                  display: "flex",
+                  justifyContent: "center",
+            }}
       >
-        <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
-          <Quadrant
-            images={(() => {
-              const imgs =
-                Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
-                  ? orderData.imagesNormalized.map(img => ({
-                      ...img,
-                      tint:
-                        img.label?.toLowerCase().includes("fur") && orderData?.furColor
-                          ? colorFromName(orderData.furColor)
-                          : null,
-                    }))
-                  : [
-                      orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
-                      orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
-                      orderData?.furImg && {
-                        src: orderData.furImg,
-                        label: "Fur",
-                        tint: orderData?.furColor ? colorFromName(orderData.furColor) : null,
-                      },
-                      ...(Array.isArray(orderData?.imagesLabeled)
-                        ? orderData.imagesLabeled.map(img => ({
-                            src: img.src,
-                            label: img.label || "Extra",
-                          }))
-                        : []),
-                    ].filter(Boolean);
+            <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
+                  <Quadrant
+                        images={(() => {
+                              const imgs =
+                                    Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
+                                          ? orderData.imagesNormalized.map(img => ({
+                                                ...img,
+                                                tint:
+                                                      img.label?.toLowerCase().includes("fur") && orderData?.furColor
+                                                            ? colorFromName(orderData.furColor)
+                                                            : null,
+                                          }))
+                                          : [
+                                                orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
+                                                orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
+                                                orderData?.furImg && {
+                                                      src: orderData.furImg,
+                                                      label: "Fur",
+                                                      tint: orderData?.furColor ? colorFromName(orderData.furColor) : null,
+                                                },
+                                                ...(Array.isArray(orderData?.imagesLabeled)
+                                                      ? orderData.imagesLabeled.map(img => ({
+                                                              src: img.src,
+                                                              label: img.label || "Extra",
+                                                      }))
+                                                      : []),
+                                          ].filter(Boolean);
 
-              // === Custom foam label logic ===
-              const product = (orderData?.product || "").toLowerCase();
-              imgs.forEach(img => {
-                if (/foam/i.test(img.label || "")) {
-                  if (
-                    /quilted blade/i.test(product) ||
-                    (/mallet/i.test(product) && !/mid mallet/i.test(product))
-                  ) {
-                    img.label = `Inside Foam - 1/4" Foam`;
-                  } else if (/blade/i.test(product) || /mid mallet/i.test(product)) {
-                    img.label = `Inside Foam - 3/8" Foam`;
-                  }
-                }
-              });
+                              // === Custom foam label logic ===
+                              const product = (orderData?.product || "").toLowerCase();
+                              imgs.forEach(img => {
+                                    if (/foam/i.test(img.label || "")) {
+                                          if (
+                                                /quilted blade/i.test(product) ||
+                                                (/mallet/i.test(product) && !/mid mallet/i.test(product))
+                                          ) {
+                                                img.label = `Inside Foam - 1/4" Foam`;
+                                          } else if (/blade/i.test(product) || /mid mallet/i.test(product)) {
+                                                img.label = `Inside Foam - 3/8" Foam`;
+                                          }
+                                    }
+                              });
 
-              console.log("[Quadrant] foam label logic →", imgs.map(i => i.label));
-              return imgs;
-            })()}
-            onClickItem={handleImageClick}
-            renderItem={(incomingImg, index) => {
-              // ensure labels and tint are not lost
-              const img = { ...incomingImg };
-              console.log("[Img] render (incoming)", img);
+                              console.log("[Quadrant] foam label logic →", imgs.map(i => i.label));
+                              return imgs;
+                        })()}
+                        onClickItem={handleImageClick}
+                        renderItem={(incomingImg, index) => {
+                              const img = { ...incomingImg };
+                              console.log("[Img] render (incoming)", img);
 
-              const isFoam = /(foam|inside foam)/i.test(img.label || "");
-              const isFur = /(fur|inside fur)/i.test(img.label || "");
+                              const isFoam = /(foam|inside foam)/i.test(img.label || "");
+                              const isFur = /(fur|inside fur)/i.test(img.label || "");
 
-              if (!img.label) console.warn("[Img WARN] Missing label for quadrant", index, img);
-              if (!img.src) console.warn("[Img WARN] Missing src for quadrant", index, img);
+                              return (
+                                    <div
+                                          key={index}
+                                          style={{
+                                                position: "relative",
+                                                width: "100%",
+                                                height: "100%",
+                                                backgroundColor: img.tint && !isFur ? img.tint : "#fff",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                overflow: "hidden",
+                                          }}
+                                    >
+                                          <canvas
+                                                ref={canvas => {
+                                                      if (!canvas) return;
+                                                      const ctx = canvas.getContext("2d");
+                                                      const imgEl = new Image();
+                                                      imgEl.crossOrigin = "anonymous";
+                                                      imgEl.src = img.src;
 
-              return (
-                <div
-                  key={index}
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    backgroundColor: img.tint && !isFur ? img.tint : "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                >
-                  <canvas
-                    ref={canvas => {
-                      if (!canvas) return;
-                      const ctx = canvas.getContext("2d");
-                      const imgEl = new Image();
-                      imgEl.crossOrigin = "anonymous";
-                      imgEl.src = img.src;
-            
-                      imgEl.onload = () => {
-                        console.log("[Canvas] draw start →", img.label);
-                        canvas.width = imgEl.width;
-                        canvas.height = imgEl.height;
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(imgEl, 0, 0);
+                                                      imgEl.onload = () => {
+                                                            console.log("[Canvas] draw start →", img.label);
+                                                            canvas.width = imgEl.width;
+                                                            canvas.height = imgEl.height;
+                                                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                                            ctx.drawImage(imgEl, 0, 0);
 
-                        if (isFur) {
-                          const tintColor = colorFromName(orderData?.furColor || "#cccccc");
-                          console.log("[Canvas] tinting fur", tintColor);
-                          const rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(tintColor);
-                          if (rgb) {
-                            const [r, g, b] = [
-                              parseInt(rgb[1], 16),
-                              parseInt(rgb[2], 16),
-                              parseInt(rgb[3], 16),
-                            ];
-                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                            const data = imageData.data;
-                            for (let i = 0; i < data.length; i += 4) {
-                              const alpha = data[i + 3];
-                              if (alpha > 10) {
-                                data[i] = (data[i] * r) / 255;
-                                data[i + 1] = (data[i + 1] * g) / 255;
-                                data[i + 2] = (data[i + 2] * b) / 255;
-                              }
-                            }
-                            ctx.putImageData(imageData, 0, 0);
-                          }
-                        }
+                                                            // === Tint Inside Fur ===
+                                                            if (isFur) {
+                                                                  const tintColor = colorFromName(orderData?.furColor || "#cccccc");
+                                                                  console.log("[Canvas] tinting fur", tintColor);
+                                                                  const rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(tintColor);
+                                                                  if (rgb) {
+                                                                        const [r, g, b] = [
+                                                                              parseInt(rgb[1], 16),
+                                                                              parseInt(rgb[2], 16),
+                                                                              parseInt(rgb[3], 16),
+                                                                        ];
+                                                                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                                                        const data = imageData.data;
+                                                                        for (let i = 0; i < data.length; i += 4) {
+                                                                              const alpha = data[i + 3];
+                                                                              if (alpha > 10) {
+                                                                                    data[i] = (data[i] * r) / 255;
+                                                                                    data[i + 1] = (data[i + 1] * g) / 255;
+                                                                                    data[i + 2] = (data[i + 2] * b) / 255;
+                                                                              }
+                                                                        }
+                                                                        ctx.putImageData(imageData, 0, 0);
+                                                                  }
+                                                            }
 
-                        if (isFoam) {
-                          console.log("[Canvas] outlining foam shape");
-                          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                          const data = imgData.data;
-                          ctx.lineWidth = 4;
-                          ctx.strokeStyle = "#000";
-                          ctx.beginPath();
-                          for (let y = 1; y < canvas.height - 1; y++) {
-                            for (let x = 1; x < canvas.width - 1; x++) {
-                              const i = (y * canvas.width + x) * 4 + 3;
-                              if (data[i] > 50) {
-                                const aL = data[i - 4];
-                                const aR = data[i + 4];
-                                const aT = data[i - canvas.width * 4];
-                                const aB = data[i + canvas.width * 4];
-                                if (aL < 40 || aR < 40 || aT < 40 || aB < 40) {
-                                  ctx.rect(x, y, 1, 1);
-                                }
-                              }
-                            }
-                          }
-                          ctx.stroke();
-                        }
+                                                            // === Outline Inside Foam ===
+                                                            if (isFoam) {
+                                                                  console.log("[Canvas] outlining foam shape");
+                                                                  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                                                                  const data = imgData.data;
+                                                                  ctx.lineWidth = 6;
+                                                                  ctx.strokeStyle = "#000";
+                                                                  ctx.beginPath();
+                                                                  for (let y = 1; y < canvas.height - 1; y++) {
+                                                                        for (let x = 1; x < canvas.width - 1; x++) {
+                                                                              const i = (y * canvas.width + x) * 4 + 3;
+                                                                              if (data[i] > 50) {
+                                                                                    const aL = data[i - 4];
+                                                                                    const aR = data[i + 4];
+                                                                                    const aT = data[i - canvas.width * 4];
+                                                                                    const aB = data[i + canvas.width * 4];
+                                                                                    if (aL < 40 || aR < 40 || aT < 40 || aB < 40) {
+                                                                                          ctx.rect(x, y, 1, 1);
+                                                                                    }
+                                                                              }
+                                                                        }
+                                                                  }
+                                                                  ctx.stroke();
+                                                            }
 
-                        console.log("[Canvas] finished render →", img.label);
-                      };
-                    }}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                    }}
+                                                            console.log("[Canvas] finished render →", img.label);
+                                                      };
+                                                }}
+                                                style={{
+                                                      width: "100%",
+                                                      height: "100%",
+                                                      objectFit: "contain",
+                                                }}
+                                          />
+                                          <div
+                                                style={{
+                                                      position: "absolute",
+                                                      bottom: 12,
+                                                      left: 12,
+                                                      fontSize: 24,
+                                                      fontWeight: 900,
+                                                      color: "#000",
+                                                      background: "rgba(255,255,255,0.95)",
+                                                      padding: "8px 16px",
+                                                      borderRadius: 6,
+                                                      border: "3px solid #000",
+                                                      boxShadow: "0 3px 8px rgba(0,0,0,0.3)",
+                                                      textTransform: "uppercase",
+                                                      letterSpacing: 1,
+                                                }}
+                                          >
+                                                {img.label}
+                                          </div>
+                                    </div>
+                              );
+                        }}
                   />
-
-                  {/* Larger label */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 12,
-                      left: 12,
-                      fontSize: 24,
-                      fontWeight: 900,
-                      color: "#000",
-                      background: "rgba(255,255,255,0.95)",
-                      padding: "8px 16px",
-                      borderRadius: 6,
-                      border: "3px solid #000",
-                      boxShadow: "0 3px 8px rgba(0,0,0,0.3)",
-                      textTransform: "uppercase",
-                      letterSpacing: 1,
-                    }}
-                  >
-                    {img.label}
-                  </div>
-                </div>
-              );
-            }}
-
-
-              return (
-                <div
-                  key={index}
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    backgroundColor: img.tint && !isFur ? img.tint : "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                >
-                  <canvas
-                    ref={canvas => {
-                      if (!canvas) return;
-                      const ctx = canvas.getContext("2d");
-                      const imgEl = new Image();
-                      imgEl.crossOrigin = "anonymous";
-                      imgEl.src = img.src;
-
-                      imgEl.onload = () => {
-                        console.log("[Canvas] start draw →", img.label);
-                        canvas.width = imgEl.width;
-                        canvas.height = imgEl.height;
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(imgEl, 0, 0);
-                        console.log("[Canvas] image drawn", imgEl.width, imgEl.height);
-
-                        // === Tint FUR ===
-                        if (isFur) {
-                          const tintColor = colorFromName(orderData?.furColor || "#cccccc");
-                          console.log("[Canvas] tinting fur", orderData?.furColor, tintColor);
-                          const rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(tintColor);
-                          if (rgb) {
-                            const [r, g, b] = [
-                              parseInt(rgb[1], 16),
-                              parseInt(rgb[2], 16),
-                              parseInt(rgb[3], 16),
-                            ];
-                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                            const data = imageData.data;
-                            for (let i = 0; i < data.length; i += 4) {
-                              const alpha = data[i + 3];
-                              if (alpha > 10) {
-                                data[i] = (data[i] * r) / 255;
-                                data[i + 1] = (data[i + 1] * g) / 255;
-                                data[i + 2] = (data[i + 2] * b) / 255;
-                              }
-                            }
-                            ctx.putImageData(imageData, 0, 0);
-                          }
-                        }
-
-                        // === Outline FOAM ===
-                        if (isFoam) {
-                          console.log("[Canvas] outlining foam", canvas.width, canvas.height);
-                          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                          const data = imgData.data;
-                          const outline = ctx.createImageData(canvas.width, canvas.height);
-                          const odata = outline.data;
-
-                          for (let y = 1; y < canvas.height - 1; y++) {
-                            for (let x = 1; x < canvas.width - 1; x++) {
-                              const i = (y * canvas.width + x) * 4 + 3;
-                              if (data[i] > 40) {
-                                const aL = data[i - 4];
-                                const aR = data[i + 4];
-                                const aT = data[i - canvas.width * 4];
-                                const aB = data[i + canvas.width * 4];
-                                if (aL < 40 || aR < 40 || aT < 40 || aB < 40) {
-                                  odata[i - 3] = 0;
-                                  odata[i - 2] = 0;
-                                  odata[i - 1] = 0;
-                                  odata[i] = 255;
-                                }
-                              }
-                            }
-                          }
-                          ctx.putImageData(outline, 0, 0);
-                        }
-
-                        console.log("[Canvas] finished", img.label);
-                      };
-                    }}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "contain",
-                    }}
-                  />
-
-                  {/* Enhanced label */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 12,
-                      left: 12,
-                      fontSize: 22,
-                      fontWeight: 900,
-                      color: "#000",
-                      background: "rgba(255,255,255,0.95)",
-                      padding: "8px 14px",
-                      borderRadius: 8,
-                      border: "3px solid #000",
-                      boxShadow: "0 3px 10px rgba(0,0,0,0.3)",
-                      textTransform: "uppercase",
-                      letterSpacing: 0.8,
-                    }}
-                  >
-                    {img.label}
-                  </div>
-                </div>
-              );
-            }}
-          />
-        </div>
+            </div>
       </div>
+
 
 
       {/* Manual dialog */}
