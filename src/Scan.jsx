@@ -941,13 +941,18 @@ function Img({ src, style, tint }) {
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          filter: tint
-            ? `invert(100%) brightness(100%) sepia(100%) saturate(2000%) hue-rotate(${getHueFromHex(
-                tint
-              )}deg) brightness(95%)`
-            : "none",
           transition: "filter 0.2s ease",
           ...style,
+          // 🎯 NEW LOGIC: Only recolor pure white pixels, transparent stays transparent
+          filter: tint
+            ? `
+                brightness(0) 
+                invert(1) 
+                sepia(1) 
+                saturate(1000%) 
+                hue-rotate(${getHueFromHex(tint)}deg)
+              `
+            : "none",
         }}
         onLoad={() => console.debug("[Img] loaded:", thumb)}
         onError={() => {
@@ -956,6 +961,7 @@ function Img({ src, style, tint }) {
         }}
         draggable={false}
       />
+
     </div>
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
