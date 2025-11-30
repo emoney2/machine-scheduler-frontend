@@ -941,12 +941,11 @@ function Img({ src, style, tint }) {
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          filter: tint && /(fur|inside fur|foam|inside foam)/i.test(src)
+          filter: tint && /(fur|foam)/i.test(label || "")
             ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
                 tint
               )}deg) saturate(400%) brightness(1)`
             : "none",
-
           transition: "filter 0.2s ease",
           ...style,
         }}
