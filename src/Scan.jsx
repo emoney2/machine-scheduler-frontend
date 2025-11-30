@@ -447,35 +447,59 @@ function openInLightBurn(bomNameOrPath) {
             <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
                   <Quadrant
                         images={(() => {
+                              const product = (orderData?.product || "").toLowerCase();
+                              const furTint = orderData?.furColor ? colorFromName(orderData.furColor) : null;
+
                               const imgs =
                                     Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
-                                          ? orderData.imagesNormalized.map(img => ({
-                                                ...img,
-                                                tint:
-                                                      img.label?.toLowerCase().includes("fur") && orderData?.furColor
-                                                            ? colorFromName(orderData.furColor)
-                                                            : null,
-                                          }))
+                                          ? orderData.imagesNormalized.map(img => {
+                                                const label = img.label?.toLowerCase() || "";
+                                                const isFoam = label.includes("foam");
+                                                const isFur = label.includes("fur");
+
+                                                return {
+                                                      ...img,
+                                                      role: isFoam ? "foam" : isFur ? "fur" : "reference",
+                                                      tint: isFoam ? "#D3D3D3" : isFur ? furTint : null,
+                                                      product: orderData?.product || "",
+                                                };
+                                          })
                                           : [
-                                                orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
-                                                orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
+                                                orderData?.thumbnailUrl && {
+                                                      src: orderData.thumbnailUrl,
+                                                      label: "Thumbnail",
+                                                      role: "reference",
+                                                      tint: null,
+                                                      product: orderData?.product || "",
+                                                },
+                                                orderData?.foamImg && {
+                                                      src: orderData.foamImg,
+                                                      label: "Inside Foam",
+                                                      role: "foam",
+                                                      tint: "#D3D3D3",
+                                                      product: orderData?.product || "",
+                                                },
                                                 orderData?.furImg && {
                                                       src: orderData.furImg,
-                                                      label: "Fur",
-                                                      tint: orderData?.furColor ? colorFromName(orderData.furColor) : null,
+                                                      label: "Inside Fur",
+                                                      role: "fur",
+                                                      tint: furTint,
+                                                      product: orderData?.product || "",
                                                 },
                                                 ...(Array.isArray(orderData?.imagesLabeled)
                                                       ? orderData.imagesLabeled.map(img => ({
                                                               src: img.src,
                                                               label: img.label || "Extra",
-                                                      }))
+                                                              role: "reference",
+                                                              tint: null,
+                                                              product: orderData?.product || "",
+                                                        }))
                                                       : []),
                                           ].filter(Boolean);
 
-                              // === Custom foam label logic ===
-                              const product = (orderData?.product || "").toLowerCase();
+                              // === Apply Foam Label Rules (Blade vs Mallet thickness) ===
                               imgs.forEach(img => {
-                                    if (/foam/i.test(img.label || "")) {
+                                    if (img.role === "foam") {
                                           if (
                                                 /quilted blade/i.test(product) ||
                                                 (/mallet/i.test(product) && !/mid mallet/i.test(product))
@@ -490,14 +514,25 @@ function openInLightBurn(bomNameOrPath) {
                               console.log("[Quadrant] foam label logic →", imgs.map(i => i.label));
                               return imgs;
                         })()}
+
                         onClickItem={handleImageClick}
                         renderItem={(incomingImg, index) => {
                               // ensure all props are retained
-                              const img = { label: incomingImg.label, tint: incomingImg.tint, src: incomingImg.src };
+                              // keep all props
+                              const img = {
+                                    label: incomingImg.label,
+                                    tint: incomingImg.tint,
+                                    src: incomingImg.src,
+                                    role: incomingImg.role,   // 🎯 NEW
+                                    product: incomingImg.product, // 🎯 NEW (helps future logic)
+                              };
+
                               console.log("[Img] render", img);
 
-                              const isFoam = /(foam|inside foam)/i.test(img.label || "");
-                              const isFur = /(fur|inside fur)/i.test(img.label || "");
+                              // 🎯 use role instead of guessing from label
+                              const isFoam = img.role === "foam";
+                              const isFur = img.role === "fur";
+
 
                               return (
                                     <div
@@ -898,11 +933,17 @@ function Quadrant({ images, onClickItem }) {
           </span>
         </div>
         <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
-          <Img src={item?.src} tint={item?.tint} />
+          <Img
+            src={item?.src}
+            tint={item?.tint}
+            label={item?.label}
+            product={item?.product}
+          />
         </div>
       </button>
     );
   };
+
 
 
   if (items.length === 0) {
@@ -968,7 +1009,7 @@ function Quadrant({ images, onClickItem }) {
   );
 }
 
-function Img({ src, style, tint, label, product }) {
+function Img({ src, style }) {
   const [ok, setOk] = useState(true);
   useEffect(() => setOk(true), [src]);
   if (!src) return null;
@@ -987,32 +1028,6 @@ function Img({ src, style, tint, label, product }) {
   }
 
   const thumb = toThumbnail(src);
-  const isBladeOrMallet = /blade|mallet/i.test(product || "");
-  const isInsideFoam = /foam/i.test(label || "");
-
-  console.log("[Img] render", { src, tint, label, product, isBladeOrMallet, isInsideFoam });
-
-  // Choose special styles for Blade/Mallet inside foam
-  // Fix fur tint, thicker foam outline
-  const filterStyle =
-    /fur/i.test(label || "")
-      ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
-          tint || colorFromName(label)
-        )}deg) saturate(400%) brightness(1)`
-      : isBladeOrMallet && isInsideFoam
-      ? "brightness(0) invert(1)"
-      : tint
-      ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
-          tint
-        )}deg) saturate(400%) brightness(1)`
-      : "none";
-
-  // Thick black outline for inside foam
-  const outlineStyle =
-    isInsideFoam
-      ? "drop-shadow(0 0 3px black) drop-shadow(0 0 3px black) drop-shadow(0 0 3px black)"
-      : "none";
-
 
   return ok ? (
     <div
@@ -1020,7 +1035,7 @@ function Img({ src, style, tint, label, product }) {
         position: "relative",
         width: "100%",
         height: "100%",
-        backgroundColor: isBladeOrMallet && isInsideFoam ? "#fff" : "#fff",
+        backgroundColor: "#fff",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1033,8 +1048,6 @@ function Img({ src, style, tint, label, product }) {
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          filter: `${filterStyle} ${outlineStyle}`,
-          transition: "filter 0.2s ease",
           ...style,
         }}
         onLoad={() => console.debug("[Img] loaded:", thumb)}
@@ -1049,6 +1062,7 @@ function Img({ src, style, tint, label, product }) {
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
 }
+
 
 
 
