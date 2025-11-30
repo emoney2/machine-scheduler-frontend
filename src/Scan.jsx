@@ -41,11 +41,15 @@ async function fetchFastOrder(orderId) {
 }
 
 function colorFromName(name = "") {
-  const normalized = name
+  // Raw string from sheet
+  const raw = String(name ?? "");
+
+  // Normalize aggressively
+  const normalized = raw
     .toLowerCase()
-    .replace(/fur/g, "")      // remove the word "fur" anywhere
-    .replace(/[-_]/g, " ")    // normalize hyphens and underscores into spaces
-    .replace(/\s+/g, " ")     // collapse multiple / weird / non-breaking spaces
+    .replace(/fur/g, "")      // drop the word "fur" anywhere
+    .replace(/[-_]/g, " ")    // treat - and _ as spaces
+    .replace(/\s+/g, " ")     // collapse weird / multiple spaces
     .trim();
 
   const map = {
@@ -58,13 +62,23 @@ function colorFromName(name = "") {
     "hunter green": "#355E3B",
     "tan": "#D2B48C",
 
-    // Optional extra synonyms:
+    // helpful synonyms
     "light gray": "#D3D3D3",
     "lt grey": "#D3D3D3",
     "lt gray": "#D3D3D3",
   };
 
-  return map[normalized] || "#CCCCCC"; // safe fallback instead of black
+  const value = map[normalized] || "#CCCCCC";
+
+  // 🔍 DEBUG: log exactly what we see and choose
+  console.log("[colorFromName]", {
+    raw,
+    normalized,
+    value,
+    charCodes: raw.split("").map(c => c.charCodeAt(0)),
+  });
+
+  return value;
 }
 
 function getHueFromHex(hex) {
@@ -77,14 +91,13 @@ function getHueFromHex(hex) {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   let h;
-
   if (max === min) h = 0;
   else if (max === r) h = (60 * ((g - b) / (max - min)) + 360) % 360;
   else if (max === g) h = 60 * ((b - r) / (max - min)) + 120;
   else h = 60 * ((r - g) / (max - min)) + 240;
-
   return Math.round(h);
 }
+
 
 
 
