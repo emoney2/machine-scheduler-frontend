@@ -784,7 +784,7 @@ function Quadrant({ images, onClickItem }) {
           </span>
         </div>
         <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
-          <Img src={item?.src} />
+          <Img src={item?.src} tint={item?.tint} />
         </div>
       </button>
     );
@@ -854,12 +854,12 @@ function Quadrant({ images, onClickItem }) {
   );
 }
 
-function Img({ src, style }) {
+function Img({ src, style, tint }) {
   const [ok, setOk] = useState(true);
-  useEffect(() => setOk(true), [src]); // reset state when URL changes
+  useEffect(() => setOk(true), [src]);
   if (!src) return null;
 
-  // 🔧 Extract Google Drive file ID and rebuild proper thumbnail URL
+  // Convert Drive URLs to thumbnails
   function toThumbnail(url) {
     try {
       const s = String(url);
@@ -875,22 +875,44 @@ function Img({ src, style }) {
 
   const thumb = toThumbnail(src);
 
+  console.log("[Img] render", { src, tint, thumb });
+
   return ok ? (
-    <img
-      src={thumb}
-      alt=""
-      style={style || { maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-      onLoad={() => console.debug("[Img] loaded:", thumb)}
-      onError={() => {
-        console.debug("[Img] error:", thumb);
-        setOk(false);
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        backgroundColor: tint || "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
-      draggable={false}
-    />
+    >
+      <img
+        src={thumb}
+        alt=""
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          mixBlendMode: tint ? "multiply" : "normal",
+          filter: tint ? "brightness(0) invert(1)" : "none",
+          ...style,
+        }}
+        onLoad={() => console.debug("[Img] loaded:", thumb)}
+        onError={() => {
+          console.debug("[Img] error:", thumb);
+          setOk(false);
+        }}
+        draggable={false}
+      />
+    </div>
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
 }
+
 
 
 async function safeJson(r) {
