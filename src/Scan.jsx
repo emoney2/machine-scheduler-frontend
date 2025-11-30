@@ -492,8 +492,9 @@ function openInLightBurn(bomNameOrPath) {
             })()}
             onClickItem={handleImageClick}
             renderItem={(img, index) => {
-              const isFoam = /foam/i.test(img.label || "");
-              const isFur = /fur/i.test(img.label || "");
+              // Use regex that matches both "Fur" and "Inside Fur"
+              const isFoam = /(foam|inside foam)/i.test(img.label || "");
+              const isFur = /(fur|inside fur)/i.test(img.label || "");
 
               return (
                 <div
@@ -518,14 +519,17 @@ function openInLightBurn(bomNameOrPath) {
                       imgEl.src = img.src;
 
                       imgEl.onload = () => {
+                        console.log("[Canvas] start draw →", img.label);
                         canvas.width = imgEl.width;
                         canvas.height = imgEl.height;
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         ctx.drawImage(imgEl, 0, 0);
+                        console.log("[Canvas] image drawn", imgEl.width, imgEl.height);
 
                         // === Tint FUR ===
                         if (isFur) {
                           const tintColor = colorFromName(orderData?.furColor || "#cccccc");
+                          console.log("[Canvas] tinting fur", orderData?.furColor, tintColor);
                           const rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(tintColor);
                           if (rgb) {
                             const [r, g, b] = [
@@ -538,7 +542,6 @@ function openInLightBurn(bomNameOrPath) {
                             for (let i = 0; i < data.length; i += 4) {
                               const alpha = data[i + 3];
                               if (alpha > 10) {
-                                // true multiply tint for depth
                                 data[i] = (data[i] * r) / 255;
                                 data[i + 1] = (data[i + 1] * g) / 255;
                                 data[i + 2] = (data[i + 2] * b) / 255;
@@ -550,11 +553,12 @@ function openInLightBurn(bomNameOrPath) {
 
                         // === Outline FOAM ===
                         if (isFoam) {
+                          console.log("[Canvas] outlining foam", canvas.width, canvas.height);
                           const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                           const data = imgData.data;
                           const outline = ctx.createImageData(canvas.width, canvas.height);
                           const odata = outline.data;
-      
+
                           for (let y = 1; y < canvas.height - 1; y++) {
                             for (let x = 1; x < canvas.width - 1; x++) {
                               const i = (y * canvas.width + x) * 4 + 3;
@@ -574,6 +578,8 @@ function openInLightBurn(bomNameOrPath) {
                           }
                           ctx.putImageData(outline, 0, 0);
                         }
+
+                        console.log("[Canvas] finished", img.label);
                       };
                     }}
                     style={{
