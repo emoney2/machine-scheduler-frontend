@@ -446,9 +446,9 @@ function openInLightBurn(bomNameOrPath) {
       >
         <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
           <Quadrant
-            images={
-              (() => {
-                const imgs = Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
+            images={(() => {
+              const imgs =
+                Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
                   ? orderData.imagesNormalized.map(img => ({
                       ...img,
                       tint:
@@ -472,23 +472,24 @@ function openInLightBurn(bomNameOrPath) {
                         : []),
                     ].filter(Boolean);
 
-                // === Custom foam label logic ===
-                const product = (orderData?.product || "").toLowerCase();
-
-                imgs.forEach(img => {
-                  if (/foam/i.test(img.label || "")) {
-                    if ((/quilted blade/i.test(product) || (/mallet/i.test(product) && !/mid mallet/i.test(product)))) {
-                      img.label = `Inside Foam - 1/4" Foam`;
-                    } else if (/blade/i.test(product) || /mid mallet/i.test(product)) {
-                      img.label = `Inside Foam - 3/8" Foam`;
-                    }
+              // === Custom foam label logic ===
+              const product = (orderData?.product || "").toLowerCase();
+              imgs.forEach(img => {
+                if (/foam/i.test(img.label || "")) {
+                  if (
+                    /quilted blade/i.test(product) ||
+                    (/mallet/i.test(product) && !/mid mallet/i.test(product))
+                  ) {
+                    img.label = `Inside Foam - 1/4" Foam`;
+                  } else if (/blade/i.test(product) || /mid mallet/i.test(product)) {
+                    img.label = `Inside Foam - 3/8" Foam`;
                   }
-                });
+                }
+              });
 
-                console.log("[Quadrant] foam label logic →", imgs.map(i => i.label));
-                return imgs;
-              })()
-            }
+              console.log("[Quadrant] foam label logic →", imgs.map(i => i.label));
+              return imgs;
+            })()}
             onClickItem={handleImageClick}
             renderItem={(img, index) => {
               const isFoam = /foam/i.test(img.label || "");
@@ -508,37 +509,96 @@ function openInLightBurn(bomNameOrPath) {
                     overflow: "hidden",
                   }}
                 >
-                  <img
-                    src={img.src}
-                    alt={img.label}
+                  <canvas
+                    ref={canvas => {
+                      if (!canvas) return;
+                      const ctx = canvas.getContext("2d");
+                      const imgEl = new Image();
+                      imgEl.crossOrigin = "anonymous";
+                      imgEl.src = img.src;
+
+                      imgEl.onload = () => {
+                        canvas.width = imgEl.width;
+                        canvas.height = imgEl.height;
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(imgEl, 0, 0);
+
+                        // === Tint FUR ===
+                        if (isFur) {
+                          const tintColor = colorFromName(orderData?.furColor || "#cccccc");
+                          const rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(tintColor);
+                          if (rgb) {
+                            const [r, g, b] = [
+                              parseInt(rgb[1], 16),
+                              parseInt(rgb[2], 16),
+                              parseInt(rgb[3], 16),
+                            ];
+                            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                            const data = imageData.data;
+                            for (let i = 0; i < data.length; i += 4) {
+                              const alpha = data[i + 3];
+                              if (alpha > 10) {
+                                // true multiply tint for depth
+                                data[i] = (data[i] * r) / 255;
+                                data[i + 1] = (data[i + 1] * g) / 255;
+                                data[i + 2] = (data[i + 2] * b) / 255;
+                              }
+                            }
+                            ctx.putImageData(imageData, 0, 0);
+                          }
+                        }
+
+                        // === Outline FOAM ===
+                        if (isFoam) {
+                          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                          const data = imgData.data;
+                          const outline = ctx.createImageData(canvas.width, canvas.height);
+                          const odata = outline.data;
+      
+                          for (let y = 1; y < canvas.height - 1; y++) {
+                            for (let x = 1; x < canvas.width - 1; x++) {
+                              const i = (y * canvas.width + x) * 4 + 3;
+                              if (data[i] > 40) {
+                                const aL = data[i - 4];
+                                const aR = data[i + 4];
+                                const aT = data[i - canvas.width * 4];
+                                const aB = data[i + canvas.width * 4];
+                                if (aL < 40 || aR < 40 || aT < 40 || aB < 40) {
+                                  odata[i - 3] = 0;
+                                  odata[i - 2] = 0;
+                                  odata[i - 1] = 0;
+                                  odata[i] = 255;
+                                }
+                              }
+                            }
+                          }
+                          ctx.putImageData(outline, 0, 0);
+                        }
+                      };
+                    }}
                     style={{
                       width: "100%",
                       height: "100%",
                       objectFit: "contain",
-                      mixBlendMode: isFur ? "multiply" : "normal",
-                      filter: isFur
-                        ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
-                            tint || colorFromName(orderData?.furColor || "#ccc")
-                          )}deg) saturate(400%) brightness(1)`
-                        : isFoam
-                        ? "brightness(0) invert(1) drop-shadow(0 0 4px black) drop-shadow(0 0 4px black) drop-shadow(0 0 4px black)"
-                        : "none",
-                      transition: "filter 0.2s ease",
                     }}
                   />
 
+                  {/* Enhanced label */}
                   <div
                     style={{
                       position: "absolute",
-                      bottom: 10,
-                      left: 10,
-                      fontSize: 15,
-                      fontWeight: 700,
-                      color: "#111",
-                      textShadow: "0 0 5px rgba(255,255,255,0.8), 0 0 5px rgba(255,255,255,0.8)",
-                      background: "rgba(255,255,255,0.6)",
-                      padding: "4px 8px",
-                      borderRadius: 4,
+                      bottom: 12,
+                      left: 12,
+                      fontSize: 22,
+                      fontWeight: 900,
+                      color: "#000",
+                      background: "rgba(255,255,255,0.95)",
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: "3px solid #000",
+                      boxShadow: "0 3px 10px rgba(0,0,0,0.3)",
+                      textTransform: "uppercase",
+                      letterSpacing: 0.8,
                     }}
                   >
                     {img.label}
