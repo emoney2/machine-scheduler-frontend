@@ -517,13 +517,16 @@ function openInLightBurn(bomNameOrPath) {
                       objectFit: "contain",
                       mixBlendMode: isFur ? "multiply" : "normal",
                       filter: isFur
-                        ? "brightness(0) invert(1)"
+                        ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
+                            tint || colorFromName(orderData?.furColor || "#ccc")
+                          )}deg) saturate(400%) brightness(1)`
                         : isFoam
-                        ? "brightness(0) invert(1) drop-shadow(0 0 3px black) drop-shadow(0 0 3px black)"
+                        ? "brightness(0) invert(1) drop-shadow(0 0 4px black) drop-shadow(0 0 4px black) drop-shadow(0 0 4px black)"
                         : "none",
                       transition: "filter 0.2s ease",
                     }}
                   />
+
                   <div
                     style={{
                       position: "absolute",
@@ -928,19 +931,26 @@ function Img({ src, style, tint, label, product }) {
   console.log("[Img] render", { src, tint, label, product, isBladeOrMallet, isInsideFoam });
 
   // Choose special styles for Blade/Mallet inside foam
+  // Fix fur tint, thicker foam outline
   const filterStyle =
-    isBladeOrMallet && isInsideFoam
-      ? "brightness(0) invert(1)" // make shape white
+    /fur/i.test(label || "")
+      ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
+          tint || colorFromName(label)
+        )}deg) saturate(400%) brightness(1)`
+      : isBladeOrMallet && isInsideFoam
+      ? "brightness(0) invert(1)"
       : tint
       ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
           tint
         )}deg) saturate(400%) brightness(1)`
       : "none";
 
+  // Thick black outline for inside foam
   const outlineStyle =
-    isBladeOrMallet && isInsideFoam
-      ? "drop-shadow(0 0 1px black) drop-shadow(0 0 1px black)"
+    isInsideFoam
+      ? "drop-shadow(0 0 3px black) drop-shadow(0 0 3px black) drop-shadow(0 0 3px black)"
       : "none";
+
 
   return ok ? (
     <div
