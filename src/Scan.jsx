@@ -43,49 +43,41 @@ async function fetchFastOrder(orderId) {
 function normalizeFast(o) {
   if (!o || typeof o !== "object") return o;
 
-  // normalize fields
+  // clone all existing props
   const result = { ...o };
 
-  // standardize raw fields
   const imagesLabeled = Array.isArray(o.imagesLabeled) ? o.imagesLabeled : [];
   const images = Array.isArray(o.images) ? o.images : [];
   const imageUrls = Array.isArray(o.imageUrls) ? o.imageUrls : [];
+  const preNormalized = Array.isArray(o.imagesNormalized) ? o.imagesNormalized : [];
   const imageUrl = o.imageUrl || o.thumbnailUrl || null;
   const thumbnail = o.thumbnailUrl || imageUrl || null;
 
-  // ---- build a normalized image array object format ----
   let normalizedImages = [];
 
-  // 1️⃣ Preferred: labeled objects
-  if (imagesLabeled.length) {
+  if (preNormalized.length) {
+    // ✅ use already-normalized quadrants from backend
+    normalizedImages = preNormalized;
+  } else if (imagesLabeled.length) {
     normalizedImages = imagesLabeled.map(img =>
       typeof img === "string" ? { src: img, label: "" } : { src: img.src, label: img.label || "" }
     );
-  }
-  // 2️⃣ fallback: raw images
-  else if (images.length) {
+  } else if (images.length) {
     normalizedImages = images.map(img =>
       typeof img === "string" ? { src: img, label: "" } : { src: img.src, label: img.label || "" }
     );
-  }
-  // 3️⃣ fallback: raw URLs list
-  else if (imageUrls.length) {
+  } else if (imageUrls.length) {
     normalizedImages = imageUrls.map(u => ({ src: u, label: "" }));
-  }
-  // 4️⃣ fallback: single thumbnail
-  else if (thumbnail) {
+  } else if (thumbnail) {
     normalizedImages = [{ src: thumbnail, label: "" }];
   }
 
-  // store normalized field
   result.imagesNormalized = normalizedImages;
   result.thumbnail = thumbnail;
   result.hasImages = normalizedImages.length > 0;
 
   return result;
 }
-
-
 
 function extractOrderId(raw) {
   const digits = (raw || "").replace(/\D+/g, "");
