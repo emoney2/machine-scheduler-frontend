@@ -478,9 +478,9 @@ function openInLightBurn(bomNameOrPath) {
                 imgs.forEach(img => {
                   if (/foam/i.test(img.label || "")) {
                     if ((/quilted blade/i.test(product) || (/mallet/i.test(product) && !/mid mallet/i.test(product)))) {
-                      img.label = `1/4" Foam`;
+                      img.label = `Inside Foam - 1/4" Foam`;
                     } else if (/blade/i.test(product) || /mid mallet/i.test(product)) {
-                      img.label = `3/8" Foam`;
+                      img.label = `Inside Foam - 3/8" Foam`;
                     }
                   }
                 });
@@ -490,46 +490,59 @@ function openInLightBurn(bomNameOrPath) {
               })()
             }
             onClickItem={handleImageClick}
-            renderItem={(img, index) => (
-              <div
-                key={index}
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  height: "100%",
-                  backgroundColor: img.tint || "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                }}
-              >
-                <img
-                  src={img.src}
-                  alt={img.label}
+            renderItem={(img, index) => {
+              const isFoam = /foam/i.test(img.label || "");
+              const isFur = /fur/i.test(img.label || "");
+
+              return (
+                <div
+                  key={index}
                   style={{
+                    position: "relative",
                     width: "100%",
                     height: "100%",
-                    objectFit: "contain",
-                    mixBlendMode: img.tint ? "multiply" : "normal",
-                    filter: img.tint ? "brightness(0) invert(1)" : "none",
-                  }}
-                />
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 8,
-                    left: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#222",
-                    textShadow: "0 0 4px rgba(255,255,255,0.6)",
+                    backgroundColor: img.tint && !isFur ? img.tint : "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
                   }}
                 >
-                  {img.label}
+                  <img
+                    src={img.src}
+                    alt={img.label}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "contain",
+                      mixBlendMode: isFur ? "multiply" : "normal",
+                      filter: isFur
+                        ? "brightness(0) invert(1)"
+                        : isFoam
+                        ? "brightness(0) invert(1) drop-shadow(0 0 3px black) drop-shadow(0 0 3px black)"
+                        : "none",
+                      transition: "filter 0.2s ease",
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 10,
+                      left: 10,
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: "#111",
+                      textShadow: "0 0 5px rgba(255,255,255,0.8), 0 0 5px rgba(255,255,255,0.8)",
+                      background: "rgba(255,255,255,0.6)",
+                      padding: "4px 8px",
+                      borderRadius: 4,
+                    }}
+                  >
+                    {img.label}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            }}
           />
         </div>
       </div>
