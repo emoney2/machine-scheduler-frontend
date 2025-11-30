@@ -942,12 +942,10 @@ function Img({ src, style, tint }) {
           height: "100%",
           objectFit: "contain",
           filter: tint
-            ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
+            ? `invert(100%) brightness(100%) sepia(100%) saturate(2000%) hue-rotate(${getHueFromHex(
                 tint
-              )}deg) saturate(400%) brightness(1)`
+              )}deg) brightness(95%)`
             : "none",
-
-
           transition: "filter 0.2s ease",
           ...style,
         }}
