@@ -422,25 +422,19 @@ function openInLightBurn(bomNameOrPath) {
 
           <Quadrant
             images={
-              Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
-                ? orderData.imagesNormalized.map(img => ({
-                    src: img.src || img.url || img.image || "",
-                    label: img.label || "",
-                  }))
+              Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length >= 4
+                ? orderData.imagesNormalized
+                : Array.isArray(orderData?.images) && orderData.images.length > 1
+                ? orderData.images
                 : [
-                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Outside" },
-                    orderData?.foamImg && { src: orderData.foamImg, label: "Inside Foam" },
-                    orderData?.furImg && { src: orderData.furImg, label: "Inside Fur" },
-                    ...(Array.isArray(orderData?.imagesLabeled)
-                      ? orderData.imagesLabeled.map(img => ({
-                          src: img.src,
-                          label: img.label || "Extra",
-                        }))
-                      : []),
+                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
+                    orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
+                    orderData?.furImg && { src: orderData.furImg, label: "Fur" },
                   ].filter(Boolean)
             }
             onClickItem={handleImageClick}
           />
+
         </div>
       </div>
 
