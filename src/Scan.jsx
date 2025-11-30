@@ -164,27 +164,28 @@ async function fetchOrder(orderId) {
   setErrMsg("");
 
   try {
-    // ---- 1) FAST PATH (paint UI instantly) ----
-    try {
-      console.log("[Scan] fast path for order", orderId);
-      const fastRow = await fetchFastOrder(orderId);
+    console.log("[Scan] fast path for order", orderId);
+    const fastRow = await fetchFastOrder(orderId);
 
-      if (fastRow) {
-        const quick = normalizeFast(fastRow, orderId);
-        console.log("[Scan] fast HIT →", quick);
-        setOrderData(quick);
-        setLoading(false);
-      } else {
-        console.log("[Scan] fast MISS (no cached row for", orderId, ")");
-      }
-    } catch (e) {
-      console.warn("[Scan] fast order lookup failed → continuing", e);
+    if (fastRow) {
+      console.log("[Scan] fast raw payload →", fastRow);
+      console.log("[Scan] fast raw keys →", Object.keys(fastRow || {}));
+      console.log("[Scan] fast raw imagesNormalized length →", Array.isArray(fastRow?.imagesNormalized) ? fastRow.imagesNormalized.length : "none");
+
+      const quick = normalizeFast(fastRow, orderId);
+      console.log("[Scan] fast normalized →", quick);
+      console.log("[Scan] fast normalized keys →", Object.keys(quick || {}));
+      console.log("[Scan] fast normalized imagesNormalized length →", Array.isArray(quick?.imagesNormalized) ? quick.imagesNormalized.length : "none");
+
+      setOrderData(quick);
+      setLoading(false);
+    } else {
+      console.log("[Scan] fast MISS (no cached row for", orderId, ")");
     }
 
     flashOk();
   } catch (e) {
     console.warn("[Scan] Full order fetch failed:", e);
-
     if (orderData) {
       console.log("[Scan] Fast data already applied — suppressing toast");
     } else {
@@ -418,26 +419,32 @@ function openInLightBurn(bomNameOrPath) {
         }}
       >
         <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
-          {console.log("[Scan] quadrant check", orderData?.imagesNormalized)}
+          {console.log("[Scan] quadrant render check",
+            Array.isArray(orderData?.imagesNormalized)
+              ? `imagesNormalized length=${orderData.imagesNormalized.length}`
+              : "no imagesNormalized",
+            Array.isArray(orderData?.images)
+              ? `images length=${orderData.images.length}`
+              : "no images",
+            orderData
+          )}
 
           <Quadrant
             images={
-              Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length >= 4
+              Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length >= 1
                 ? orderData.imagesNormalized
                 : Array.isArray(orderData?.images) && orderData.images.length > 1
                 ? orderData.images
                 : [
-                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
-                    orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
-                    orderData?.furImg && { src: orderData.furImg, label: "Fur" },
+                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Outside" },
+                    orderData?.foamImg && { src: orderData.foamImg, label: "Inside Foam" },
+                    orderData?.furImg && { src: orderData.furImg, label: "Inside Fur" },
                   ].filter(Boolean)
             }
             onClickItem={handleImageClick}
           />
-
         </div>
       </div>
-
 
       {/* Manual dialog */}
       {showManual && (
