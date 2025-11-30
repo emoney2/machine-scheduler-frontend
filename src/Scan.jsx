@@ -418,14 +418,19 @@ function openInLightBurn(bomNameOrPath) {
         }}
       >
         <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
+          {console.log("[Scan] quadrant check", orderData?.imagesNormalized)}
+
           <Quadrant
             images={
               Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
-                ? orderData.imagesNormalized
+                ? orderData.imagesNormalized.map(img => ({
+                    src: img.src || img.url || img.image || "",
+                    label: img.label || "",
+                  }))
                 : [
-                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
-                    orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
-                    orderData?.furImg && { src: orderData.furImg, label: "Fur" },
+                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Outside" },
+                    orderData?.foamImg && { src: orderData.foamImg, label: "Inside Foam" },
+                    orderData?.furImg && { src: orderData.furImg, label: "Inside Fur" },
                     ...(Array.isArray(orderData?.imagesLabeled)
                       ? orderData.imagesLabeled.map(img => ({
                           src: img.src,
@@ -436,9 +441,9 @@ function openInLightBurn(bomNameOrPath) {
             }
             onClickItem={handleImageClick}
           />
-
         </div>
       </div>
+
 
       {/* Manual dialog */}
       {showManual && (
