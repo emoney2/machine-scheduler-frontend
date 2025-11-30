@@ -928,7 +928,7 @@ function Img({ src, style, tint }) {
         position: "relative",
         width: "100%",
         height: "100%",
-        backgroundColor: "#fff", // keep white background behind transparent PNG
+        backgroundColor: tint || "#fff",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -941,11 +941,12 @@ function Img({ src, style, tint }) {
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          filter: tint && /(fur|foam)/i.test(img.label || "")
+          filter: tint
             ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
                 tint
               )}deg) saturate(400%) brightness(1)`
             : "none",
+
 
           transition: "filter 0.2s ease",
           ...style,
