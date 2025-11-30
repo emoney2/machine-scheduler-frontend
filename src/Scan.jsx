@@ -423,9 +423,9 @@ function openInLightBurn(bomNameOrPath) {
               Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
                 ? orderData.imagesNormalized
                 : [
-                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Outside" },
-                    orderData?.foamImg && { src: orderData.foamImg, label: "Inside Foam" },
-                    orderData?.furImg && { src: orderData.furImg, label: "Inside Fur" },
+                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
+                    orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
+                    orderData?.furImg && { src: orderData.furImg, label: "Fur" },
                     ...(Array.isArray(orderData?.imagesLabeled)
                       ? orderData.imagesLabeled.map(img => ({
                           src: img.src,
@@ -436,6 +436,7 @@ function openInLightBurn(bomNameOrPath) {
             }
             onClickItem={handleImageClick}
           />
+
         </div>
       </div>
 
