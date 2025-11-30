@@ -492,8 +492,9 @@ function openInLightBurn(bomNameOrPath) {
                         })()}
                         onClickItem={handleImageClick}
                         renderItem={(incomingImg, index) => {
-                              const img = { ...incomingImg };
-                              console.log("[Img] render (incoming)", img);
+                              // ensure all props are retained
+                              const img = { label: incomingImg.label, tint: incomingImg.tint, src: incomingImg.src };
+                              console.log("[Img] render", img);
 
                               const isFoam = /(foam|inside foam)/i.test(img.label || "");
                               const isFur = /(fur|inside fur)/i.test(img.label || "");
@@ -521,7 +522,6 @@ function openInLightBurn(bomNameOrPath) {
                                                       imgEl.src = img.src;
 
                                                       imgEl.onload = () => {
-                                                            console.log("[Canvas] draw start →", img.label);
                                                             canvas.width = imgEl.width;
                                                             canvas.height = imgEl.height;
                                                             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -543,6 +543,7 @@ function openInLightBurn(bomNameOrPath) {
                                                                         for (let i = 0; i < data.length; i += 4) {
                                                                               const alpha = data[i + 3];
                                                                               if (alpha > 10) {
+                                                                                    // Blend with tint color but keep shading
                                                                                     data[i] = (data[i] * r) / 255;
                                                                                     data[i + 1] = (data[i + 1] * g) / 255;
                                                                                     data[i + 2] = (data[i + 2] * b) / 255;
@@ -554,10 +555,9 @@ function openInLightBurn(bomNameOrPath) {
 
                                                             // === Outline Inside Foam ===
                                                             if (isFoam) {
-                                                                  console.log("[Canvas] outlining foam shape");
                                                                   const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                                                                   const data = imgData.data;
-                                                                  ctx.lineWidth = 6;
+                                                                  ctx.lineWidth = 8;
                                                                   ctx.strokeStyle = "#000";
                                                                   ctx.beginPath();
                                                                   for (let y = 1; y < canvas.height - 1; y++) {
@@ -576,8 +576,6 @@ function openInLightBurn(bomNameOrPath) {
                                                                   }
                                                                   ctx.stroke();
                                                             }
-
-                                                            console.log("[Canvas] finished render →", img.label);
                                                       };
                                                 }}
                                                 style={{
@@ -608,6 +606,7 @@ function openInLightBurn(bomNameOrPath) {
                                     </div>
                               );
                         }}
+
                   />
             </div>
       </div>
