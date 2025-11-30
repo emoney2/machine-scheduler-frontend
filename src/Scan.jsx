@@ -41,6 +41,13 @@ async function fetchFastOrder(orderId) {
 }
 
 function colorFromName(name = "") {
+  const normalized = name
+    .toLowerCase()
+    .replace(/fur/g, "")      // remove the word "fur" anywhere
+    .replace(/[-_]/g, " ")    // normalize hyphens and underscores into spaces
+    .replace(/\s+/g, " ")     // collapse multiple / weird / non-breaking spaces
+    .trim();
+
   const map = {
     "navy blue": "#001F5B",
     "light grey": "#D3D3D3",
@@ -50,13 +57,17 @@ function colorFromName(name = "") {
     "royal blue": "#4169E1",
     "hunter green": "#355E3B",
     "tan": "#D2B48C",
+
+    // Optional extra synonyms:
+    "light gray": "#D3D3D3",
+    "lt grey": "#D3D3D3",
+    "lt gray": "#D3D3D3",
   };
-  const key = name.toLowerCase().replace("fur", "").trim();
-  return map[key] || "#CCCCCC";
+
+  return map[normalized] || "#CCCCCC"; // safe fallback instead of black
 }
 
 function getHueFromHex(hex) {
-  // Convert hex (#RRGGBB) to approximate hue rotation
   const rgb = hex
     .replace("#", "")
     .match(/.{1,2}/g)
@@ -66,12 +77,15 @@ function getHueFromHex(hex) {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   let h;
+
   if (max === min) h = 0;
   else if (max === r) h = (60 * ((g - b) / (max - min)) + 360) % 360;
   else if (max === g) h = 60 * ((b - r) / (max - min)) + 120;
   else h = 60 * ((r - g) / (max - min)) + 240;
+
   return Math.round(h);
 }
+
 
 
 function normalizeFast(o) {
@@ -438,214 +452,83 @@ function openInLightBurn(bomNameOrPath) {
 
       {/* CENTERED QUADRANT */}
       <div
-            style={{
-                  padding: "12px 20px 28px",
-                  display: "flex",
-                  justifyContent: "center",
-            }}
+        style={{
+          padding: "12px 20px 28px",
+          display: "flex",
+          justifyContent: "center",
+        }}
       >
-            <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
-                  <Quadrant
-                        images={(() => {
-                              const product = (orderData?.product || "").toLowerCase();
-                              const furTint = orderData?.furColor ? colorFromName(orderData.furColor) : null;
-
-                              const imgs =
-                                    Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
-                                          ? orderData.imagesNormalized.map(img => {
-                                                const label = img.label?.toLowerCase() || "";
-                                                const isFoam = label.includes("foam");
-                                                const isFur = label.includes("fur");
-
-                                                return {
-                                                      ...img,
-                                                      role: isFoam ? "foam" : isFur ? "fur" : "reference",
-                                                      tint: isFoam ? "#D3D3D3" : isFur ? furTint : null,
-                                                      product: orderData?.product || "",
-                                                };
-                                          })
-                                          : [
-                                                orderData?.thumbnailUrl && {
-                                                      src: orderData.thumbnailUrl,
-                                                      label: "Thumbnail",
-                                                      role: "reference",
-                                                      tint: null,
-                                                      product: orderData?.product || "",
-                                                },
-                                                orderData?.foamImg && {
-                                                      src: orderData.foamImg,
-                                                      label: "Inside Foam",
-                                                      role: "foam",
-                                                      tint: "#D3D3D3",
-                                                      product: orderData?.product || "",
-                                                },
-                                                orderData?.furImg && {
-                                                      src: orderData.furImg,
-                                                      label: "Inside Fur",
-                                                      role: "fur",
-                                                      tint: furTint,
-                                                      product: orderData?.product || "",
-                                                },
-                                                ...(Array.isArray(orderData?.imagesLabeled)
-                                                      ? orderData.imagesLabeled.map(img => ({
-                                                              src: img.src,
-                                                              label: img.label || "Extra",
-                                                              role: "reference",
-                                                              tint: null,
-                                                              product: orderData?.product || "",
-                                                        }))
-                                                      : []),
-                                          ].filter(Boolean);
-
-                              // === Apply Foam Label Rules (Blade vs Mallet thickness) ===
-                              imgs.forEach(img => {
-                                    if (img.role === "foam") {
-                                          if (
-                                                /quilted blade/i.test(product) ||
-                                                (/mallet/i.test(product) && !/mid mallet/i.test(product))
-                                          ) {
-                                                img.label = `Inside Foam - 1/4" Foam`;
-                                          } else if (/blade/i.test(product) || /mid mallet/i.test(product)) {
-                                                img.label = `Inside Foam - 3/8" Foam`;
-                                          }
-                                    }
-                              });
-
-                              console.log("[Quadrant] foam label logic →", imgs.map(i => i.label));
-                              return imgs;
-                        })()}
-
-                        onClickItem={handleImageClick}
-                        renderItem={(incomingImg, index) => {
-                              // ensure all props are retained
-                              // keep all props
-                              const img = {
-                                    label: incomingImg.label,
-                                    tint: incomingImg.tint,
-                                    src: incomingImg.src,
-                                    role: incomingImg.role,   // 🎯 NEW
-                                    product: incomingImg.product, // 🎯 NEW (helps future logic)
-                              };
-
-                              console.log("[Img] render", img);
-
-                              // 🎯 use role instead of guessing from label
-                              const isFoam = img.role === "foam";
-                              const isFur = img.role === "fur";
-
-
-                              return (
-                                    <div
-                                          key={index}
-                                          style={{
-                                                position: "relative",
-                                                width: "100%",
-                                                height: "100%",
-                                                backgroundColor: img.tint && !isFur ? img.tint : "#fff",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                overflow: "hidden",
-                                          }}
-                                    >
-                                          <canvas
-                                                ref={canvas => {
-                                                      if (!canvas) return;
-                                                      const ctx = canvas.getContext("2d");
-                                                      const imgEl = new Image();
-                                                      imgEl.crossOrigin = "anonymous";
-                                                      imgEl.src = img.src;
-
-                                                      imgEl.onload = () => {
-                                                            canvas.width = imgEl.width;
-                                                            canvas.height = imgEl.height;
-                                                            ctx.clearRect(0, 0, canvas.width, canvas.height);
-                                                            ctx.drawImage(imgEl, 0, 0);
-
-                                                            // === Tint Inside Fur ===
-                                                            if (isFur) {
-                                                                  const tintColor = colorFromName(orderData?.furColor || "#cccccc");
-                                                                  console.log("[Canvas] tinting fur", tintColor);
-                                                                  const rgb = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(tintColor);
-                                                                  if (rgb) {
-                                                                        const [r, g, b] = [
-                                                                              parseInt(rgb[1], 16),
-                                                                              parseInt(rgb[2], 16),
-                                                                              parseInt(rgb[3], 16),
-                                                                        ];
-                                                                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                                                                        const data = imageData.data;
-                                                                        for (let i = 0; i < data.length; i += 4) {
-                                                                              const alpha = data[i + 3];
-                                                                              if (alpha > 10) {
-                                                                                    // Blend with tint color but keep shading
-                                                                                    data[i] = (data[i] * r) / 255;
-                                                                                    data[i + 1] = (data[i + 1] * g) / 255;
-                                                                                    data[i + 2] = (data[i + 2] * b) / 255;
-                                                                              }
-                                                                        }
-                                                                        ctx.putImageData(imageData, 0, 0);
-                                                                  }
-                                                            }
-
-                                                            // === Outline Inside Foam ===
-                                                            if (isFoam) {
-                                                                  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                                                                  const data = imgData.data;
-                                                                  ctx.lineWidth = 8;
-                                                                  ctx.strokeStyle = "#000";
-                                                                  ctx.beginPath();
-                                                                  for (let y = 1; y < canvas.height - 1; y++) {
-                                                                        for (let x = 1; x < canvas.width - 1; x++) {
-                                                                              const i = (y * canvas.width + x) * 4 + 3;
-                                                                              if (data[i] > 50) {
-                                                                                    const aL = data[i - 4];
-                                                                                    const aR = data[i + 4];
-                                                                                    const aT = data[i - canvas.width * 4];
-                                                                                    const aB = data[i + canvas.width * 4];
-                                                                                    if (aL < 40 || aR < 40 || aT < 40 || aB < 40) {
-                                                                                          ctx.rect(x, y, 1, 1);
-                                                                                    }
-                                                                              }
-                                                                        }
-                                                                  }
-                                                                  ctx.stroke();
-                                                            }
-                                                      };
-                                                }}
-                                                style={{
-                                                      width: "100%",
-                                                      height: "100%",
-                                                      objectFit: "contain",
-                                                }}
-                                          />
-                                          <div
-                                                style={{
-                                                      position: "absolute",
-                                                      bottom: 12,
-                                                      left: 12,
-                                                      fontSize: 24,
-                                                      fontWeight: 900,
-                                                      color: "#000",
-                                                      background: "rgba(255,255,255,0.95)",
-                                                      padding: "8px 16px",
-                                                      borderRadius: 6,
-                                                      border: "3px solid #000",
-                                                      boxShadow: "0 3px 8px rgba(0,0,0,0.3)",
-                                                      textTransform: "uppercase",
-                                                      letterSpacing: 1,
-                                                }}
-                                          >
-                                                {img.label}
-                                          </div>
-                                    </div>
-                              );
-                        }}
-
-                  />
-            </div>
+        <div style={{ width: "100%", maxWidth: 1100, margin: "0 auto" }}>
+          <Quadrant
+            images={
+              Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
+                ? orderData.imagesNormalized.map(img => ({
+                    ...img,
+                    tint:
+                      img.label?.toLowerCase().includes("fur") && orderData?.furColor
+                        ? colorFromName(orderData.furColor)
+                        : null,
+                  }))
+                : [
+                    orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
+                    orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
+                    orderData?.furImg && {
+                      src: orderData.furImg,
+                      label: "Fur",
+                      tint: orderData?.furColor ? colorFromName(orderData.furColor) : null,
+                    },
+                    ...(Array.isArray(orderData?.imagesLabeled)
+                      ? orderData.imagesLabeled.map(img => ({
+                          src: img.src,
+                          label: img.label || "Extra",
+                        }))
+                      : []),
+                  ].filter(Boolean)
+            }
+            onClickItem={handleImageClick}
+            renderItem={(img, index) => (
+              <div
+                key={index}
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: img.tint || "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                <img
+                  src={img.src}
+                  alt={img.label}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
+                    mixBlendMode: img.tint ? "multiply" : "normal",
+                    filter: img.tint ? "brightness(0) invert(1)" : "none",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 8,
+                    left: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#222",
+                    textShadow: "0 0 4px rgba(255,255,255,0.6)",
+                  }}
+                >
+                  {img.label}
+                </div>
+              </div>
+            )}
+          />
+        </div>
       </div>
-
 
 
       {/* Manual dialog */}
@@ -933,17 +816,11 @@ function Quadrant({ images, onClickItem }) {
           </span>
         </div>
         <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
-          <Img
-            src={item?.src}
-            tint={item?.tint}
-            label={item?.label}
-            product={item?.product}
-          />
+          <Img src={item?.src} tint={item?.tint} />
         </div>
       </button>
     );
   };
-
 
 
   if (items.length === 0) {
@@ -1009,11 +886,12 @@ function Quadrant({ images, onClickItem }) {
   );
 }
 
-function Img({ src, style }) {
+function Img({ src, style, tint }) {
   const [ok, setOk] = useState(true);
   useEffect(() => setOk(true), [src]);
   if (!src) return null;
 
+  // Convert Google Drive URLs into thumbnails
   function toThumbnail(url) {
     try {
       const s = String(url);
@@ -1029,13 +907,15 @@ function Img({ src, style }) {
 
   const thumb = toThumbnail(src);
 
+  console.log("[Img] render", { src, tint, thumb });
+
   return ok ? (
     <div
       style={{
         position: "relative",
         width: "100%",
         height: "100%",
-        backgroundColor: "#fff",
+        backgroundColor: "#fff", // keep white background behind transparent PNG
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -1048,6 +928,12 @@ function Img({ src, style }) {
           width: "100%",
           height: "100%",
           objectFit: "contain",
+          filter: tint
+            ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(
+                tint
+              )}deg) saturate(400%) brightness(1)`
+            : "none",
+          transition: "filter 0.2s ease",
           ...style,
         }}
         onLoad={() => console.debug("[Img] loaded:", thumb)}
@@ -1062,8 +948,6 @@ function Img({ src, style }) {
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
 }
-
-
 
 
 
