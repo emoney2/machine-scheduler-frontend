@@ -946,7 +946,7 @@ function Img({ src, style, tint }) {
 
           // 🎯 Only recolor if this is the inside fur image AND we have a tint
           filter:
-            label?.toLowerCase().includes("fur") && tint
+            img?.label?.toLowerCase().includes("fur") && tint
               ? `
                   brightness(0)    /* convert pixels → black */
                   invert(1)        /* black → white */
