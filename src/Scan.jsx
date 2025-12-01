@@ -894,33 +894,36 @@ function Img({ src, style, tint, label, product, furColor }) {
   let finalTint = tint;
 
   if (isFur && product && furColor) {
-    // --- NEW RULE: remove "full", "back", "front" from ANY product name ---
-    const cleanedProduct = String(product)
-      .replace(/\b(full|back|front)\b/gi, "")   // remove word matches
-      .replace(/\s+/g, " ")                     // collapse extra spaces
-      .trim();                                  // remove leftover whitespace
+    // Step 1: Remove "full", "front", "back" (whole word matches)
+    let cleaned = String(product)
+      .replace(/\b(full|front|back)\b/gi, "")
+      .replace(/\s+/g, " ") // collapse spacing
+      .trim();
 
-    // Use cleaned product name to match your base image map
-    const mappedBase =
-      BASE_IMAGE_MAP[cleanedProduct] ||
-      BASE_IMAGE_MAP[cleanedProduct.toLowerCase()] ||
+    // Step 2: Remove ALL spaces for dynamic matching
+    let compressed = cleaned.replace(/\s+/g, "");
+
+    // Step 3: Try existing BASE_IMAGE_MAP
+    let mappedBase =
+      BASE_IMAGE_MAP[cleaned] ||
+      BASE_IMAGE_MAP[cleaned.toLowerCase()] ||
+      BASE_IMAGE_MAP[compressed] ||
+      BASE_IMAGE_MAP[compressed.toLowerCase()] ||
       null;
 
-    console.log("[IMG DEBUG]",
-      {
-        originalProduct: product,
-        cleanedProduct,
-        mappedBase,
-        finalSrcCandidate: mappedBase || src,
-        tintColor: finalTint
-      }
-    );
-
-    if (mappedBase) {
-      finalSrc = mappedBase;
+    // Step 4: If still no match, fall back to filename pattern
+    if (!mappedBase) {
+      mappedBase = `/fur-icons/${compressed}Fur.png`;
     }
 
+    console.log("[IMG DEBUG FINAL]", {
+      original: product,
+      cleaned,
+      compressed,
+      expectedFile: mappedBase,
+    });
 
+    finalSrc = mappedBase;
     finalTint = colorFromName(furColor);
   }
 
@@ -968,7 +971,6 @@ function Img({ src, style, tint, label, product, furColor }) {
           objectFit: "contain",
           ...style,
         }}
-        onLoad={() => console.debug("[Img] loaded:", thumb)}
         onError={() => setOk(false)}
         draggable={false}
       />
