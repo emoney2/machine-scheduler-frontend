@@ -934,23 +934,37 @@ function Img({ src, style, tint }) {
         justifyContent: "center",
       }}
     >
-      {/* 🎯 NEW — Mask-based recoloring approach */}
-      <div
+      <img
+        src={thumb}
+        alt=""
         style={{
           width: "100%",
           height: "100%",
-          backgroundColor: tint ?? "white",
-          maskImage: `url(${thumb})`,
-          WebkitMaskImage: `url(${thumb})`,
-          maskSize: "contain",
-          WebkitMaskSize: "contain",
-          maskRepeat: "no-repeat",
-          WebkitMaskRepeat: "no-repeat",
-          maskPosition: "center",
-          WebkitMaskPosition: "center",
+          objectFit: "contain",
+          transition: "filter 0.2s ease",
           ...style,
+
+          // 🎯 Only recolor if this is the inside fur image AND we have a tint
+          filter:
+            label?.toLowerCase().includes("fur") && tint
+              ? `
+                  brightness(0)    /* convert pixels → black */
+                  invert(1)        /* black → white */
+                  sepia(1)         /* enable tinting */
+                  saturate(900%)   /* boost color */
+                  hue-rotate(${getHueFromHex(tint)}deg)
+                  brightness(1.3)  /* keep brightness correct */
+                `
+              : "none",
         }}
+        onLoad={() => console.debug("[Img] loaded:", thumb)}
+        onError={() => {
+          console.debug("[Img] error:", thumb);
+          setOk(false);
+        }}
+        draggable={false}
       />
+
     </div>
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
