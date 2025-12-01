@@ -147,16 +147,24 @@ function extractOrderId(raw) {
 }
 
 function normalizeFurFilename(product, sheetValue) {
-  const cleanProduct = String(product).replace(/\s+/g, "");
-  const cleanColor = String(sheetValue)
-    .replace(/fur/i, "")
+  // Step 1 — remove extra words from product names
+  const cleanedProduct = product
+    .replace(/front|back|full|fullfront|fullback/gi, "") 
+    .replace(/\s+/g, "") // remove spaces
+    .trim();
+
+  // Step 2 — clean the color name
+  const cleanedColor = (sheetValue || "")
+    .replace(/fur/gi, "")
     .trim()
     .split(/\s+/)
-    .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join("");
 
-  return `${cleanProduct}Fur_${cleanColor}.png`;
+  // Step 3 — final filename format
+  return `${cleanedProduct}Fur_${cleanedColor}.png`;
 }
+
 
 export default function Scan() {
   const [params] = useSearchParams();
