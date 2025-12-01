@@ -1,8 +1,7 @@
 // src/Scan.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { recolorImage } from "../utils/recolorImage";
-import React, { useState, useEffect } from "react";
+
 
 const FUR_COLOR_MAP = {
   "Black Fur": "#1A1A1A",
