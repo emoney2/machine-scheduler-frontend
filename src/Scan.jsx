@@ -40,6 +40,34 @@ async function fetchFastOrder(orderId) {
   return j?.order || null;
 }
 
+function normalizeFurFilename(product, sheetValue) {
+  const cleanProduct = product.replace(/\s+/g, "");
+  const cleanColor = sheetValue
+    .replace(/fur/i, "")
+    .trim()
+    .split(/\s+/)
+    .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+    .join("");
+
+  return `${cleanProduct}Fur_${cleanColor}.png`;
+}
+
+const [furFiles, setFurFiles] = useState({});
+
+useEffect(() => {
+  fetch("https://machine-scheduler-backend.onrender.com/api/fur_files")
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        console.log("[FUR MAP LOADED]", data.files);
+        setFurFiles(data.files);
+      } else {
+        console.warn("FUR LOAD ERROR:", data.error);
+      }
+    });
+}, []);
+
+
 function colorFromName(name = "") {
   // Raw string from sheet
   const raw = String(name ?? "");
@@ -475,13 +503,27 @@ function openInLightBurn(bomNameOrPath) {
           <Quadrant
             images={
               Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
-                ? orderData.imagesNormalized.map(img => ({
-                    ...img,
-                    tint:
-                      img.label?.toLowerCase().includes("fur") && orderData?.furColor
-                        ? colorFromName(orderData.furColor)
-                        : null,
-                  }))
+                ? orderData.imagesNormalized.map(img => {
+                    const isFur = img.label?.toLowerCase().includes("fur");
+
+                    if (isFur && orderData?.furColor && furFiles) {
+                      const filename = normalizeFurFilename(orderData.product, orderData.furColor);
+                      const id = furFiles[filename];
+
+                      console.log("[FUR MATCH]", { filename, id });
+
+                      if (id) {
+                        return {
+                          ...img,
+                          tint: null, // stop tinting
+                          src: `https://drive.google.com/uc?export=view&id=${id}`,
+                        };
+                      }
+                    }
+
+                    return { ...img, tint: null };
+                  })
+
                 : [
                     orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
                     orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
