@@ -906,9 +906,20 @@ function Img({ src, style, tint, label, product, furColor }) {
       BASE_IMAGE_MAP[cleanedProduct.toLowerCase()] ||
       null;
 
+    console.log("[IMG DEBUG]",
+      {
+        originalProduct: product,
+        cleanedProduct,
+        mappedBase,
+        finalSrcCandidate: mappedBase || src,
+        tintColor: finalTint
+      }
+    );
+
     if (mappedBase) {
       finalSrc = mappedBase;
     }
+
 
     finalTint = colorFromName(furColor);
   }
