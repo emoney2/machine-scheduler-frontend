@@ -933,9 +933,9 @@ function Img({ src, style, tint }) {
     try {
       const s = String(url);
       const m = s.match(/\/d\/([A-Za-z0-9_-]+)/);
-      if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`;
+      if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
       const m2 = s.match(/id=([A-Za-z0-9_-]+)/);
-      if (m2) return `https://drive.google.com/uc?export=download&id=${m2[1]}`;
+      if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
       return s;
     } catch {
       return url;
@@ -947,57 +947,29 @@ function Img({ src, style, tint }) {
   console.log("[Img] render", { src, tint, thumb });
 
   return ok ? (
-    <div
+    <img
+      src={thumb}
+      alt=""
       style={{
-        position: "relative",
         width: "100%",
         height: "100%",
-        backgroundColor: "#ffffff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
+        objectFit: "contain",
+        ...style,      // tint is currently ignored so we just get a clean preview
       }}
-    >
-      {tint ? (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: tint,
-            WebkitMaskImage: `url(${thumb})`,
-            WebkitMaskRepeat: "no-repeat",
-            WebkitMaskPosition: "center",
-            WebkitMaskSize: "contain",
-            maskImage: `url(${thumb})`,
-            maskRepeat: "no-repeat",
-            maskPosition: "center",
-            maskSize: "contain",
-          }}
-        />
-      ) : (
-        <img
-          src={thumb}
-          alt=""
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            ...style,
-          }}
-          onLoad={() => console.debug("[Img] loaded:", thumb)}
-          onError={() => {
-            console.debug("[Img] error:", thumb);
-            setOk(false);
-          }}
-          draggable={false}
-        />
-      )}
-    </div>
+      onLoad={() => console.debug("[Img] loaded:", thumb)}
+      onError={() => {
+        console.debug("[Img] error:", thumb);
+        setOk(false);
+      }}
+      draggable={false}
+    />
   ) : (
-    <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
+    <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>
+      Image unavailable
+    </div>
   );
 }
+
 
 
 async function safeJson(r) {
