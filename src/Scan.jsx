@@ -945,17 +945,17 @@ function Img({ src, style, tint }) {
           ...style,
 
           // 🎯 Only recolor if this is the inside fur image AND we have a tint
-          filter:
-            img?.label?.toLowerCase().includes("fur") && tint
-              ? `
-                  brightness(0)    /* convert pixels → black */
-                  invert(1)        /* black → white */
-                  sepia(1)         /* enable tinting */
-                  saturate(900%)   /* boost color */
-                  hue-rotate(${getHueFromHex(tint)}deg)
-                  brightness(1.3)  /* keep brightness correct */
-                `
-              : "none",
+          filter: tint
+            ? `
+                brightness(0)
+                invert(1)
+                sepia(1)
+                saturate(900%)
+                hue-rotate(${getHueFromHex(tint)}deg)
+                brightness(1.2)
+              `
+            : "none",
+
         }}
         onLoad={() => console.debug("[Img] loaded:", thumb)}
         onError={() => {
