@@ -499,46 +499,70 @@ function openInLightBurn(bomNameOrPath) {
                   ].filter(Boolean)
             }
             onClickItem={handleImageClick}
-            renderItem={(img, index) => (
-              <div
-                key={index}
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  height: "100%",
-                  backgroundColor: img.tint || "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  overflow: "hidden",
-                }}
-              >
-                <img
-                  src={img.src}
-                  alt={img.label}
+            renderItem={(img, index) => {
+              const isTinted = !!img.tint;
+
+              return (
+                <div
+                  key={index}
                   style={{
+                    position: "relative",
                     width: "100%",
                     height: "100%",
-                    objectFit: "contain",
-                    filter: img.tint ? `brightness(0) saturate(100%) sepia(100%) hue-rotate(${getHueFromHex(img.tint)}deg)` : "none"
-                  }}
-                />
-
-                <div
-                  style={{
-                    position: "absolute",
-                    bottom: 8,
-                    left: 8,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: "#222",
-                    textShadow: "0 0 4px rgba(255,255,255,0.6)",
+                    backgroundColor: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
                   }}
                 >
-                  {img.label}
+                  {isTinted ? (
+                    // 🟢 Use the white PNG as a mask and fill it with the fur color
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        backgroundColor: img.tint,
+                        WebkitMaskImage: `url(${img.src})`,
+                        WebkitMaskRepeat: "no-repeat",
+                        WebkitMaskPosition: "center",
+                        WebkitMaskSize: "contain",
+                        maskImage: `url(${img.src})`,
+                        maskRepeat: "no-repeat",
+                        maskPosition: "center",
+                        maskSize: "contain",
+                      }}
+                    />
+                  ) : (
+                    // Fallback for non-tinted images
+                    <img
+                      src={img.src}
+                      alt={img.label}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
+                  )}
+
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 8,
+                      left: 8,
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "#222",
+                      textShadow: "0 0 4px rgba(255,255,255,0.6)",
+                    }}
+                  >
+                    {img.label}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            }}
+
           />
         </div>
       </div>
