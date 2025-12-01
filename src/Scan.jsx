@@ -952,16 +952,14 @@ function Img({ src, style, tint }) {
         position: "relative",
         width: "100%",
         height: "100%",
-        backgroundColor: "#ffffff", // keep background clean
+        backgroundColor: "#ffffff",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
       }}
     >
-
       {tint ? (
-        // 🟢 Use image as a mask and fill the shape with the fur color
         <div
           style={{
             width: "100%",
@@ -978,7 +976,6 @@ function Img({ src, style, tint }) {
           }}
         />
       ) : (
-        // Normal image when no tint required
         <img
           src={thumb}
           alt=""
@@ -996,12 +993,11 @@ function Img({ src, style, tint }) {
           draggable={false}
         />
       )}
-
     </div>
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
-
+}
 
 
 async function safeJson(r) {
