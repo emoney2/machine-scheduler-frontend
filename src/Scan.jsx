@@ -934,54 +934,20 @@ function Img({ src, style, tint }) {
         justifyContent: "center",
       }}
     >
-      <canvas
-        ref={(canvas) => {
-          if (!canvas) return;
-
-          const ctx = canvas.getContext("2d");
-          const image = new Image();
-          image.crossOrigin = "anonymous";
-          image.src = thumb;
-
-          image.onload = () => {
-            canvas.width = image.width;
-            canvas.height = image.height;
-
-            // Draw original image
-            ctx.drawImage(image, 0, 0);
-
-            if (!tint) return;
-
-            // Get pixel data
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imgData.data;
-
-            // Convert hex → RGB
-            const r = parseInt(tint.slice(1, 3), 16);
-            const g = parseInt(tint.slice(3, 5), 16);
-            const b = parseInt(tint.slice(5, 7), 16);
-
-            // Loop every pixel
-            for (let i = 0; i < data.length; i += 4) {
-              const alpha = data[i + 3];
-
-              // If pixel is visible (not transparent)
-              if (alpha > 5) {
-                // Replace pixel with the fur color
-                data[i] = r;
-                data[i + 1] = g;
-                data[i + 2] = b;
-              }
-            }
-
-            ctx.putImageData(imgData, 0, 0);
-          };
-        }}
+      {/* 🎯 NEW — Mask-based recoloring approach */}
+      <div
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "contain",
-          backgroundColor: "#ffffff",
+          backgroundColor: tint ?? "white",
+          maskImage: `url(${thumb})`,
+          WebkitMaskImage: `url(${thumb})`,
+          maskSize: "contain",
+          WebkitMaskSize: "contain",
+          maskRepeat: "no-repeat",
+          WebkitMaskRepeat: "no-repeat",
+          maskPosition: "center",
+          WebkitMaskPosition: "center",
           ...style,
         }}
       />
