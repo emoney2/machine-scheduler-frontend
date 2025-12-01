@@ -933,9 +933,9 @@ function Img({ src, style, tint }) {
     try {
       const s = String(url);
       const m = s.match(/\/d\/([A-Za-z0-9_-]+)/);
-      if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+      if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`;
       const m2 = s.match(/id=([A-Za-z0-9_-]+)/);
-      if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
+      if (m2) return `https://drive.google.com/uc?export=download&id=${m2[1]}`;
       return s;
     } catch {
       return url;
