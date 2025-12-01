@@ -874,11 +874,13 @@ function Quadrant({ images, onClickItem, product, furColor }) {
 
 const BASE_IMAGE_MAP = {
   Driver: "/fur-icons/DriverFur.png",
+  Fairway: "/fur-icons/FairwayFur.png",
   Blade: "/fur-icons/BladeFur.png",
   Hybrid: "/fur-icons/HybridFur.png",
   Mallet: "/fur-icons/MalletFur.png",
   "Center Shafted Mallet": "/fur-icons/CenterShaftedMalletFur.png",
 };
+
 
 function Img({ src, style, tint, label, product, furColor }) {
   const [ok, setOk] = useState(true);
@@ -892,10 +894,22 @@ function Img({ src, style, tint, label, product, furColor }) {
   let finalTint = tint;
 
   if (isFur && product && furColor) {
-    const mappedBase = BASE_IMAGE_MAP[product];
+    // --- NEW RULE: remove "full", "back", "front" from ANY product name ---
+    const cleanedProduct = String(product)
+      .replace(/\b(full|back|front)\b/gi, "")   // remove word matches
+      .replace(/\s+/g, " ")                     // collapse extra spaces
+      .trim();                                  // remove leftover whitespace
+
+    // Use cleaned product name to match your base image map
+    const mappedBase =
+      BASE_IMAGE_MAP[cleanedProduct] ||
+      BASE_IMAGE_MAP[cleanedProduct.toLowerCase()] ||
+      null;
+
     if (mappedBase) {
       finalSrc = mappedBase;
     }
+
     finalTint = colorFromName(furColor);
   }
 
