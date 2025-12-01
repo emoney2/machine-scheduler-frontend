@@ -1,6 +1,42 @@
 // src/Scan.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { recolorImage } from "../utils/recolorImage";
+import React, { useState, useEffect } from "react";
+
+const FUR_COLOR_MAP = {
+  "Black Fur": "#1A1A1A",
+  "Light Grey Fur": "#CFCFCF",
+  "Red Fur": "#B31824",
+  "Navy Fur": "#0C2340"
+};
+
+const BASE_IMAGE_MAP = {
+  Driver: "/fur-icons/DriverFur.png",
+  Blade: "/fur-icons/BladeFur.png",
+  Hybrid: "/fur-icons/HybridFur.png",
+  Mallet: "/fur-icons/MalletFur.png",
+  "Center Shafted Mallet": "/fur-icons/CenterShaftedMalletFur.png"
+};
+
+const [tintedImgSrc, setTintedImgSrc] = useState(null);
+
+useEffect(() => {
+  if (!fastData) return;
+
+  const product = fastData?.product;
+  const furName = fastData?.furColor;
+
+  const baseImage = BASE_IMAGE_MAP[product];
+  const color = FUR_COLOR_MAP[furName];
+
+  if (!baseImage || !color) {
+    setTintedImgSrc(null);
+    return;
+  }
+
+  recolorImage(baseImage, color).then(setTintedImgSrc);
+}, [fastData]);
 
 const requestCache = {};
 
@@ -146,44 +182,9 @@ function extractOrderId(raw) {
   return trimmed || digits;
 }
 
-function normalizeFurFilename(product, sheetValue) {
-  // Step 1 — remove extra words from product names
-  const cleanedProduct = product
-    .replace(/front|back|full|fullfront|fullback/gi, "") 
-    .replace(/\s+/g, "") // remove spaces
-    .trim();
-
-  // Step 2 — clean the color name
-  const cleanedColor = (sheetValue || "")
-    .replace(/fur/gi, "")
-    .trim()
-    .split(/\s+/)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join("");
-
-  // Step 3 — final filename format
-  return `${cleanedProduct}Fur_${cleanedColor}.png`;
-}
-
-
 export default function Scan() {
   const [params] = useSearchParams();
   const dept = (params.get("dept") || "").toLowerCase();
-  // 🆕 VALID LOCATION FOR HOOKS
-  const [furFiles, setFurFiles] = useState({});
-
-  useEffect(() => {
-    fetch("https://machine-scheduler-backend.onrender.com/api/fur_files")
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok) {
-          console.log("[FUR MAP LOADED]", data.files);
-          setFurFiles(data.files);
-        } else {
-          console.warn("FUR LOAD ERROR:", data.error);
-        }
-      });
-  }, []);
 
   const allowedDepts = useMemo(
     () => new Set(["fur", "cut", "print", "embroidery", "sewing"]),
@@ -207,6 +208,9 @@ export default function Scan() {
 
   const idleTimerRef = useRef(null);
   const focusRef = useRef(null);
+
+  const [furIconSrc, setFurIconSrc] = useState(null);
+
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") setLightboxSrc(""); };
@@ -510,27 +514,13 @@ function openInLightBurn(bomNameOrPath) {
           <Quadrant
             images={
               Array.isArray(orderData?.imagesNormalized) && orderData.imagesNormalized.length > 0
-                ? orderData.imagesNormalized.map(img => {
-                    const isFur = img.label?.toLowerCase().includes("fur");
-
-                    if (isFur && orderData?.furColor && furFiles) {
-                      const filename = normalizeFurFilename(orderData.product, orderData.furColor);
-                      const id = furFiles[filename];
-
-                      console.log("[FUR MATCH]", { filename, id });
-
-                      if (id) {
-                        return {
-                          ...img,
-                          tint: null, // stop tinting
-                          src: `https://drive.google.com/uc?export=view&id=${id}`,
-                        };
-                      }
-                    }
-
-                    return { ...img, tint: null };
-                  })
-
+                ? orderData.imagesNormalized.map(img => ({
+                    ...img,
+                    tint:
+                      img.label?.toLowerCase().includes("fur") && orderData?.furColor
+                        ? colorFromName(orderData.furColor)
+                        : null,
+                  }))
                 : [
                     orderData?.thumbnailUrl && { src: orderData.thumbnailUrl, label: "Thumbnail" },
                     orderData?.foamImg && { src: orderData.foamImg, label: "Foam" },
@@ -902,7 +892,7 @@ function Quadrant({ images, onClickItem }) {
           </span>
         </div>
         <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
-          <Img src={item?.src} tint={item?.tint} />
+          <Img src={item?.src} tint={item?.tint} label={item?.label} />
         </div>
       </button>
     );
@@ -972,42 +962,63 @@ function Quadrant({ images, onClickItem }) {
   );
 }
 
-function Img({ src, style, tint }) {
+// 🔥 REPLACE old Img() with this
+function Img({ src, style, tint, label }) {
   const [ok, setOk] = useState(true);
   useEffect(() => setOk(true), [src]);
+
   if (!src) return null;
 
-  // Convert Google Drive URLs into thumbnails
+  // 🔹 NEW: These two maps tell the UI which local PNG matches which fur/product.
+  const FUR_COLOR_MAP = {
+    "Black Fur": "#1A1A1A",
+    "Light Grey Fur": "#CFCFCF",
+    "Red Fur": "#B31824",
+    "Navy Fur": "#0C2340"
+  };
+
+  const BASE_IMAGE_MAP = {
+    Driver: "/fur-icons/DriverFur.png",
+    Blade: "/fur-icons/BladeFur.png",
+    Hybrid: "/fur-icons/HybridFur.png",
+    Mallet: "/fur-icons/MalletFur.png",
+    "Center Shafted Mallet": "/fur-icons/CenterShaftedMalletFur.png"
+  };
+
+  // 🔹 If the image label says "Fur", override src and tint automatically
+  const isFur = label?.toLowerCase()?.includes("fur");
+
+  let finalSrc = src;
+  let finalTint = tint;
+
+  if (isFur && window?.orderData?.product && window?.orderData?.furColor) {
+    finalSrc = BASE_IMAGE_MAP[window.orderData.product] || src;
+    finalTint = FUR_COLOR_MAP[window.orderData.furColor] || tint;
+  }
+
+  // Convert Google Drive URLs into thumbnails (kept)
   function toThumbnail(url) {
     try {
       const s = String(url);
-
-      // Case 1: URL like https://drive.google.com/file/d/ID/view
       const m = s.match(/\/d\/([A-Za-z0-9_-]+)/);
-      if (m) return `https://drive.google.com/uc?export=download&id=${m[1]}`;
-
-      // Case 2: URL like ?id=ID
+      if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
       const m2 = s.match(/id=([A-Za-z0-9_-]+)/);
-      if (m2) return `https://drive.google.com/uc?export=download&id=${m2[1]}`;
-
+      if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
       return s;
     } catch {
       return url;
     }
   }
 
-
-  const thumb = toThumbnail(src);
-
-  console.log("[Img] render", { src, tint, thumb });
+  const thumb = isFur ? finalSrc : toThumbnail(finalSrc);
 
   return ok ? (
-    tint ? (
+    finalTint ? (
       <div
         style={{
           width: "100%",
           height: "100%",
-          backgroundColor: tint,
+          backgroundColor: finalTint,
           WebkitMaskImage: `url(${thumb})`,
           WebkitMaskRepeat: "no-repeat",
           WebkitMaskPosition: "center",
@@ -1016,6 +1027,7 @@ function Img({ src, style, tint }) {
           maskRepeat: "no-repeat",
           maskPosition: "center",
           maskSize: "contain",
+          ...style
         }}
         draggable={false}
       />
@@ -1030,10 +1042,7 @@ function Img({ src, style, tint }) {
           ...style
         }}
         onLoad={() => console.debug("[Img] loaded:", thumb)}
-        onError={() => {
-          console.debug("[Img] error:", thumb);
-          setOk(false);
-        }}
+        onError={() => setOk(false)}
         draggable={false}
       />
     )
@@ -1043,6 +1052,7 @@ function Img({ src, style, tint }) {
     </div>
   );
 }
+
 
 
 
