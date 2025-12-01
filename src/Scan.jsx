@@ -934,34 +934,57 @@ function Img({ src, style, tint }) {
         justifyContent: "center",
       }}
     >
-      <img
-        src={thumb}
-        alt=""
+      <canvas
+        ref={(canvas) => {
+          if (!canvas) return;
+
+          const ctx = canvas.getContext("2d");
+          const image = new Image();
+          image.crossOrigin = "anonymous";
+          image.src = thumb;
+
+          image.onload = () => {
+            canvas.width = image.width;
+            canvas.height = image.height;
+
+            // Draw original image
+            ctx.drawImage(image, 0, 0);
+
+            if (!tint) return;
+
+            // Get pixel data
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imgData.data;
+
+            // Convert hex → RGB
+            const r = parseInt(tint.slice(1, 3), 16);
+            const g = parseInt(tint.slice(3, 5), 16);
+            const b = parseInt(tint.slice(5, 7), 16);
+
+            // Loop every pixel
+            for (let i = 0; i < data.length; i += 4) {
+              const alpha = data[i + 3];
+
+              // If pixel is visible (not transparent)
+              if (alpha > 5) {
+                // Replace pixel with the fur color
+                data[i] = r;
+                data[i + 1] = g;
+                data[i + 2] = b;
+              }
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+          };
+        }}
         style={{
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          transition: "filter 0.2s ease",
+          backgroundColor: "#ffffff",
           ...style,
-          // 🎯 NEW LOGIC: Only recolor pure white pixels, transparent stays transparent
-          filter: tint
-            ? `
-                brightness(0) 
-                invert(1) 
-                sepia(1) 
-                saturate(1000%) 
-                hue-rotate(${getHueFromHex(tint)}deg)
-              `
-            : "none",
         }}
-        onLoad={() => console.debug("[Img] loaded:", thumb)}
-        onError={() => {
-          console.debug("[Img] error:", thumb);
-          setOk(false);
-        }}
-        draggable={false}
       />
-
     </div>
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
