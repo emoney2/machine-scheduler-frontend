@@ -906,17 +906,18 @@ function Img({ src, style, tint }) {
 
   // Convert Google Drive URLs into thumbnails
   function toThumbnail(url) {
-    try {
-      const s = String(url);
-      const m = s.match(/\/d\/([A-Za-z0-9_-]+)/);
-      if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
-      const m2 = s.match(/id=([A-Za-z0-9_-]+)/);
-      if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
-      return s;
-    } catch {
-      return url;
+    // Extract file ID (works for all Google Drive share link formats)
+    const match = String(url).match(/([A-Za-z0-9_-]{20,})/);
+
+    // If we found a file ID, return a raw CORS-safe direct image URL
+    if (match && match[1]) {
+      return `https://lh3.googleusercontent.com/d/${match[1]}=s1000`;
     }
+
+    // Otherwise, return original URL unchanged
+    return url;
   }
+
 
   const thumb = toThumbnail(src);
 
@@ -934,27 +935,37 @@ function Img({ src, style, tint }) {
         justifyContent: "center",
       }}
     >
-      <div
+      <img
+        src={thumb}
+        alt=""
         style={{
           width: "100%",
           height: "100%",
-          backgroundColor: tint || "#FFFFFF", // The shape becomes this color
-          WebkitMaskImage: `url(${thumb})`,
-          maskImage: `url(${thumb})`,
-          WebkitMaskRepeat: "no-repeat",
-          maskRepeat: "no-repeat",
-          WebkitMaskSize: "contain",
-          maskSize: "contain",
-          WebkitMaskPosition: "center",
-          maskPosition: "center",
+          objectFit: "contain",
+          transition: "filter 0.2s ease",
           ...style,
+
+          // 🎯 Only recolor if this is the inside fur image AND we have a tint
+          filter: tint
+            ? `
+                brightness(0)
+                invert(1)
+                sepia(1)
+                saturate(900%)
+                hue-rotate(${getHueFromHex(tint)}deg)
+                brightness(1.2)
+              `
+            : "none",
+
         }}
-        onLoad={() => console.debug("[Mask IMG] loaded:", thumb)}
+        onLoad={() => console.debug("[Img] loaded:", thumb)}
         onError={() => {
-          console.debug("[Mask IMG] failed:", thumb);
+          console.debug("[Img] error:", thumb);
           setOk(false);
         }}
+        draggable={false}
       />
+
     </div>
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
