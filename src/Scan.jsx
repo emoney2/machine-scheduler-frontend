@@ -2,41 +2,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
-
-const FUR_COLOR_MAP = {
-  "Black Fur": "#1A1A1A",
-  "Light Grey Fur": "#CFCFCF",
-  "Red Fur": "#B31824",
-  "Navy Fur": "#0C2340"
-};
-
-const BASE_IMAGE_MAP = {
-  Driver: "/fur-icons/DriverFur.png",
-  Blade: "/fur-icons/BladeFur.png",
-  Hybrid: "/fur-icons/HybridFur.png",
-  Mallet: "/fur-icons/MalletFur.png",
-  "Center Shafted Mallet": "/fur-icons/CenterShaftedMalletFur.png"
-};
-
-const [tintedImgSrc, setTintedImgSrc] = useState(null);
-
-useEffect(() => {
-  if (!fastData) return;
-
-  const product = fastData?.product;
-  const furName = fastData?.furColor;
-
-  const baseImage = BASE_IMAGE_MAP[product];
-  const color = FUR_COLOR_MAP[furName];
-
-  if (!baseImage || !color) {
-    setTintedImgSrc(null);
-    return;
-  }
-
-  recolorImage(baseImage, color).then(setTintedImgSrc);
-}, [fastData]);
-
 const requestCache = {};
 
 async function fetchOnce(url) {
@@ -537,71 +502,10 @@ function openInLightBurn(bomNameOrPath) {
                   ].filter(Boolean)
             }
             onClickItem={handleImageClick}
-            renderItem={(img, index) => {
-              const isTinted = !!img.tint;
-
-              return (
-                <div
-                  key={index}
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    height: "100%",
-                    backgroundColor: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                >
-                  {isTinted ? (
-                    // 🟢 Use the white PNG as a mask and fill it with the fur color
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        backgroundColor: img.tint,
-                        WebkitMaskImage: `url(${img.src})`,
-                        WebkitMaskRepeat: "no-repeat",
-                        WebkitMaskPosition: "center",
-                        WebkitMaskSize: "contain",
-                        maskImage: `url(${img.src})`,
-                        maskRepeat: "no-repeat",
-                        maskPosition: "center",
-                        maskSize: "contain",
-                      }}
-                    />
-                  ) : (
-                    // Fallback for non-tinted images
-                    <img
-                      src={img.src}
-                      alt={img.label}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                      }}
-                    />
-                  )}
-
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 8,
-                      left: 8,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: "#222",
-                      textShadow: "0 0 4px rgba(255,255,255,0.6)",
-                    }}
-                  >
-                    {img.label}
-                  </div>
-                </div>
-              );
-            }}
-
+            product={orderData?.product}
+            furColor={orderData?.furColor}
           />
+
         </div>
       </div>
 
@@ -821,7 +725,7 @@ function toImgMeta(arr) {
     .map(it => (typeof it === "string" ? { src: it, label: "" } : it));
 }
 
-function Quadrant({ images, onClickItem }) {
+function Quadrant({ images, onClickItem, product, furColor }) {
   const items = toImgMeta(images);
 
   const frameStyle = {
@@ -891,7 +795,13 @@ function Quadrant({ images, onClickItem }) {
           </span>
         </div>
         <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 8 }}>
-          <Img src={item?.src} tint={item?.tint} label={item?.label} />
+          <Img
+            src={item?.src}
+            tint={item?.tint}
+            label={item?.label}
+            product={product}
+            furColor={furColor}
+          />
         </div>
       </button>
     );
@@ -961,41 +871,33 @@ function Quadrant({ images, onClickItem }) {
   );
 }
 
-// 🔥 REPLACE old Img() with this
-function Img({ src, style, tint, label }) {
+const BASE_IMAGE_MAP = {
+  Driver: "/fur-icons/DriverFur.png",
+  Blade: "/fur-icons/BladeFur.png",
+  Hybrid: "/fur-icons/HybridFur.png",
+  Mallet: "/fur-icons/MalletFur.png",
+  "Center Shafted Mallet": "/fur-icons/CenterShaftedMalletFur.png",
+};
+
+function Img({ src, style, tint, label, product, furColor }) {
   const [ok, setOk] = useState(true);
   useEffect(() => setOk(true), [src]);
 
   if (!src) return null;
 
-  // 🔹 NEW: These two maps tell the UI which local PNG matches which fur/product.
-  const FUR_COLOR_MAP = {
-    "Black Fur": "#1A1A1A",
-    "Light Grey Fur": "#CFCFCF",
-    "Red Fur": "#B31824",
-    "Navy Fur": "#0C2340"
-  };
-
-  const BASE_IMAGE_MAP = {
-    Driver: "/fur-icons/DriverFur.png",
-    Blade: "/fur-icons/BladeFur.png",
-    Hybrid: "/fur-icons/HybridFur.png",
-    Mallet: "/fur-icons/MalletFur.png",
-    "Center Shafted Mallet": "/fur-icons/CenterShaftedMalletFur.png"
-  };
-
-  // 🔹 If the image label says "Fur", override src and tint automatically
   const isFur = label?.toLowerCase()?.includes("fur");
 
   let finalSrc = src;
   let finalTint = tint;
 
-  if (isFur && window?.orderData?.product && window?.orderData?.furColor) {
-    finalSrc = BASE_IMAGE_MAP[window.orderData.product] || src;
-    finalTint = FUR_COLOR_MAP[window.orderData.furColor] || tint;
+  if (isFur && product && furColor) {
+    const mappedBase = BASE_IMAGE_MAP[product];
+    if (mappedBase) {
+      finalSrc = mappedBase;
+    }
+    finalTint = colorFromName(furColor);
   }
 
-  // Convert Google Drive URLs into thumbnails (kept)
   function toThumbnail(url) {
     try {
       const s = String(url);
@@ -1026,7 +928,7 @@ function Img({ src, style, tint, label }) {
           maskRepeat: "no-repeat",
           maskPosition: "center",
           maskSize: "contain",
-          ...style
+          ...style,
         }}
         draggable={false}
       />
@@ -1038,7 +940,7 @@ function Img({ src, style, tint, label }) {
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          ...style
+          ...style,
         }}
         onLoad={() => console.debug("[Img] loaded:", thumb)}
         onError={() => setOk(false)}
@@ -1051,9 +953,6 @@ function Img({ src, style, tint, label }) {
     </div>
   );
 }
-
-
-
 
 async function safeJson(r) {
   try {
