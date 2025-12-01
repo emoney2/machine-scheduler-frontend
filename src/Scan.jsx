@@ -947,22 +947,41 @@ function Img({ src, style, tint }) {
   console.log("[Img] render", { src, tint, thumb });
 
   return ok ? (
-    <img
-      src={thumb}
-      alt=""
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "contain",
-        ...style,      // tint is currently ignored so we just get a clean preview
-      }}
-      onLoad={() => console.debug("[Img] loaded:", thumb)}
-      onError={() => {
-        console.debug("[Img] error:", thumb);
-        setOk(false);
-      }}
-      draggable={false}
-    />
+    tint ? (
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          backgroundColor: tint,
+          WebkitMaskImage: `url(${thumb})`,
+          WebkitMaskRepeat: "no-repeat",
+          WebkitMaskPosition: "center",
+          WebkitMaskSize: "contain",
+          maskImage: `url(${thumb})`,
+          maskRepeat: "no-repeat",
+          maskPosition: "center",
+          maskSize: "contain",
+        }}
+        draggable={false}
+      />
+    ) : (
+      <img
+        src={thumb}
+        alt=""
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          ...style
+        }}
+        onLoad={() => console.debug("[Img] loaded:", thumb)}
+        onError={() => {
+          console.debug("[Img] error:", thumb);
+          setOk(false);
+        }}
+        draggable={false}
+      />
+    )
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>
       Image unavailable
