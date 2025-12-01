@@ -952,45 +952,55 @@ function Img({ src, style, tint }) {
         position: "relative",
         width: "100%",
         height: "100%",
-        backgroundColor: tint || "#fff",
+        backgroundColor: "#ffffff", // keep background clean
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
+        overflow: "hidden",
       }}
     >
-      <img
-        src={thumb}
-        alt=""
-        style={{
-          width: "100%",
-          height: "100%",
-          objectFit: "contain",
-          transition: "filter 0.2s ease",
-          ...style,
-          // 🎯 NEW LOGIC: Only recolor pure white pixels, transparent stays transparent
-          filter: tint
-            ? `
-                brightness(0) 
-                invert(1) 
-                sepia(1) 
-                saturate(1000%) 
-                hue-rotate(${getHueFromHex(tint)}deg)
-              `
-            : "none",
-        }}
-        onLoad={() => console.debug("[Img] loaded:", thumb)}
-        onError={() => {
-          console.debug("[Img] error:", thumb);
-          setOk(false);
-        }}
-        draggable={false}
-      />
+
+      {tint ? (
+        // 🟢 Use image as a mask and fill the shape with the fur color
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            backgroundColor: tint,
+            WebkitMaskImage: `url(${thumb})`,
+            WebkitMaskRepeat: "no-repeat",
+            WebkitMaskPosition: "center",
+            WebkitMaskSize: "contain",
+            maskImage: `url(${thumb})`,
+            maskRepeat: "no-repeat",
+            maskPosition: "center",
+            maskSize: "contain",
+          }}
+        />
+      ) : (
+        // Normal image when no tint required
+        <img
+          src={thumb}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            ...style,
+          }}
+          onLoad={() => console.debug("[Img] loaded:", thumb)}
+          onError={() => {
+            console.debug("[Img] error:", thumb);
+            setOk(false);
+          }}
+          draggable={false}
+        />
+      )}
 
     </div>
   ) : (
     <div style={{ fontSize: 12, color: "#9ca3af", padding: 8 }}>Image unavailable</div>
   );
-}
 
 
 
