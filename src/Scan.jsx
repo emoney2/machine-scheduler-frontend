@@ -935,35 +935,26 @@ function Img({ src, style, tint }) {
         justifyContent: "center",
       }}
     >
-      <img
-        src={thumb}
-        alt=""
+      <div
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "contain",
-          transition: "filter 0.2s ease",
+          backgroundColor: tint || "#FFFFFF", // The shape becomes this color
+          WebkitMaskImage: `url(${thumb})`,
+          maskImage: `url(${thumb})`,
+          WebkitMaskRepeat: "no-repeat",
+          maskRepeat: "no-repeat",
+          WebkitMaskSize: "contain",
+          maskSize: "contain",
+          WebkitMaskPosition: "center",
+          maskPosition: "center",
           ...style,
-
-          // 🎯 Only recolor if this is the inside fur image AND we have a tint
-          filter: tint
-            ? `
-                brightness(0)
-                invert(1)
-                sepia(1)
-                saturate(900%)
-                hue-rotate(${getHueFromHex(tint)}deg)
-                brightness(1.2)
-              `
-            : "none",
-
         }}
-        onLoad={() => console.debug("[Img] loaded:", thumb)}
+        onLoad={() => console.debug("[Mask IMG] loaded:", thumb)}
         onError={() => {
-          console.debug("[Img] error:", thumb);
+          console.debug("[Mask IMG] failed:", thumb);
           setOk(false);
         }}
-        draggable={false}
       />
 
     </div>
