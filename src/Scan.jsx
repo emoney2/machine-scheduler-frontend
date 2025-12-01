@@ -168,6 +168,7 @@ export default function Scan() {
   const [errMsg, setErrMsg] = useState("");
 
   const [orderData, setOrderData] = useState(null);
+  window._orderDebug = orderData;
   const [lightboxSrc, setLightboxSrc] = useState("");
 
   const idleTimerRef = useRef(null);
