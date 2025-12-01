@@ -40,34 +40,6 @@ async function fetchFastOrder(orderId) {
   return j?.order || null;
 }
 
-function normalizeFurFilename(product, sheetValue) {
-  const cleanProduct = product.replace(/\s+/g, "");
-  const cleanColor = sheetValue
-    .replace(/fur/i, "")
-    .trim()
-    .split(/\s+/)
-    .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
-    .join("");
-
-  return `${cleanProduct}Fur_${cleanColor}.png`;
-}
-
-const [furFiles, setFurFiles] = useState({});
-
-useEffect(() => {
-  fetch("https://machine-scheduler-backend.onrender.com/api/fur_files")
-    .then(r => r.json())
-    .then(data => {
-      if (data.ok) {
-        console.log("[FUR MAP LOADED]", data.files);
-        setFurFiles(data.files);
-      } else {
-        console.warn("FUR LOAD ERROR:", data.error);
-      }
-    });
-}, []);
-
-
 function colorFromName(name = "") {
   // Raw string from sheet
   const raw = String(name ?? "");
@@ -174,9 +146,36 @@ function extractOrderId(raw) {
   return trimmed || digits;
 }
 
+function normalizeFurFilename(product, sheetValue) {
+  const cleanProduct = String(product).replace(/\s+/g, "");
+  const cleanColor = String(sheetValue)
+    .replace(/fur/i, "")
+    .trim()
+    .split(/\s+/)
+    .map(w => w[0].toUpperCase() + w.slice(1).toLowerCase())
+    .join("");
+
+  return `${cleanProduct}Fur_${cleanColor}.png`;
+}
+
 export default function Scan() {
   const [params] = useSearchParams();
   const dept = (params.get("dept") || "").toLowerCase();
+  // 🆕 VALID LOCATION FOR HOOKS
+  const [furFiles, setFurFiles] = useState({});
+
+  useEffect(() => {
+    fetch("https://machine-scheduler-backend.onrender.com/api/fur_files")
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          console.log("[FUR MAP LOADED]", data.files);
+          setFurFiles(data.files);
+        } else {
+          console.warn("FUR LOAD ERROR:", data.error);
+        }
+      });
+  }, []);
 
   const allowedDepts = useMemo(
     () => new Set(["fur", "cut", "print", "embroidery", "sewing"]),
