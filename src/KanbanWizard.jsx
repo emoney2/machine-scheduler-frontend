@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+import 'react-image-crop/dist/ReactCrop.css';
+
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
@@ -69,6 +71,15 @@ export default function KanbanWizard() {
   const [photoUrl, setPhotoUrl] = useState(""); // will support camera/crop next
   const [cameraImage, setCameraImage] = useState(null); // base64 jpeg
   const [saving, setSaving] = useState(false);
+  const [cropSrc, setCropSrc] = useState(null);        // original image (camera or URL)
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [crop, setCrop] = useState({ unit: "%", width: 80, x: 10, y: 10 });
+  const [croppedImage, setCroppedImage] = useState(null);
+  const cropImageRef = React.useRef(null);
+  const [cropSource, setCropSource] = useState(null);
+  const [completedCrop, setCompletedCrop] = useState(null);
+
+
 
   const kanbanId = useMemo(() => makeKanbanId(dept, category, sku), [dept, category, sku]);
 
@@ -99,6 +110,36 @@ export default function KanbanWizard() {
       const img = canvas.toDataURL("image/jpeg", 0.9);
       onCapture(img);
     }
+
+    function applyCrop() {
+      if (!completedCrop || !cropImageRef.current) return;
+
+      const img = cropImageRef.current;
+      const canvas = document.createElement("canvas");
+      const scaleX = img.naturalWidth / img.width;
+      const scaleY = img.naturalHeight / img.height;
+
+      canvas.width = completedCrop.width * scaleX;
+      canvas.height = completedCrop.height * scaleY;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(
+        img,
+        completedCrop.x * scaleX,
+        completedCrop.y * scaleY,
+        completedCrop.width * scaleX,
+        completedCrop.height * scaleY,
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
+      const base64 = canvas.toDataURL("image/jpeg", 0.9);
+      setPhotoUrl(base64);
+      setCropModalOpen(false);
+    }
+
 
     return (
       <div style={{ marginTop: 12 }}>
@@ -294,6 +335,62 @@ export default function KanbanWizard() {
                 />
 
                 <Field label="Item Name (required)" value={itemName} setValue={setItemName} />
+                {/* PHOTO SECTION */}
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ fontWeight: 600 }}>Photo</div>
+
+                  {/* Webcam Capture */}
+                  <CameraCapture
+                    onCapture={(img) => {
+                      setPhotoUrl(img);
+                      setCropSrc(img);
+                      setCropModalOpen(true);
+                    }}
+                  />
+
+                  {/* Crop Button */}
+                  {photoUrl && (
+                    <button
+                      type="button"
+                      style={btnSecondary}
+                      onClick={() => {
+                        setCropSrc(photoUrl);
+                        setCropModalOpen(true);
+                      }}
+                    >
+                      Crop Photo
+                    </button>
+                  )}
+
+                  {/* Photo URL Entry */}
+                  <input
+                    value={photoUrl.startsWith("data:") ? "" : photoUrl}
+                    onChange={(e) => {
+                      setPhotoUrl(e.target.value);
+                      setCameraImage(null);
+                    }}
+                    placeholder="https://image..."
+                    style={inp}
+                  />
+
+                  {/* Preview */}
+                  {photoUrl && (
+                    <img
+                      src={photoUrl}
+                      alt=""
+                      style={{
+                        width: 140,
+                        height: 140,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        border: "1px solid #e5e7eb",
+                        marginTop: 8
+                      }}
+                    />
+                  )}
+                </div>
+
+
                 <Field label="Dept (required)" value={dept} setValue={setDept} />
                 <Select label="Location (required)" value={location} setValue={setLocation} options={LOCATIONS} />
                 <Field
@@ -309,44 +406,6 @@ export default function KanbanWizard() {
                   mono
                 />
                 <Field label="Category (optional)" value={category} setValue={setCategory} />
-                {/* Photo Block */}
-                <div style={{ gridColumn: "1 / -1", marginTop: 6 }}>
-                  <label style={{ fontWeight: 600 }}>Photo</label>
-
-                  {/* Webcam UI */}
-                  <CameraCapture
-                    onCapture={(img) => {
-                      setCameraImage(img);
-                      setPhotoUrl(img);   // store base64 into photoUrl field
-                    }}
-                  />
-
-                  {/* Show preview if taken */}
-                  {cameraImage && (
-                    <img
-                      src={cameraImage}
-                      style={{ width: 180, marginTop: 12, borderRadius: 8 }}
-                    />
-                  )}
-
-                  {/* OR user can still type a link */}
-                  <div style={{ marginTop: 12 }}>
-                    <label>Photo URL (optional)</label>
-                    <input
-                      type="text"
-                      value={photoUrl.startsWith("data:") ? "" : photoUrl}
-                      onChange={(e) => {
-                        setPhotoUrl(e.target.value);
-                        setCameraImage(null);
-                      }}
-                      placeholder="https://image..."
-                      style={{ width: "100%" }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {step === 3 && (
             <div>
@@ -407,6 +466,48 @@ export default function KanbanWizard() {
           </div>
         </div>
       )}
+
+    {cropModalOpen && cropSrc && (
+      <div style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "grid",
+        placeItems: "center",
+        zIndex: 9999,
+        padding: 20
+      }}>
+        <div style={{
+          background: "white",
+          padding: 20,
+          borderRadius: 12,
+          maxWidth: "90vw",
+          maxHeight: "90vh",
+          overflow: "auto"
+        }}>
+          <ReactCrop
+            crop={crop}
+            onChange={(c) => setCrop(c)}
+            onComplete={(c) => setCompletedCrop(c)}
+          >
+            <img
+              ref={cropImageRef}
+              src={cropSrc}
+              style={{ maxWidth: "100%" }}
+            />
+          </ReactCrop>
+
+          <div style={{ marginTop: 12, textAlign: "right", display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button onClick={() => setShowCropModal(false)} style={btnSecondary}>
+              Cancel
+            </button>
+            <button onClick={applyCrop} style={btnPrimary}>
+              Apply Crop
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     </div>
   );
