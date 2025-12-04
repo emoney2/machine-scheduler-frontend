@@ -52,18 +52,33 @@ export default function KanbanQueue() {
   const orderedCount = grouped.ordered.length;
 
   async function markOrdered(eventId, row) {
-    const qtyStr = row["Reorder Qty Basis"] || row["Reorder Qty"] || "1";
+    // SAFELY RESOLVE EVENT ID (supports all variants)
+    const resolvedEventId =
+      eventId ||
+      row["Event ID"] ||
+      row["EventID"] ||
+      row["eventId"] ||
+      row["Event Id"] ||
+      row["ID"] ||
+      row["Id"] ||
+      row["Kanban ID"] ||
+      row["KanbanID"];
 
-    const qty = Number(qtyStr);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      alert("Please enter a positive number.");
+    // STOP IF NO ID FOUND
+    if (!resolvedEventId) {
+      alert("ERROR: No Event ID found for this row.");
+      console.log("ROW CONTENTS:", row);
       return;
     }
 
-    // We are NOT using PO # anymore. Backend expects a string.
+    // READ QUANTITY SAFELY
+    const qtyStr = row["Reorder Qty Basis"] || row["Reorder Qty"] || "1";
+    const qty = Number(qtyStr) || 1;
+
+    // NO MORE POPUP
     const poNumber = "N/A";
 
-    // Show overlay IMMEDIATELY
+    // SHOW OVERLAY IMMEDIATELY
     setOverlay({ message: "Marking Ordered… Please wait" });
 
     try {
@@ -72,9 +87,9 @@ export default function KanbanQueue() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          eventId,
+          eventId: resolvedEventId,
           orderedQty: qty,
-          poNumber,          // <-- IMPORTANT
+          poNumber: poNumber
         }),
       });
 
@@ -84,11 +99,13 @@ export default function KanbanQueue() {
       }
 
       window.location.reload();
+
     } catch (e) {
       setOverlay(null);
       alert(String(e));
     }
   }
+
 
 
   async function markReceived(eventId) {
@@ -389,7 +406,21 @@ export default function KanbanQueue() {
                       >
                         {status === "open" && (
                           <button
-                            onClick={() => markOrdered(r["Event ID"], r)}
+                            onClick={() =>
+                              markOrdered(
+                                r["Event ID"] ||
+                                r["EventID"] ||
+                                r["Event Id"] ||
+                                r["EventId"] ||
+                                r["eventId"] ||
+                                r["ID"] ||
+                                r["Id"] ||
+                                r["Kanban ID"] ||
+                                r["KanbanID"],
+                                r
+                              )
+                            }
+
                             title="Append ORDERED row and mark this request as Ordered"
                             style={{
                               padding: "8px 12px",
