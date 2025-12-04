@@ -51,7 +51,7 @@ export default function KanbanQueue() {
   const openCount = grouped.open.length;
   const orderedCount = grouped.ordered.length;
 
-  async function markOrdered(eventId) {
+  async function markOrdered(eventId, r) {
     const qtyStr = r["Reorder Qty Basis"] || r["Reorder Qty"] || "1";
     if (!qtyStr) return;
     const qty = Number(qtyStr);
@@ -347,23 +347,20 @@ export default function KanbanQueue() {
 
                         {/* link/contact row: show contact info (email or phone) */}
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                          {r["Order Method"] === "Email" && (r["Order Email"] || "").trim() && (() => {
+                          {(() => {
                             const contact = (r["Order Email"] || "").trim();
-                            const hasAt = contact.includes("@");
-                            if (hasAt) {
-                              return (
-                                <a
-                                  href={`mailto:${contact}`}
-                                  style={{ color: "#2563eb", textDecoration: "underline" }}
-                                >
-                                  Contact: {contact}
-                                </a>
-                              );
-                            }
-                            return (
-                              <span style={{ color: "#374151" }}>
+                            if (!contact) return null;
+
+                            const isEmail = contact.includes("@");
+                            return isEmail ? (
+                              <a
+                                href={`mailto:${contact}`}
+                                style={{ color: "#2563eb", textDecoration: "underline" }}
+                              >
                                 Contact: {contact}
-                              </span>
+                              </a>
+                            ) : (
+                              <span style={{ color: "#374151" }}>Contact: {contact}</span>
                             );
                           })()}
                         </div>

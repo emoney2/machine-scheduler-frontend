@@ -362,7 +362,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                             <div>
                               <span style={{ opacity: 0.8 }}>Contact:&nbsp;</span>
                               <span style={{ fontWeight: 600 }}>
-                                {item.contactInfo || "—"}
+                                {item.contactInfo || item.orderEmail || "—"}
                               </span>
                             </div>
                           </div>

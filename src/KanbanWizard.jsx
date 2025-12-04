@@ -230,6 +230,7 @@ function applyCrop() {
 
     try {
       setSaving(true);
+      await new Promise(r => setTimeout(r, 50));
       const r = await fetch(`${BACKEND}/api/kanban/upsert-item`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
