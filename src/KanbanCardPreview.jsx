@@ -309,8 +309,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                 )}
                         </div>
 
-                        {/* Right: Item name (big) + Price row (both centered) */}
-                        <div style={{ display: "grid", rowGap: 12, textAlign: "center", justifyItems: "center" }}>
+                        {/* Right: Item name (big) + Price row + Vendor/Contact */}
+                        <div
+                          style={{
+                            display: "grid",
+                            rowGap: 12,
+                            textAlign: "center",
+                            justifyItems: "center",
+                          }}
+                        >
                           <div
                             style={{
                               fontWeight: 900,
@@ -340,7 +347,29 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                               })()}
                             </span>
                           </div>
+
+                          {/* Vendor + Contact info */}
+                          <div
+                            style={{
+                              fontSize: "clamp(12px, 1.6vw, 16px)",
+                              lineHeight: 1.3,
+                            }}
+                          >
+                            <div>
+                              <span style={{ opacity: 0.8 }}>Vendor:&nbsp;</span>
+                              <span style={{ fontWeight: 600 }}>
+                                {item.supplier || "—"}
+                              </span>
+                            </div>
+                            <div>
+                              <span style={{ opacity: 0.8 }}>Contact:&nbsp;</span>
+                              <span style={{ fontWeight: 600 }}>
+                                {item.orderEmail || "—"}
+                              </span>
+                            </div>
+                          </div>
                         </div>
+
                         </div>   {/* <-- CLOSES the TOP third wrapper */}
 
 

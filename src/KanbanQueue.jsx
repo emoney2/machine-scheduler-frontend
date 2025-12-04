@@ -338,23 +338,34 @@ export default function KanbanQueue() {
                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                               <Chip label="Kanban" value={r["Kanban ID"]} mono />
                               <Chip label="Qty" value={r["Event Qty"]} mono />
-                              <Chip label="Supplier" value={r["Supplier"]} />
+                              <Chip label="Vendor" value={r["Supplier"]} />
                               <Chip label="Method" value={r["Order Method"]} />
                               <Chip label="Requested By" value={r["Requested By"] || "Public Scanner"} />
                             </div>
                           </div>
                         </div>
 
-                        {/* link/email row: keep email link only; Online link now lives on Item Name */}
+                        {/* link/contact row: show contact info (email or phone) */}
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                          {r["Order Method"] === "Email" && (
-                            <a
-                              href={`mailto:${r["Order Email"] || ""}`}
-                              style={{ color: "#2563eb", textDecoration: "underline" }}
-                            >
-                              {r["Order Email"] || "(missing email)"}
-                            </a>
-                          )}
+                          {r["Order Method"] === "Email" && (r["Order Email"] || "").trim() && (() => {
+                            const contact = (r["Order Email"] || "").trim();
+                            const hasAt = contact.includes("@");
+                            if (hasAt) {
+                              return (
+                                <a
+                                  href={`mailto:${contact}`}
+                                  style={{ color: "#2563eb", textDecoration: "underline" }}
+                                >
+                                  Contact: {contact}
+                                </a>
+                              );
+                            }
+                            return (
+                              <span style={{ color: "#374151" }}>
+                                Contact: {contact}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
 

@@ -91,12 +91,16 @@ export default function KanbanWizard() {
     if (orderMethod === "Online" && !String(url).trim())
       return alert("Product URL is required for Online order method.");
     if (orderMethod === "Email" && !String(orderEmail).trim())
-      return alert("Order Email is required for Email order method.");
+      return alert("Contact info (email or phone) is required for a manual Kanban.");
+
+    if (!String(supplier).trim())
+      return alert("Vendor name is required.");
 
     // Step 3 requireds (your labels already say required)
     if (!String(binQtyUnits).trim())      return alert("Bin Qty (units) is required.");
     if (!String(leadTimeDays).trim())     return alert("Lead Time (days) is required.");
     if (!String(reorderQtyBasis).trim())  return alert("Reorder Qty (basis) is required.");
+
 
     // Compute the first free ID like K-<DEPT>-<CAT>-<SKU>-02 if ...-01 exists
     const finalId = await findNextKanbanId(dept, category, sku);
@@ -199,7 +203,7 @@ export default function KanbanWizard() {
                     cursor: "pointer",
                   }}
                 >
-                  Order via Email
+                  Create Manual Kanban
                 </button>
               </div>
             </div>
@@ -207,26 +211,60 @@ export default function KanbanWizard() {
           {step === 2 && (
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
-                {orderMethod === "Online" ? "Order Online — Details" : "Order via Email — Details"}
+                {orderMethod === "Online"
+                  ? "Order Online — Details"
+                  : "Create Manual Kanban — Details"}
               </h2>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {orderMethod === "Online" ? (
-                  <Field label="Product URL (required)" value={url} setValue={setUrl} placeholder="https://vendor.com/product" />
+                  <Field
+                    label="Product URL (required)"
+                    value={url}
+                    setValue={setUrl}
+                    placeholder="https://vendor.com/product"
+                  />
                 ) : (
-                  <Field label="Order Email (required)" value={orderEmail} setValue={setOrderEmail} placeholder="purchasing@vendor.com" />
+                  <Field
+                    label="Contact info (email or phone — required)"
+                    value={orderEmail}
+                    setValue={setOrderEmail}
+                    placeholder="purchasing@vendor.com or 555-123-4567"
+                  />
                 )}
+
+                <Field
+                  label="Vendor name (required)"
+                  value={supplier}
+                  setValue={setSupplier}
+                />
 
                 <Field label="Item Name (required)" value={itemName} setValue={setItemName} />
                 <Field label="Dept (required)" value={dept} setValue={setDept} />
                 <Select label="Location (required)" value={location} setValue={setLocation} options={LOCATIONS} />
-                <Field label="Package Size (required)" value={packageSize} setValue={setPackageSize} placeholder="e.g., 6 rolls/case" />
-                <Field label="Cost (per pkg) — required" value={costPerPkg} setValue={setCostPerPkg} mono />
+                <Field
+                  label="Package Size (required)"
+                  value={packageSize}
+                  setValue={setPackageSize}
+                  placeholder="e.g., 6 rolls/case"
+                />
+                <Field
+                  label="Cost (per pkg) — required"
+                  value={costPerPkg}
+                  setValue={setCostPerPkg}
+                  mono
+                />
                 <Field label="Category (optional)" value={category} setValue={setCategory} />
-                <Field label="Photo URL (required)" value={photoUrl} setValue={setPhotoUrl} placeholder="https://image..." />
+                <Field
+                  label="Photo URL (required)"
+                  value={photoUrl}
+                  setValue={setPhotoUrl}
+                  placeholder="https://image..."
+                />
               </div>
             </div>
           )}
+
           {step === 3 && (
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>2-Bin & Ordering</h2>
@@ -247,18 +285,22 @@ export default function KanbanWizard() {
             )}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            {step < 3 ? (
-              <button
-                onClick={next}
-                style={btnPrimary}
-                disabled={
-                  (step === 2 && (orderMethod === "Online" ? !url : !orderEmail)) ||
-                  (step === 2 && (!itemName || !dept || !packageSize || !costPerPkg || !photoUrl))
-                }
-                title="Complete required fields to continue"
-              >
-                Next
-              </button>
+              {step < 3 ? (
+                <button
+                  onClick={next}
+                  style={btnPrimary}
+                  disabled={
+                    (step === 2 &&
+                      (orderMethod === "Online"
+                        ? (!url || !supplier)
+                        : (!orderEmail || !supplier))) ||
+                    (step === 2 &&
+                      (!itemName || !dept || !packageSize || !costPerPkg || !photoUrl))
+                  }
+                  title="Complete required fields to continue"
+                >
+                  Next
+                </button>
             ) : (
               <button onClick={save} style={btnPrimary}>Save Kanban</button>
             )}
