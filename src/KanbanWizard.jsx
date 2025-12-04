@@ -404,15 +404,38 @@ export default function KanbanWizard() {
             )}  {/* CLOSE STEP 2 */} 
           {step === 3 && (
             <div>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>2-Bin & Ordering</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                <Field label="Bin Qty (units) — required" value={binQtyUnits} setValue={setBinQtyUnits} mono />
-                <Field label="Lead Time (days) — required" value={leadTimeDays} setValue={setLeadTimeDays} mono />
-                <Field label="Reorder Qty (basis) — required" value={reorderQtyBasis} setValue={setReorderQtyBasis} mono />
+              <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+                2-Bin & Ordering
+              </h2>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: 12,
+                }}
+              >
+                <Field
+                  label="Bin Qty (units) — required"
+                  value={binQtyUnits}
+                  setValue={setBinQtyUnits}
+                  mono
+                />
+                <Field
+                  label="Lead Time (days) — required"
+                  value={leadTimeDays}
+                  setValue={setLeadTimeDays}
+                  mono
+                />
+                <Field
+                  label="Reorder Qty (basis) — required"
+                  value={reorderQtyBasis}
+                  setValue={setReorderQtyBasis}
+                  mono
+                />
               </div>
             </div>
-          )}
-        </div>
+          )} {/* CLOSE STEP 3 */}
 
         {/* Footer buttons */}
         <div style={{ display: "flex", gap: 10, justifyContent: "space-between", padding: 16, borderTop: "1px solid #e5e7eb" }}>
