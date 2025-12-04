@@ -400,8 +400,8 @@ export default function KanbanWizard() {
                <Field label="Cost (per pkg) — required" value={costPerPkg} setValue={setCostPerPkg} mono />
                <Field label="Category (optional)" value={category} setValue={setCategory} />
 
-             </div>  {/* ✅ CLOSE STEP 2 GRID */}
-            )}  {/* CLOSE STEP 2 */} 
+            </div>  {/* ✅ CLOSE STEP 2 GRID */}
+          )}  {/* CLOSE STEP 2 */}
           {step === 3 && (
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
