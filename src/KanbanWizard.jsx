@@ -76,7 +76,6 @@ export default function KanbanWizard() {
   const [crop, setCrop] = useState({ unit: "%", width: 80, x: 10, y: 10 });
   const [croppedImage, setCroppedImage] = useState(null);
   const cropImageRef = React.useRef(null);
-  const [cropSource, setCropSource] = useState(null);
   const [completedCrop, setCompletedCrop] = useState(null);
 
 
@@ -468,23 +467,27 @@ export default function KanbanWizard() {
       )}
 
     {cropModalOpen && cropSrc && (
-      <div style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        display: "grid",
-        placeItems: "center",
-        zIndex: 9999,
-        padding: 20
-      }}>
-        <div style={{
-          background: "white",
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.55)",
+          display: "grid",
+          placeItems: "center",
+          zIndex: 9999,
           padding: 20,
-          borderRadius: 12,
-          maxWidth: "90vw",
-          maxHeight: "90vh",
-          overflow: "auto"
-        }}>
+        }}
+      >
+        <div
+          style={{
+            background: "white",
+            padding: 20,
+            borderRadius: 12,
+            maxWidth: "90vw",
+            maxHeight: "90vh",
+            overflow: "auto",
+          }}
+        >
           <ReactCrop
             crop={crop}
             onChange={(c) => setCrop(c)}
@@ -497,8 +500,19 @@ export default function KanbanWizard() {
             />
           </ReactCrop>
 
-          <div style={{ marginTop: 12, textAlign: "right", display: "flex", gap: 10, justifyContent: "flex-end" }}>
-            <button onClick={() => setShowCropModal(false)} style={btnSecondary}>
+          <div
+            style={{
+              marginTop: 12,
+              textAlign: "right",
+              display: "flex",
+              gap: 10,
+              justifyContent: "flex-end",
+            }}
+          >
+            <button
+              onClick={() => setCropModalOpen(false)}
+              style={btnSecondary}
+            >
               Cancel
             </button>
             <button onClick={applyCrop} style={btnPrimary}>
