@@ -67,9 +67,60 @@ export default function KanbanWizard() {
   const [substitutes, setSubstitutes] = useState("Y");
   const [notes, setNotes] = useState("");
   const [photoUrl, setPhotoUrl] = useState(""); // will support camera/crop next
+  const [cameraImage, setCameraImage] = useState(null); // base64 jpeg
   const [saving, setSaving] = useState(false);
 
   const kanbanId = useMemo(() => makeKanbanId(dept, category, sku), [dept, category, sku]);
+
+  function CameraCapture({ onCapture }) {
+    const videoRef = React.useRef(null);
+    const [stream, setStream] = React.useState(null);
+
+    async function startCamera() {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: true });
+        videoRef.current.srcObject = s;
+        setStream(s);
+      } catch (e) {
+        alert("Camera error: " + e.message);
+      }
+    }
+
+    function takePhoto() {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0);
+
+      const img = canvas.toDataURL("image/jpeg", 0.9);
+      onCapture(img);
+    }
+
+    return (
+      <div style={{ marginTop: 12 }}>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          style={{ width: "100%", maxWidth: 320, borderRadius: 8 }}
+        />
+
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button type="button" onClick={startCamera} style={{ padding: "8px 12px" }}>
+            Start Camera
+          </button>
+          <button type="button" onClick={takePhoto} style={{ padding: "8px 12px" }}>
+            Take Photo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
 
 
   function next() { setStep((s) => Math.min(3, s + 1)); }
@@ -86,7 +137,10 @@ export default function KanbanWizard() {
     if (!String(dept).trim())           return alert("Dept is required.");
     if (!String(packageSize).trim())    return alert("Package Size is required.");
     if (!String(costPerPkg).trim())     return alert("Cost (per pkg) is required.");
-    if (!String(photoUrl).trim())       return alert("Photo URL is required.");
+    if (!String(photoUrl).trim()) {
+      return alert("A photo is required. Use camera OR photo URL.");
+    }
+
 
     if (orderMethod === "Online" && !String(url).trim())
       return alert("Product URL is required for Online order method.");
@@ -255,12 +309,41 @@ export default function KanbanWizard() {
                   mono
                 />
                 <Field label="Category (optional)" value={category} setValue={setCategory} />
-                <Field
-                  label="Photo URL (required)"
-                  value={photoUrl}
-                  setValue={setPhotoUrl}
-                  placeholder="https://image..."
-                />
+                {/* Photo Block */}
+                <div style={{ gridColumn: "1 / -1", marginTop: 6 }}>
+                  <label style={{ fontWeight: 600 }}>Photo</label>
+
+                  {/* Webcam UI */}
+                  <CameraCapture
+                    onCapture={(img) => {
+                      setCameraImage(img);
+                      setPhotoUrl(img);   // store base64 into photoUrl field
+                    }}
+                  />
+
+                  {/* Show preview if taken */}
+                  {cameraImage && (
+                    <img
+                      src={cameraImage}
+                      style={{ width: 180, marginTop: 12, borderRadius: 8 }}
+                    />
+                  )}
+
+                  {/* OR user can still type a link */}
+                  <div style={{ marginTop: 12 }}>
+                    <label>Photo URL (optional)</label>
+                    <input
+                      type="text"
+                      value={photoUrl.startsWith("data:") ? "" : photoUrl}
+                      onChange={(e) => {
+                        setPhotoUrl(e.target.value);
+                        setCameraImage(null);
+                      }}
+                      placeholder="https://image..."
+                      style={{ width: "100%" }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
