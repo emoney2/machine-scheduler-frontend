@@ -311,101 +311,96 @@ export default function KanbanWizard() {
               </h2>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                {orderMethod === "Online" ? (
-                  <Field
-                    label="Product URL (required)"
-                    value={url}
-                    setValue={setUrl}
-                    placeholder="https://vendor.com/product"
-                  />
-                ) : (
-                  <Field
-                    label="Contact info (email or phone — required)"
-                    value={orderEmail}
-                    setValue={setOrderEmail}
-                    placeholder="purchasing@vendor.com or 555-123-4567"
-                  />
-                )}
+               {orderMethod === "Online" ? (
+                 <Field
+                   label="Product URL (required)"
+                   value={url}
+                   setValue={setUrl}
+                   placeholder="https://vendor.com/product"
+                 />
+               ) : (
+                 <Field
+                   label="Contact info (email or phone — required)"
+                   value={orderEmail}
+                   setValue={setOrderEmail}
+                   placeholder="purchasing@vendor.com or 555-123-4567"
+                 />
+               )}
 
-                <Field
-                  label="Vendor name (required)"
-                  value={supplier}
-                  setValue={setSupplier}
-                />
+               <Field
+                 label="Vendor name (required)"
+                 value={supplier}
+                 setValue={setSupplier}
+               />
 
-                <Field label="Item Name (required)" value={itemName} setValue={setItemName} />
-                {/* PHOTO SECTION */}
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ fontWeight: 600 }}>Photo</div>
+               <Field
+                 label="Item Name (required)"
+                 value={itemName}
+                 setValue={setItemName}
+               />
 
-                  {/* Webcam Capture */}
-                  <CameraCapture
-                    onCapture={(img) => {
-                      setPhotoUrl(img);
-                      setCropSrc(img);
-                      setCropModalOpen(true);
-                    }}
-                  />
+               {/* PHOTO SECTION */}
+               <div style={{ display: "grid", gap: 8 }}>
+                 <div style={{ fontWeight: 600 }}>Photo</div>
 
-                  {/* Crop Button */}
-                  {photoUrl && (
-                    <button
-                      type="button"
-                      style={btnSecondary}
-                      onClick={() => {
-                        setCropSrc(photoUrl);
-                        setCropModalOpen(true);
-                      }}
-                    >
-                      Crop Photo
-                    </button>
-                  )}
+                 {/* Webcam Capture */}
+                 <CameraCapture
+                   onCapture={(img) => {
+                     setPhotoUrl(img);
+                     setCropSrc(img);
+                     setCropModalOpen(true);
+                   }}
+                 />
 
-                  {/* Photo URL Entry */}
-                  <input
-                    value={photoUrl.startsWith("data:") ? "" : photoUrl}
-                    onChange={(e) => {
-                      setPhotoUrl(e.target.value);
-                      setCameraImage(null);
-                    }}
-                    placeholder="https://image..."
-                    style={inp}
-                  />
+                 {/* Crop Button */}
+                 {photoUrl && (
+                   <button
+                     type="button"
+                     style={btnSecondary}
+                     onClick={() => {
+                       setCropSrc(photoUrl);
+                       setCropModalOpen(true);
+                     }}
+                   >
+                     Crop Photo
+                   </button>
+                 )}
 
-                  {/* Preview */}
-                  {photoUrl && (
-                    <img
-                      src={photoUrl}
-                      alt=""
-                      style={{
-                        width: 140,
-                        height: 140,
-                        objectFit: "cover",
-                        borderRadius: 8,
-                        border: "1px solid #e5e7eb",
-                        marginTop: 8
-                      }}
-                    />
-                  )}
-                </div>
+                 {/* Photo URL */}
+                 <input
+                   value={photoUrl.startsWith("data:") ? "" : photoUrl}
+                   onChange={(e) => {
+                     setPhotoUrl(e.target.value);
+                     setCameraImage(null);
+                   }}
+                   placeholder="https://image..."
+                   style={inp}
+                 />
 
+                 {/* Preview */}
+                 {photoUrl && (
+                   <img
+                     src={photoUrl}
+                     alt=""
+                     style={{
+                       width: 140,
+                       height: 140,
+                       objectFit: "cover",
+                       borderRadius: 8,
+                       border: "1px solid #e5e7eb",
+                       marginTop: 8
+                     }}
+                   />
+                 )}
+               </div>
 
-                <Field label="Dept (required)" value={dept} setValue={setDept} />
-                <Select label="Location (required)" value={location} setValue={setLocation} options={LOCATIONS} />
-                <Field
-                  label="Package Size (required)"
-                  value={packageSize}
-                  setValue={setPackageSize}
-                  placeholder="e.g., 6 rolls/case"
-                />
-                <Field
-                  label="Cost (per pkg) — required"
-                  value={costPerPkg}
-                  setValue={setCostPerPkg}
-                  mono
-                />
-                <Field label="Category (optional)" value={category} setValue={setCategory} />
+               <Field label="Dept (required)" value={dept} setValue={setDept} />
+               <Select label="Location (required)" value={location} setValue={setLocation} options={LOCATIONS} />
+               <Field label="Package Size (required)" value={packageSize} setValue={setPackageSize} />
+               <Field label="Cost (per pkg) — required" value={costPerPkg} setValue={setCostPerPkg} mono />
+               <Field label="Category (optional)" value={category} setValue={setCategory} />
 
+             </div>  {/* ✅ CLOSE STEP 2 GRID */}
           {step === 3 && (
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>2-Bin & Ordering</h2>
