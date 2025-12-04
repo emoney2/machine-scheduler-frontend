@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from "react";
 import 'react-image-crop/dist/ReactCrop.css';
+import ReactCrop from "react-image-crop";
+
+
 
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
