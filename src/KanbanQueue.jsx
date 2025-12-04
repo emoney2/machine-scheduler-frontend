@@ -51,34 +51,45 @@ export default function KanbanQueue() {
   const openCount = grouped.open.length;
   const orderedCount = grouped.ordered.length;
 
-  async function markOrdered(eventId, r) {
-    const qtyStr = r["Reorder Qty Basis"] || r["Reorder Qty"] || "1";
-    if (!qtyStr) return;
+  async function markOrdered(eventId, row) {
+    const qtyStr = row["Reorder Qty Basis"] || row["Reorder Qty"] || "1";
+
     const qty = Number(qtyStr);
     if (!Number.isFinite(qty) || qty <= 0) {
       alert("Please enter a positive number.");
       return;
     }
-    const po = prompt("PO # (optional)", "") || "";
 
+    // We are NOT using PO # anymore. Backend expects a string.
+    const poNumber = "N/A";
+
+    // Show overlay IMMEDIATELY
     setOverlay({ message: "Marking Ordered… Please wait" });
+
     try {
-      const r = await fetch(`${BACKEND}/api/kanban/ordered`, {
+      const response = await fetch(`${BACKEND}/api/kanban/ordered`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ eventId, orderedQty: qty, po }),
+        body: JSON.stringify({
+          eventId,
+          orderedQty: qty,
+          poNumber,          // <-- IMPORTANT
+        }),
       });
-      if (!r.ok) {
-        const t = await r.text().catch(() => "");
-        throw new Error(`Failed (HTTP ${r.status}) ${t}`);
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`Failed (HTTP ${response.status}) ${text}`);
       }
+
       window.location.reload();
     } catch (e) {
       setOverlay(null);
       alert(String(e));
     }
   }
+
 
   async function markReceived(eventId) {
     const qtyStr = prompt("Received qty (cases/units)?", "1");
