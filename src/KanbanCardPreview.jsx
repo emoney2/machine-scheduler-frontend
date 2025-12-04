@@ -171,15 +171,13 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   // Final DIRECT URL for Order QR (short if available) — with safe fallback
   // Normalize order target safely
   let orderTarget = "";
-  if (item.orderMethod === "Email") {
-    if (item.orderEmail && item.orderEmail.includes("@")) {
-      orderTarget = `mailto:${item.orderEmail.trim()}`;
-    }
+  if (item.contactInfo && item.contactInfo.includes("@")) {
+    orderTarget = `mailto:${item.contactInfo.trim()}`;
   } else if (item.orderUrl) {
     const u = item.orderUrl.trim();
-    // prepend https:// if missing
     orderTarget = /^https?:\/\//i.test(u) ? u : `https://${u}`;
   }
+
 
 
   const fallbackOpen = `https://machineschedule.netlify.app/kanban/open?id=${encodeURIComponent(item.kanbanId || routeKanbanId)}`;
@@ -358,13 +356,13 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                             <div>
                               <span style={{ opacity: 0.8 }}>Vendor:&nbsp;</span>
                               <span style={{ fontWeight: 600 }}>
-                                {item.supplier || "—"}
+                                {item.vendorName || item.supplier || "—"}
                               </span>
                             </div>
                             <div>
                               <span style={{ opacity: 0.8 }}>Contact:&nbsp;</span>
                               <span style={{ fontWeight: 600 }}>
-                                {item.orderEmail || "—"}
+                                {item.contactInfo || "—"}
                               </span>
                             </div>
                           </div>
