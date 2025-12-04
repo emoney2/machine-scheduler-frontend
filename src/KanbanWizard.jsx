@@ -113,34 +113,34 @@ export default function KanbanWizard() {
       onCapture(img);
     }
 
-    function applyCrop() {
-      if (!completedCrop || !cropImageRef.current) return;
+function applyCrop() {
+  if (!completedCrop || !cropImageRef.current) return;
 
-      const img = cropImageRef.current;
-      const canvas = document.createElement("canvas");
-      const scaleX = img.naturalWidth / img.width;
-      const scaleY = img.naturalHeight / img.height;
+  const img = cropImageRef.current;
+  const canvas = document.createElement("canvas");
+  const scaleX = img.naturalWidth / img.width;
+  const scaleY = img.naturalHeight / img.height;
 
-      canvas.width = completedCrop.width * scaleX;
-      canvas.height = completedCrop.height * scaleY;
+  canvas.width = completedCrop.width * scaleX;
+  canvas.height = completedCrop.height * scaleY;
 
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(
-        img,
-        completedCrop.x * scaleX,
-        completedCrop.y * scaleY,
-        completedCrop.width * scaleX,
-        completedCrop.height * scaleY,
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(
+    img,
+    completedCrop.x * scaleX,
+    completedCrop.y * scaleY,
+    completedCrop.width * scaleX,
+    completedCrop.height * scaleY,
+    0,
+    0,
+    canvas.width,
+    canvas.height
+  );
 
-      const base64 = canvas.toDataURL("image/jpeg", 0.9);
-      setPhotoUrl(base64);
-      setCropModalOpen(false);
-    }
+  const base64 = canvas.toDataURL("image/jpeg", 0.9);
+  setPhotoUrl(base64);
+  setCropModalOpen(false);
+}
 
 
     return (
