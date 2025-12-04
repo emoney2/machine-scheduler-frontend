@@ -436,6 +436,7 @@ export default function KanbanWizard() {
               </div>
             </div>
           )} {/* CLOSE STEP 3 */}
+        </div>   {/* CLOSE padding wrapper from line ~200 */}
 
         {/* Footer buttons */}
         <div style={{ display: "flex", gap: 10, justifyContent: "space-between", padding: 16, borderTop: "1px solid #e5e7eb" }}>
