@@ -401,7 +401,7 @@ export default function KanbanWizard() {
                <Field label="Category (optional)" value={category} setValue={setCategory} />
 
              </div>  {/* ✅ CLOSE STEP 2 GRID */}
-             )} 
+            )}  {/* CLOSE STEP 2 */} 
           {step === 3 && (
             <div>
               <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>2-Bin & Ordering</h2>
