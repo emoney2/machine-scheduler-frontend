@@ -1268,58 +1268,16 @@ const fetchManualStateCore = async (previousCols) => {
     combinedInFlightRef.current = true;
 
     try {
-      const res = await axios.get(`${API_ROOT}/combined`, {
-        withCredentials: true,
-      });
+      // ✅ Step 1: build scheduler columns using the EXISTING proven pipeline
+      const cols = await fetchOrdersEmbroLinksCore();
 
-      const orders = res.data.orders || [];
-      const links  = res.data.links  || {};
+      // ✅ Step 2: apply manualState on top (machines + placeholders)
+      const finalCols = await fetchManualStateCore(cols);
 
-      setOrders(orders);
-      setLinks(links);
-
-      // ✅ BUILD MACHINE COLUMNS
-      // ✅ Start with ALL active jobs in Queue
-      const queue    = [];
-      const machine1 = [];
-      const machine2 = [];
-
-      // Build lookup of manual assignments
-      const assignedByOrder = {};
-      for (const entry of Object.values(manualState || {})) {
-        if (!entry?.order) continue;
-        assignedByOrder[String(entry.order)] = entry;
-      }
-
-      for (const o of orders) {
-        const stage = String(o.Stage || "").toUpperCase();
-
-        // ✅ Hide completed jobs everywhere
-        if (stage === "COMPLETE") continue;
-
-        const orderNum = String(o["Order #"] || o.order || "").trim();
-        const assignment = assignedByOrder[orderNum];
-
-        // ✅ If manually assigned, place on that machine
-        if (assignment?.machine === 1) {
-          machine1.push(o);
-        } else if (assignment?.machine === 2) {
-          machine2.push(o);
-        } else {
-          // ✅ Otherwise always goes to Queue
-          queue.push(o);
-        }
-      }
-
-
-      setColumns({
-        queue:    { title: "Queue",     jobs: queue },
-        machine1: { title: "Machine 1", jobs: machine1, headCount: 1 },
-        machine2: { title: "Machine 2", jobs: machine2, headCount: 6 },
-      });
-
-    } catch (e) {
-      console.warn("fetchAllCombined failed", e?.message || e);
+      // ✅ Step 3: commit once
+      setColumns(finalCols);
+    } catch (err) {
+      console.warn("fetchAllCombined failed", err?.message || err);
     } finally {
       combinedInFlightRef.current = false;
     }
