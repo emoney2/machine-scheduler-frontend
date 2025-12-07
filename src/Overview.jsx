@@ -3,6 +3,9 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
 
+const [metrics, setMetrics] = useState(null);
+const [metricsUpdatedAt, setMetricsUpdatedAt] = useState(null);
+
 
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
