@@ -592,8 +592,6 @@ function col(width, center = false) {
 }
 
 // ——— Component ——————————————————————————————————————————————
-export default function Overview() {
-  // Upcoming jobs
   const [upcoming, setUpcoming] = useState([]);
   const [loadingUpcoming, setLoadingUpcoming] = useState(true);
 
