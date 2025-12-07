@@ -1279,21 +1279,38 @@ const fetchManualStateCore = async (previousCols) => {
       setLinks(links);
 
       // ✅ BUILD MACHINE COLUMNS
+      // ✅ Start with ALL active jobs in Queue
       const queue    = [];
       const machine1 = [];
       const machine2 = [];
 
-      for (const o of orders) {
-        const stage = String(o.Stage || "").toLowerCase();
+      // Build lookup of manual assignments
+      const assignedByOrder = {};
+      for (const entry of Object.values(manualState || {})) {
+        if (!entry?.order) continue;
+        assignedByOrder[String(entry.order)] = entry;
+      }
 
-        if (stage === "machine 1") {
+      for (const o of orders) {
+        const stage = String(o.Stage || "").toUpperCase();
+
+        // ✅ Hide completed jobs everywhere
+        if (stage === "COMPLETE") continue;
+
+        const orderNum = String(o["Order #"] || o.order || "").trim();
+        const assignment = assignedByOrder[orderNum];
+
+        // ✅ If manually assigned, place on that machine
+        if (assignment?.machine === 1) {
           machine1.push(o);
-        } else if (stage === "machine 2") {
+        } else if (assignment?.machine === 2) {
           machine2.push(o);
-        } else if (stage !== "complete") {
+        } else {
+          // ✅ Otherwise always goes to Queue
           queue.push(o);
         }
       }
+
 
       setColumns({
         queue:    { title: "Queue",     jobs: queue },
