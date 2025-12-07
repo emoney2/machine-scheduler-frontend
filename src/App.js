@@ -274,6 +274,10 @@ export default function App() {
   const BACKEND_ORIGIN = API_ROOT.replace(/\/api$/, "");
   const [manualReorder, setManualReorder] = useState(false);
 
+  useEffect(() => {
+    fetchAllCombined();
+  }, []);
+
   // NEW: prevent overlapping combined fetches
   const combinedInFlightRef = useRef(false);
 
@@ -1260,46 +1264,50 @@ const fetchManualStateCore = async (previousCols) => {
 
   // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
   const fetchAllCombined = async () => {
-    // Prevent overlapping requests
-    if (combinedInFlightRef.current) {
-      // console.log('⏭️ fetchAllCombined skipped (in flight)');
-      return;
-    }
+    if (combinedInFlightRef.current) return;
     combinedInFlightRef.current = true;
 
-    // console.log('fetchAllCombined ▶ start');
-    setIsLoading(true);
-    setHasError(false);
-
     try {
-      // 1) First, build new columns from orders/embroidery/links only
-      const colsAfterOrders = await fetchOrdersEmbroLinksCore();
+      const res = await axios.get(`${API_ROOT}/combined`, {
+        withCredentials: true,
+      });
 
-      // 2) Now apply manualState BEFORE updating the UI, so cards don't bounce
-      setIsManualLoading(true);
-      let colsFinal;
-      try {
-        colsFinal = await fetchManualStateCore(colsAfterOrders);
-      } catch (e) {
-        console.warn('manualState fetch failed/skipped', e?.message || e);
-        colsFinal = colsAfterOrders; // fallback if manualState fails
-      } finally {
-        setIsManualLoading(false);
+      const orders = res.data.orders || [];
+      const links  = res.data.links  || {};
+
+      setOrders(orders);
+      setLinks(links);
+
+      // ✅ BUILD MACHINE COLUMNS
+      const queue    = [];
+      const machine1 = [];
+      const machine2 = [];
+
+      for (const o of orders) {
+        const stage = String(o.Stage || "").toLowerCase();
+
+        if (stage === "machine 1") {
+          machine1.push(o);
+        } else if (stage === "machine 2") {
+          machine2.push(o);
+        } else if (stage !== "complete") {
+          queue.push(o);
+        }
       }
 
-      // 3) Update UI once, after manualState is applied (no temporary queue bounce)
-      setColumns(colsFinal);
+      setColumns({
+        queue:    { title: "Queue",     jobs: queue },
+        machine1: { title: "Machine 1", jobs: machine1, headCount: 1 },
+        machine2: { title: "Machine 2", jobs: machine2, headCount: 6 },
+      });
 
-      setHasError(false);
-    } catch (err) {
-
-      console.error('❌ fetchAllCombined error', err);
-      setHasError(true);
+    } catch (e) {
+      console.warn("fetchAllCombined failed", e?.message || e);
     } finally {
-      setIsLoading(false);
       combinedInFlightRef.current = false;
     }
   };
+
 
 
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
