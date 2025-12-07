@@ -872,37 +872,36 @@ export default function Overview() {
       if (metricsLockRef.current) return; // single-flight
       metricsLockRef.current = true;
 
-      // abort any prior metrics request
-      try { metricsCtrlRef.current?.abort(); } catch {}
-      const ctrl = new AbortController();
-      metricsCtrlRef.current = ctrl;
-
       try {
-        const res = await axios.get(`${ROOT}/overview/metrics`, {
-          withCredentials: true,
-          signal: ctrl.signal,
-          timeout: 10000, // ⏱️ fail fast at 10s
-          validateStatus: (s) => s >= 200 && s < 400,
-        });
+        // 🔹 Supabase connection
+        const { createClient } = await import("@supabase/supabase-js");
+        const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+        const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        // 🔹 Query your "metrics" table (adjust table name if different)
+        const { data, error } = await supabase
+          .from("metrics")
+          .select("*")
+          .single();
+
+        if (error) throw error;
         if (!alive) return;
-        const data = res?.data || null;
+
+        // ✅ Save + update state
         setMetrics(data);
         saveMetricsCache(data);
         setLoadingMetrics(false);
         markUpdated();
       } catch (err) {
         if (!alive) return;
-        const msg = err?.message || String(err);
-        if (msg === "canceled" || err?.name === "CanceledError" || msg.includes("timeout")) {
-          // quiet cancel/timeout; keep whatever we have
-        } else {
-          console.warn("overview/metrics failed:", msg);
-        }
-        setLoadingMetrics(false); // don't block UI
+        console.warn("Supabase metrics fetch failed:", err.message || err);
+        setLoadingMetrics(false);
       } finally {
         metricsLockRef.current = false;
       }
     }
+
 
     // initial fetch
     fetchMetrics();
