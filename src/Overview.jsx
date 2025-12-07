@@ -623,7 +623,6 @@ function col(width, center = false) {
   const [requestBy, setRequestBy] = useState("");
 
   const [gmailPopup, setGmailPopup] = useState(null);
-  const [metrics, setMetrics] = useState(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
 
   // ⬇️ Inside export default function Overview() { ... } with your other useState hooks
