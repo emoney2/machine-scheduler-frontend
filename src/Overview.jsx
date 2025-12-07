@@ -1120,43 +1120,37 @@ function col(width, center = false) {
               }}
             >
 
-              {/* Headcovers Sold / Day (V2 directly) */}
+              {/* Headcovers Sold / Day */}
               <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
                 <div style={{ fontSize: 12, color: "#666" }}>Headcovers Sold / Day</div>
                 <div style={{ fontSize: 28, fontWeight: 800 }}>
-                  {(() => {
-                    const v = metrics?.headcovers_sold; // V2 literal (no coercion)
-                    return (v !== undefined && v !== null && String(v).trim() !== "") ? String(v) : "—";
-                  })()}
+                  {metrics?.headcovers_sold_per_day
+                    ? metrics.headcovers_sold_per_day.toFixed(2)
+                    : "—"}
                 </div>
               </div>
 
-                  {/* Goal (X2) */}
-                  <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                    <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
-                    <div style={{ fontSize: 28, fontWeight: 800 }}>
-                      {(() => {
-                        const g = Number(metrics?.goal);
-                        return Number.isFinite(g) ? g : "—";
-                      })()}
-                    </div>
-                  </div>
+              {/* Goal */}
+              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
+                <div style={{ fontSize: 28, fontWeight: 800 }}>
+                  {metrics?.goal ?? "—"}
+                </div>
+              </div>
 
-                  {/* Average Price per Cover (Production Orders!Y2) */}
-                  <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                    <div style={{ fontSize: 12, color: "#666" }}>Average Price per Cover</div>
-                    <div style={{ fontSize: 28, fontWeight: 800 }}>
-                      {(() => {
-                        const v = metrics?.average_price;
-                        // If it's numeric, format as currency; otherwise show as-is
-                        const n = Number(v);
-                        if (Number.isFinite(n)) {
-                          return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-                        }
-                        return (v !== undefined && v !== null && String(v).trim() !== "") ? String(v) : "—";
-                      })()}
-                    </div>
-                  </div>
+              {/* Average Price per Cover */}
+              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: "#666" }}>Average Price per Cover</div>
+                <div style={{ fontSize: 28, fontWeight: 800 }}>
+                  {metrics?.average_price_per_cover
+                    ? metrics.average_price_per_cover.toLocaleString(undefined, {
+                        style: "currency",
+                        currency: "USD",
+                        maximumFractionDigits: 2,
+                      })
+                    : "—"}
+                </div>
+              </div>
               </div>  {/* <-- closes the grid */}
           </div>
           {/* Department Status */}
