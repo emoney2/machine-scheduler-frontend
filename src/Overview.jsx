@@ -674,21 +674,26 @@ export default function Overview() {
 
       try {
         // Run /overview and /api/combined in parallel, but fail fast at 10s so we never hang the tab
-        const [overRes, comboRes] = await Promise.all([
-          getWithRetry(
-            axios,
-            `${ROOT}/overview`,
-            { withCredentials: true, signal: ctrl.signal },
-            [30000, 40000, 50000]
-          ),
-          getWithRetry(
-            axios,
-            `${ROOT}/combined`,
-            { withCredentials: true, signal: ctrl.signal },
-            [20000, 30000]
-          ),
-        ]);
+        // ✅ Only block on /overview
+        const overRes = await getWithRetry(
+          axios,
+          `${ROOT}/overview`,
+          { withCredentials: true, signal: ctrl.signal },
+          [15000, 20000]
+        );
 
+        // ✅ Fire /combined in the background (non-blocking)
+        let comboRes = null;
+        getWithRetry(
+          axios,
+          `${ROOT}/combined`,
+          { withCredentials: true },
+          [15000, 20000]
+        )
+          .then(res => { comboRes = res; })
+          .catch(() => {
+            console.warn("/combined failed — continuing without it");
+          });
 
         if (!alive) return;
         const data = overRes?.data || {};
