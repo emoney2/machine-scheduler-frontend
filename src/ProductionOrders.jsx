@@ -35,23 +35,27 @@ function ProductionOrders() {
 
       {orders.length === 0 && <div>No orders found.</div>}
 
-      {orders.map(order => (
+      {orders.map((order, idx) => (
         <div
-          key={order.id}
+          key={idx}
           style={{
             border: '1px solid #ccc',
             borderRadius: 8,
             padding: 12,
-            marginBottom: 10,
+            marginBottom: 12,
             background: '#fff'
           }}
         >
-          <div><strong>Order #:</strong> {order.order_number}</div>
-          <div><strong>Company:</strong> {order.company_name}</div>
-          <div><strong>Design:</strong> {order.design}</div>
-          <div><strong>Quantity:</strong> {order.quantity}</div>
-          <div><strong>Stage:</strong> {order.stage}</div>
-          <div><strong>Due Date:</strong> {order.due_date}</div>
+          {Object.entries(order).map(([key, value]) => (
+            <div key={key} style={{ display: 'flex', marginBottom: 4 }}>
+              <div style={{ minWidth: 180, fontWeight: 600 }}>
+                {key}:
+              </div>
+              <div style={{ whiteSpace: 'pre-wrap' }}>
+                {value === null || value === '' ? '—' : String(value)}
+              </div>
+            </div>
+          ))}
         </div>
       ))}
     </div>
