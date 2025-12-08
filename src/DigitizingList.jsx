@@ -155,16 +155,18 @@ export default function DigitizingList() {
   // Filter + sort (+optional partition like Fur List)
   const cards = useMemo(() => {
     // 1) Only show Stage === Ordered (case-insensitive).
+    // 1) Only show jobs with NO Stitch Count
     let base = (orders || []).filter(o => {
-      const stage = String(o["Stage"] || "").trim().toUpperCase();
-      return stage === "ORDERED";
+      const stitch = String(o["Stitch Count"] || "").trim();
+      return stitch === "";
     });
 
-    // 2) Show all products (front, back, pocket, towel, etc.)
+    // 2) Exclude Printed Towels
     base = base.filter(o => {
-      // no exclusions
-      return true;
+      const product = String(o["Product"] || "").toLowerCase();
+      return !product.includes("printed towel");
     });
+
 
 
     // 3) Sort strictly by Due Date (oldest first).
