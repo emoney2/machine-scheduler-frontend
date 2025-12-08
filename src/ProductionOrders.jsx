@@ -13,7 +13,7 @@ function ProductionOrders() {
     setLoading(true);
 
     const { data, error } = await supabase
-      .from('production_orders')
+      .from('Production Orders TEST')
       .select('*')
       .order('created_at', { ascending: false });
 
