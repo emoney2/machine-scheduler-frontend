@@ -15,7 +15,6 @@ function ProductionOrders() {
     const { data, error } = await supabase
       .from('Production Orders TEST')
       .select('*')
-      .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error loading production orders:', error);
