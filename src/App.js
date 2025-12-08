@@ -33,6 +33,8 @@ import KanbanOpen from "./KanbanOpen";
 import KanbanGo from "./KanbanGo";
 import KanbanScanPublic from "./KanbanScanPublic";
 import KanbanPrint from "./KanbanPrint";
+import ProductionOrders from './ProductionOrders';
+
 
 
 
@@ -1777,6 +1779,7 @@ useEffect(() => {
         {[
          { to: "/Overview",          label: "Overview" },
          { to: "/",                  label: "Scheduler" },
+         { to: "/production-orders", label: "Production Orders" },
          { to: "/submit",            label: "Order Submission" },
          { to: "/inventory",         label: "Inventory" },
          { to: "/inventory-ordered", label: "Inventory Ordered" },
@@ -1857,6 +1860,7 @@ useEffect(() => {
         />
           <Route path="/overview" element={<Overview />} />
           <Route path="/submit" element={<OrderSubmission />} />
+          <Route path="/production-orders" element={<ProductionOrders />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/inventory-ordered" element={<InventoryOrdered />} />
           <Route path="/digitizing" element={<DigitizingList />} />
