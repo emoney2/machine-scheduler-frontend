@@ -1194,19 +1194,21 @@ const fetchManualStateCore = async (previousCols) => {
     setPlaceholders(msData.placeholders || []);
 
     // 3) Extract machine1 & machine2 IDs
-    const cols        = msData.machineColumns || [];
+    const cols = Array.isArray(msData.machineColumns)
+      ? msData.machineColumns
+      : [[], []];
+
     const machine1Ids = cols[0] || [];
     const machine2Ids = cols[1] || [];
+
 
     // 4) Build a unified pool of all active, non-placeholder jobs
     const pool = [
       ...previousCols.queue.jobs,
       ...previousCols.machine1.jobs,
-      ...previousCols.machine2.jobs,
-    ].filter(job =>
-      !msData.placeholders.some(p => p.id === job.id) &&
-      !['sewing','complete'].includes(String(job.status || '').toLowerCase())
-    );
+      ...previousCols.machine2.jobs
+    ];
+
 
     const byId = new Map(pool.map(j => [j.id, { ...j, machineId: 'queue' }]));
 
