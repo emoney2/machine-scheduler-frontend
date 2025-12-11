@@ -265,7 +265,8 @@ function buildEmailText(vendor, rows, { notes, requestBy } = {}) {
     const subject = `JR & Co. Thread Order - Madeira - ${mm}/${dd}/${yyyy}`;
     const lines = rows.map(i => {
       const qty = i.qty ? Number(i.qty) : 1;
-      return `${i.name} (Polyneon) - ${qty} Cones`;
+      // i.name is now "1800 (Polyneon)"
+      return `${i.name} - ${qty} Cones`;
     });
 
     const parts = [
