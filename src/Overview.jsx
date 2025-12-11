@@ -1349,10 +1349,21 @@ function col(width, center = false) {
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                               }}
-                              title={it.name}
+                              title={it.label || it.name}
                             >
-                              {it.name}
+                              {/* If thread has a label (pretty text), show it. Otherwise show plain name */}
+                              <div style={{ fontWeight: it.type === "Thread" ? "600" : "normal" }}>
+                                {it.label || it.name}
+                              </div>
+
+                              {/* Only threads get a second line showing the % */}
+                              {it.type === "Thread" && it.pct !== undefined && (
+                                <div style={{ fontSize: 11, color: "#666" }}>
+                                  (Inventory: {it.pct}%)
+                                </div>
+                              )}
                             </div>
+
 
                             {/* Qty / Unit / Type */}
                             <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
