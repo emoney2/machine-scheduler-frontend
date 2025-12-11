@@ -341,8 +341,10 @@ export default function FurList() {
   }
 
   // 🆕 Print handler function
+  // 🆕 Print handler function
   async function handlePrint(mode) {
     try {
+      // 1️⃣ PRINT SHEETS
       await fetch("http://127.0.0.1:5009/print", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -353,7 +355,7 @@ export default function FurList() {
         })
       });
 
-      // 🆕 Immediately mark as printed in UI if needed
+      // 2️⃣ UPDATE UI
       if (mode === "process" || mode === "both") {
         setOrders(prev =>
           prev.map(o =>
@@ -364,13 +366,25 @@ export default function FurList() {
         );
       }
 
-      showToast(`Print sent (${mode})`, "success");
+      // 3️⃣ BUILD PATH TO EMB FILE
+      const embPath = `G:\\My Drive\\Orders\\${printOrder}\\${printOrder}.EMB`;
+
+      // 4️⃣ SEND JOB TO WILCOM QUEUE
+      await fetch("http://127.0.0.1:5009/queue-emb", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: embPath })
+      });
+
+      showToast(`Print + Queue sent (${mode})`, "success");
     } catch (err) {
-      showToast("Print service not running", "error", 2600);
+      console.error(err);
+      showToast("Print or Wilcom queue failed", "error", 2600);
     }
 
     setShowPrintModal(false);
   }
+
 
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
