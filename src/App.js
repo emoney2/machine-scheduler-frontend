@@ -1349,9 +1349,6 @@ const fetchManualStateCore = async (previousCols) => {
       }
     }
 
-    // global pause flag (add it near imports once)
-    window._isSubmittingOrder = false;
-
     const handle = setInterval(() => {
       if (!canceled && !window._isSubmittingOrder) pollChanges();
     }, 15000);
