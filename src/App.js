@@ -1308,7 +1308,13 @@ const fetchManualStateCore = async (previousCols) => {
         const url  = `${root}/changes`;
         const res  = await fetch(url, { credentials: "include" });
         if (!res.ok) return; // silent skip on transient errors
-        const data = await res.json();
+        let data = null;
+        try {
+          data = await res.json();
+        } catch (e) {
+          console.warn("changes returned non-JSON", e);
+          return;
+        }
 
         const serverHashes = data?.hashes || {};
         const prevHashes   = changesHashesRef.current || {};
