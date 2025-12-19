@@ -1271,6 +1271,12 @@ const fetchManualStateCore = async (previousCols) => {
 
   // ─── Section 5C: Combined “fetchAll” that first loads orders/embroidery/links, THEN applies manualState ─────
   const fetchAllCombined = async () => {
+    // ⛔ if user is submitting an order, skip ALL reloads
+    if (window._isSubmittingOrder) {
+      console.log("⏸ fetchAllCombined skipped (submitting order)");
+      return;
+    }
+
     if (combinedInFlightRef.current) return;
     combinedInFlightRef.current = true;
 
