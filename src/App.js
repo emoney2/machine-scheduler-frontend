@@ -35,6 +35,9 @@ import KanbanScanPublic from "./KanbanScanPublic";
 import KanbanPrint from "./KanbanPrint";
 import ProductionOrders from './ProductionOrders';
 
+window._isSubmittingOrder = false;
+
+
 
 
 
@@ -1346,9 +1349,15 @@ const fetchManualStateCore = async (previousCols) => {
       }
     }
 
-    const handle = setInterval(() => { if (!canceled) pollChanges(); }, 15000);
+    // global pause flag (add it near imports once)
+    window._isSubmittingOrder = false;
+
+    const handle = setInterval(() => {
+      if (!canceled && !window._isSubmittingOrder) pollChanges();
+    }, 15000);
 
     return () => { canceled = true; clearInterval(handle); };
+
   }, []);
 
 // ─── Section 5E: Always ensure top jobs have a start time (no clamp) ───

@@ -650,8 +650,11 @@ const handleSubmit = async (e) => {
 
 // 🔧 Shared submission logic for normal orders and reorders
 const submitForm = async () => {
+  window._isSubmittingOrder = true;   // ⛔ pause polling
+
   console.log("⏳ Waiting for prodFiles to finalize...");
   await new Promise(resolve => setTimeout(resolve, 100));
+
   console.log("🛎️ submitForm called");
 
   console.log("🧪 prodFiles right before check:", prodFiles);
@@ -822,7 +825,9 @@ const submitForm = async () => {
   } finally {
     setIsSubmitting(false);
     setUploadProgress(0);
+    window._isSubmittingOrder = false;   // ✔ resume polling
   }
+
 };
 
 
