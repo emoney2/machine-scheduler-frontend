@@ -1115,11 +1115,11 @@ function col(width, center = false) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)", // was 2
+                gridTemplateColumns: "repeat(4, 1fr)",
                 gap: 10,
-                opacity: loadingMetrics ? 0.6 : 1,
               }}
             >
+
 
               {/* Headcovers Sold / Day */}
               <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
@@ -1152,6 +1152,26 @@ function col(width, center = false) {
                     : "—"}
                 </div>
               </div>
+
+              {/* Embroidery Backlog */}
+              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: "#666" }}>
+                  Embroidery Backlog
+                </div>
+
+                <div style={{ fontSize: 26, fontWeight: 800 }}>
+                  {metrics?.embroidery_backlog_hours != null
+                    ? `${metrics.embroidery_backlog_hours} hrs`
+                    : "—"}
+                </div>
+
+                <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
+                  {metrics?.embroidery_backlog_weeks != null
+                    ? `${metrics.embroidery_backlog_weeks} weeks`
+                    : ""}
+                </div>
+              </div>
+
               </div>  {/* <-- closes the grid */}
           </div>
           {/* Department Status */}
