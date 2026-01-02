@@ -174,6 +174,7 @@ export default function FurList() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printOrder, setPrintOrder] = useState(null);
   const [printServiceOnline, setPrintServiceOnline] = useState(true);
+  const [isPrinting, setIsPrinting] = useState(false);
 
 
 
@@ -343,6 +344,9 @@ export default function FurList() {
 
   // 🆕 Print handler function
   async function handlePrint(mode) {
+    if (isPrinting) return; // Prevent double-clicks
+    
+    setIsPrinting(true);
     try {
       const response = await fetch(`${BACKEND_ROOT}/print`, {
         method: "POST",
@@ -362,9 +366,10 @@ export default function FurList() {
     } catch (err) {
       console.error(err);
       showToast(err.message || "Print failed", "error", 2600);
+    } finally {
+      setIsPrinting(false);
+      setShowPrintModal(false);
     }
-
-    setShowPrintModal(false);
   }
 
 
@@ -830,6 +835,7 @@ export default function FurList() {
               className="btn"
               style={{ padding: "14px 10px" }}
               onClick={() => handlePrint("both")}
+              disabled={isPrinting}
             >
               Bin sheet + Process Sheet
             </button>
@@ -838,6 +844,7 @@ export default function FurList() {
               className="btn"
               style={{ padding: "14px 10px" }}
               onClick={() => handlePrint("process")}
+              disabled={isPrinting}
             >
               Process sheet
             </button>
@@ -846,9 +853,61 @@ export default function FurList() {
               className="btn"
               style={{ padding: "14px 10px" }}
               onClick={() => handlePrint("binsheet")}
+              disabled={isPrinting}
             >
               Bin sheet
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 🆕 Printing Overlay */}
+      {isPrinting && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(230, 255, 230, 0.85)", // Light green overlay
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            pointerEvents: "auto"
+          }}
+          aria-live="assertive"
+          role="alert"
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              padding: "24px 32px",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 16,
+              minWidth: 280
+            }}
+          >
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                border: "4px solid #e6ffe6",
+                borderTopColor: "#8ce68c",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite"
+              }}
+            />
+            <div style={{ fontSize: 18, fontWeight: 600, color: "#333" }}>
+              Printing...
+            </div>
+            <div style={{ fontSize: 14, color: "#666" }}>
+              Please wait while we process your request
+            </div>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
           </div>
         </div>
       )}
