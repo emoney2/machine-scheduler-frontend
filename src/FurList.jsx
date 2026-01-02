@@ -342,45 +342,26 @@ export default function FurList() {
   }
 
   // 🆕 Print handler function
-  // 🆕 Print handler function
   async function handlePrint(mode) {
     try {
-      // 1️⃣ PRINT SHEETS (via backend which forwards to local print service)
-      await fetch(`${BACKEND_ROOT}/print`, {
+      const response = await fetch(`${BACKEND_ROOT}/print`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order: printOrder,
-          mode,
-          requiresProcessSheetUpdate: mode === "process" || mode === "both"
+          mode
         })
       });
 
-      // 2️⃣ UPDATE UI
-      if (mode === "process" || mode === "both") {
-        setOrders(prev =>
-          prev.map(o =>
-            String(o["Order #"]) === String(printOrder)
-              ? { ...o, "Process Sheet Printed": o["Process Sheet Printed"] || "printed" }
-              : o
-          )
-        );
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Print request failed");
       }
 
-      // 3️⃣ BUILD PATH TO EMB FILE
-      const embPath = `G:\\My Drive\\Orders\\${printOrder}\\${printOrder}.EMB`;
-
-      // 4️⃣ SEND JOB TO WILCOM QUEUE (via backend which forwards to local print service)
-      await fetch(`${BACKEND_ROOT}/queue-emb`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: embPath })
-      });
-
-      showToast(`Print + Queue sent (${mode})`, "success");
+      showToast(`Print sent (${mode})`, "success");
     } catch (err) {
       console.error(err);
-      showToast("Print or Wilcom queue failed", "error", 2600);
+      showToast(err.message || "Print failed", "error", 2600);
     }
 
     setShowPrintModal(false);
@@ -850,7 +831,7 @@ export default function FurList() {
               style={{ padding: "14px 10px" }}
               onClick={() => handlePrint("both")}
             >
-              Process Sheet + Bin Sheet
+              Bin sheet + Process Sheet
             </button>
 
             <button
@@ -858,7 +839,7 @@ export default function FurList() {
               style={{ padding: "14px 10px" }}
               onClick={() => handlePrint("process")}
             >
-              Process Sheet Only
+              Process sheet
             </button>
 
             <button
@@ -866,7 +847,7 @@ export default function FurList() {
               style={{ padding: "14px 10px" }}
               onClick={() => handlePrint("binsheet")}
             >
-              Bin Sheet Only
+              Bin sheet
             </button>
           </div>
         </div>
