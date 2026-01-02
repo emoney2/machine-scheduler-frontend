@@ -3,6 +3,7 @@ import axios from "axios";
 
 // ---------- Config ----------
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+const BACKEND_ROOT = API_ROOT.replace(/\/api$/, "");
 
 // ---------- Utils ----------
 function toDate(v) {
@@ -221,7 +222,7 @@ export default function FurList() {
   useEffect(() => {
     async function checkService() {
       try {
-        await fetch("http://127.0.0.1:5009/print", { method: "OPTIONS" });
+        await fetch(`${BACKEND_ROOT}/print`, { method: "OPTIONS" });
         setPrintServiceOnline(true);
       } catch {
         setPrintServiceOnline(false);
@@ -344,8 +345,8 @@ export default function FurList() {
   // 🆕 Print handler function
   async function handlePrint(mode) {
     try {
-      // 1️⃣ PRINT SHEETS
-      await fetch("http://127.0.0.1:5009/print", {
+      // 1️⃣ PRINT SHEETS (via backend which forwards to local print service)
+      await fetch(`${BACKEND_ROOT}/print`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -369,8 +370,8 @@ export default function FurList() {
       // 3️⃣ BUILD PATH TO EMB FILE
       const embPath = `G:\\My Drive\\Orders\\${printOrder}\\${printOrder}.EMB`;
 
-      // 4️⃣ SEND JOB TO WILCOM QUEUE
-      await fetch("http://127.0.0.1:5009/queue-emb", {
+      // 4️⃣ SEND JOB TO WILCOM QUEUE (via backend which forwards to local print service)
+      await fetch(`${BACKEND_ROOT}/queue-emb`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ path: embPath })
