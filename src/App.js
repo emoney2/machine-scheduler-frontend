@@ -440,6 +440,60 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('');
 
 
+  // Auto-fill machines handler
+  const handleAutoFill = async () => {
+    if (!columns) return;
+    
+    try {
+      // Prepare data for backend
+      const payload = {
+        queue: columns.queue.jobs || [],
+        machine1: columns.machine1.jobs || [],
+        machine2: columns.machine2.jobs || [],
+        machine1_headCount: columns.machine1.headCount || 1,
+        machine2_headCount: columns.machine2.headCount || 6
+      };
+      
+      const res = await axios.post(API_ROOT + '/autoFillMachines', payload, {
+        withCredentials: true
+      });
+      
+      if (res.data.status === 'ok') {
+        // Update columns with the new state
+        setColumns(prev => {
+          const next = {
+            ...prev,
+            queue: { ...prev.queue, jobs: res.data.queue || [] },
+            machine1: { ...prev.machine1, jobs: res.data.machine1 || [] },
+            machine2: { ...prev.machine2, jobs: res.data.machine2 || [] }
+          };
+          
+          // Re-schedule machine jobs to update timing
+          next.machine1.jobs = scheduleMachineJobs(next.machine1.jobs, 'Machine 1 (1)');
+          next.machine2.jobs = scheduleMachineJobs(next.machine2.jobs, 'Machine 2 (6)');
+          
+          return next;
+        });
+        
+        // Save the new state to backend
+        const manualState = {
+          machine1: res.data.machine1.map(j => j.id),
+          machine2: res.data.machine2.map(j => j.id),
+          placeholders: placeholders
+        };
+        
+        await axios.post(API_ROOT + '/manualState', manualState, {
+          withCredentials: true
+        });
+        
+        console.log(`✅ Auto-filled: ${res.data.moves_made?.length || 0} jobs moved`);
+      }
+    } catch (err) {
+      console.error("Error auto-filling machines:", err);
+      alert("Failed to auto-fill machines: " + (err.response?.data?.error || err.message));
+    }
+  };
+
   // Sync button handler for Section9: do a full combined reload
   const handleSync = async () => {
     try {
@@ -1853,6 +1907,7 @@ useEffect(() => {
               columns={columns}
               setColumns={setColumns}
               handleSync={handleSync}
+              handleAutoFill={handleAutoFill}
               syncStatus={syncStatus}
               showModal={showModal}
               setShowModal={setShowModal}

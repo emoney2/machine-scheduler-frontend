@@ -58,6 +58,14 @@ export default function Section9(props) {
           {syncStatus === 'updated' && <span style={{ color: 'green' }}>✓ Updated</span>}
         </button>
 
+        <button 
+          onClick={props.handleAutoFill} 
+          style={{ fontSize: 13, background: '#e3f2fd', border: '1px solid #2196f3' }}
+          title="Auto-fill machines to 10 jobs (machines with 6+ heads only)"
+        >
+          Auto-Fill to 10
+        </button>
+
         {/* push status to the far right */}
         <span style={{ marginLeft: 'auto', fontWeight: 'bold' }}>
           {status}
