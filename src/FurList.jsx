@@ -231,7 +231,7 @@ export default function FurList() {
     }
 
     checkService();
-    const interval = setInterval(checkService, 10000);
+    const interval = setInterval(checkService, 30000); // Reduced from 10s to 30s to reduce load
     return () => clearInterval(interval);
   }, []);
 
@@ -372,6 +372,39 @@ export default function FurList() {
     }
   }
 
+  // 🆕 Batch print handler function
+  async function handleBatchPrint(mode) {
+    const selectedOrderIds = Object.keys(selected).filter(id => selected[id]);
+    if (!selectedOrderIds.length || isPrinting) return;
+    
+    setIsPrinting(true);
+    try {
+      const response = await fetch(`${BACKEND_ROOT}/print`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orders: selectedOrderIds,
+          mode
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Batch print request failed");
+      }
+
+      const result = await response.json();
+      const successCount = result.successCount || selectedOrderIds.length;
+      showToast(`Batch print sent: ${successCount}/${selectedOrderIds.length} orders (${mode})`, "success", 3000);
+      setSelected({}); // Clear selection after successful batch print
+    } catch (err) {
+      console.error(err);
+      showToast(err.message || "Batch print failed", "error", 2600);
+    } finally {
+      setIsPrinting(false);
+    }
+  }
+
 
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
@@ -451,6 +484,24 @@ export default function FurList() {
         ))}
 
         <div style={{ flex: 1 }} />
+        <button
+          onClick={() => {
+            if (selectedCount) {
+              setShowPrintModal(true);
+              setPrintOrder(null); // Signal batch mode
+            }
+          }}
+          className="btn"
+          disabled={!selectedCount || !printServiceOnline || isPrinting}
+          title={selectedCount ? `Print ${selectedCount} selected orders` : "Select orders to enable"}
+          style={{ 
+            background: (selectedCount && printServiceOnline) ? "#f0f0f0" : "#f0f0f0", 
+            opacity: (selectedCount && printServiceOnline) ? 1 : 0.6,
+            borderColor: (selectedCount && printServiceOnline) ? "#ccc" : "#999"
+          }}
+        >
+          Print Selected {selectedCount ? `(${selectedCount})` : ""}
+        </button>
         <button
           onClick={completeSelected}
           className="btn"
@@ -828,13 +879,19 @@ export default function FurList() {
             }}
           >
             <div style={{ fontSize: 18, marginBottom: 12 }}>
-              Print Order #{printOrder}
+              {printOrder ? `Print Order #${printOrder}` : `Print ${selectedCount} Selected Orders`}
             </div>
 
             <button
               className="btn"
               style={{ padding: "14px 10px" }}
-              onClick={() => handlePrint("both")}
+              onClick={() => {
+                if (printOrder) {
+                  handlePrint("both");
+                } else {
+                  handleBatchPrint("both");
+                }
+              }}
               disabled={isPrinting}
             >
               Bin sheet + Process Sheet
@@ -843,7 +900,13 @@ export default function FurList() {
             <button
               className="btn"
               style={{ padding: "14px 10px" }}
-              onClick={() => handlePrint("process")}
+              onClick={() => {
+                if (printOrder) {
+                  handlePrint("process");
+                } else {
+                  handleBatchPrint("process");
+                }
+              }}
               disabled={isPrinting}
             >
               Process sheet
@@ -852,7 +915,13 @@ export default function FurList() {
             <button
               className="btn"
               style={{ padding: "14px 10px" }}
-              onClick={() => handlePrint("binsheet")}
+              onClick={() => {
+                if (printOrder) {
+                  handlePrint("binsheet");
+                } else {
+                  handleBatchPrint("binsheet");
+                }
+              }}
               disabled={isPrinting}
             >
               Bin sheet

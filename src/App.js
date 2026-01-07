@@ -1299,7 +1299,7 @@ const fetchManualStateCore = async (previousCols) => {
 
 
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
-  // ─── Section 5D: Initial full load, then every 15s ask "did anything change?" ─────────────
+  // ─── Section 5D: Initial full load, then every 30s ask "did anything change?" ─────────────
   useEffect(() => {
     // Disable polling on Scan page for speed
     if (window.location.pathname.toLowerCase().includes("/scan")) {
@@ -1357,7 +1357,7 @@ const fetchManualStateCore = async (previousCols) => {
 
     const handle = setInterval(() => {
       if (!canceled && !window._isSubmittingOrder) pollChanges();
-    }, 15000);
+    }, 30000);
 
     return () => { canceled = true; clearInterval(handle); };
 
