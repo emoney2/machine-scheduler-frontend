@@ -373,11 +373,13 @@ function deriveThumb(link) {
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w160` : "";
 }
 function ringColorByShipDate(shipDate) {
-  const d = daysUntil(shipDate);
+  // Handle both "Ship Date" string or the actual field value
+  const dateVal = shipDate || null;
+  const d = daysUntil(dateVal);
   if (d === null) return "#999";
-  if (d <= 0) return "#e74c3c";
-  if (d <= 3) return "#f39c12";
-  if (d <= 7) return "#2ecc71";
+  if (d <= 0) return "#e74c3c";  // Red for overdue
+  if (d <= 3) return "#f39c12";  // Orange for urgent (3 days)
+  if (d <= 7) return "#2ecc71";  // Green for within 7 days
   return "#999";
 }
 
@@ -639,11 +641,13 @@ function col(width, center = false) {
     if (cached) {
       const { upcoming = [], materials = [] } = cached;
 
-      // Keep only non-complete from the sheet first
-      const baseJobs = (upcoming ?? []).filter(j => {
-        const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
-        return stage !== "COMPLETE" && stage !== "COMPLETED";
-      });
+        // Filter out only COMPLETE jobs (keep all others including past ship dates)
+        const daysWindowNum = parseInt(daysWindow, 10) || 7;
+        const baseJobs = (upcoming ?? []).filter(j => {
+          const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
+          // Only filter out COMPLETE jobs, keep all others (including past ship dates)
+          return stage !== "COMPLETE" && stage !== "COMPLETED";
+        });
 
       // We’ll enrich with overdue below if we already have them cached elsewhere;
       // otherwise we’ll do it in the fresh load (the next block).
@@ -702,10 +706,12 @@ function col(width, center = false) {
         saveOverviewCache(data);
 
         const { upcoming, materials } = data;
+        const daysWindowNum = parseInt(daysWindow, 10) || 7;
 
-        // Keep non-complete rows from sheet (next 7 days)
+        // Filter out only COMPLETE jobs (backend already filters, but double-check here)
         const sheetJobs = (upcoming ?? []).filter(j => {
           const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
+          // Only filter out COMPLETE jobs, keep all others (including past ship dates)
           return stage !== "COMPLETE" && stage !== "COMPLETED";
         });
 
@@ -715,6 +721,16 @@ function col(width, center = false) {
         const overdueJobs = allOrders.filter(j => {
           const stage = String(j["Stage"] ?? "").trim().toUpperCase();
           if (stage === "COMPLETE" || stage === "COMPLETED") return false;
+          
+          // Also filter by Ship Date for overdue jobs
+          const shipDate = j["Ship Date"] ?? j["Ship"] ?? null;
+          if (shipDate) {
+            const daysToShip = daysUntil(shipDate);
+            if (daysToShip !== null) {
+              return daysToShip <= daysWindowNum && !included.has(String(j["Order #"] || "").trim());
+            }
+          }
+          
           const d = daysUntil(j["Due Date"]);
           if (d === null) return false;
           const orderId = String(j["Order #"] || "").trim();
@@ -724,15 +740,20 @@ function col(width, center = false) {
         // Merge + sort (overdue first → smaller daysUntil)
         const merged = [...sheetJobs, ...overdueJobs];
         const sorted = merged.slice().sort((a, b) => {
-          const da = daysUntil(a["Due Date"]), db = daysUntil(b["Due Date"]);
+          // Primary sort by Ship Date
+          const sa = daysUntil(a["Ship Date"] ?? a["Ship"]), sb = daysUntil(b["Ship Date"] ?? b["Ship"]);
+          if (sa !== null && sb !== null && sa !== sb) return sa - sb;
+          if (sa !== null && sb === null) return -1;
+          if (sa === null && sb !== null) return 1;
+          
+          // Secondary sort by Due Date
+          const da = daysUntil(a["Due Date"] ?? a["Due"]), db = daysUntil(b["Due Date"] ?? b["Due"]);
           if (da === null && db === null) return 0;
           if (da === null) return 1;
           if (db === null) return -1;
           if (da !== db) return da - db;
 
-          const sa = daysUntil(a["Ship Date"]), sb = daysUntil(b["Ship Date"]);
-          if (sa !== null && sb !== null && sa !== sb) return sa - sb;
-
+          // Tertiary sort by Order #
           const oa = parseInt(String(a["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
           const ob = parseInt(String(b["Order #"] || "").replace(/\D+/g, ""), 10) || 0;
           return oa - ob;
@@ -1501,7 +1522,9 @@ function col(width, center = false) {
 
             <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
               {!loadingUpcoming && upcoming.map((job, idx) => {
-                const ring = ringColorByShipDate(job["Ship Date"]);
+                // Get Ship Date from either field name (for compatibility)
+                const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
+                const ring = ringColorByShipDate(shipDate);
                 const isHard = /^hard/i.test(String(pickHardSoft(job)));
                 const hardPill = isHard ? (
                   <span style={{
@@ -1588,8 +1611,8 @@ function col(width, center = false) {
                       <div style={{ ...col(50, true), fontSize: 13, color: "#374151" }} title={String(job["Print"] || "")}>
                         {job["Print"]}
                       </div>
-                      <div style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }} title={String(job["Ship Date"] || "")}>
-                        {fmtMMDD(job["Ship Date"])}
+                      <div style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }} title={String(shipDate || "")}>
+                        {fmtMMDD(shipDate)}
                       </div>
                       <div style={{ ...col(110, true), fontSize: 13, color: "#374151" }} title={String(pickHardSoft(job) || "")}>
                         {showMMDDorRaw(pickHardSoft(job))}
