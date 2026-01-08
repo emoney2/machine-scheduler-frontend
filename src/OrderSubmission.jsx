@@ -28,6 +28,10 @@ export default function OrderSubmission() {
   const [printFiles, setPrintFiles] = useState([]);
   const [prodPreviews, setProdPreviews] = useState([]);
   const [printPreviews, setPrintPreviews] = useState([]);
+  
+  // Track preview URLs for cleanup on unmount
+  const prodPreviewUrlsRef = useRef(new Set());
+  const printPreviewUrlsRef = useRef(new Set());
   const location = useLocation();
   const reorderJob = location.state?.reorderJob;
   const navigate = useNavigate();
@@ -483,6 +487,21 @@ useEffect(() => {
     .finally(() => setLoadingMaterials(false));
 }, []);
 
+  // ─── Cleanup blob URLs on component unmount to prevent memory leaks ───────────
+  useEffect(() => {
+    return () => {
+      // Revoke all blob URLs when component unmounts
+      prodPreviewUrlsRef.current.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      printPreviewUrlsRef.current.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      prodPreviewUrlsRef.current.clear();
+      printPreviewUrlsRef.current.clear();
+    };
+  }, []); // Only run on mount/unmount
+
 
 
 
@@ -501,16 +520,30 @@ const companyNames = companies.map((opt) => opt.value);
 
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
-    // Only update file & preview arrays; leave form.designName alone
+    // Revoke the blob URL before removing to prevent memory leaks
+    setProdPreviews((prev) => {
+      if (prev[i]?.url) {
+        URL.revokeObjectURL(prev[i].url);
+        prodPreviewUrlsRef.current.delete(prev[i].url); // Remove from tracking
+      }
+      return prev.filter((_, idx) => idx !== i);
+    });
+    // Only update file array; leave form.designName alone
     setProdFiles((prevFiles) => prevFiles.filter((_, idx) => idx !== i));
-    setProdPreviews((prev) => prev.filter((_, idx) => idx !== i));
   };
 
 
   // remove the print file + its preview at index i
   const removePrintFile = (i) => {
+    // Revoke the blob URL before removing to prevent memory leaks
+    setPrintPreviews((prev) => {
+      if (prev[i]?.url) {
+        URL.revokeObjectURL(prev[i].url);
+        printPreviewUrlsRef.current.delete(prev[i].url); // Remove from tracking
+      }
+      return prev.filter((_, idx) => idx !== i);
+    });
     setPrintFiles((f) => f.filter((_, idx) => idx !== i));
-    setPrintPreviews((p) => p.filter((_, idx) => idx !== i));
   };
 
 
@@ -551,13 +584,17 @@ const companyNames = companies.map((opt) => opt.value);
   };
 
 
-  const createPreviews = (files) =>
-    files.map((f) => ({ url: URL.createObjectURL(f), type: f.type, name: f.name }));
+  const createPreviews = (files, urlsRef) =>
+    files.map((f) => {
+      const url = URL.createObjectURL(f);
+      urlsRef.current.add(url); // Track URL for cleanup
+      return { url, type: f.type, name: f.name };
+    });
 
-  const handleFileChange = (e, setter, previewSetter) => {
+  const handleFileChange = (e, setter, previewSetter, urlsRef) => {
     const files = Array.from(e.target.files);
     setter((prev) => [...prev, ...files]);
-    previewSetter((prev) => [...prev, ...createPreviews(files)]);
+    previewSetter((prev) => [...prev, ...createPreviews(files, urlsRef)]);
     // Do NOT touch form.designName — user will type it manually 
   };
 
@@ -572,6 +609,9 @@ const handleSubmit = async (e) => {
   console.log("🛎️ isReorder:", form.isReorder);
   e.preventDefault();
 
+  // Show overlay immediately when submit button is clicked
+  setIsSubmittingOverlay(true);
+
   // ⛔ Skip all validation if this is a reorder
   if (form.isReorder) {
     return submitForm();
@@ -581,6 +621,7 @@ const handleSubmit = async (e) => {
   const companyLower = form.company.trim().toLowerCase();
   const knownCompanies = companies.map(c => c.value.toLowerCase());
   if (!knownCompanies.includes(companyLower)) {
+    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
     setNewCompanyData(dc => ({ ...dc, companyName: form.company }));
     return setIsNewCompanyModalOpen(true);
   }
@@ -595,6 +636,7 @@ const handleSubmit = async (e) => {
     table = await res.json();
   } catch (err) {
     console.error("Could not load Table data:", err);
+    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
     alert("Unable to verify product list. Please try again later.");
     return;
   }
@@ -603,6 +645,7 @@ const handleSubmit = async (e) => {
     .filter(Boolean);
   const requested = form.product.trim().toLowerCase();
   if (!existingProducts.includes(requested)) {
+    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
     setNewProductName(form.product);
     setNewProductData(p => ({ ...p, product: form.product }));
     return setIsNewProductModalOpen(true);
@@ -618,6 +661,7 @@ const handleSubmit = async (e) => {
     !materialsInv.map(v => v.toLowerCase()).includes(m.trim().toLowerCase())
   );
   if (missingMat) {
+    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
     const matIndex = form.materials.indexOf(missingMat);
     setModalMaterialField({
       type: matIndex >= 0 ? "materials" : "backMaterial",
@@ -638,6 +682,7 @@ const handleSubmit = async (e) => {
     const mat = form.materials[i].trim();
     const pct = (form.materialPercents[i] || "").toString().trim();
     if (mat && !pct) {
+      setIsSubmittingOverlay(false);  // Hide overlay on validation failure
       alert(`Please enter a percentage for Material ${i+1}.`);
       return;  // stop here and keep the form visible
     }
@@ -660,6 +705,8 @@ const submitForm = async () => {
   console.log("🧪 prodFiles right before check:", prodFiles);
 
   if (prodFiles.length === 0 && !form.isReorder) {
+    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
+    window._isSubmittingOrder = false;  // Resume polling
     alert("Please select one or more production files.");
     return;
   }
@@ -688,6 +735,8 @@ const submitForm = async () => {
       console.log(`📦 Added prodFile[${i}]:`, safeFile.name, safeFile.size, safeFile.type);
     });
   } else if (!form.isReorder) {
+    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
+    window._isSubmittingOrder = false;  // Resume polling
     alert("Please select one or more production files.");
     return;
   } else {
@@ -743,7 +792,7 @@ const submitForm = async () => {
   }
 
   setIsSubmitting(true);
-  setIsSubmittingOverlay(true);
+  // Note: setIsSubmittingOverlay(true) is already set at the start of handleSubmit
 
   try {
     const baseForSubmit = API_ROOT.replace(/\/api$/, "");
@@ -815,6 +864,21 @@ const submitForm = async () => {
       furColor: "",
       notes: "",
     });
+    // Clean up blob URLs before clearing arrays to prevent memory leaks
+    prodPreviews.forEach((preview) => {
+      if (preview?.url) {
+        URL.revokeObjectURL(preview.url);
+        prodPreviewUrlsRef.current.delete(preview.url);
+      }
+    });
+    printPreviews.forEach((preview) => {
+      if (preview?.url) {
+        URL.revokeObjectURL(preview.url);
+        printPreviewUrlsRef.current.delete(preview.url);
+      }
+    });
+    prodPreviewUrlsRef.current.clear();
+    printPreviewUrlsRef.current.clear();
     setProdFiles([]);
     setPrintFiles([]);
     setProdPreviews([]);
@@ -992,8 +1056,10 @@ const handleSaveNewCompany = async () => {
                   });
 
                   files.push(file);
+                  const url = URL.createObjectURL(blob);
+                  prodPreviewUrlsRef.current.add(url); // Track URL for cleanup
                   previews.push({
-                    url: URL.createObjectURL(blob),
+                    url,
                     type: blob.type,
                     name: fileMeta.name,
                   });
@@ -1038,9 +1104,11 @@ const handleSaveNewCompany = async () => {
                     type: blob.type || "application/octet-stream",
                   });
 
+                  const url = URL.createObjectURL(blob);
+                  prodPreviewUrlsRef.current.add(url); // Track URL for cleanup
                   setProdFiles([wrappedFile]);
                   setProdPreviews([{
-                    url: URL.createObjectURL(blob),
+                    url,
                     type: blob.type,
                     name: filename,
                   }]);
@@ -1095,8 +1163,10 @@ const handleSaveNewCompany = async () => {
                 });
 
                 files.push(file);
+                const url = URL.createObjectURL(blob);
+                printPreviewUrlsRef.current.add(url); // Track URL for cleanup
                 previews.push({
-                  url: URL.createObjectURL(blob),
+                  url,
                   type: blob.type,
                   name: fileMeta.name,
                 });
@@ -2313,7 +2383,7 @@ const handleSaveNewCompany = async () => {
             type="file"
             multiple
             required={!form.isReorder}
-            onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews)}
+            onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews, prodPreviewUrlsRef)}
             style={{ marginBottom: "0.5rem" }}
           />
           <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
@@ -2369,7 +2439,7 @@ const handleSaveNewCompany = async () => {
           <input
             type="file"
             multiple
-            onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews)}
+            onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews, printPreviewUrlsRef)}
             style={{ marginBottom: "0.5rem" }}
           />
           <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
