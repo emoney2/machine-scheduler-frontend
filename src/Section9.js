@@ -1,12 +1,14 @@
 // File: frontend/src/Section9.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
+import axios from 'axios';
 
 export default function Section9(props) {
   console.log('🔥 Section9 props.onDragEnd is', typeof props.onDragEnd);
 
   const [status, setStatus] = useState('');
+  const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
   const {
     columns,
     setColumns,
@@ -36,6 +38,38 @@ export default function Section9(props) {
     openArtwork
   } = props;
 
+  // Fetch thread inventory status on mount and periodically refresh
+  useEffect(() => {
+    const API_ROOT = process.env.REACT_APP_API_ROOT || '';
+    
+    const fetchThreadStatus = async () => {
+      try {
+        const response = await axios.get(`${API_ROOT}/thread-inventory-status`, {
+          withCredentials: true
+        });
+        if (response.data) {
+          setThreadInventoryStatus(response.data);
+        }
+      } catch (error) {
+        console.error('Error fetching thread inventory status:', error);
+        // Don't show error to user, just use empty status map
+      }
+    };
+    
+    // Fetch immediately
+    fetchThreadStatus();
+    
+    // Refresh every 3 minutes (180000ms) - balances freshness with performance
+    const interval = setInterval(fetchThreadStatus, 180000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper function to get thread status color
+  const getThreadStatus = (threadCode) => {
+    const status = threadInventoryStatus[threadCode] || 'green'; // default to green if not found
+    return status;
+  };
 
   return (
     <div style={{ padding: 16, fontFamily: 'sans-serif', fontSize: 13 }}>
@@ -687,26 +721,45 @@ export default function Section9(props) {
                                           .map(c => c.trim())
                                           .filter(c => c)
                                           .sort((a, b) => Number(a) - Number(b))
-                                          .map(code => (
-                                            <span
-                                              key={code}
-                                              style={{
-                                                background:   '#fff',
-                                                color:        '#000',
-                                                borderRadius: 3,
-                                                padding:      '1px 2px',
-                                                fontSize:     10,
-                                                textAlign:    'center',
-                                                // show full text; allow wrapping if needed
-                                                overflow:     'visible',
-                                                textOverflow: 'clip',
-                                                whiteSpace:   'normal',
-                                                width:        '100%'
-                                              }}
-                                            >
-                                              {code}
-                                            </span>
-                                          ))}
+                                          .map(code => {
+                                            const threadStatus = getThreadStatus(code);
+                                            // Determine background and text colors based on status
+                                            let bgColor = '#fff';
+                                            let textColor = '#000';
+                                            
+                                            if (threadStatus === 'red') {
+                                              bgColor = '#ff0000';  // red background
+                                              textColor = '#ffffff'; // white text
+                                            } else if (threadStatus === 'yellow') {
+                                              bgColor = '#ffd700';  // yellow background
+                                              textColor = '#000';    // black text
+                                            } else {
+                                              // green or default - keep current styling
+                                              bgColor = '#fff';
+                                              textColor = '#000';
+                                            }
+                                            
+                                            return (
+                                              <span
+                                                key={code}
+                                                style={{
+                                                  background:   bgColor,
+                                                  color:        textColor,
+                                                  borderRadius: 3,
+                                                  padding:      '1px 2px',
+                                                  fontSize:     10,
+                                                  textAlign:    'center',
+                                                  // show full text; allow wrapping if needed
+                                                  overflow:     'visible',
+                                                  textOverflow: 'clip',
+                                                  whiteSpace:   'normal',
+                                                  width:        '100%'
+                                                }}
+                                              >
+                                                {code}
+                                              </span>
+                                            );
+                                          })}
                                       </div>
                                     )}
                                   </div>
