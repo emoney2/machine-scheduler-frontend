@@ -7,11 +7,15 @@ export default function ReorderPage() {
   const [companyInput, setCompanyInput] = useState("");
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingCustomers, setLoadingCustomers] = useState(true);
+  const [loadingCustomersText, setLoadingCustomersText] = useState("Loading customers…");
   const inputRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     console.log("🔄 Fetching company list...");
+    setLoadingCustomers(true);
+    setLoadingCustomersText("Loading customers…");
     axios
       .get(`${process.env.REACT_APP_API_ROOT}/directory`)
       .then((res) => {
@@ -23,6 +27,10 @@ export default function ReorderPage() {
       })
       .catch((err) => {
         console.error("❌ Failed to load company names", err);
+      })
+      .finally(() => {
+        setLoadingCustomers(false);
+        setLoadingCustomersText("");
       });
   }, []);
 
@@ -85,6 +93,24 @@ export default function ReorderPage() {
       </datalist>
 
       {loading && <p>Loading jobs…</p>}
+
+      {/* 🌕 Page Overlay for loading customers */}
+      {loadingCustomers && (
+        <div style={{
+          position: "fixed",
+          top: 0, left: 0,
+          width: "100vw", height: "100vh",
+          backgroundColor: "rgba(255, 247, 194, 0.65)", // transparent yellow
+          zIndex: 9998,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "1.25rem",
+          fontWeight: "bold"
+        }}>
+          {loadingCustomersText || "Loading…"}
+        </div>
+      )}
 
       <div style={{ marginTop: "2rem" }}>
         {jobs.map((job, idx) => (
