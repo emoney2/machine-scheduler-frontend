@@ -10,15 +10,24 @@ export default function ReorderPage() {
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingCustomersText, setLoadingCustomersText] = useState("Loading customers…");
   const inputRef = useRef(null);
+  const jobsRequestRef = useRef(null);
+  const inputDebounceRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    let isMounted = true;
+    const cancelTokenSource = axios.CancelToken.source();
+    
     console.log("🔄 Fetching company list...");
     setLoadingCustomers(true);
     setLoadingCustomersText("Loading customers…");
+    
     axios
-      .get(`${process.env.REACT_APP_API_ROOT}/directory`)
+      .get(`${process.env.REACT_APP_API_ROOT}/directory`, {
+        cancelToken: cancelTokenSource.token
+      })
       .then((res) => {
+        if (!isMounted) return;
         const names = (res.data || [])
           .map((name) => name)
           .filter((name) => typeof name === "string" && name.trim());
@@ -26,12 +35,30 @@ export default function ReorderPage() {
         setCompanyList(names);
       })
       .catch((err) => {
+        if (!isMounted || axios.isCancel(err)) return;
         console.error("❌ Failed to load company names", err);
       })
       .finally(() => {
-        setLoadingCustomers(false);
-        setLoadingCustomersText("");
+        if (isMounted) {
+          setLoadingCustomers(false);
+          setLoadingCustomersText("");
+        }
       });
+    
+    return () => {
+      isMounted = false;
+      cancelTokenSource.cancel("Component unmounted");
+      // Also cancel any jobs request if component unmounts
+      if (jobsRequestRef.current) {
+        jobsRequestRef.current.cancel("Component unmounted");
+        jobsRequestRef.current = null;
+      }
+      // Clear debounce timer
+      if (inputDebounceRef.current) {
+        clearTimeout(inputDebounceRef.current);
+        inputDebounceRef.current = null;
+      }
+    };
   }, []);
 
   const handleCompanySelect = async (value) => {
@@ -42,17 +69,33 @@ export default function ReorderPage() {
       return;
     }
 
+    // Cancel any in-flight request
+    if (jobsRequestRef.current) {
+      jobsRequestRef.current.cancel("New company selected");
+    }
+
+    const cancelTokenSource = axios.CancelToken.source();
+    jobsRequestRef.current = cancelTokenSource;
+
     setLoading(true);
     try {
       const res = await axios.get(
-        `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`
+        `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`,
+        { cancelToken: cancelTokenSource.token }
       );
       console.log("📦 Jobs loaded:", res.data.jobs);
       setJobs(res.data.jobs || []);
     } catch (err) {
+      if (axios.isCancel(err)) {
+        console.log("⏹️ Jobs request cancelled");
+        return;
+      }
       console.error("❌ Failed to load jobs for company:", value, err);
       alert("Failed to load jobs.");
     } finally {
+      if (jobsRequestRef.current === cancelTokenSource) {
+        jobsRequestRef.current = null;
+      }
       setLoading(false);
     }
   };
@@ -61,12 +104,21 @@ export default function ReorderPage() {
     const val = e.target.value;
     console.log("⌨️ Typing:", val);
     setCompanyInput(val);
-    if (companyList.includes(val)) {
-      console.log("✅ Match found in companyList, fetching jobs...");
-      handleCompanySelect(val);
-    } else {
-      console.log("🔍 No exact match yet.");
+    
+    // Clear any existing debounce timer
+    if (inputDebounceRef.current) {
+      clearTimeout(inputDebounceRef.current);
     }
+    
+    // Debounce the company selection to avoid rapid-fire requests
+    inputDebounceRef.current = setTimeout(() => {
+      if (companyList.includes(val)) {
+        console.log("✅ Match found in companyList, fetching jobs...");
+        handleCompanySelect(val);
+      } else {
+        console.log("🔍 No exact match yet.");
+      }
+    }, 300); // 300ms debounce
   };
 
   const handleReorder = (job) => {
