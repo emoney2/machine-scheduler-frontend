@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -12,6 +12,7 @@ export default function ReorderPage() {
   const inputRef = useRef(null);
   const jobsRequestRef = useRef(null);
   const inputDebounceRef = useRef(null);
+  const companyListRef = useRef([]);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,6 +34,7 @@ export default function ReorderPage() {
           .filter((name) => typeof name === "string" && name.trim());
         console.log("✅ Company list loaded:", names);
         setCompanyList(names);
+        companyListRef.current = names;
       })
       .catch((err) => {
         if (!isMounted || axios.isCancel(err)) return;
@@ -61,10 +63,12 @@ export default function ReorderPage() {
     };
   }, []);
 
-  const handleCompanySelect = async (value) => {
+  const handleCompanySelect = useCallback(async (value) => {
     console.log("🏢 Company selected:", value);
     setCompanyInput(value);
-    if (!companyList.includes(value)) {
+    
+    // Use ref to avoid stale closure
+    if (!companyListRef.current.includes(value)) {
       console.log("⚠️ Company not in list:", value);
       return;
     }
@@ -98,9 +102,9 @@ export default function ReorderPage() {
       }
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const val = e.target.value;
     console.log("⌨️ Typing:", val);
     setCompanyInput(val);
@@ -112,14 +116,15 @@ export default function ReorderPage() {
     
     // Debounce the company selection to avoid rapid-fire requests
     inputDebounceRef.current = setTimeout(() => {
-      if (companyList.includes(val)) {
+      // Use ref to avoid stale closure
+      if (companyListRef.current.includes(val)) {
         console.log("✅ Match found in companyList, fetching jobs...");
         handleCompanySelect(val);
       } else {
         console.log("🔍 No exact match yet.");
       }
     }, 300); // 300ms debounce
-  };
+  }, [handleCompanySelect]);
 
   const handleReorder = (job) => {
     console.log("🔁 Reordering job:", job);

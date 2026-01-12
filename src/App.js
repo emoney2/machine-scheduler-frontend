@@ -1355,9 +1355,10 @@ const fetchManualStateCore = async (previousCols) => {
   // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
   // ─── Section 5D: Initial full load, then every 30s ask "did anything change?" ─────────────
   useEffect(() => {
-    // Disable polling on Scan page for speed
-    if (window.location.pathname.toLowerCase().includes("/scan")) {
-      console.log("[Polling] disabled while scanning");
+    // Disable polling on Scan and Reorder pages for speed and to prevent memory leaks
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes("/scan") || path.includes("/reorder")) {
+      console.log("[Polling] disabled on", path);
       return;
     }
     // 1) One full load on mount (keeps your thin status bar behavior)
