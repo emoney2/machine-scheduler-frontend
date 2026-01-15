@@ -330,7 +330,7 @@ export default function QueueTab() {
   }
 
   // ---------- Layout ----------
-  // Column order (compact hides Print + Hard/Soft):
+  // Column order (removed Print and Fur Color columns):
   const gridFull = `
     62px   /* Order */
     56px   /* Preview */
@@ -339,8 +339,6 @@ export default function QueueTab() {
     50px   /* Qty */
     100px  /* Product */
     80px   /* Stage */
-    60px   /* Print column */
-    100px  /* Fur Color */
     70px   /* Ship */
     70px   /* Due */
     90px   /* Hard/Soft */
@@ -356,7 +354,6 @@ export default function QueueTab() {
     50px   /* Qty */
     100px  /* Product */
     80px   /* Stage */
-    100px  /* Fur Color */
     70px   /* Ship */
     70px   /* Due */
     90px   /* Open button */
@@ -453,8 +450,6 @@ export default function QueueTab() {
         <div style={cellBase}>Qty</div>
         <div style={cellBase}>Product</div>
         <div style={cellBase}>Stage</div>
-        {!compact && <div style={cellBase}>Print</div>}
-        <div style={cellBase}>Fur Color</div>
         <div style={cellBase}>Ship</div>
         <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
@@ -506,13 +501,12 @@ export default function QueueTab() {
             const product = order["Product"] || "";
             const stage   = order["Stage"] || "";
             const due     = toDate(order["Due Date"]);
-            const print   = order["Print"] || "";
-            const color   = order["Fur Color"] || "";
             const ship    = toDate(order["Ship Date"]);
             const hardSoft= order["Hard Date/Soft Date"] || "";
             const imageUrl= orderThumbUrl(order);
             const sel = !!selected[orderId];
             const processSheetPrinted = order["Process Sheet Printed"] || "";
+            const color   = order["Fur Color"] || ""; // Still needed for background color
 
             // Card background from Fur Color (with readable text)
             const bg = (() => {
@@ -628,13 +622,14 @@ export default function QueueTab() {
                   </div>
                 </div>
 
-                {/* Company Name */}
+                {/* Company Name - wrapped */}
                 <div style={{ 
-                  ...cellBase, 
-                  maxWidth: 100, 
-                  overflow: "hidden", 
-                  textOverflow: "ellipsis", 
-                  whiteSpace: "nowrap" 
+                  textAlign: "center",
+                  maxWidth: 140, 
+                  whiteSpace: "normal",
+                  wordWrap: "break-word",
+                  overflow: "visible",
+                  lineHeight: 1.3
                 }}>
                   {company}
                 </div>
@@ -666,22 +661,6 @@ export default function QueueTab() {
 
                 {/* Stage */}
                 <div style={{ ...cellBase, width: 65 }}>{stage}</div>
-
-                {/* Print (if visible) */}
-                {!compact && (
-                  <div style={{ ...cellBase, width: 50 }}>{print}</div>
-                )}
-
-                {/* Fur Color */}
-                <div style={{ 
-                  ...cellBase, 
-                  maxWidth: 90, 
-                  overflow: "hidden", 
-                  textOverflow: "ellipsis", 
-                  whiteSpace: "nowrap" 
-                }}>
-                  {color}
-                </div>
 
                 {/* Ship Date */}
                 <div style={{ ...cellBase, width: 60 }}>{fmtMMDD(ship)}</div>

@@ -1861,7 +1861,7 @@ useEffect(() => {
          { to: "/inventory-ordered", label: "Inventory Ordered" },
          { to: "/digitizing",        label: "Digitizing" }, 
          { to: "/fur",               label: "Fur List" },
-         { to: "/queue",             label: "Queue Tab" },
+         { to: "/queue",             label: "Queue" },
          { to: "/cut",               label: "Cut List" },  
          { to: "/ship",              label: "Ship" },
          { to: "/material-log",      label: "Material Log" },
