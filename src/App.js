@@ -34,6 +34,7 @@ import KanbanGo from "./KanbanGo";
 import KanbanScanPublic from "./KanbanScanPublic";
 import KanbanPrint from "./KanbanPrint";
 import ProductionOrders from './ProductionOrders';
+import QueueTab from './QueueTab';
 
 window._isSubmittingOrder = false;
 
@@ -1860,6 +1861,7 @@ useEffect(() => {
          { to: "/inventory-ordered", label: "Inventory Ordered" },
          { to: "/digitizing",        label: "Digitizing" }, 
          { to: "/fur",               label: "Fur List" },
+         { to: "/queue",             label: "Queue Tab" },
          { to: "/cut",               label: "Cut List" },  
          { to: "/ship",              label: "Ship" },
          { to: "/material-log",      label: "Material Log" },
@@ -1943,6 +1945,7 @@ useEffect(() => {
           <Route path="/cut" element={<CutList />} />
           <Route path="/ship" element={<Ship />} />
           <Route path="/fur" element={<FurList />} />
+          <Route path="/queue" element={<QueueTab />} />
           <Route path="/material-log" element={<MaterialLog />} />
           <Route path="/departments" element={<Departments />} />
           <Route path="/kanban/queue" element={<KanbanQueue />} />
