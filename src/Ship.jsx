@@ -529,12 +529,10 @@ export default function Ship() {
       setTimeout(() => window.focus(), 500);
 
       // Build invoice URL for summary page
-      const invoiceUrl =
-        typeof data?.invoice === "string" && data.invoice.startsWith("http")
-          ? data.invoice
-          : data?.invoice
-          ? `https://app.qbo.intuit.com/app/invoice?txnId=${data.invoice}`
-          : "";
+      // Backend already returns full URL, use it directly
+      const invoiceUrl = data?.invoice && typeof data.invoice === "string"
+        ? data.invoice.trim()
+        : "";
 
       navigate("/shipment-complete", {
         state: {
@@ -815,10 +813,9 @@ export default function Ship() {
       setLoading(false);
 
       // build invoiceUrl but do NOT open it here
-      const invoiceUrl = shipData.invoice
-        ? shipData.invoice.startsWith("http")
-          ? shipData.invoice
-          : `https://app.sandbox.qbo.intuit.com/app/invoice?txnId=${shipData.invoice}`
+      // Backend already returns full URL, use it directly
+      const invoiceUrl = shipData.invoice && typeof shipData.invoice === "string"
+        ? shipData.invoice.trim()
         : "";
 
       // Persist URLs for the completion page
