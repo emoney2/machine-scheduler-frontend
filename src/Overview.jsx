@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { io } from "socket.io-client";
+import { supabase } from "./supabaseClient";
 
 export default function Overview() {
   const [metrics, setMetrics] = useState(null);
@@ -811,6 +812,16 @@ function col(width, center = false) {
     socket.on("manualStateUpdated", debounced);
     socket.on("placeholdersUpdated", debounced);
     socket.on("materialsUpdated", debounced); // Listen for material updates
+    
+    // Listen for custom event when materials are ordered
+    const handleMaterialsOrdered = () => {
+      if (alive) {
+        // Clear cache and force refresh
+        try { localStorage.removeItem("jrco.overview.cache"); } catch {}
+        loadFresh();
+      }
+    };
+    window.addEventListener("materialsOrdered", handleMaterialsOrdered);
 
     return () => {
       alive = false;
@@ -820,6 +831,7 @@ function col(width, center = false) {
       socket.off("manualStateUpdated", debounced);
       socket.off("placeholdersUpdated", debounced);
       socket.off("materialsUpdated", debounced);
+      window.removeEventListener("materialsOrdered", handleMaterialsOrdered);
     };
   }, []);
 
@@ -915,11 +927,7 @@ function col(width, center = false) {
       metricsLockRef.current = true;
 
       try {
-        // 🔹 Supabase connection
-        const { createClient } = await import("@supabase/supabase-js");
-        const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-        const supabaseKey = process.env.REACT_APP_SUPABASE_KEY;
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        // 🔹 Use singleton Supabase client (imported at top)
 
         // 🔹 Query your "metrics" table (adjust table name if different)
         const { data, error } = await supabase
@@ -1023,8 +1031,23 @@ function col(width, center = false) {
       // If targeting Madeira via email, force email method (not website/cart)
       const method = (emailTo === "contactus@madeirausa.com") ? "email" : (orderMethod || defaultMethod);
 
+      // Pre-open popup window synchronously (before async operations) to avoid popup blocking
+      let popupWindow = null;
+      let gmailUrl = null;
+      
+      if (method === "website" && v.website) {
+        // For website method, open immediately (synchronously)
+        popupWindow = window.open(v.website, "_blank", "noopener");
+      } else if (method !== "website" || !(modalOpenForVendor || "").toLowerCase().includes("madeira")) {
+        // For email method, prepare Gmail URL and open immediately
+        gmailUrl = buildGmailCompose({ to: emailTo, cc, subject, body, authUser });
+        popupWindow = openUrlReturn(gmailUrl);
+        if (popupWindow) {
+          setGmailPopup(popupWindow);
+        }
+      }
 
-      // WEBSITE path — Madeira (special)
+      // WEBSITE path — Madeira (special) - needs async call first
       if (method === "website" && (modalOpenForVendor || "").toLowerCase().includes("madeira")) {
         // Only send thread items for Madeira
         const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
@@ -1041,24 +1064,23 @@ function col(width, center = false) {
 
           // Open the cart only after success (fallback to the common cart URL)
           const cartUrl = resp?.data?.cart || "https://www.madeirausa.com/shoppingcart.aspx";
-          window.open(cartUrl, "_blank", "noopener");
+          // Use the pre-opened window if available, otherwise open new
+          if (popupWindow && !popupWindow.closed) {
+            popupWindow.location.href = cartUrl;
+          } else {
+            window.open(cartUrl, "_blank", "noopener");
+          }
         } catch (err) {
           console.error("Madeira web order failed:", err);
           const msg = err?.response?.data?.details || err?.message || "Unknown error";
           alert("Failed to add to Madeira cart. " + msg);
+          if (popupWindow && !popupWindow.closed) {
+            popupWindow.close();
+          }
           return; // don't log inventory if order failed
         }
       }
-      // WEBSITE path — other vendors: open configured website if present
-      else if (method === "website" && v.website) {
-        window.open(v.website, "_blank", "noopener");
-      }
-      // EMAIL path (no mailto fallback → avoids Outlook)
-      else {
-        const gmailUrl = buildGmailCompose({ to: emailTo, cc, subject, body, authUser });
-        const win = openUrlReturn(gmailUrl);
-        setGmailPopup(win);
-      }
+
       // Log "Ordered" just like before
       const materialPayload = [];
       const threadPayload = [];
@@ -1069,8 +1091,6 @@ function col(width, center = false) {
         } else {
           materialPayload.push({ ...base, materialName: r.name, type: "Material" });
         }
-
-
       }
 
       if (materialPayload.length) {
@@ -1080,11 +1100,25 @@ function col(width, center = false) {
         await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
+      // Refresh materials after successful order
+      if (materialPayload.length || threadPayload.length) {
+        // Clear cache and trigger refresh
+        try {
+          localStorage.removeItem("jrco.overview.cache");
+          // Trigger refresh via custom event that the useEffect listens to
+          window.dispatchEvent(new CustomEvent("materialsOrdered"));
+        } catch (e) {
+          console.warn("Failed to trigger materials refresh:", e);
+        }
+      }
+
       alert((method === "website" ? "Website opened." : "Gmail compose opened.") + " Order logged.");
       setModalOpenForVendor(null);
       setPoNotes("");
       setRequestBy("");
-      setGmailPopup(null);
+      if (!popupWindow || popupWindow.closed) {
+        setGmailPopup(null);
+      }
     } catch (e) {
       console.error("Failed to order/log", e);
       alert("Failed to order/log. Check console.");
