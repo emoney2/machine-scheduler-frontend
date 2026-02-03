@@ -85,6 +85,8 @@ export default function OrderSubmission() {
     minInv: "",
     reorder: "",
     cost: "",
+    vendor: "",
+    color: "#000000",
   });
   const [newMaterialErrors, setNewMaterialErrors] = useState({});
 
@@ -947,8 +949,8 @@ const handleSaveNewCompany = async () => {
 
   // ─── Save the new material to Google Sheets ───────────────────
   const handleSaveNewMaterial = async () => {
-    // validate name, unit, minInv, reorder, cost
-    const required = ["materialName", "unit", "minInv", "reorder", "cost"];
+    // validate name, unit, minInv, reorder, cost, vendor
+    const required = ["materialName", "unit", "minInv", "reorder", "cost", "vendor"];
     const errors = {};
     required.forEach((k) => {
       if (!newMaterialData[k]?.toString().trim()) errors[k] = "Required";
@@ -1511,6 +1513,72 @@ const handleSaveNewCompany = async () => {
               {newMaterialErrors.cost && (
                 <div style={{ color: "red", fontSize: "0.8rem" }}>
                   {newMaterialErrors.cost}
+                </div>
+              )}
+            </div>
+            {/* Vendor */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label>Vendor*<br/>
+                <input
+                  name="vendor"
+                  value={newMaterialData.vendor}
+                  onChange={handleNewMaterialChange}
+                  style={{
+                    width: "100%",
+                    padding: "0.4rem",
+                    border: newMaterialErrors.vendor
+                      ? "1px solid red"
+                      : "1px solid #ccc",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+              </label>
+              {newMaterialErrors.vendor && (
+                <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  {newMaterialErrors.vendor}
+                </div>
+              )}
+            </div>
+            {/* Color */}
+            <div style={{ marginBottom: "0.75rem" }}>
+              <label>Color*<br/>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                  <input
+                    type="color"
+                    name="color"
+                    value={newMaterialData.color}
+                    onChange={handleNewMaterialChange}
+                    style={{
+                      width: "60px",
+                      height: "40px",
+                      padding: "0",
+                      border: newMaterialErrors.color
+                        ? "1px solid red"
+                        : "1px solid #ccc",
+                      borderRadius: "0.25rem",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <input
+                    type="text"
+                    name="color"
+                    value={newMaterialData.color}
+                    onChange={handleNewMaterialChange}
+                    placeholder="#000000"
+                    style={{
+                      flex: 1,
+                      padding: "0.4rem",
+                      border: newMaterialErrors.color
+                        ? "1px solid red"
+                        : "1px solid #ccc",
+                      borderRadius: "0.25rem",
+                    }}
+                  />
+                </div>
+              </label>
+              {newMaterialErrors.color && (
+                <div style={{ color: "red", fontSize: "0.8rem" }}>
+                  {newMaterialErrors.color}
                 </div>
               )}
             </div>

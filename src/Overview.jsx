@@ -1370,7 +1370,18 @@ function col(width, center = false) {
                             >
                               {isThread ? (
                                 <ThreadThumb name={it.name} fallbackColor={swatch} />
+                              ) : it.color ? (
+                                // Show color box if color is available
+                                <div 
+                                  style={{ 
+                                    width: "100%",
+                                    height: "100%",
+                                    background: it.color,
+                                    borderRadius: "4px",
+                                  }} 
+                                />
                               ) : (
+                                // Fallback to image if no color
                                 <BasicImg
                                   src={materialImgUrl(ROOT, grp.vendor, it.name)}
                                   alt=""
