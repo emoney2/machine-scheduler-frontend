@@ -636,7 +636,7 @@ function col(width, center = false) {
   useEffect(() => {
     let alive = true;
 
-    // 1) Hydrate instantly from cache (if any)
+    // 1) Hydrate instantly from cache (if any) - always fetch fresh on mount
     const cached = loadOverviewCache();
     if (cached) {
       const { upcoming = [], materials = [] } = cached;
@@ -649,14 +649,18 @@ function col(width, center = false) {
           return stage !== "COMPLETE" && stage !== "COMPLETED";
         });
 
-      // We’ll enrich with overdue below if we already have them cached elsewhere;
-      // otherwise we’ll do it in the fresh load (the next block).
+      // Show cached data immediately while fresh data loads in background
       setUpcoming(baseJobs);
       setMaterials(materials ?? []);
       markUpdated();
 
+      // Don't show loading spinner - data will update when fresh load completes
       setLoadingUpcoming(false);
       setLoadingMaterials(false);
+    } else {
+      // If no cache, show loading state
+      setLoadingUpcoming(true);
+      setLoadingMaterials(true);
     }
 
     // 2) Fetch fresh in background (stale-while-revalidate)
@@ -670,8 +674,12 @@ function col(width, center = false) {
       if (fetchLockRef.current) return;
       fetchLockRef.current = true;
 
-      setLoadingUpcoming(!cached);
-      setLoadingMaterials(!cached);
+      // Only show loading if we don't have cached data to display
+      const hasCache = !!cached;
+      if (!hasCache) {
+        setLoadingUpcoming(true);
+        setLoadingMaterials(true);
+      }
 
       // Cancel any prior in-flight overview fetch
       try { overviewCtrlRef.current?.abort(); } catch {}
@@ -789,6 +797,7 @@ function col(width, center = false) {
     socket.on("ordersUpdated", debounced);
     socket.on("manualStateUpdated", debounced);
     socket.on("placeholdersUpdated", debounced);
+    socket.on("materialsUpdated", debounced); // Listen for material updates
 
     return () => {
       alive = false;
@@ -797,6 +806,7 @@ function col(width, center = false) {
       socket.off("ordersUpdated", debounced);
       socket.off("manualStateUpdated", debounced);
       socket.off("placeholdersUpdated", debounced);
+      socket.off("materialsUpdated", debounced);
     };
   }, []);
 
