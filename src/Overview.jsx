@@ -651,7 +651,10 @@ function col(width, center = false) {
 
       // Show cached data immediately while fresh data loads in background
       setUpcoming(baseJobs);
-      setMaterials(materials ?? []);
+      // Ensure materials is always an array
+      const materialsArray = Array.isArray(materials) ? materials : [];
+      setMaterials(materialsArray);
+      console.log("📦 Cached materials loaded:", materialsArray.length, "vendors");
       markUpdated();
 
       // Don't show loading spinner - data will update when fresh load completes
@@ -713,7 +716,12 @@ function col(width, center = false) {
         const data = overRes?.data || {};
         saveOverviewCache(data);
 
-        const { upcoming, materials } = data;
+        const { upcoming = [], materials = [] } = data;
+        console.log("📦 Overview data received:", { 
+          upcomingCount: upcoming?.length || 0, 
+          materialsCount: materials?.length || 0,
+          materials: materials 
+        });
         const daysWindowNum = parseInt(daysWindow, 10) || 7;
 
         // Filter out only COMPLETE jobs (backend already filters, but double-check here)
@@ -768,10 +776,15 @@ function col(width, center = false) {
         });
 
         setUpcoming(sorted);
-        setMaterials(materials ?? []);
+        // Ensure materials is always an array
+        const materialsArray = Array.isArray(materials) ? materials : [];
+        setMaterials(materialsArray);
+        console.log("📦 Fresh materials loaded:", materialsArray.length, "vendors", materialsArray);
         markUpdated();
       } catch (e) {
-        console.warn("Overview loadFresh failed:", e);
+        console.error("Overview loadFresh failed:", e);
+        // Ensure materials is set to empty array on error
+        setMaterials([]);
       } finally {
         fetchLockRef.current = false;
         if (!alive) return;
