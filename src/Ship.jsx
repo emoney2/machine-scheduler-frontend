@@ -412,9 +412,16 @@ export default function Ship() {
         const data = await res.json();
 
         if (res.ok) {
-          // 1) Build job array and initialize shipQty from the sheet quantity
-          const updatedJobs = data.jobs.map((job) => {
-            // Pull from the sheet’s "Quantity" column (capital Q)
+          // 1) Filter out COMPLETE jobs
+          const incompleteJobs = data.jobs.filter((job) => {
+            const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
+            const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
+            return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
+          });
+
+          // 2) Build job array and initialize shipQty from the sheet quantity
+          const updatedJobs = incompleteJobs.map((job) => {
+            // Pull from the sheet's "Quantity" column (capital Q)
             const qty = Number(job.Quantity ?? job.quantity ?? 0);
             return {
               ...job,
@@ -423,7 +430,7 @@ export default function Ship() {
             };
           });
 
-          // 2) Push into state
+          // 3) Push into state
           setJobs(updatedJobs);
 
           // 3) Drop any selected IDs that no longer exist
@@ -471,9 +478,16 @@ export default function Ship() {
 
         .then(data => {
           if (data.jobs) {
+            // Filter out COMPLETE jobs
+            const incompleteJobs = data.jobs.filter((job) => {
+              const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
+              const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
+              return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
+            });
+
             setJobs(prev => {
               const prevMap = Object.fromEntries(prev.map(j => [j.orderId, j]));
-              return data.jobs.map(newJob => {
+              return incompleteJobs.map(newJob => {
                 const existing = prevMap[newJob.orderId];
                 return {
                   ...newJob,
@@ -485,7 +499,7 @@ export default function Ship() {
 
             // 🧼 Remove any selected jobs that no longer exist
             setSelected(prevSelected => {
-              const newOrderIds = new Set(data.jobs.map(j => j.orderId.toString()));
+              const newOrderIds = new Set(incompleteJobs.map(j => j.orderId.toString()));
               return prevSelected.filter(id => newOrderIds.has(id));
             });
           }
@@ -595,7 +609,14 @@ export default function Ship() {
 
       const data = await res.json();
       if (res.ok) {
-        const jobsWithQty = data.jobs.map(job => {
+        // Filter out COMPLETE jobs
+        const incompleteJobs = data.jobs.filter((job) => {
+          const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
+          const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
+          return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
+        });
+
+        const jobsWithQty = incompleteJobs.map(job => {
           const qty = Number(job.Quantity ?? 0);
           return { ...job, shipQty: qty, ShippedQty: qty };
         });
