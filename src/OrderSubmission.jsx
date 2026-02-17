@@ -1022,6 +1022,13 @@ const handleSaveNewCompany = async () => {
           reorderJob["Material4"] || "",
           reorderJob["Material5"] || "",
         ],
+        materialPercents: [
+          reorderJob["Material1 Percent"] || reorderJob["Material 1 Percent"] || "",
+          reorderJob["Material2 Percent"] || reorderJob["Material 2 Percent"] || "",
+          reorderJob["Material3 Percent"] || reorderJob["Material 3 Percent"] || "",
+          reorderJob["Material4 Percent"] || reorderJob["Material 4 Percent"] || "",
+          reorderJob["Material5 Percent"] || reorderJob["Material 5 Percent"] || "",
+        ],
         backMaterial: reorderJob["Back Material"] || "",
         embBacking: reorderJob["EMB Backing"] || "",  // ✅ this now works with your <select>
         furColor: reorderJob["Fur Color"] || "",
