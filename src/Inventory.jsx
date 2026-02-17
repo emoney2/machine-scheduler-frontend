@@ -28,6 +28,7 @@ export default function Inventory() {
   const [materials, setMaterials]       = useState([]);
   const [threadRows, setThreadRows]     = useState(() => initRows());
   const [materialRows, setMaterialRows] = useState(() => initRows());
+  const [isLoading, setIsLoading]       = useState(true);
 
   // --- Section 2.2: New-Item Modal State --------------------------------
   const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
@@ -48,12 +49,17 @@ export default function Inventory() {
 
   // --- Section 2.4: Effects to Fetch Dropdown Lists ---------------------
   useEffect(() => {
-    axios.get(`${process.env.REACT_APP_API_ROOT}/thread-colors`)
-      .then(res => setThreads(res.data))
-      .catch(console.error);
-    axios.get(`${process.env.REACT_APP_API_ROOT}/materials`)
-      .then(res => setMaterials(res.data))
-      .catch(console.error);
+    setIsLoading(true);
+    Promise.all([
+      axios.get(`${process.env.REACT_APP_API_ROOT}/thread-colors`)
+        .then(res => setThreads(res.data))
+        .catch(console.error),
+      axios.get(`${process.env.REACT_APP_API_ROOT}/materials`)
+        .then(res => setMaterials(res.data))
+        .catch(console.error)
+    ]).finally(() => {
+      setIsLoading(false);
+    });
   }, []);
 
   // --- Section 2.5: Helper to Initialize Rows ----------------------------
@@ -439,6 +445,28 @@ const handleSaveBulkNewItems = async () => {
   // --- Section 6: Render -----------------------------------------------
   return (
     <>
+      {/* Loading overlay */}
+      {isLoading && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(255, 255, 200, 0.7)", // Light yellow overlay
+            zIndex: 999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none"
+          }}
+        >
+          <div style={{ fontSize: "18px", fontWeight: "bold", color: "#666" }}>
+            Loading Materials and Threads...
+          </div>
+        </div>
+      )}
 {isNewItemModalOpen && (bulkNewItems.length > 0 || newMaterialsBatch.length > 0) && (
   <div style={modalOverlay}>
     <div style={modalBox}>
