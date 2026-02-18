@@ -655,6 +655,11 @@ export default function Ship() {
     );
   };
 
+  const handleSelectAll = () => {
+    const allOrderIds = jobs.map(job => job.orderId.toString());
+    setSelected(allOrderIds);
+  };
+
   const goToBoxSelect = () => {
     try {
       sessionStorage.setItem(
@@ -1391,6 +1396,25 @@ export default function Ship() {
           <option key={c} value={c} />
         ))}
       </datalist>
+
+      {jobs.length > 0 && (
+        <button
+          onClick={handleSelectAll}
+          style={{
+            fontSize: "1rem",
+            padding: "0.5rem 1rem",
+            marginBottom: "1rem",
+            backgroundColor: "#4CAF50",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontWeight: "bold"
+          }}
+        >
+          Select All
+        </button>
+      )}
 
       {jobs.length > 0 && (
         <div style={{ display: "flex", fontWeight: "bold", padding: "0.5rem 1rem", borderBottom: "2px solid #333", marginBottom: "0.5rem", marginTop: "1rem", fontSize: "0.85rem" }}>
