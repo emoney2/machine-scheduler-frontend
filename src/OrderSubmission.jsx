@@ -631,7 +631,7 @@ const handleSubmit = async (e) => {
   // 2) Product check
   let table;
   try {
-    const res = await fetch(`${process.env.REACT_APP_API_ROOT}/table`, {
+    const res = await fetch(`${API_ROOT}/table`, {
       credentials: "include",
     });
     if (!res.ok) throw new Error("Table fetch failed");
@@ -925,7 +925,7 @@ const handleSaveNewCompany = async () => {
   // 2) Call the backend
   try {
     await axios.post(
-      `${process.env.REACT_APP_API_ROOT}/directory`,
+      `${API_ROOT}/directory`,
       newCompanyData
     );
     alert("Company successfully added");
@@ -962,7 +962,7 @@ const handleSaveNewCompany = async () => {
 
     try {
       await axios.post(
-        `${process.env.REACT_APP_API_ROOT}/materials`,
+        `${API_ROOT}/materials`,
         newMaterialData
       );
       alert("Material successfully added");
@@ -1043,7 +1043,7 @@ const handleSaveNewCompany = async () => {
           console.warn("❗ Invalid production folder link:", reorderJob["Image"]);
         } else {
           setProdFilesLoading(true);
-          fetch(`${process.env.REACT_APP_API_ROOT}/list-folder-files?folderId=${prodFolderId}`)
+          fetch(`${API_ROOT}/list-folder-files?folderId=${prodFolderId}`)
             .then(res => res.json())
             .then(async (data) => {
               if (!Array.isArray(data.files)) {
@@ -1056,7 +1056,7 @@ const handleSaveNewCompany = async () => {
               const files = [];
 
               for (let fileMeta of data.files) {
-                const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
+                const downloadUrl = `${API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
                 try {
                   const blob = await fetch(downloadUrl).then(r => r.blob());
                   const realBlob = blob.slice(0, blob.size, blob.type);
@@ -1096,11 +1096,11 @@ const handleSaveNewCompany = async () => {
           console.warn("❗ Invalid production file link:", reorderJob["Image"]);
         } else {
           setProdFilesLoading(true);
-          fetch(`${process.env.REACT_APP_API_ROOT}/drive-file-metadata?fileId=${fileId}`)
+          fetch(`${API_ROOT}/drive-file-metadata?fileId=${fileId}`)
             .then(res => res.json())
             .then(meta => {
               const filename = meta?.name || "Production File";
-              const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileId}`;
+              const downloadUrl = `${API_ROOT}/proxy-drive-file?fileId=${fileId}`;
               return fetch(downloadUrl)
                 .then(r => r.blob())
                 .then(blob => {
@@ -1149,7 +1149,7 @@ const handleSaveNewCompany = async () => {
         }
 
         setPrintFilesLoading(true);
-        fetch(`${process.env.REACT_APP_API_ROOT}/list-folder-files?folderId=${folderId}`)
+        fetch(`${API_ROOT}/list-folder-files?folderId=${folderId}`)
           .then(res => res.json())
           .then(async (data) => {
             if (!Array.isArray(data.files)) {
@@ -1162,7 +1162,7 @@ const handleSaveNewCompany = async () => {
             const files = [];
 
             for (let fileMeta of data.files) {
-              const downloadUrl = `${process.env.REACT_APP_API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
+              const downloadUrl = `${API_ROOT}/proxy-drive-file?fileId=${fileMeta.id}`;
 
               try {
                 const blob = await fetch(downloadUrl).then(r => r.blob());
@@ -1912,7 +1912,7 @@ const handleSaveNewCompany = async () => {
                   };
                   try {
                     await axios.post(
-                      `${process.env.REACT_APP_API_ROOT}/table`,
+                      `${API_ROOT}/table`,
                       tablePayload,
                       { withCredentials: true }
                     );

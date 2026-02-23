@@ -207,11 +207,13 @@ function BoxSelectGuard() {
 axios.defaults.withCredentials = true;
 
 // if any API response is 401, kick the browser to /login
+// (redirect base is set below after API_ROOT is defined)
+let BACKEND_ORIGIN_FOR_REDIRECT = '';
 axios.interceptors.response.use(
   resp => resp,
   err => {
     if (err.response && err.response.status === 401) {
-      const base = process.env.REACT_APP_API_ROOT.replace(/\/api$/, '');
+      const base = BACKEND_ORIGIN_FOR_REDIRECT || window.location.origin;
       const currentPath = window.location.pathname + window.location.search;
       window.location.href = `${base}/login?next=${encodeURIComponent(currentPath)}`;
     }
@@ -220,11 +222,12 @@ axios.interceptors.response.use(
 );
 
 // CONFIGURATION
-// Provide a safe default to avoid crashes if REACT_APP_API_ROOT isn't set in Netlify.
-
+// Use relative /api when unset so Netlify can proxy to backend (avoids CORS).
 const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
-const API_ROOT      = RAW_API_ROOT || 'https://machine-scheduler-backend.onrender.com/api';
-const SOCKET_ORIGIN = API_ROOT.replace(/\/api$/, '');           // → https://machine-scheduler-backend.onrender.com
+const API_ROOT      = (RAW_API_ROOT || '/api').replace(/\/$/, '');
+BACKEND_ORIGIN_FOR_REDIRECT = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
+// Socket must still reach Render (Netlify doesn't proxy WebSockets). Backend must allow origin.
+const SOCKET_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : 'https://machine-scheduler-backend.onrender.com';
 const SOCKET_PATH   = '/socket.io';
 
 let socket = null;
@@ -277,7 +280,7 @@ const BUBBLE_DELIV  = '#c8e6c9';
 
 export default function App() {
   // Derive backend origin (no /api) for login redirects
-  const BACKEND_ORIGIN = API_ROOT.replace(/\/api$/, "");
+  const BACKEND_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
   const [manualReorder, setManualReorder] = useState(false);
 
   useEffect(() => {
@@ -300,7 +303,7 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${process.env.REACT_APP_API_ROOT}/ping`, {
+        const res = await fetch(`${API_ROOT}/ping`, {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" }
