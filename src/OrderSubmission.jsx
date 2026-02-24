@@ -79,6 +79,7 @@ export default function OrderSubmission() {
   // ─── New-Material modal state & data ─────────────────────────
   const [isNewMaterialModalOpen, setIsNewMaterialModalOpen] = useState(false);
   const [modalMaterialField, setModalMaterialField] = useState(null);
+  const [vendorsList, setVendorsList] = useState([]); // from Material Inventory column K (Vendor)
   const [newMaterialData, setNewMaterialData] = useState({
     materialName: "",
     unit: "",
@@ -488,6 +489,22 @@ useEffect(() => {
     })
     .finally(() => setLoadingMaterials(false));
 }, []);
+
+  // ─── Fetch vendors (Material Inventory column K) for New Material dropdown ───
+  useEffect(() => {
+    const cfg = {
+      withCredentials: true,
+      timeout: 15000,
+      validateStatus: s => s >= 200 && s < 400,
+    };
+    axios.get(`${API_ROOT}/vendors`, cfg)
+      .then(res => {
+        const arr = Array.isArray(res.data) ? res.data : [];
+        const unique = [...new Set(arr.map(v => String(v || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        setVendorsList(unique);
+      })
+      .catch(() => setVendorsList([]));
+  }, []);
 
   // ─── Cleanup blob URLs on component unmount to prevent memory leaks ───────────
   useEffect(() => {
@@ -960,6 +977,7 @@ const handleSaveNewCompany = async () => {
       return;
     }
 
+    setIsSubmittingOverlay(true);
     try {
       await axios.post(
         `${API_ROOT}/materials`,
@@ -986,6 +1004,8 @@ const handleSaveNewCompany = async () => {
       setNewMaterialErrors({});
     } catch {
       setNewMaterialErrors({ general: "Failed to save material. Try again." });
+    } finally {
+      setIsSubmittingOverlay(false);
     }
   };
 
@@ -1526,7 +1546,7 @@ const handleSaveNewCompany = async () => {
             {/* Vendor */}
             <div style={{ marginBottom: "0.75rem" }}>
               <label>Vendor*<br/>
-                <input
+                <select
                   name="vendor"
                   value={newMaterialData.vendor}
                   onChange={handleNewMaterialChange}
@@ -1538,7 +1558,12 @@ const handleSaveNewCompany = async () => {
                       : "1px solid #ccc",
                     borderRadius: "0.25rem",
                   }}
-                />
+                >
+                  <option value="">Select vendor…</option>
+                  {vendorsList.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
               </label>
               {newMaterialErrors.vendor && (
                 <div style={{ color: "red", fontSize: "0.8rem" }}>
