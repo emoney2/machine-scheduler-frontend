@@ -966,8 +966,8 @@ const handleSaveNewCompany = async () => {
 
   // ─── Save the new material to Google Sheets ───────────────────
   const handleSaveNewMaterial = async () => {
-    // validate name, unit, minInv, reorder, cost, vendor
-    const required = ["materialName", "unit", "minInv", "reorder", "cost", "vendor"];
+    // validate name, unit, minInv, reorder, cost (vendor is optional; list comes from Material Inventory column K)
+    const required = ["materialName", "unit", "minInv", "reorder", "cost"];
     const errors = {};
     required.forEach((k) => {
       if (!newMaterialData[k]?.toString().trim()) errors[k] = "Required";
@@ -1543,13 +1543,16 @@ const handleSaveNewCompany = async () => {
                 </div>
               )}
             </div>
-            {/* Vendor */}
+            {/* Vendor (optional; list from Material Inventory column K when /vendors is available) */}
             <div style={{ marginBottom: "0.75rem" }}>
-              <label>Vendor*<br/>
-                <select
+              <label>Vendor (optional)<br/>
+                <input
+                  type="text"
                   name="vendor"
+                  list="new-material-vendor-list"
                   value={newMaterialData.vendor}
                   onChange={handleNewMaterialChange}
+                  placeholder={vendorsList.length ? "Select or type vendor…" : "Type vendor (e.g. from Material Inventory column K)…"}
                   style={{
                     width: "100%",
                     padding: "0.4rem",
@@ -1558,12 +1561,12 @@ const handleSaveNewCompany = async () => {
                       : "1px solid #ccc",
                     borderRadius: "0.25rem",
                   }}
-                >
-                  <option value="">Select vendor…</option>
+                />
+                <datalist id="new-material-vendor-list">
                   {vendorsList.map((v) => (
-                    <option key={v} value={v}>{v}</option>
+                    <option key={v} value={v} />
                   ))}
-                </select>
+                </datalist>
               </label>
               {newMaterialErrors.vendor && (
                 <div style={{ color: "red", fontSize: "0.8rem" }}>
