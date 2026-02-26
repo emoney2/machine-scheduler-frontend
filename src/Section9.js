@@ -360,71 +360,93 @@ export default function Section9(props) {
                                     }}
 
                                   >
-{/* Artwork thumbnail (absolute, top-left); hidden if no imageLink */}
+{/* Artwork thumbnail (absolute, top-left); hidden if no imageLink. When digitized, show checkmark under image and thread colors in white boxes. */}
 {job.imageLink ? (
   <div
-    title="Click to open full artwork"
     style={{
       position: 'absolute',
       top: 6,
       left: 6,
-      display: 'block',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       zIndex: 5,
-      width: 56,
-      height: 56,
-      borderRadius: 8,
-      overflow: 'hidden',
-      border: '1px solid #eee',
-      background: '#fff',
-      cursor: 'pointer'
-    }}
-    onMouseDown={(e) => { e.stopPropagation(); }}
-    onClick={(e) => {
-      e.stopPropagation();
-      openArtwork(job.imageLink); // full file via backend proxy (thumb=0)
+      gap: 4
     }}
   >
-    {(() => {
-      // 1) Build a safe thumbnail src
-      let src = toPreviewUrl(job.imageLink); // usually /drive/proxy/<id>?thumb=1&sz=w240
+    <div
+      title="Click to open full artwork"
+      style={{
+        display: 'block',
+        width: 56,
+        height: 56,
+        borderRadius: 8,
+        overflow: 'hidden',
+        border: '1px solid #eee',
+        background: '#fff',
+        cursor: 'pointer'
+      }}
+      onMouseDown={(e) => { e.stopPropagation(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        openArtwork(job.imageLink); // full file via backend proxy (thumb=0)
+      }}
+    >
+      {(() => {
+        // 1) Build a safe thumbnail src
+        let src = toPreviewUrl(job.imageLink); // usually /drive/proxy/<id>?thumb=1&sz=w240
 
-      if (!src) {
-        // Parse Google Drive id if toPreviewUrl couldn't
-        try {
-          const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-          const altId = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-          if (altId) src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
-        } catch {}
-      }
+        if (!src) {
+          // Parse Google Drive id if toPreviewUrl couldn't
+          try {
+            const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+            const altId = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
+            if (altId) src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
+          } catch {}
+        }
 
-      // 2) If still nothing, render a label (no white boxes)
-      if (!src) {
+        // 2) If still nothing, render a label (no white boxes)
+        if (!src) {
+          return (
+            <span style={{ fontSize: 11, color: '#888', padding: 4, display: 'block', textAlign: 'center' }}>
+              No image
+            </span>
+          );
+        }
+
+        // 3) Prioritize first 8 rows
+        const isAboveFold = typeof globalIdx === 'number' ? globalIdx < 8 : false;
+
         return (
-          <span style={{ fontSize: 11, color: '#888', padding: 4, display: 'block', textAlign: 'center' }}>
-            No image
-          </span>
-        );
-      }
-
-      // 3) Prioritize first 8 rows
-      const isAboveFold = typeof globalIdx === 'number' ? globalIdx < 8 : false;
-
-      return (
-        <img
-          src={src}
-          alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
-          width={56}
-          height={56}
-          style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
-          loading={isAboveFold ? 'eager' : 'lazy'}
-          decoding="async"
-          fetchPriority={isAboveFold ? 'high' : 'low'}
-          data-upscaled="0"
-          onLoad={(e) => {
-            // If Drive thumb came back tiny (like 1x1), retry once with a bigger thumbnail (w512)
-            const img = e.currentTarget;
-            if (img.dataset.upscaled === '1') return;
-            if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
+          <img
+            src={src}
+            alt={`${(job.product ?? job.Product ?? 'Artwork')} preview`}
+            width={56}
+            height={56}
+            style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover' }}
+            loading={isAboveFold ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={isAboveFold ? 'high' : 'low'}
+            data-upscaled="0"
+            onLoad={(e) => {
+              // If Drive thumb came back tiny (like 1x1), retry once with a bigger thumbnail (w512)
+              const img = e.currentTarget;
+              if (img.dataset.upscaled === '1') return;
+              if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
+                try {
+                  const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+                  const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
+                  if (id) {
+                    img.dataset.upscaled = '1';
+                    img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
+                  }
+                } catch {}
+              }
+            }}
+            onError={(e) => {
+              // If the smaller thumb failed, try once more with a bigger thumb
+              const img = e.currentTarget;
+              if (img.dataset.upscaled === '1') return;
               try {
                 const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
                 const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
@@ -433,24 +455,32 @@ export default function Section9(props) {
                   img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
                 }
               } catch {}
-            }
-          }}
-          onError={(e) => {
-            // If the smaller thumb failed, try once more with a bigger thumb
-            const img = e.currentTarget;
-            if (img.dataset.upscaled === '1') return;
-            try {
-              const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-              const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-              if (id) {
-                img.dataset.upscaled = '1';
-                img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
-              }
-            } catch {}
-          }}
-        />
-      );
-    })()}
+            }}
+          />
+        );
+      })()}
+    </div>
+    {/* Digitized checkmark: light green circle with dark green check, under job image */}
+    {!isPh && job.threadColors && String(job.threadColors).trim() && (
+      <div
+        title="Digitized"
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          background: '#b8e6b8',
+          border: '1px solid #2e7d32',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0
+        }}
+      >
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style={{ display: 'block' }}>
+          <path d="M1 4 L4 7 L9 1" stroke="#1b5e20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+    )}
   </div>
 ) : null}
 
@@ -700,8 +730,7 @@ export default function Section9(props) {
                                       </span>
                                     )}
 
-                                    {/* Thread‐Color Bubbles */}
-
+                                    {/* Thread‐Color Bubbles (digitized jobs): white boxes with thread codes; border color shows inventory status */}
                                     {job.threadColors && (
                                       <div
                                         style={{
@@ -723,37 +752,25 @@ export default function Section9(props) {
                                           .sort((a, b) => Number(a) - Number(b))
                                           .map(code => {
                                             const threadStatus = getThreadStatus(code);
-                                            // Determine background and text colors based on status
-                                            let bgColor = '#fff';
-                                            let textColor = '#000';
-                                            
-                                            if (threadStatus === 'red') {
-                                              bgColor = '#ff0000';  // red background
-                                              textColor = '#ffffff'; // white text
-                                            } else if (threadStatus === 'yellow') {
-                                              bgColor = '#ffd700';  // yellow background
-                                              textColor = '#000';    // black text
-                                            } else {
-                                              // green or default - keep current styling
-                                              bgColor = '#fff';
-                                              textColor = '#000';
-                                            }
-                                            
+                                            // Digitized: white boxes; use border to show inventory status
+                                            const borderColor =
+                                              threadStatus === 'red' ? '#c62828' :
+                                              threadStatus === 'yellow' ? '#f9a825' : '#e0e0e0';
                                             return (
                                               <span
                                                 key={code}
                                                 style={{
-                                                  background:   bgColor,
-                                                  color:        textColor,
+                                                  background:   '#fff',
+                                                  color:       '#111',
+                                                  border:      `1px solid ${borderColor}`,
                                                   borderRadius: 3,
-                                                  padding:      '1px 2px',
-                                                  fontSize:     10,
-                                                  textAlign:    'center',
-                                                  // show full text; allow wrapping if needed
-                                                  overflow:     'visible',
+                                                  padding:     '1px 2px',
+                                                  fontSize:    10,
+                                                  textAlign:   'center',
+                                                  overflow:    'visible',
                                                   textOverflow: 'clip',
-                                                  whiteSpace:   'normal',
-                                                  width:        '100%'
+                                                  whiteSpace:  'normal',
+                                                  width:       '100%'
                                                 }}
                                               >
                                                 {code}
