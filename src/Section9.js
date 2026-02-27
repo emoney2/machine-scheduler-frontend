@@ -30,6 +30,8 @@ export default function Section9(props) {
     DARK_GREY,
     LIGHT_PURPLE,
     DARK_PURPLE,
+    LIGHT_ORANGE,
+    DARK_ORANGE,
     BUBBLE_START,
     BUBBLE_END,
     BUBBLE_DELIV,
@@ -128,6 +130,18 @@ export default function Section9(props) {
             }}
           />
           Placeholder
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: LIGHT_ORANGE,
+              border: `2px solid ${DARK_ORANGE}`,
+              borderRadius: 2
+            }}
+          />
+          Sample (qty 1)
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span
@@ -314,14 +328,19 @@ export default function Section9(props) {
                             const rightPadding = stripWidth + 8;
                             const isHard = job.due_type === 'Hard Date';
                             const isSoft = !isPh && !isHard;
+                            const isSample = !isPh && Number(job.quantity) === 1;
 
                             const base = isPh
                               ? LIGHT_YELLOW
+                              : isSample
+                              ? LIGHT_ORANGE
                               : isSoft
                               ? LIGHT_GREY
                               : LIGHT_PURPLE;
                             const bCol = isPh
                               ? DARK_YELLOW
+                              : isSample
+                              ? DARK_ORANGE
                               : isSoft
                               ? DARK_GREY
                               : DARK_PURPLE;

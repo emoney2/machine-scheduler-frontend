@@ -274,6 +274,8 @@ const LIGHT_GREY    = '#ECEFF1';
 const DARK_GREY     = '#616161';
 const LIGHT_PURPLE  = '#E1BEE7';
 const DARK_PURPLE   = '#6A1B9A';
+const LIGHT_ORANGE  = '#e86a00';  // Tennessee Vols-style orange for sample (qty 1) cards
+const DARK_ORANGE   = '#b84a00';
 const BUBBLE_START  = '#e0f7fa';
 const BUBBLE_END    = '#ffe0b2';
 const BUBBLE_DELIV  = '#c8e6c9';
@@ -826,8 +828,15 @@ function sortQueue(list) {
     return isNaN(n) ? null : n;
   };
 
+  const isSample = (job) => Number(job.quantity) === 1;
+
   // Make a copy before sorting to avoid mutating original arrays
+  // Samples (qty 1) at top of queue, then due date asc, then order # asc
   return [...(list || [])].sort((a, b) => {
+    const aSample = isSample(a);
+    const bSample = isSample(b);
+    if (aSample !== bSample) return aSample ? -1 : 1; // samples first
+
     const aTS = toTS(getDue(a));
     const bTS = toTS(getDue(b));
     if (aTS !== bTS) return aTS - bTS; // earlier date first
@@ -1931,6 +1940,8 @@ useEffect(() => {
               DARK_GREY={DARK_GREY}
               LIGHT_PURPLE={LIGHT_PURPLE}
               DARK_PURPLE={DARK_PURPLE}
+              LIGHT_ORANGE={LIGHT_ORANGE}
+              DARK_ORANGE={DARK_ORANGE}
               BUBBLE_START={BUBBLE_START}
               BUBBLE_END={BUBBLE_END}
               BUBBLE_DELIV={BUBBLE_DELIV}
