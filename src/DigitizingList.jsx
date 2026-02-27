@@ -169,8 +169,13 @@ export default function DigitizingList() {
 
 
 
-    // 3) Sort strictly by Due Date (oldest first).
+    // 3) Sort: samples (qty 1) at top, then by Due Date (oldest first), then Order #
+    const isSample = (o) => Number(o["Quantity"]) === 1;
     base.sort((a, b) => {
+      const aSample = isSample(a);
+      const bSample = isSample(b);
+      if (aSample !== bSample) return aSample ? -1 : 1; // samples first
+
       const ad = toDate(a["Due Date"]);
       const bd = toDate(b["Due Date"]);
       const at = ad ? ad.getTime() : Infinity;
