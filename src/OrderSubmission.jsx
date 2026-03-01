@@ -28,6 +28,8 @@ export default function OrderSubmission() {
   const [printFiles, setPrintFiles] = useState([]);
   const [prodPreviews, setProdPreviews] = useState([]);
   const [printPreviews, setPrintPreviews] = useState([]);
+  /** When true, Print column is set to YES (checkbox or auto when file uploaded). */
+  const [orderHasPrint, setOrderHasPrint] = useState(false);
   
   // Track preview URLs for cleanup on unmount
   const prodPreviewUrlsRef = useRef(new Set());
@@ -506,6 +508,11 @@ useEffect(() => {
       .catch(() => setVendorsList([]));
   }, []);
 
+  // Auto-check "Print" when user uploads print files (so Print column = YES)
+  useEffect(() => {
+    if (printFiles.length > 0) setOrderHasPrint(true);
+  }, [printFiles.length]);
+
   // ─── Cleanup blob URLs on component unmount to prevent memory leaks ───────────
   useEffect(() => {
     return () => {
@@ -762,6 +769,9 @@ const submitForm = async () => {
     console.warn("⚠️ No prodFiles but this is reorder, continuing...");
   }
 
+  // 🖨️ Print column: use checkbox (orderHasPrint) so you can submit YES before file is ready
+  fd.append("print", orderHasPrint ? "YES" : "NO");
+
   // 🖨️ Append printFiles
   if (printFiles.length > 0) {
     printFiles.forEach((f, i) => {
@@ -902,6 +912,7 @@ const submitForm = async () => {
     setPrintFiles([]);
     setProdPreviews([]);
     setPrintPreviews([]);
+    setOrderHasPrint(false);
   } catch (err) {
     console.error(err);
     alert(err.response?.data?.error || "Submission failed");
@@ -1206,6 +1217,7 @@ const handleSaveNewCompany = async () => {
 
             setPrintFiles(files);
             setPrintPreviews(previews);
+            if (files.length > 0) setOrderHasPrint(true);
             setPrintFilesLoading(false);
           })
           .catch(err => {
@@ -2538,7 +2550,18 @@ const handleSaveNewCompany = async () => {
 
         {/* ── Print Upload + Preview ──────────────────────────────────── */}
         <div>
-          <h3 style={{ margin: "0.25rem 0" }}>Print Files</h3>
+          <h3 style={{ margin: "0.25rem 0", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            Print Files
+            <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontWeight: "normal", fontSize: "0.9rem" }}>
+              <input
+                type="checkbox"
+                checked={orderHasPrint}
+                onChange={(e) => setOrderHasPrint(e.target.checked)}
+                aria-label="Print column YES"
+              />
+              Print: YES
+            </label>
+          </h3>
           <input
             type="file"
             multiple
