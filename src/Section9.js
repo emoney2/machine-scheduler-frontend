@@ -38,6 +38,13 @@ export default function Section9(props) {
     openArtwork
   } = props;
 
+  // Ensure we never crash on missing columns (e.g. during initial load or parent bug)
+  const safeColumns = columns ?? {
+    queue: { title: 'Queue', jobs: [] },
+    machine1: { title: 'Machine 1', headCount: 1, jobs: [] },
+    machine2: { title: 'Machine 2', headCount: 6, jobs: [] }
+  };
+
   // Fetch thread inventory status on mount and periodically refresh
   useEffect(() => {
     const API_ROOT = process.env.REACT_APP_API_ROOT || '';
@@ -81,13 +88,13 @@ export default function Section9(props) {
         marginBottom: 12
       }}>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => setShowModal?.(true)}
           style={{ fontSize: 13 }}
         >
           + Add Placeholder
         </button>
 
-        <button onClick={handleSync} style={{ fontSize: 13 }}>
+        <button onClick={() => handleSync?.()} style={{ fontSize: 13 }}>
           Sync from Sheet{' '}
           {syncStatus === 'updated' && <span style={{ color: 'green' }}>✓ Updated</span>}
         </button>
@@ -221,26 +228,25 @@ export default function Section9(props) {
 
        <DragDropContext
          onDragEnd={result => {
-           // show working...
            setStatus('Working…');
- 
-           // call the passed-in handler (which does your fetch)
-           const ret = props.onDragEnd(result);
- 
-           // if it returns a Promise, wait for it
+           const onDragEndFn = props.onDragEnd;
+           if (typeof onDragEndFn !== 'function') {
+             setStatus('');
+             return;
+           }
+           const ret = onDragEndFn(result);
            if (ret && typeof ret.then === 'function') {
              ret
                .then(() => setStatus('Success!'))
                .catch(() => setStatus('Error'));
            } else {
-             // otherwise mark success immediately
              setStatus('Success!');
            }
          }}
        >
         <div style={{ display: 'flex', gap: 16, marginTop: 16, overflowX: 'auto' }}>
           {['queue', 'machine1', 'machine2'].map(colId => {
-            const col = columns[colId] || {};
+            const col = safeColumns[colId] || {};
             const rawJobs = Array.isArray(col.jobs) ? col.jobs : [];
             const jobs = rawJobs
               // keep only active jobs
@@ -257,8 +263,9 @@ export default function Section9(props) {
 
             const segments = [];
             let idx = 0;
+            const getChainSafe = typeof getChain === 'function' ? getChain : () => [];
             while (idx < jobs.length) {
-              const chainIds = getChain(jobs, jobs[idx].id);
+              const chainIds = getChainSafe(jobs, jobs[idx].id);
               const len = chainIds.length > 1 ? chainIds.length : 1;
               segments.push({ start: idx, len });
               idx += len;
@@ -297,7 +304,7 @@ export default function Section9(props) {
                             fontWeight:     'bold'
                           }}
                         >
-                          {columns[colId].headCount}
+                          {safeColumns[colId]?.headCount ?? 0}
                         </span>
                       )}
                     </h4>
