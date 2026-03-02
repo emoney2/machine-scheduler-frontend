@@ -1150,6 +1150,12 @@ const fetchOrdersEmbroLinksCore = async () => {
       const fileId = extractDriveId(rawImageLink);
       if (fileId) driveIdsToPublicize.push(fileId);
 
+      // Materials used by this job (for D/T/M Material status on scheduler card)
+      const matList = [
+        o['Material1'], o['Material2'], o['Material3'], o['Material4'], o['Material5'],
+        o['Back Material'], o['Fur Color']
+      ].filter(Boolean).map(s => String(s).trim()).filter(Boolean);
+
       jobById[sid] = {
         id:               sid,
         company:          o['Company Name'] || '',
@@ -1165,6 +1171,7 @@ const fetchOrdersEmbroLinksCore = async () => {
         threadColors:     o['Threads'] || '',
         imageLink:        rawImageLink,
         imageFileId:      fileId || '',
+        materials:        matList,
         // artworkUrl is set AFTER we fetch (or recall) version tokens
         machineId:        'queue',
         linkedTo:         linksData[sid] || null

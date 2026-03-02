@@ -7,6 +7,9 @@ import axios from 'axios';
 export default function Section9(props) {
   const [status, setStatus] = useState('');
   const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
+  const [materialInventoryStatus, setMaterialInventoryStatus] = useState({});
+  // Sticky green: once D/T/M turns green for a job, it stays green (key: jobId, value: { D, T, M })
+  const greenOnceRef = React.useRef({});
   const {
     columns,
     setColumns,
@@ -72,10 +75,36 @@ export default function Section9(props) {
     return () => clearInterval(interval);
   }, []);
 
-  // Helper function to get thread status color
+  // Fetch material inventory status (Material Inventory tab: red = negative, yellow = on order, green = in stock)
+  useEffect(() => {
+    const API_ROOT = process.env.REACT_APP_API_ROOT || '';
+    const fetchMaterialStatus = async () => {
+      try {
+        const response = await axios.get(`${API_ROOT}/material-inventory-status`, {
+          withCredentials: true
+        });
+        if (response.data && typeof response.data === 'object') {
+          setMaterialInventoryStatus(response.data);
+        }
+      } catch (error) {
+        // Endpoint may not exist yet; M will show red until backend provides it
+      }
+    };
+    fetchMaterialStatus();
+    const interval = setInterval(fetchMaterialStatus, 180000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Helper: get thread status (red | yellow | green)
   const getThreadStatus = (threadCode) => {
-    const status = threadInventoryStatus[threadCode] || 'green'; // default to green if not found
-    return status;
+    return threadInventoryStatus[threadCode] || 'green';
+  };
+
+  // Helper: get material status by name (red = negative, yellow = on order, green = in stock). Unknown => red.
+  const getMaterialStatus = (materialName) => {
+    if (!materialName || !String(materialName).trim()) return 'green';
+    const key = String(materialName).trim();
+    return materialInventoryStatus[key] ?? materialInventoryStatus[key.toLowerCase()] ?? 'red';
   };
 
   return (
@@ -481,27 +510,67 @@ export default function Section9(props) {
         );
       })()}
     </div>
-    {/* Digitized checkmark: light green circle with dark green check, under job image */}
-    {!isPh && job.threadColors && String(job.threadColors).trim() && (
-      <div
-        title="Digitized"
-        style={{
-          width: 18,
-          height: 18,
-          borderRadius: '50%',
-          background: '#b8e6b8',
-          border: '1px solid #2e7d32',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0
-        }}
-      >
-        <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style={{ display: 'block' }}>
-          <path d="M1 4 L4 7 L9 1" stroke="#1b5e20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
-    )}
+    {/* D/T/M status or green checkmark when all three ready (D=Digitized, T=Thread, M=Material) */}
+    {!isPh && (() => {
+      const jobId = job.id;
+      const isDigitized = !!(job.threadColors != null && String(job.threadColors).trim());
+      const dStatus = isDigitized ? 'green' : 'red';
+      const threadCodes = (job.threadColors != null && String(job.threadColors).trim())
+        ? String(job.threadColors).split(',').map(c => c.trim()).filter(Boolean)
+        : [];
+      let tStatus = 'green';
+      if (threadCodes.length) {
+        const statuses = threadCodes.map(c => getThreadStatus(c));
+        if (statuses.some(s => s === 'red')) tStatus = 'red';
+        else if (statuses.some(s => s === 'yellow')) tStatus = 'yellow';
+      }
+      const materials = Array.isArray(job.materials) ? job.materials : [];
+      let mStatus = 'green';
+      if (materials.length) {
+        const statuses = materials.map(m => getMaterialStatus(m));
+        if (statuses.some(s => s === 'red')) mStatus = 'red';
+        else if (statuses.some(s => s === 'yellow')) mStatus = 'yellow';
+      }
+      const sticky = greenOnceRef.current[jobId] || {};
+      if (dStatus === 'green') sticky.D = true;
+      if (tStatus === 'green') sticky.T = true;
+      if (mStatus === 'green') sticky.M = true;
+      greenOnceRef.current[jobId] = sticky;
+      const displayD = sticky.D ? 'green' : dStatus;
+      const displayT = sticky.T ? 'green' : tStatus;
+      const displayM = sticky.M ? 'green' : mStatus;
+      const allGreen = displayD === 'green' && displayT === 'green' && displayM === 'green';
+      const letterStyle = (color) => ({
+        width: 14,
+        height: 14,
+        borderRadius: 2,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 9,
+        fontWeight: 'bold',
+        flexShrink: 0,
+        background: color === 'green' ? '#b8e6b8' : color === 'yellow' ? '#ffecb3' : '#ffcdd2',
+        color: color === 'green' ? '#1b5e20' : color === 'yellow' ? '#333' : '#b71c1c',
+        border: `1px solid ${color === 'green' ? '#2e7d32' : color === 'yellow' ? '#f9a825' : '#c62828'}`
+      });
+      if (allGreen) {
+        return (
+          <div title="Digitized, thread & material ready" style={{ width: 18, height: 18, borderRadius: '50%', background: '#b8e6b8', border: '1px solid #2e7d32', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style={{ display: 'block' }}>
+              <path d="M1 4 L4 7 L9 1" stroke="#1b5e20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        );
+      }
+      return (
+        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }} title="D=Digitized, T=Thread, M=Material">
+          <span style={letterStyle(displayD)} title="Digitized">D</span>
+          <span style={letterStyle(displayT)} title="Thread">T</span>
+          <span style={letterStyle(displayM)} title="Material">M</span>
+        </div>
+      );
+    })()}
   </div>
 ) : null}
 
