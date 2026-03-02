@@ -749,7 +749,7 @@ export default function Section9(props) {
                                       </span>
                                     )}
 
-                                    {/* Thread‐Color Bubbles (digitized jobs): white boxes with thread codes; border color shows inventory status */}
+                                    {/* Thread‐Color Bubbles (digitized jobs): solid fill by status — red = missing, yellow = ordered, white = in stock */}
                                     {job.threadColors && (
                                       <div
                                         style={{
@@ -771,16 +771,18 @@ export default function Section9(props) {
                                           .sort((a, b) => Number(a) - Number(b))
                                           .map(code => {
                                             const threadStatus = getThreadStatus(code);
-                                            // Digitized: white boxes; use border to show inventory status
-                                            const borderColor =
-                                              threadStatus === 'red' ? '#c62828' :
-                                              threadStatus === 'yellow' ? '#f9a825' : '#e0e0e0';
+                                            // Solid fill: red = missing, yellow = ordered, default = in stock (white)
+                                            const isRed = threadStatus === 'red';
+                                            const isYellow = threadStatus === 'yellow';
+                                            const backgroundColor = isRed ? '#c62828' : isYellow ? '#ffecb3' : '#fff';
+                                            const borderColor = isRed ? '#b71c1c' : isYellow ? '#f9a825' : '#e0e0e0';
+                                            const textColor = isRed ? '#fff' : isYellow ? '#333' : '#111';
                                             return (
                                               <span
                                                 key={code}
                                                 style={{
-                                                  background:   '#fff',
-                                                  color:       '#111',
+                                                  background:   backgroundColor,
+                                                  color:       textColor,
                                                   border:      `1px solid ${borderColor}`,
                                                   borderRadius: 3,
                                                   padding:     '1px 2px',
