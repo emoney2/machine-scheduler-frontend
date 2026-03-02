@@ -8,8 +8,6 @@ export default function Section9(props) {
   const [status, setStatus] = useState('');
   const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
   const [materialInventoryStatus, setMaterialInventoryStatus] = useState({});
-  // Sticky green: once D/T/M turns green for a job, it stays green (key: jobId, value: { D, T, M })
-  const greenOnceRef = React.useRef({});
   const {
     columns,
     setColumns,
@@ -48,63 +46,101 @@ export default function Section9(props) {
     machine2: { title: 'Machine 2', headCount: 6, jobs: [] }
   };
 
-  // Fetch thread inventory status on mount and periodically refresh
+  // Fetch thread inventory: prefer status API; fallback to raw /threadInventory and derive red/yellow/green
+  // Yellow = inventory negative but on-order (Inventory..) > 0
   useEffect(() => {
-    const API_ROOT = process.env.REACT_APP_API_ROOT || '';
-    
+    const API_ROOT = (process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '');
+    const deriveStatus = (row) => {
+      const inv = Number(row.inventory ?? row.Inventory ?? row.quantity ?? row.Quantity ?? 0);
+      const onOrder = Number(row['Inventory..'] ?? row.onOrder ?? row.inventoryOnOrder ?? 0);
+      if (inv < 0 && onOrder > 0) return 'yellow';
+      if (inv < 0) return 'red';
+      return 'green';
+    };
     const fetchThreadStatus = async () => {
       try {
-        const response = await axios.get(`${API_ROOT}/thread-inventory-status`, {
-          withCredentials: true
-        });
-        if (response.data) {
-          setThreadInventoryStatus(response.data);
+        const res = await axios.get(`${API_ROOT}/thread-inventory-status`, { withCredentials: true });
+        const data = res.data;
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          setThreadInventoryStatus(data);
+          return;
         }
-      } catch (error) {
-        console.error('Error fetching thread inventory status:', error);
-        // Don't show error to user, just use empty status map
-      }
+      } catch (_) {}
+      try {
+        const res = await axios.get(`${API_ROOT}/threadInventory`, { withCredentials: true });
+        const arr = Array.isArray(res.data) ? res.data : [];
+        const map = {};
+        arr.forEach(row => {
+          const code = String(row.value ?? row.threadColor ?? row.Value ?? row.code ?? '').trim();
+          if (!code) return;
+          map[code] = typeof row === 'object' && (row.inventory !== undefined || row.quantity !== undefined || row.Inventory !== undefined)
+            ? deriveStatus(row)
+            : (row.status ?? 'green');
+        });
+        setThreadInventoryStatus(map);
+      } catch (_) {}
     };
-    
-    // Fetch immediately
     fetchThreadStatus();
-    
-    // Refresh every 3 minutes (180000ms) - balances freshness with performance
     const interval = setInterval(fetchThreadStatus, 180000);
-    
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch material inventory status (Material Inventory tab: red = negative, yellow = on order, green = in stock)
+  // Fetch material inventory: try status endpoint first, else try GET /materialInventory and derive status
   useEffect(() => {
-    const API_ROOT = process.env.REACT_APP_API_ROOT || '';
+    const API_ROOT = (process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '');
     const fetchMaterialStatus = async () => {
       try {
-        const response = await axios.get(`${API_ROOT}/material-inventory-status`, {
-          withCredentials: true
-        });
-        if (response.data && typeof response.data === 'object') {
-          setMaterialInventoryStatus(response.data);
+        const res = await axios.get(`${API_ROOT}/material-inventory-status`, { withCredentials: true });
+        if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
+          setMaterialInventoryStatus(res.data);
+          return;
         }
-      } catch (error) {
-        // Endpoint may not exist yet; M will show red until backend provides it
-      }
+      } catch (_) {}
+      try {
+        const res = await axios.get(`${API_ROOT}/materialInventory`, { withCredentials: true });
+        const arr = Array.isArray(res.data) ? res.data : [];
+        const map = {};
+        arr.forEach(row => {
+          const name = (row.materialName ?? row.Material ?? row.name ?? row.value ?? '').toString().trim();
+          if (!name) return;
+          const inv = Number(row.inventory ?? row.Quantity ?? row.quantity ?? row.Stock ?? 0);
+          const onOrder = Number(row.onOrder ?? row['Inventory..'] ?? row.inventoryOnOrder ?? 0);
+          if (inv < 0 && onOrder > 0) map[name] = 'yellow';
+          else if (inv < 0) map[name] = 'red';
+          else map[name] = 'green';
+        });
+        setMaterialInventoryStatus(map);
+      } catch (_) {}
     };
     fetchMaterialStatus();
     const interval = setInterval(fetchMaterialStatus, 180000);
     return () => clearInterval(interval);
   }, []);
 
-  // Helper: get thread status (red | yellow | green)
+  // Helper: get thread status (red | yellow | green). Supports API returning string or object with inventory/onOrder.
   const getThreadStatus = (threadCode) => {
-    return threadInventoryStatus[threadCode] || 'green';
+    const raw = threadInventoryStatus[threadCode];
+    if (raw === undefined || raw === null) return 'green';
+    if (typeof raw === 'string') return raw;
+    if (typeof raw === 'object' && raw !== null) {
+      const inv = raw.inventory ?? raw.quantity ?? raw.Inventory ?? 0;
+      const onOrder = raw.onOrder ?? raw.inventoryOnOrder ?? raw['Inventory..'] ?? 0;
+      const numInv = Number(inv);
+      const numOn = Number(onOrder);
+      if (numInv < 0 && numOn > 0) return 'yellow';
+      if (numInv < 0) return 'red';
+      return 'green';
+    }
+    return 'green';
   };
 
-  // Helper: get material status by name (red = negative, yellow = on order, green = in stock). Unknown => red.
+  // Helper: get material status (red = negative, yellow = on order, green = in stock). Unknown => green (no data = assume OK).
   const getMaterialStatus = (materialName) => {
     if (!materialName || !String(materialName).trim()) return 'green';
     const key = String(materialName).trim();
-    return materialInventoryStatus[key] ?? materialInventoryStatus[key.toLowerCase()] ?? 'red';
+    const lower = key.toLowerCase();
+    const status = materialInventoryStatus[key] ?? Object.entries(materialInventoryStatus).find(([k]) => k.trim().toLowerCase() === lower)?.[1];
+    return status ?? 'green';
   };
 
   return (
@@ -451,7 +487,7 @@ export default function Section9(props) {
           try {
             const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
             const altId = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-            if (altId) src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
+            if (altId) src = `${(process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '')}/drive/proxy/${altId}?thumb=1&sz=w240`;
           } catch {}
         }
 
@@ -488,7 +524,7 @@ export default function Section9(props) {
                   const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
                   if (id) {
                     img.dataset.upscaled = '1';
-                    img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
+                    img.src = `${(process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '')}/drive/proxy/${id}?thumb=1&sz=w512`;
                   }
                 } catch {}
               }
@@ -502,7 +538,7 @@ export default function Section9(props) {
                 const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
                 if (id) {
                   img.dataset.upscaled = '1';
-                  img.src = `${process.env.REACT_APP_API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
+                  img.src = `${(process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '')}/drive/proxy/${id}?thumb=1&sz=w512`;
                 }
               } catch {}
             }}
@@ -510,19 +546,19 @@ export default function Section9(props) {
         );
       })()}
     </div>
-    {/* D/T/M status or green checkmark when all three ready (D=Digitized, T=Thread, M=Material) */}
+    {/* D/T/M status or green checkmark when all three ready (D=Digitized, T=Thread, M=Material). No sticky green. */}
     {!isPh && (() => {
-      const jobId = job.id;
       const isDigitized = !!(job.threadColors != null && String(job.threadColors).trim());
       const dStatus = isDigitized ? 'green' : 'red';
       const threadCodes = (job.threadColors != null && String(job.threadColors).trim())
         ? String(job.threadColors).split(',').map(c => c.trim()).filter(Boolean)
         : [];
-      let tStatus = 'green';
+      let tStatus = 'gray';
       if (threadCodes.length) {
         const statuses = threadCodes.map(c => getThreadStatus(c));
         if (statuses.some(s => s === 'red')) tStatus = 'red';
         else if (statuses.some(s => s === 'yellow')) tStatus = 'yellow';
+        else tStatus = 'green';
       }
       const materials = Array.isArray(job.materials) ? job.materials : [];
       let mStatus = 'green';
@@ -531,29 +567,23 @@ export default function Section9(props) {
         if (statuses.some(s => s === 'red')) mStatus = 'red';
         else if (statuses.some(s => s === 'yellow')) mStatus = 'yellow';
       }
-      const sticky = greenOnceRef.current[jobId] || {};
-      if (dStatus === 'green') sticky.D = true;
-      if (tStatus === 'green') sticky.T = true;
-      if (mStatus === 'green') sticky.M = true;
-      greenOnceRef.current[jobId] = sticky;
-      const displayD = sticky.D ? 'green' : dStatus;
-      const displayT = sticky.T ? 'green' : tStatus;
-      const displayM = sticky.M ? 'green' : mStatus;
-      const allGreen = displayD === 'green' && displayT === 'green' && displayM === 'green';
-      const letterStyle = (color) => ({
-        width: 14,
-        height: 14,
-        borderRadius: 2,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 9,
-        fontWeight: 'bold',
-        flexShrink: 0,
-        background: color === 'green' ? '#b8e6b8' : color === 'yellow' ? '#ffecb3' : '#ffcdd2',
-        color: color === 'green' ? '#1b5e20' : color === 'yellow' ? '#333' : '#b71c1c',
-        border: `1px solid ${color === 'green' ? '#2e7d32' : color === 'yellow' ? '#f9a825' : '#c62828'}`
-      });
+      const allGreen = dStatus === 'green' && tStatus === 'green' && mStatus === 'green';
+      const letterStyle = (color) => {
+        if (color === 'gray') {
+          return {
+            width: 14, height: 14, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 9, fontWeight: 'bold', flexShrink: 0,
+            background: '#e0e0e0', color: '#9e9e9e', border: '1px solid #bdbdbd'
+          };
+        }
+        return {
+          width: 14, height: 14, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 9, fontWeight: 'bold', flexShrink: 0,
+          background: color === 'green' ? '#b8e6b8' : color === 'yellow' ? '#ffecb3' : '#ffcdd2',
+          color: color === 'green' ? '#1b5e20' : color === 'yellow' ? '#333' : '#b71c1c',
+          border: `1px solid ${color === 'green' ? '#2e7d32' : color === 'yellow' ? '#f9a825' : '#c62828'}`
+        };
+      };
       if (allGreen) {
         return (
           <div title="Digitized, thread & material ready" style={{ width: 18, height: 18, borderRadius: '50%', background: '#b8e6b8', border: '1px solid #2e7d32', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -565,9 +595,9 @@ export default function Section9(props) {
       }
       return (
         <div style={{ display: 'flex', gap: 2, flexShrink: 0 }} title="D=Digitized, T=Thread, M=Material">
-          <span style={letterStyle(displayD)} title="Digitized">D</span>
-          <span style={letterStyle(displayT)} title="Thread">T</span>
-          <span style={letterStyle(displayM)} title="Material">M</span>
+          <span style={letterStyle(dStatus)} title="Digitized">D</span>
+          <span style={letterStyle(tStatus)} title="Thread">T</span>
+          <span style={letterStyle(mStatus)} title="Material">M</span>
         </div>
       );
     })()}
