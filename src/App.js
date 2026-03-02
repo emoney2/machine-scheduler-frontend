@@ -231,26 +231,34 @@ const SOCKET_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '
 const SOCKET_PATH   = '/socket.io';
 
 let socket = null;
+let socketErrorLogged = false;
 try {
   socket = io(SOCKET_ORIGIN, {
     path: SOCKET_PATH,
-    transports: ['websocket'], // force native WS
-    upgrade: false,            // skip polling->ws upgrade
-    timeout: 20000,
+    transports: ['websocket'],
+    upgrade: false,
+    timeout: 60000,  // 60s for Render cold start
     reconnection: true,
-    reconnectionAttempts: 8,
-    reconnectionDelay: 800,
-    reconnectionDelayMax: 3000,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 2000,
+    reconnectionDelayMax: 10000,
     withCredentials: true
   });
 
-  // socket.on("connect",       () => console.log("⚡ socket connected, id =", socket.id));
-  // socket.on("disconnect",    (reason) => console.log("🛑 socket disconnected:", reason));
+  socket.on("connect", () => { socketErrorLogged = false; });
   socket.on("connect_error", (err) => {
-    console.warn("🟡 socket connect_error:", err?.message || err);
     window.__SOCKET_DOWN__ = true;
+    if (!socketErrorLogged) {
+      socketErrorLogged = true;
+      console.warn("🟡 Socket connection failed (backend may be waking up). Real-time updates disabled until connected.");
+    }
   });
-  socket.on("error", (err) => console.warn("🟡 socket error:", err?.message || err));
+  socket.on("error", (err) => {
+    if (!socketErrorLogged) {
+      socketErrorLogged = true;
+      console.warn("🟡 socket error:", err?.message || err);
+    }
+  });
 } catch (e) {
   console.warn("🟡 socket init failed:", e);
   window.__SOCKET_DOWN__ = true;
@@ -1096,8 +1104,15 @@ const fetchOrdersEmbroLinksCore = async () => {
   setHasError(false);
 
   try {
-    // 1) Fetch everything in a single round-trip
-    const combinedRes = await axios.get(API_ROOT + '/combined');
+    // 1) Fetch everything in a single round-trip (long timeout for Render cold start)
+    let combinedRes;
+    try {
+      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
+    } catch (firstErr) {
+      console.warn("🟡 /combined first attempt failed, retrying in 5s…", firstErr?.message || firstErr);
+      await new Promise(r => setTimeout(r, 5000));
+      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
+    }
     const ordersRes   = { data: combinedRes.data?.orders || [] };
     const embRes      = { data: combinedRes.data?.embroideryList || [] };
     const linksRes    = { data: combinedRes.data?.links || {} };
