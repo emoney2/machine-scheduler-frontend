@@ -5,8 +5,6 @@ import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
 import axios from 'axios';
 
 export default function Section9(props) {
-  console.log('🔥 Section9 props.onDragEnd is', typeof props.onDragEnd);
-
   const [status, setStatus] = useState('');
   const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
   const {
@@ -256,9 +254,6 @@ export default function Section9(props) {
                 const prod = String(j.product ?? j.Product ?? '').toLowerCase();
                 return !prod.includes('towel');
               });
-
-            console.log('🤖 Column', colId, 'jobs after filter:', jobs.map(j => [j.id, `"${j.status}"`, (j.product ?? j.Product ?? '')] ));
-
 
             const segments = [];
             let idx = 0;
@@ -750,7 +745,7 @@ export default function Section9(props) {
                                     )}
 
                                     {/* Thread‐Color Bubbles (digitized jobs): solid fill by status — red = missing, yellow = ordered, white = in stock */}
-                                    {job.threadColors && (
+                                    {job.threadColors != null && String(job.threadColors).trim() && (
                                       <div
                                         style={{
                                           gridRow:             4,
@@ -764,7 +759,7 @@ export default function Section9(props) {
                                           minWidth:            0                   // ← lets it expand right up to Delivery
                                         }}
                                       >
-                                        {job.threadColors
+                                        {String(job.threadColors)
                                           .split(',')
                                           .map(c => c.trim())
                                           .filter(c => c)
