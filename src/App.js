@@ -222,11 +222,9 @@ axios.interceptors.response.use(
 );
 
 // CONFIGURATION
-// When served from production Netlify, always use same-origin /api so the Netlify proxy is used (avoids CORS).
-const PRODUCTION_ORIGIN = 'https://machineschedule.netlify.app';
-const useProxy = typeof window !== 'undefined' && window.location.origin === PRODUCTION_ORIGIN;
+// Use REACT_APP_API_ROOT when set (production: backend URL); else /api for local proxy.
 const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
-const API_ROOT      = (useProxy ? '/api' : (RAW_API_ROOT || '/api')).replace(/\/$/, '');
+const API_ROOT      = (RAW_API_ROOT || '/api').replace(/\/$/, '');
 BACKEND_ORIGIN_FOR_REDIRECT = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
 // Socket must still reach Render (Netlify doesn't proxy WebSockets). Backend must allow origin.
 const SOCKET_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : 'https://machine-scheduler-backend.onrender.com';

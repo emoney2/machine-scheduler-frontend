@@ -4,10 +4,7 @@ import "./FileInput.css";
 import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
-// When on production Netlify, use same-origin /api so the Netlify proxy is used (avoids CORS).
-const PRODUCTION_ORIGIN = "https://machineschedule.netlify.app";
-const useProxy = typeof window !== "undefined" && window.location?.origin === PRODUCTION_ORIGIN;
-const API_ROOT = (useProxy ? "/api" : (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
+const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
 export default function OrderSubmission() {
   const [form, setForm] = useState({
@@ -577,7 +574,7 @@ const companyNames = companies.map((opt) => opt.value);
 
 
   const baseForSubmit = API_ROOT.replace(/\/api$/, "");
-  const submitUrl = useProxy ? "/submit" : (process.env.REACT_APP_ORDER_SUBMIT_URL || `${baseForSubmit}/submit`);
+  const submitUrl = process.env.REACT_APP_ORDER_SUBMIT_URL || `${baseForSubmit}/submit`;
 
 
   const handleChange = (e) => {
@@ -828,7 +825,7 @@ const submitForm = async () => {
 
   try {
     const baseForSubmit = API_ROOT.replace(/\/api$/, "");
-    const submitUrl = useProxy ? "/submit" : (process.env.REACT_APP_ORDER_SUBMIT_URL || `${baseForSubmit}/submit`);
+    const submitUrl = process.env.REACT_APP_ORDER_SUBMIT_URL || `${baseForSubmit}/submit`;
 
 
     const config = {
