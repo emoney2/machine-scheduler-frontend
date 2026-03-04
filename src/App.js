@@ -1332,7 +1332,7 @@ const fetchManualStateCore = async (previousCols) => {
     machine2Ids.forEach(id => pullToMachine(id, 'machine2'));
 
     // 7.5) Any placeholders that are not explicitly on a machine stay in queue
-    msData.placeholders.forEach(ph => {
+    (msData.placeholders || []).forEach(ph => {
       const onM1 = machine1Ids.includes(ph.id);
       const onM2 = machine2Ids.includes(ph.id);
       if (!onM1 && !onM2 && !mergedCols.queue.jobs.some(j => j.id === ph.id)) {
