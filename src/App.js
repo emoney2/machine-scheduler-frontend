@@ -222,9 +222,11 @@ axios.interceptors.response.use(
 );
 
 // CONFIGURATION
-// Use relative /api when unset so Netlify can proxy to backend (avoids CORS).
+// When served from production Netlify, always use same-origin /api so the Netlify proxy is used (avoids CORS).
+const PRODUCTION_ORIGIN = 'https://machineschedule.netlify.app';
+const useProxy = typeof window !== 'undefined' && window.location.origin === PRODUCTION_ORIGIN;
 const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
-const API_ROOT      = (RAW_API_ROOT || '/api').replace(/\/$/, '');
+const API_ROOT      = (useProxy ? '/api' : (RAW_API_ROOT || '/api')).replace(/\/$/, '');
 BACKEND_ORIGIN_FOR_REDIRECT = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
 // Socket must still reach Render (Netlify doesn't proxy WebSockets). Backend must allow origin.
 const SOCKET_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : 'https://machine-scheduler-backend.onrender.com';
@@ -1403,8 +1405,7 @@ const fetchManualStateCore = async (previousCols) => {
 
     async function pollChanges() {
       try {
-        const root = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
-        const url  = `${root}/changes`;
+        const url  = `${API_ROOT}/changes`;
         const res  = await fetch(url, { credentials: "include" });
         if (!res.ok) return; // silent skip on transient errors
         let data = null;
@@ -1918,7 +1919,7 @@ useEffect(() => {
         <button
           onClick={() => {
             // redirect to backend logout endpoint
-            const base = process.env.REACT_APP_API_ROOT.replace(/\/api$/, '');
+            const base = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
             window.location.href = `${base}/logout`;
           }}
           style={{
