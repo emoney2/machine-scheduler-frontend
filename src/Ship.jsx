@@ -542,11 +542,13 @@ export default function Ship() {
       // Refocus current tab
       setTimeout(() => window.focus(), 500);
 
-      // Build invoice URL for summary page
-      // Backend already returns full URL, use it directly
+      // Build invoice URL for summary page (use the one we just created)
       const invoiceUrl = data?.invoice && typeof data.invoice === "string"
         ? data.invoice.trim()
         : "";
+      try {
+        sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
+      } catch {}
 
       navigate("/shipment-complete", {
         state: {

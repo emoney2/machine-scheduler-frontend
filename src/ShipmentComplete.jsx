@@ -10,13 +10,14 @@ export default function ShipmentComplete() {
   const slipsPrinted  = state?.slipsPrinted  ?? false;
   const labelsPrinted = state?.labelsPrinted ?? false;
 
-  // Prefer the URL saved by Ship.jsx; fall back to state.invoiceUrl if needed
+  // Prefer state.invoiceUrl (the invoice we just created this run); use sessionStorage only when state is missing (e.g. page refresh)
   const invoiceUrl = useMemo(() => {
+    const fromState = (state?.invoiceUrl || "").trim();
+    if (fromState) return fromState;
     try {
-      const stored = (sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
-      return stored || (state?.invoiceUrl || "");
+      return (sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
     } catch {
-      return state?.invoiceUrl || "";
+      return "";
     }
   }, [state]);
 
