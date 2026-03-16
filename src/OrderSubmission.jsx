@@ -624,11 +624,6 @@ const companyNames = companies.map((opt) => opt.value);
     // Do NOT touch form.designName — user will type it manually 
   };
 
-console.log({
-  companyNames: companyNames.slice(0, 5),
-  productNames: productNames.slice(0, 5),
-  materialNames: materialNames.slice(0, 5),
-});
 // ─── UPDATED handleSubmit ───────────────────────────────────────
 const handleSubmit = async (e) => {
   console.log("🛎️ handleSubmit called");
@@ -698,7 +693,9 @@ const handleSubmit = async (e) => {
       unit: "",
       minInv: "",
       reorder: "",
-      cost: ""
+      cost: "",
+      vendor: "",
+      color: "#000000",
     });
     return setIsNewMaterialModalOpen(true);
   }
@@ -1053,13 +1050,19 @@ const handleSaveNewCompany = async () => {
           reorderJob["Material4"] || "",
           reorderJob["Material5"] || "",
         ],
-        materialPercents: [
-          reorderJob["Material1 Percent"] || reorderJob["Material 1 Percent"] || "",
-          reorderJob["Material2 Percent"] || reorderJob["Material 2 Percent"] || "",
-          reorderJob["Material3 Percent"] || reorderJob["Material 3 Percent"] || "",
-          reorderJob["Material4 Percent"] || reorderJob["Material 4 Percent"] || "",
-          reorderJob["Material5 Percent"] || reorderJob["Material 5 Percent"] || "",
-        ],
+        materialPercents: [1, 2, 3, 4, 5].map((n) => {
+          const keyNoSpace = `Material${n}%`;
+          const keyWithSpace = `Material ${n}%`;
+          const keyPercent = `Material${n} Percent`;
+          const keySpacePercent = `Material ${n} Percent`;
+          const raw =
+            reorderJob[keyNoSpace] ??
+            reorderJob[keyWithSpace] ??
+            reorderJob[keyPercent] ??
+            reorderJob[keySpacePercent] ??
+            "";
+          return raw !== "" && raw !== null && raw !== undefined ? String(raw).trim() : "";
+        }),
         backMaterial: reorderJob["Back Material"] || "",
         embBacking: reorderJob["EMB Backing"] || "",  // ✅ this now works with your <select>
         furColor: reorderJob["Fur Color"] || "",
@@ -1593,7 +1596,7 @@ const handleSaveNewCompany = async () => {
                   <input
                     type="color"
                     name="color"
-                    value={newMaterialData.color}
+                    value={newMaterialData.color && /^#[0-9A-Fa-f]{6}$/.test(newMaterialData.color) ? newMaterialData.color : "#000000"}
                     onChange={handleNewMaterialChange}
                     style={{
                       width: "60px",
@@ -1609,7 +1612,7 @@ const handleSaveNewCompany = async () => {
                   <input
                     type="text"
                     name="color"
-                    value={newMaterialData.color}
+                    value={newMaterialData.color || ""}
                     onChange={handleNewMaterialChange}
                     placeholder="#000000"
                     style={{

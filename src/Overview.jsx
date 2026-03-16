@@ -366,6 +366,21 @@ function pickHardSoft(job) {
       ?? job["Hard or Soft"]
       ?? "";
 }
+// Normalize Stage from job (Sheet column may be "Stage", "stage", "Status"; API may use different keys)
+function getJobStage(job) {
+  const raw = (job["Stage"] ?? job["stage"] ?? job["Status"] ?? job["status"] ?? job["Stage "] ?? "").toString().trim();
+  return raw.toUpperCase();
+}
+// True if job's Ship Date or Due Date falls within the window: today through today + daysWindow (or overdue)
+function isJobInTimeWindow(job, daysWindowNum) {
+  const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
+  const dueDate = job["Due Date"] ?? job["Due"] ?? null;
+  const daysToShip = shipDate != null ? daysUntil(shipDate) : null;
+  const daysToDue = dueDate != null ? daysUntil(dueDate) : null;
+  const days = daysToShip ?? daysToDue;
+  if (days === null) return false;
+  return days <= daysWindowNum;
+}
 function deriveThumb(link) {
   const s = String(link || "");
   let id = "";
@@ -642,12 +657,13 @@ function col(width, center = false) {
     if (cached) {
       const { upcoming = [], materials = [] } = cached;
 
-        // Filter out only COMPLETE jobs (keep all others including past ship dates)
+        // Only include Open jobs within the time window (read Stage column; filter by Ship/Due date)
         const daysWindowNum = parseInt(daysWindow, 10) || 7;
         const baseJobs = (upcoming ?? []).filter(j => {
-          const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
-          // Only filter out COMPLETE jobs, keep all others (including past ship dates)
-          return stage !== "COMPLETE" && stage !== "COMPLETED";
+          const stage = getJobStage(j);
+          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
+          if (stage !== "OPEN") return false;
+          return isJobInTimeWindow(j, daysWindowNum);
         });
 
       // Show cached data immediately while fresh data loads in background
@@ -725,33 +741,24 @@ function col(width, center = false) {
         });
         const daysWindowNum = parseInt(daysWindow, 10) || 7;
 
-        // Filter out only COMPLETE jobs (backend already filters, but double-check here)
+        // Only include Open jobs within the time window (read Stage column; filter by Ship/Due date)
         const sheetJobs = (upcoming ?? []).filter(j => {
-          const stage = String(j["Stage"] ?? j.stage ?? "").trim().toUpperCase();
-          // Only filter out COMPLETE jobs, keep all others (including past ship dates)
-          return stage !== "COMPLETE" && stage !== "COMPLETED";
+          const stage = getJobStage(j);
+          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
+          if (stage !== "OPEN") return false;
+          return isJobInTimeWindow(j, daysWindowNum);
         });
 
-        // Merge overdue from /orders (not already included)
+        // Merge overdue from /orders (only Open, within window, not already included)
         const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
         const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
         const overdueJobs = allOrders.filter(j => {
-          const stage = String(j["Stage"] ?? "").trim().toUpperCase();
+          const stage = getJobStage(j);
           if (stage === "COMPLETE" || stage === "COMPLETED") return false;
-          
-          // Also filter by Ship Date for overdue jobs
-          const shipDate = j["Ship Date"] ?? j["Ship"] ?? null;
-          if (shipDate) {
-            const daysToShip = daysUntil(shipDate);
-            if (daysToShip !== null) {
-              return daysToShip <= daysWindowNum && !included.has(String(j["Order #"] || "").trim());
-            }
-          }
-          
-          const d = daysUntil(j["Due Date"]);
-          if (d === null) return false;
+          if (stage !== "OPEN") return false;
+          if (!isJobInTimeWindow(j, daysWindowNum)) return false;
           const orderId = String(j["Order #"] || "").trim();
-          return d < 0 && !included.has(orderId);
+          return !included.has(orderId);
         });
 
         // Merge + sort (overdue first → smaller daysUntil)
@@ -833,7 +840,7 @@ function col(width, center = false) {
       socket.off("materialsUpdated", debounced);
       window.removeEventListener("materialsOrdered", handleMaterialsOrdered);
     };
-  }, []);
+  }, [daysWindow]);
 
   // Load vendor directory once
   useEffect(() => {
