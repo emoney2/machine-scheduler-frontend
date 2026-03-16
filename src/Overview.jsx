@@ -371,6 +371,11 @@ function getJobStage(job) {
   const raw = (job["Stage"] ?? job["stage"] ?? job["Status"] ?? job["status"] ?? job["Stage "] ?? "").toString().trim();
   return raw.toUpperCase();
 }
+// True if job should be hidden (show all Stage values except Completed)
+function isStageCompleted(job) {
+  const stage = getJobStage(job);
+  return stage === "COMPLETE" || stage === "COMPLETED";
+}
 // True if job's Ship Date or Due Date falls within the window: today through today + daysWindow (or overdue)
 function isJobInTimeWindow(job, daysWindowNum) {
   const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
@@ -657,12 +662,10 @@ function col(width, center = false) {
     if (cached) {
       const { upcoming = [], materials = [] } = cached;
 
-        // Only include Open jobs within the time window (read Stage column; filter by Ship/Due date)
+        // Show all Stage values except Completed; within time window
         const daysWindowNum = parseInt(daysWindow, 10) || 7;
         const baseJobs = (upcoming ?? []).filter(j => {
-          const stage = getJobStage(j);
-          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
-          if (stage !== "OPEN") return false;
+          if (isStageCompleted(j)) return false;
           return isJobInTimeWindow(j, daysWindowNum);
         });
 
@@ -741,21 +744,17 @@ function col(width, center = false) {
         });
         const daysWindowNum = parseInt(daysWindow, 10) || 7;
 
-        // Only include Open jobs within the time window (read Stage column; filter by Ship/Due date)
+        // Show all Stage values except Completed; within time window
         const sheetJobs = (upcoming ?? []).filter(j => {
-          const stage = getJobStage(j);
-          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
-          if (stage !== "OPEN") return false;
+          if (isStageCompleted(j)) return false;
           return isJobInTimeWindow(j, daysWindowNum);
         });
 
-        // Merge overdue from /orders (only Open, within window, not already included)
+        // Merge from /orders: not completed, within window, not already included
         const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
         const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
         const overdueJobs = allOrders.filter(j => {
-          const stage = getJobStage(j);
-          if (stage === "COMPLETE" || stage === "COMPLETED") return false;
-          if (stage !== "OPEN") return false;
+          if (isStageCompleted(j)) return false;
           if (!isJobInTimeWindow(j, daysWindowNum)) return false;
           const orderId = String(j["Order #"] || "").trim();
           return !included.has(orderId);
