@@ -366,10 +366,23 @@ function pickHardSoft(job) {
       ?? job["Hard or Soft"]
       ?? "";
 }
-// Normalize Stage from job (Sheet column may be "Stage", "stage", "Status"; API may use different keys)
+// Values that are likely from other columns (Print, material, etc.) - not real stage names
+const NON_STAGE_VALUES = new Set(["PRINT", "NO", "YES", "FUR"].map((s) => s.toUpperCase()));
+
+// Prefer stage-like value: if "Stage" looks wrong (e.g. FUR, PRINT), use Status/Job Stage if present
+function getStageForDisplay(job) {
+  const fromStage = (job["Stage"] ?? job["stage"] ?? "").toString().trim();
+  const fromStatus = (job["Status"] ?? job["status"] ?? "").toString().trim();
+  const fromJobStage = (job["Job Stage"] ?? job["JobStage"] ?? "").toString().trim();
+  if (fromStatus && NON_STAGE_VALUES.has(fromStage.toUpperCase())) return fromStatus;
+  if (fromJobStage && NON_STAGE_VALUES.has(fromStage.toUpperCase())) return fromJobStage;
+  if (fromStatus) return fromStatus;
+  if (fromJobStage) return fromJobStage;
+  return fromStage || "";
+}
+// Normalize for filtering (uppercase)
 function getJobStage(job) {
-  const raw = (job["Stage"] ?? job["stage"] ?? job["Status"] ?? job["status"] ?? job["Stage "] ?? "").toString().trim();
-  return raw.toUpperCase();
+  return getStageForDisplay(job).toUpperCase();
 }
 // True if job should be hidden (show all Stage values except Completed)
 function isStageCompleted(job) {
@@ -1676,8 +1689,8 @@ function col(width, center = false) {
                       <div style={{ ...col(120), fontSize: 13, color: "#374151" }} title={String(job["Product"] || "")}>
                         {job["Product"]}
                       </div>
-                      <div style={{ ...col(90), fontSize: 13, color: "#374151" }} title={String(job["Stage"] || "")}>
-                        {job["Stage"]}
+                      <div style={{ ...col(90), fontSize: 13, color: "#374151" }} title={String(getStageForDisplay(job) || "")}>
+                        {getStageForDisplay(job)}
                       </div>
                       <div style={{ ...col(64, true), fontSize: 13, color: "#374151" }} title={String(job["Due Date"] || "")}>
                         {fmtMMDD(job["Due Date"])}{hardPill}
