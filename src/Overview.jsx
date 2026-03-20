@@ -14,6 +14,8 @@ const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 const BACKEND_ROOT = ROOT.replace(/\/api$/, "");
 const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
+// When set, upcoming jobs are loaded from the Overview sheet A3 QUERY via this Apps Script URL (accurate list).
+const OVERVIEW_QUERY_URL = (process.env.REACT_APP_OVERVIEW_QUERY_URL || "").trim();
 
 const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 
@@ -674,13 +676,12 @@ function col(width, center = false) {
     const cached = loadOverviewCache();
     if (cached) {
       const { upcoming = [], materials = [] } = cached;
-
-        // Show all Stage values except Completed; within time window
-        const daysWindowNum = parseInt(daysWindow, 10) || 7;
-        const baseJobs = (upcoming ?? []).filter(j => {
-          if (isStageCompleted(j)) return false;
-          return isJobInTimeWindow(j, daysWindowNum);
-        });
+      const baseJobs = OVERVIEW_QUERY_URL
+        ? (upcoming ?? [])
+        : (upcoming ?? []).filter(j => {
+            if (isStageCompleted(j)) return false;
+            return isJobInTimeWindow(j, parseInt(daysWindow, 10) || 7);
+          });
 
       // Show cached data immediately while fresh data loads in background
       setUpcoming(baseJobs);
@@ -723,59 +724,72 @@ function col(width, center = false) {
       overviewCtrlRef.current = ctrl;
 
       try {
-        // Run /overview and /api/combined in parallel, but fail fast at 10s so we never hang the tab
-        // ✅ Only block on /overview
-        const overRes = await getWithRetry(
-          axios,
-          `${ROOT}/overview`,
-          { withCredentials: true, signal: ctrl.signal },
-          [15000, 20000]
-        );
+        let upcoming = [];
+        let materials = [];
 
-        // ✅ Fire /combined in the background (non-blocking)
-        let comboRes = null;
-        getWithRetry(
-          axios,
-          `${ROOT}/combined`,
-          { withCredentials: true },
-          [15000, 20000]
-        )
-          .then(res => { comboRes = res; })
-          .catch(() => {
-            console.warn("/combined failed — continuing without it");
+        if (OVERVIEW_QUERY_URL) {
+          // Use Overview sheet A3 QUERY list (accurate) — no filtering; query is already correct
+          const queryUrl = OVERVIEW_QUERY_URL.includes("?") ? `${OVERVIEW_QUERY_URL}&action=overviewquery` : `${OVERVIEW_QUERY_URL}?action=overviewquery`;
+          const queryRes = await getWithRetry(
+            axios,
+            queryUrl,
+            { signal: ctrl.signal },
+            [15000, 20000]
+          );
+          const queryData = queryRes?.data || {};
+          upcoming = queryData.upcoming || [];
+          if (!alive) return;
+          // Get materials from main overview API
+          try {
+            const overRes = await axios.get(`${ROOT}/overview`, { withCredentials: true, timeout: 15000 });
+            materials = overRes?.data?.materials || [];
+          } catch (_) {
+            materials = [];
+          }
+          console.log("📦 Overview query data (A3):", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
+        } else {
+          // Legacy: /overview + /combined, then filter by Stage and time window
+          const overRes = await getWithRetry(
+            axios,
+            `${ROOT}/overview`,
+            { withCredentials: true, signal: ctrl.signal },
+            [15000, 20000]
+          );
+          let comboRes = null;
+          getWithRetry(
+            axios,
+            `${ROOT}/combined`,
+            { withCredentials: true },
+            [15000, 20000]
+          )
+            .then(res => { comboRes = res; })
+            .catch(() => { console.warn("/combined failed — continuing without it"); });
+
+          if (!alive) return;
+          const data = overRes?.data || {};
+          materials = data.materials || [];
+          const rawUpcoming = data.upcoming || [];
+          const daysWindowNum = parseInt(daysWindow, 10) || 7;
+          const sheetJobs = (rawUpcoming ?? []).filter(j => {
+            if (isStageCompleted(j)) return false;
+            return isJobInTimeWindow(j, daysWindowNum);
           });
+          const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
+          const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
+          const overdueJobs = allOrders.filter(j => {
+            if (isStageCompleted(j)) return false;
+            if (!isJobInTimeWindow(j, daysWindowNum)) return false;
+            return !included.has(String(j["Order #"] || "").trim());
+          });
+          upcoming = [...sheetJobs, ...overdueJobs];
+          console.log("📦 Overview data received:", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
+        }
 
         if (!alive) return;
-        const data = overRes?.data || {};
-        saveOverviewCache(data);
+        saveOverviewCache({ upcoming, materials });
 
-        const { upcoming = [], materials = [] } = data;
-        console.log("📦 Overview data received:", { 
-          upcomingCount: upcoming?.length || 0, 
-          materialsCount: materials?.length || 0,
-          materials: materials 
-        });
-        const daysWindowNum = parseInt(daysWindow, 10) || 7;
-
-        // Show all Stage values except Completed; within time window
-        const sheetJobs = (upcoming ?? []).filter(j => {
-          if (isStageCompleted(j)) return false;
-          return isJobInTimeWindow(j, daysWindowNum);
-        });
-
-        // Merge from /orders: not completed, within window, not already included
-        const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
-        const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
-        const overdueJobs = allOrders.filter(j => {
-          if (isStageCompleted(j)) return false;
-          if (!isJobInTimeWindow(j, daysWindowNum)) return false;
-          const orderId = String(j["Order #"] || "").trim();
-          return !included.has(orderId);
-        });
-
-        // Merge + sort (overdue first → smaller daysUntil)
-        const merged = [...sheetJobs, ...overdueJobs];
-        const sorted = merged.slice().sort((a, b) => {
+        // Sort by Ship Date then Due Date then Order #
+        const sorted = (upcoming ?? []).slice().sort((a, b) => {
           // Primary sort by Ship Date
           const sa = daysUntil(a["Ship Date"] ?? a["Ship"]), sb = daysUntil(b["Ship Date"] ?? b["Ship"]);
           if (sa !== null && sb !== null && sa !== sb) return sa - sb;
@@ -927,7 +941,7 @@ function col(width, center = false) {
     return () => clearInterval(id);
   }, [gmailPopup]);
 
-  // ▼ Fetch Performance Metrics (Overview!V1:X2) — cached + single-flight + abortable
+  // ▼ Fetch Performance Metrics — backend merges Supabase (sales) + Google Sheets (embroidery backlog)
   useEffect(() => {
     let alive = true;
 
@@ -946,25 +960,21 @@ function col(width, center = false) {
       metricsLockRef.current = true;
 
       try {
-        // 🔹 Use singleton Supabase client (imported at top)
+        // Backend returns sales metrics (Supabase) + embroidery backlog (Overview sheet cells or Supabase fallback)
+        const { data } = await axios.get(`${ROOT}/overview/metrics`, {
+          withCredentials: true,
+          timeout: 10000,
+        });
 
-        // 🔹 Query your "metrics" table (adjust table name if different)
-        const { data, error } = await supabase
-          .from("metrics")
-          .select("*")
-          .single();
-
-        if (error) throw error;
         if (!alive) return;
 
-        // ✅ Save + update state
         setMetrics(data);
         saveMetricsCache(data);
         setLoadingMetrics(false);
         markUpdated();
       } catch (err) {
         if (!alive) return;
-        console.warn("Supabase metrics fetch failed:", err.message || err);
+        console.warn("Overview metrics fetch failed:", err?.message || err);
         setLoadingMetrics(false);
       } finally {
         metricsLockRef.current = false;
@@ -1650,10 +1660,23 @@ function col(width, center = false) {
                   e.currentTarget.style.display = "none";
                 };
 
+                const isShopifyCustomer = /^shopify$/i.test(
+                  String(job["Company Name"] || "").trim()
+                );
+                const SHOPIFY_CARD_BG = "#dbeafe";
+                const SHOPIFY_CARD_BORDER = "2px solid #4169E1";
+
+                const cardBackground = isShopifyCustomer ? SHOPIFY_CARD_BG : fillColor;
+                const cardBorderStyle = isShopifyCustomer
+                  ? SHOPIFY_CARD_BORDER
+                  : rowCard.border;
+                const thumbBorderStyle = isShopifyCustomer
+                  ? { border: "2px solid #4169E1" }
+                  : { borderColor };
 
                 return (
-                  <div key={idx} style={{ ...rowCard, background: fillColor }}>
-                    <div style={{ ...imgBox, borderColor }}>
+                  <div key={idx} style={{ ...rowCard, background: cardBackground, border: cardBorderStyle }}>
+                    <div style={{ ...imgBox, ...thumbBorderStyle }}>
 
                       {primaryUrl ? (
                         <img

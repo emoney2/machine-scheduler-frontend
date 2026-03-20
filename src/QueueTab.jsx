@@ -496,6 +496,7 @@ export default function QueueTab() {
           {cards.map(order => {
             const orderId = String(order["Order #"] || "");
             const company = order["Company Name"] || "";
+            const isShopifyCustomer = /^shopify$/i.test(String(company).trim());
             const design  = order["Design"] || "";
             const qty     = order["Quantity"] || "";
             const product = order["Product"] || "";
@@ -540,6 +541,7 @@ export default function QueueTab() {
               return nameRaw || "#fff";
             })();
             const fg = (() => {
+              if (isShopifyCustomer) return "#111827";
               const hex = String(bg).replace("#","");
               if (!/^[0-9a-f]{6}$/i.test(hex)) return "#111";
               const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
@@ -564,6 +566,34 @@ export default function QueueTab() {
             })();
             const urgent = daysToShip !== null && daysToShip <= 7;
 
+            const shopifyCardBg = sel ? "#bfdbfe" : "#dbeafe";
+            const cardBg = isShopifyCustomer ? shopifyCardBg : (sel ? "rgba(37, 99, 235, 0.05)" : bg);
+            const cardBorder = isShopifyCustomer
+              ? "2px solid #4169E1"
+              : urgent
+                ? "2px solid #e11900"
+                : sel
+                  ? "2px solid #2563eb"
+                  : "1px solid #ddd";
+
+            const cardShadow = (() => {
+              const base = "0 1px 3px rgba(0,0,0,0.05)";
+              if (!isShopifyCustomer) {
+                return sel ? "0 0 0 4px rgba(37,99,235,0.15)" : base;
+              }
+              const shopifySel = "0 0 0 4px rgba(65, 105, 225, 0.28)";
+              const shopifyUrgent = "0 0 0 3px rgba(225, 25, 0, 0.38)";
+              const shopifyUrgentOuter = "0 0 0 7px rgba(225, 25, 0, 0.32)";
+              if (sel && urgent) return `${base}, ${shopifySel}, ${shopifyUrgentOuter}`;
+              if (sel) return `${base}, ${shopifySel}`;
+              if (urgent) return `${base}, ${shopifyUrgent}`;
+              return base;
+            })();
+
+            const thumbBorder = isShopifyCustomer
+              ? "2px solid #4169E1"
+              : "1px solid rgba(0,0,0,0.08)";
+
             return (
               <div
                 key={orderId}
@@ -576,10 +606,10 @@ export default function QueueTab() {
                 style={{
                   display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
                   gap: 8, padding: 10, borderRadius: 14,
-                  border: urgent ? "2px solid #e11900" : (sel ? "2px solid #2563eb" : "1px solid #ddd"),
-                  background: sel ? "rgba(37, 99, 235, 0.05)" : bg,
+                  border: cardBorder,
+                  background: cardBg,
                   color: fg, position: "relative",
-                  boxShadow: sel ? "0 0 0 4px rgba(37,99,235,0.15)" : "0 1px 3px rgba(0,0,0,0.05)",
+                  boxShadow: cardShadow,
                   transform: sel ? "translateY(-1px)" : "none",
                   transition: "border 120ms ease, box-shadow 120ms ease, background 120ms ease, transform 120ms ease",
                   cursor: "pointer", userSelect: "none", outline: "none"
@@ -591,7 +621,7 @@ export default function QueueTab() {
                       position: "absolute",
                       top: 8,
                       right: 8,
-                      background: "#2563eb",
+                      background: isShopifyCustomer ? "#4169E1" : "#2563eb",
                       color: "white",
                       fontSize: 12,
                       fontWeight: 700,
@@ -607,7 +637,7 @@ export default function QueueTab() {
 
                 {/* Preview */}
                 <div style={{ display: "grid", placeItems: "center" }}>
-                  <div style={{ width: 72, height: 52, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
+                  <div style={{ width: 72, height: 52, overflow: "hidden", borderRadius: 6, border: thumbBorder, background: "#fff" }}>
                     {imageUrl ? (
                       <img
                         loading="lazy" decoding="async" src={imageUrl} alt="preview"
