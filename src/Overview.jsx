@@ -128,6 +128,15 @@ const LS_OVERVIEW_KEY = "jrco.overview.cache.v1";
 
 const LS_METRICS_KEY = "jrco.metrics.cache.v1";
 
+// Backend `/overview` keeps a 30s in-memory cache; bypass unless explicitly disabled.
+const OVERVIEW_BYPASS_SERVER_CACHE =
+  (process.env.REACT_APP_OVERVIEW_BYPASS_SERVER_CACHE || "1").trim() !== "0";
+
+function withOverviewNoCache(url) {
+  if (!OVERVIEW_BYPASS_SERVER_CACHE) return url;
+  return url.includes("?") ? `${url}&nocache=1` : `${url}?nocache=1`;
+}
+
 // Simple Axios GET with per-attempt timeouts and exponential backoff
 async function getWithRetry(axiosInstance, url, baseConfig = {}, attempts = [15000, 20000, 25000, 30000, 40000]) {
   let lastErr;
@@ -180,6 +189,24 @@ function loadOverviewCache(maxAgeMs = 5 * 60 * 1000) { // 5 min
     if (!t || (Date.now() - t) > maxAgeMs) return null;
     return data;
   } catch { return null; }
+}
+
+function getOverviewCacheMeta() {
+  try {
+    const raw = localStorage.getItem(LS_OVERVIEW_KEY);
+    if (!raw) return { present: false };
+    const parsed = JSON.parse(raw) || {};
+    const ts = parsed?.t || null;
+    const ageMs = ts ? (Date.now() - ts) : null;
+    return {
+      present: true,
+      ageMs,
+      upcomingCount: Array.isArray(parsed?.data?.upcoming) ? parsed.data.upcoming.length : 0,
+      materialsCount: Array.isArray(parsed?.data?.materials) ? parsed.data.materials.length : 0,
+    };
+  } catch (e) {
+    return { present: false, parseError: e?.message || String(e) };
+  }
 }
 
 
@@ -724,6 +751,14 @@ function col(width, center = false) {
   // Load combined overview (upcoming + materials)
   useEffect(() => {
     let alive = true;
+    console.log("[Overview upcoming] init", {
+      root: ROOT,
+      overviewQueryUrl: OVERVIEW_QUERY_URL || null,
+      usingOverviewQuery: !!OVERVIEW_QUERY_URL,
+      daysWindow,
+      cacheMeta: getOverviewCacheMeta(),
+      ts: new Date().toISOString(),
+    });
 
     // 1) Hydrate instantly from cache (if any) - always fetch fresh on mount
     const cached = loadOverviewCache();
@@ -742,6 +777,11 @@ function col(width, center = false) {
       const materialsArray = Array.isArray(materials) ? materials : [];
       setMaterials(materialsArray);
       console.log("📦 Cached materials loaded:", materialsArray.length, "vendors");
+      console.log("[Overview upcoming] hydrated from cache", {
+        cachedUpcomingCount: Array.isArray(upcoming) ? upcoming.length : 0,
+        renderedUpcomingCount: Array.isArray(baseJobs) ? baseJobs.length : 0,
+        cachedMaterialsCount: materialsArray.length,
+      });
       markUpdated();
 
       // Don't show loading spinner - data will update when fresh load completes
@@ -783,6 +823,7 @@ function col(width, center = false) {
         if (OVERVIEW_QUERY_URL) {
           // Use Overview sheet A3 QUERY list (accurate) — no filtering; query is already correct
           const queryUrl = OVERVIEW_QUERY_URL.includes("?") ? `${OVERVIEW_QUERY_URL}&action=overviewquery` : `${OVERVIEW_QUERY_URL}?action=overviewquery`;
+          console.log("[Overview upcoming] source=google-apps-script-query", { queryUrl });
           const queryRes = await getWithRetry(
             axios,
             queryUrl,
@@ -794,7 +835,10 @@ function col(width, center = false) {
           if (!alive) return;
           // Get materials from main overview API
           try {
-            const overRes = await axios.get(`${ROOT}/overview`, { withCredentials: true, timeout: 15000 });
+            const overRes = await axios.get(withOverviewNoCache(`${ROOT}/overview`), {
+              withCredentials: true,
+              timeout: 15000,
+            });
             materials = overRes?.data?.materials || [];
           } catch (_) {
             materials = [];
@@ -802,21 +846,35 @@ function col(width, center = false) {
           console.log("📦 Overview query data (A3):", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
         } else {
           // Legacy: /overview + /combined, then filter by Stage and time window
-          const overRes = await getWithRetry(
-            axios,
-            `${ROOT}/overview`,
-            { withCredentials: true, signal: ctrl.signal },
-            [15000, 20000]
-          );
-          let comboRes = null;
-          getWithRetry(
-            axios,
-            `${ROOT}/combined`,
-            { withCredentials: true },
-            [15000, 20000]
-          )
-            .then(res => { comboRes = res; })
-            .catch(() => { console.warn("/combined failed — continuing without it"); });
+          const overviewUrl = withOverviewNoCache(`${ROOT}/overview`);
+          const combinedUrl = `${ROOT}/combined`;
+          console.log("[Overview upcoming] source=backend-overview", {
+            overviewUrl,
+            combinedUrl,
+            daysWindow,
+          });
+          const [overRes, comboRes] = await Promise.all([
+            getWithRetry(
+              axios,
+              overviewUrl,
+              { withCredentials: true, signal: ctrl.signal },
+              [15000, 20000]
+            ),
+            getWithRetry(
+              axios,
+              combinedUrl,
+              { withCredentials: true, signal: ctrl.signal },
+              [15000, 20000]
+            ).catch((err) => {
+              console.warn("/combined failed — continuing without it", err?.message || err);
+              return { data: { orders: [] } };
+            }),
+          ]);
+          console.log("[Overview upcoming] /overview response", {
+            status: overRes?.status,
+            upcomingCountRaw: Array.isArray(overRes?.data?.upcoming) ? overRes.data.upcoming.length : 0,
+            materialsCountRaw: Array.isArray(overRes?.data?.materials) ? overRes.data.materials.length : 0,
+          });
 
           if (!alive) return;
           const data = overRes?.data || {};
@@ -836,6 +894,12 @@ function col(width, center = false) {
           });
           upcoming = [...sheetJobs, ...overdueJobs];
           console.log("📦 Overview data received:", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
+          console.log("[Overview upcoming] filtered counts", {
+            rawUpcomingCount: Array.isArray(rawUpcoming) ? rawUpcoming.length : 0,
+            sheetJobsCount: sheetJobs.length,
+            overdueJobsCount: overdueJobs.length,
+            finalUpcomingCount: upcoming.length,
+          });
         }
 
         if (!alive) return;
@@ -903,7 +967,7 @@ function col(width, center = false) {
     const handleMaterialsOrdered = () => {
       if (alive) {
         // Clear cache and force refresh
-        try { localStorage.removeItem("jrco.overview.cache"); } catch {}
+        try { localStorage.removeItem(LS_OVERVIEW_KEY); } catch {}
         loadFresh();
       }
     };
@@ -1209,7 +1273,7 @@ function col(width, center = false) {
       if (materialPayload.length || threadPayload.length) {
         // Clear cache and trigger refresh
         try {
-          localStorage.removeItem("jrco.overview.cache");
+          localStorage.removeItem(LS_OVERVIEW_KEY);
           // Trigger refresh via custom event that the useEffect listens to
           window.dispatchEvent(new CustomEvent("materialsOrdered"));
         } catch (e) {
