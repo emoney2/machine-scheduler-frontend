@@ -14,8 +14,8 @@ const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 const BACKEND_ROOT = ROOT.replace(/\/api$/, "");
 const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
-// When set, upcoming jobs are loaded from the Overview sheet A3 QUERY via this Apps Script URL (accurate list).
-const OVERVIEW_QUERY_URL = (process.env.REACT_APP_OVERVIEW_QUERY_URL || "").trim();
+// Upcoming jobs always come from GET /api/overview (backend reads **Production Orders** tab only).
+// Do not use the Overview-tab QUERY via Apps Script here — wrong tab vs Production Orders.
 
 const LS_VENDORS_KEY = "jrco.vendors.cache.v1";
 
@@ -753,8 +753,7 @@ function col(width, center = false) {
     let alive = true;
     console.log("[Overview upcoming] init", {
       root: ROOT,
-      overviewQueryUrl: OVERVIEW_QUERY_URL || null,
-      usingOverviewQuery: !!OVERVIEW_QUERY_URL,
+      upcomingSource: "api/overview (Production Orders sheet via backend)",
       daysWindow,
       cacheMeta: getOverviewCacheMeta(),
       ts: new Date().toISOString(),
@@ -764,12 +763,10 @@ function col(width, center = false) {
     const cached = loadOverviewCache();
     if (cached) {
       const { upcoming = [], materials = [] } = cached;
-      const baseJobs = OVERVIEW_QUERY_URL
-        ? (upcoming ?? [])
-        : (upcoming ?? []).filter(j => {
-            if (isStageCompleted(j)) return false;
-            return isJobInTimeWindow(j, parseInt(daysWindow, 10) || 7);
-          });
+      const baseJobs = (upcoming ?? []).filter(j => {
+        if (isStageCompleted(j)) return false;
+        return isJobInTimeWindow(j, parseInt(daysWindow, 10) || 7);
+      });
 
       // Show cached data immediately while fresh data loads in background
       setUpcoming(baseJobs);
@@ -820,87 +817,62 @@ function col(width, center = false) {
         let upcoming = [];
         let materials = [];
 
-        if (OVERVIEW_QUERY_URL) {
-          // Use Overview sheet A3 QUERY list (accurate) — no filtering; query is already correct
-          const queryUrl = OVERVIEW_QUERY_URL.includes("?") ? `${OVERVIEW_QUERY_URL}&action=overviewquery` : `${OVERVIEW_QUERY_URL}?action=overviewquery`;
-          console.log("[Overview upcoming] source=google-apps-script-query", { queryUrl });
-          const queryRes = await getWithRetry(
+        // /overview upcoming = Production Orders tab (backend); /combined for overdue merge
+        const overviewUrl = withOverviewNoCache(`${ROOT}/overview`);
+        const combinedUrl = `${ROOT}/combined`;
+        console.log("[Overview upcoming] source=backend-overview (Production Orders tab)", {
+          overviewUrl,
+          combinedUrl,
+          daysWindow,
+        });
+        const [overRes, comboRes] = await Promise.all([
+          getWithRetry(
             axios,
-            queryUrl,
-            { signal: ctrl.signal },
-            [15000, 20000]
-          );
-          const queryData = queryRes?.data || {};
-          upcoming = queryData.upcoming || [];
-          if (!alive) return;
-          // Get materials from main overview API
-          try {
-            const overRes = await axios.get(withOverviewNoCache(`${ROOT}/overview`), {
-              withCredentials: true,
-              timeout: 15000,
-            });
-            materials = overRes?.data?.materials || [];
-          } catch (_) {
-            materials = [];
-          }
-          console.log("📦 Overview query data (A3):", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
-        } else {
-          // Legacy: /overview + /combined, then filter by Stage and time window
-          const overviewUrl = withOverviewNoCache(`${ROOT}/overview`);
-          const combinedUrl = `${ROOT}/combined`;
-          console.log("[Overview upcoming] source=backend-overview", {
             overviewUrl,
+            { withCredentials: true, signal: ctrl.signal },
+            [15000, 20000]
+          ),
+          getWithRetry(
+            axios,
             combinedUrl,
-            daysWindow,
-          });
-          const [overRes, comboRes] = await Promise.all([
-            getWithRetry(
-              axios,
-              overviewUrl,
-              { withCredentials: true, signal: ctrl.signal },
-              [15000, 20000]
-            ),
-            getWithRetry(
-              axios,
-              combinedUrl,
-              { withCredentials: true, signal: ctrl.signal },
-              [15000, 20000]
-            ).catch((err) => {
-              console.warn("/combined failed — continuing without it", err?.message || err);
-              return { data: { orders: [] } };
-            }),
-          ]);
-          console.log("[Overview upcoming] /overview response", {
-            status: overRes?.status,
-            upcomingCountRaw: Array.isArray(overRes?.data?.upcoming) ? overRes.data.upcoming.length : 0,
-            materialsCountRaw: Array.isArray(overRes?.data?.materials) ? overRes.data.materials.length : 0,
-          });
+            { withCredentials: true, signal: ctrl.signal },
+            [15000, 20000]
+          ).catch((err) => {
+            console.warn("/combined failed — continuing without it", err?.message || err);
+            return { data: { orders: [] } };
+          }),
+        ]);
+        console.log("[Overview upcoming] /overview response", {
+          status: overRes?.status,
+          upcomingCountRaw: Array.isArray(overRes?.data?.upcoming) ? overRes.data.upcoming.length : 0,
+          materialsCountRaw: Array.isArray(overRes?.data?.materials) ? overRes.data.materials.length : 0,
+          jobsSource: overRes?.data?.jobsSource,
+        });
 
-          if (!alive) return;
-          const data = overRes?.data || {};
-          materials = data.materials || [];
-          const rawUpcoming = data.upcoming || [];
-          const daysWindowNum = parseInt(daysWindow, 10) || 7;
-          const sheetJobs = (rawUpcoming ?? []).filter(j => {
-            if (isStageCompleted(j)) return false;
-            return isJobInTimeWindow(j, daysWindowNum);
-          });
-          const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
-          const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
-          const overdueJobs = allOrders.filter(j => {
-            if (isStageCompleted(j)) return false;
-            if (!isJobInTimeWindow(j, daysWindowNum)) return false;
-            return !included.has(String(j["Order #"] || "").trim());
-          });
-          upcoming = [...sheetJobs, ...overdueJobs];
-          console.log("📦 Overview data received:", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
-          console.log("[Overview upcoming] filtered counts", {
-            rawUpcomingCount: Array.isArray(rawUpcoming) ? rawUpcoming.length : 0,
-            sheetJobsCount: sheetJobs.length,
-            overdueJobsCount: overdueJobs.length,
-            finalUpcomingCount: upcoming.length,
-          });
-        }
+        if (!alive) return;
+        const data = overRes?.data || {};
+        materials = data.materials || [];
+        const rawUpcoming = data.upcoming || [];
+        const daysWindowNum = parseInt(daysWindow, 10) || 7;
+        const sheetJobs = (rawUpcoming ?? []).filter(j => {
+          if (isStageCompleted(j)) return false;
+          return isJobInTimeWindow(j, daysWindowNum);
+        });
+        const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
+        const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
+        const overdueJobs = allOrders.filter(j => {
+          if (isStageCompleted(j)) return false;
+          if (!isJobInTimeWindow(j, daysWindowNum)) return false;
+          return !included.has(String(j["Order #"] || "").trim());
+        });
+        upcoming = [...sheetJobs, ...overdueJobs];
+        console.log("📦 Overview data received:", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
+        console.log("[Overview upcoming] filtered counts", {
+          rawUpcomingCount: Array.isArray(rawUpcoming) ? rawUpcoming.length : 0,
+          sheetJobsCount: sheetJobs.length,
+          overdueJobsCount: overdueJobs.length,
+          finalUpcomingCount: upcoming.length,
+        });
 
         if (!alive) return;
         saveOverviewCache({ upcoming, materials });
