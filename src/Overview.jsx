@@ -446,6 +446,33 @@ function ringColorByShipDate(shipDate) {
   return "#999";
 }
 
+/** Full-row card tint + border from ship urgency (thumbnail stays neutral). */
+function cardUrgencyFromRing(ring) {
+  const r = (ring || "").toLowerCase();
+  if (r === "#e74c3c") {
+    return {
+      background: "rgba(231, 76, 60, 0.22)",
+      border: "2px solid #e74c3c",
+    };
+  }
+  if (r === "#f39c12") {
+    return {
+      background: "rgba(243, 156, 18, 0.2)",
+      border: "2px solid #f39c12",
+    };
+  }
+  if (r === "#2ecc71") {
+    return {
+      background: "rgba(46, 204, 113, 0.16)",
+      border: "2px solid #2ecc71",
+    };
+  }
+  return {
+    background: "rgba(249, 250, 251, 0.95)",
+    border: "1px solid #e5e7eb",
+  };
+}
+
 // Parse a Drive file id from a link (works for .../file/d/<id>/... or ?id=<id>)
 function parseDriveId(s) {
   const str = String(s || "");
@@ -1743,20 +1770,6 @@ function col(width, center = false) {
                   </span>
                 ) : null;
 
-
-
-                // Map the existing ring color → card fill + border color.
-                // If your ring function returns orange for moderate, use YELLOW for both fill and border.
-                const ORANGE = "#ffa500";
-                const RED = "#ff0000";
-                const YELLOW = "#ffd000"; // slightly warm yellow for better contrast
-
-                const borderColor = (ring && ring.toLowerCase() === ORANGE) ? YELLOW : ring;
-                const fillColor =
-                  (ring && ring.toLowerCase() === RED)    ? "rgba(255, 0, 0, 0.08)" :
-                  (ring && ring.toLowerCase() === ORANGE) ? "rgba(255, 221, 0, 0.12)" : "transparent";
-
-
                 const primaryUrl = getJobThumbUrl(job, ROOT);
 
                 // Keep it simple: if the primary fails, hide the image (skip JSON scanning)
@@ -1770,17 +1783,17 @@ function col(width, center = false) {
                 const SHOPIFY_CARD_BG = "#dbeafe";
                 const SHOPIFY_CARD_BORDER = "2px solid #4169E1";
 
-                const cardBackground = isShopifyCustomer ? SHOPIFY_CARD_BG : fillColor;
-                const cardBorderStyle = isShopifyCustomer
-                  ? SHOPIFY_CARD_BORDER
-                  : rowCard.border;
-                const thumbBorderStyle = isShopifyCustomer
+                const urgency = cardUrgencyFromRing(ring);
+                const cardBackground = isShopifyCustomer ? SHOPIFY_CARD_BG : urgency.background;
+                const cardBorderStyle = isShopifyCustomer ? SHOPIFY_CARD_BORDER : urgency.border;
+                // Highlight the whole card; keep thumbnail border neutral
+                const thumbBoxStyle = isShopifyCustomer
                   ? { border: "2px solid #4169E1" }
-                  : { borderColor };
+                  : { border: "1px solid #e5e7eb" };
 
                 return (
                   <div key={idx} style={{ ...rowCard, background: cardBackground, border: cardBorderStyle }}>
-                    <div style={{ ...imgBox, ...thumbBorderStyle }}>
+                    <div style={{ ...imgBox, ...thumbBoxStyle }}>
 
                       {primaryUrl ? (
                         <img
