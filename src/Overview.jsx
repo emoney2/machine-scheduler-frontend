@@ -817,31 +817,19 @@ function col(width, center = false) {
         let upcoming = [];
         let materials = [];
 
-        // /overview upcoming = Production Orders tab (backend); /combined for overdue merge
+        // Single source: GET /overview only (Production Orders via backend). Do not merge /combined —
+        // that produced two stacked blocks (duplicate / mixed rows vs the overview payload).
         const overviewUrl = withOverviewNoCache(`${ROOT}/overview`);
-        const combinedUrl = `${ROOT}/combined`;
-        console.log("[Overview upcoming] source=backend-overview (Production Orders tab)", {
+        console.log("[Overview upcoming] source=backend-overview (Production Orders tab only)", {
           overviewUrl,
-          combinedUrl,
           daysWindow,
         });
-        const [overRes, comboRes] = await Promise.all([
-          getWithRetry(
-            axios,
-            overviewUrl,
-            { withCredentials: true, signal: ctrl.signal },
-            [15000, 20000]
-          ),
-          getWithRetry(
-            axios,
-            combinedUrl,
-            { withCredentials: true, signal: ctrl.signal },
-            [15000, 20000]
-          ).catch((err) => {
-            console.warn("/combined failed — continuing without it", err?.message || err);
-            return { data: { orders: [] } };
-          }),
-        ]);
+        const overRes = await getWithRetry(
+          axios,
+          overviewUrl,
+          { withCredentials: true, signal: ctrl.signal },
+          [15000, 20000]
+        );
         console.log("[Overview upcoming] /overview response", {
           status: overRes?.status,
           upcomingCountRaw: Array.isArray(overRes?.data?.upcoming) ? overRes.data.upcoming.length : 0,
@@ -858,20 +846,24 @@ function col(width, center = false) {
           if (isStageCompleted(j)) return false;
           return isJobInTimeWindow(j, daysWindowNum);
         });
-        const allOrders = Array.isArray(comboRes?.data?.orders) ? comboRes.data.orders : [];
-        const included = new Set(sheetJobs.map(j => String(j["Order #"] || "").trim()));
-        const overdueJobs = allOrders.filter(j => {
-          if (isStageCompleted(j)) return false;
-          if (!isJobInTimeWindow(j, daysWindowNum)) return false;
-          return !included.has(String(j["Order #"] || "").trim());
-        });
-        upcoming = [...sheetJobs, ...overdueJobs];
+        // Dedupe line items: same Order # + Product + Design can appear twice if data ever overlaps
+        const seen = new Set();
+        upcoming = [];
+        for (const j of sheetJobs) {
+          const k = [
+            String(j["Order #"] ?? "").trim(),
+            String(j["Product"] ?? "").trim(),
+            String(j["Design"] ?? "").trim(),
+          ].join("|");
+          if (seen.has(k)) continue;
+          seen.add(k);
+          upcoming.push(j);
+        }
         console.log("📦 Overview data received:", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
         console.log("[Overview upcoming] filtered counts", {
           rawUpcomingCount: Array.isArray(rawUpcoming) ? rawUpcoming.length : 0,
-          sheetJobsCount: sheetJobs.length,
-          overdueJobsCount: overdueJobs.length,
-          finalUpcomingCount: upcoming.length,
+          afterWindowFilter: sheetJobs.length,
+          afterDedupe: upcoming.length,
         });
 
         if (!alive) return;
