@@ -448,7 +448,7 @@ const COLOR_LOOKUP = {
 /** Madeira Polyneon (4-digit) → hex for Materials To Order thread swatches */
 const THREAD_HEX_BY_CODE = {
   "1610": "#cbd5e1", "1615": "#63666a", "1617": "#6a5acd", "1621": "#cc4e00",
-  "1622": "#f5e6a1", "1629": "#a4c8ff", "1630": "#8c7ae6", "1631": "#9c6ade",
+  "1622": "#f5e6a1", "1627": "#6e5a9a", "1629": "#a4c8ff", "1630": "#8c7ae6", "1631": "#9c6ade",
   "1633": "#5b2c83", "1637": "#d22630", "1638": "#7a1e2c", "1639": "#a6192e",
   "1640": "#4a4f54", "1642": "#0077be", "1645": "#00b398", "1651": "#2dc653",
   "1654": "#5c1a1b", "1656": "#d7ccc8", "1658": "#bcaaa4", "1661": "#e9edc9",
@@ -461,7 +461,7 @@ const THREAD_HEX_BY_CODE = {
   "1731": "#8e5ea2", "1734": "#ef3340", "1736": "#8d6e63", "1738": "#d6d2c4",
   "1743": "#1a237e", "1744": "#6f4e37", "1745": "#6d4c41", "1750": "#2e7d32",
   "1751": "#55a630", "1752": "#ffb07c", "1754": "#ff3b30", "1755": "#ff8f1c",
-  "1762": "#00b4d8", "1765": "#ff9e1b", "1766": "#1e3a8a", "1767": "#1e40af",
+  "1762": "#00b4d8", "1765": "#ff9e1b",   "1766": "#1e3a8a", "1767": "#1e40af", "1768": "#8fae5c",
   "1771": "#f4c430", "1773": "#ff7a00", "1778": "#ff6a13", "1780": "#006241",
   "1781": "#8a0029", "1784": "#9e1b32", "1786": "#8a1538", "1791": "#c69214",
   "1794": "#8a9a5b", "1795": "#556b2f", "1796": "#7c8a3d", "1797": "#005f9e",
@@ -527,15 +527,13 @@ function getThreadThumbUrl(it) {
 
 
 // === Private thread image helpers (Netlify → Render, with auth cookies) ===
-const isFourDigitThreadName = (name) => /^\d{4}$/.test(String(name || "").trim());
-
 const urlCandidatesForThreadImage = (name) => {
-  const n = String(name || "").trim();
-  if (!isFourDigitThreadName(n)) return [];
+  const code = threadCodeForSwatch(String(name || "").trim());
+  if (!code) return [];
   return [
-    `${THREAD_IMG_BASE}/${n}.jpg`,
-    `${THREAD_IMG_BASE}/${n}.png`,
-    `${THREAD_IMG_BASE}/${n}.webp`,
+    `${THREAD_IMG_BASE}/${code}.jpg`,
+    `${THREAD_IMG_BASE}/${code}.png`,
+    `${THREAD_IMG_BASE}/${code}.webp`,
   ];
 };
 
@@ -1016,9 +1014,24 @@ function col(width, center = false) {
 
       try {
         // Backend returns sales metrics (Supabase) + embroidery backlog (Overview sheet cells or Supabase fallback)
-        const { data } = await axios.get(`${ROOT}/overview/metrics`, {
+        const metricsUrl = `${ROOT}/overview/metrics`;
+        console.log("[Overview metrics] starting fetch", {
+          url: metricsUrl,
+          root: ROOT,
+          ts: new Date().toISOString(),
+          hasCachedMetrics: !!cached,
+        });
+
+        const res = await axios.get(metricsUrl, {
           withCredentials: true,
           timeout: 10000,
+        });
+        const data = res?.data;
+        console.log("[Overview metrics] fetch success", {
+          status: res?.status,
+          statusText: res?.statusText,
+          keys: data && typeof data === "object" ? Object.keys(data) : [],
+          data,
         });
 
         if (!alive) return;
@@ -1029,7 +1042,15 @@ function col(width, center = false) {
         markUpdated();
       } catch (err) {
         if (!alive) return;
-        console.warn("Overview metrics fetch failed:", err?.message || err);
+        console.error("[Overview metrics] fetch failed", {
+          message: err?.message,
+          code: err?.code,
+          url: err?.config?.url,
+          method: err?.config?.method,
+          status: err?.response?.status,
+          statusText: err?.response?.statusText,
+          responseData: err?.response?.data,
+        });
         setLoadingMetrics(false);
       } finally {
         metricsLockRef.current = false;
