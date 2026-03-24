@@ -763,13 +763,13 @@ const imgBox = {
   background: "#fafafa",
 };
 
-// Upcoming jobs: shared grid so headers line up with row cells (Production Orders columns)
+// Upcoming jobs: shared grid (tight gaps/columns to avoid horizontal scroll on typical widths)
 const UPCOMING_JOBS_GRID_TEMPLATE =
-  "70px minmax(40px,0.48fr) minmax(76px,1.05fr) minmax(68px,1fr) 30px minmax(60px,0.95fr) minmax(54px,0.72fr) 26px 36px minmax(58px,0.82fr)";
+  "58px minmax(34px,0.42fr) minmax(56px,0.95fr) minmax(52px,0.88fr) 26px minmax(48px,0.85fr) minmax(44px,0.62fr) 22px 30px minmax(46px,0.72fr)";
 
 const upcomingJobsThumbBox = {
-  width: 66,
-  height: 36,
+  width: 56,
+  height: 32,
   borderRadius: 6,
   overflow: "hidden",
   display: "flex",
@@ -788,6 +788,7 @@ function upcomingJobsTextCell(extra = {}) {
     hyphens: "auto",
     minWidth: 0,
     color: "#374151",
+    textAlign: "center",
     ...extra,
   };
 }
@@ -1717,7 +1718,7 @@ function col(width, center = false) {
         </div>
 
         {/* RIGHT COLUMN: Upcoming Jobs */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
           {/* Upcoming Jobs */}
           <div
             style={{
@@ -1728,6 +1729,7 @@ function col(width, center = false) {
               padding: 12,
               overflow: "hidden",
               position: "relative",
+              minWidth: 0,
             }}
           >
             <div
@@ -1777,32 +1779,33 @@ function col(width, center = false) {
               </div>
             )}
 
-            <div style={{ overflowX: "auto", opacity: loadingUpcoming ? 0.6 : 1 }}>
+            <div style={{ width: "100%", minWidth: 0, opacity: loadingUpcoming ? 0.6 : 1 }}>
               {/* Column headers — same grid as rows; compact single-line labels */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: UPCOMING_JOBS_GRID_TEMPLATE,
-                  columnGap: 6,
+                  columnGap: 3,
                   alignItems: "center",
-                  padding: "6px 4px",
-                  marginBottom: 8,
+                  padding: "5px 2px",
+                  marginBottom: 6,
                   background: "#fafafa",
                   border: "1px solid #eee",
                   borderRadius: 8,
-                  minWidth: 640,
+                  width: "100%",
+                  minWidth: 0,
                 }}
               >
                 <div aria-hidden style={{ ...upcomingJobsThumbBox, border: "none", background: "transparent" }} />
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", letterSpacing: "-0.03em" }}>Order</div>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Company</div>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Design</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", letterSpacing: "-0.03em", textAlign: "center" }}>Order</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", textAlign: "center" }}>Company</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", textAlign: "center" }}>Design</div>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Qty</div>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Product</div>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Stage</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", textAlign: "center" }}>Product</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", textAlign: "center" }}>Stage</div>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Pr</div>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Ship</div>
-                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "right", whiteSpace: "nowrap" }}>H/S due</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>H/S due</div>
               </div>
 
               {!loadingUpcoming && !upcoming.length && (
@@ -1812,24 +1815,6 @@ function col(width, center = false) {
               {!loadingUpcoming && upcoming.map((job, idx) => {
                 const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
                 const ring = ringColorByShipDate(shipDate);
-                const isHard = /^hard/i.test(String(pickHardSoft(job)));
-                const hardPill = isHard ? (
-                  <span
-                    style={{
-                      marginLeft: 4,
-                      fontSize: 8,
-                      fontWeight: 700,
-                      padding: "1px 5px",
-                      borderRadius: 6,
-                      background: "#fee2e2",
-                      color: "#991b1b",
-                      border: "1px solid #fecaca",
-                      verticalAlign: "middle",
-                    }}
-                  >
-                    HARD
-                  </span>
-                ) : null;
 
                 const primaryUrl = getJobThumbUrl(job, ROOT);
                 const handleImgError = (e) => {
@@ -1858,33 +1843,44 @@ function col(width, center = false) {
                     style={{
                       display: "grid",
                       gridTemplateColumns: UPCOMING_JOBS_GRID_TEMPLATE,
-                      columnGap: 6,
+                      columnGap: 3,
                       alignItems: "start",
-                      minHeight: 42,
-                      padding: "4px 4px",
-                      marginBottom: 6,
+                      minHeight: 38,
+                      padding: "3px 2px",
+                      marginBottom: 5,
                       borderRadius: 8,
                       background: cardBackground,
                       border: cardBorderStyle,
-                      minWidth: 640,
+                      width: "100%",
+                      minWidth: 0,
                     }}
                   >
-                    <div style={{ ...upcomingJobsThumbBox, ...thumbBoxStyle, alignSelf: "center" }}>
-                      {primaryUrl ? (
-                        <img
-                          src={primaryUrl}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                          width={132}
-                          height={72}
-                          onError={handleImgError}
-                          style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
-                        />
-                      ) : (
-                        <div style={{ fontSize: 9, color: "#999", textAlign: "center", padding: 2 }}>No img</div>
-                      )}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        minWidth: 0,
+                        alignSelf: "center",
+                      }}
+                    >
+                      <div style={{ ...upcomingJobsThumbBox, ...thumbBoxStyle }}>
+                        {primaryUrl ? (
+                          <img
+                            src={primaryUrl}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
+                            width={132}
+                            height={72}
+                            onError={handleImgError}
+                            style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: 9, color: "#999", textAlign: "center", padding: 2 }}>No img</div>
+                        )}
+                      </div>
                     </div>
                     <div
                       style={upcomingJobsTextCell({ fontWeight: 700, fontSize: 11, color: "#111827", alignSelf: "center" })}
@@ -1892,19 +1888,19 @@ function col(width, center = false) {
                     >
                       {job["Order #"]}
                     </div>
-                    <div style={upcomingJobsTextCell({ fontSize: 9 })} title={String(job["Company Name"] || "")}>
+                    <div style={upcomingJobsTextCell({ fontSize: 9, alignSelf: "center" })} title={String(job["Company Name"] || "")}>
                       {job["Company Name"]}
                     </div>
-                    <div style={upcomingJobsTextCell({ fontSize: 9 })} title={String(job["Design"] || "")}>
+                    <div style={upcomingJobsTextCell({ fontSize: 9, alignSelf: "center" })} title={String(job["Design"] || "")}>
                       {job["Design"]}
                     </div>
                     <div
-                      style={upcomingJobsTextCell({ fontWeight: 700, fontSize: 11, textAlign: "center", color: "#111827", alignSelf: "center" })}
+                      style={upcomingJobsTextCell({ fontWeight: 700, fontSize: 11, color: "#111827", alignSelf: "center" })}
                       title={String(job["Quantity"] ?? "")}
                     >
                       {job["Quantity"]}
                     </div>
-                    <div style={upcomingJobsTextCell({ fontSize: 9 })} title={String(job["Product"] || "")}>
+                    <div style={upcomingJobsTextCell({ fontSize: 9, alignSelf: "center" })} title={String(job["Product"] || "")}>
                       {job["Product"]}
                     </div>
                     <div
@@ -1913,9 +1909,12 @@ function col(width, center = false) {
                         flexDirection: "row",
                         flexWrap: "wrap",
                         alignItems: "center",
-                        gap: 4,
+                        justifyContent: "center",
+                        gap: 2,
                         minWidth: 0,
+                        width: "100%",
                         alignSelf: "center",
+                        textAlign: "center",
                       }}
                       title={
                         sewingDone
@@ -1931,6 +1930,7 @@ function col(width, center = false) {
                             fontSize: stageLabel.length > 14 ? 8 : stageLabel.length > 9 ? 9 : 10,
                             lineHeight: 1.2,
                             wordBreak: "break-word",
+                            textAlign: "center",
                           }}
                         >
                           {stageLabel}
@@ -1938,7 +1938,7 @@ function col(width, center = false) {
                       )}
                     </div>
                     <div
-                      style={upcomingJobsTextCell({ fontSize: 9, textAlign: "center", alignSelf: "center" })}
+                      style={upcomingJobsTextCell({ fontSize: 9, alignSelf: "center" })}
                       title={String(job["Print"] || "")}
                     >
                       {job["Print"]}
@@ -1947,7 +1947,6 @@ function col(width, center = false) {
                       style={upcomingJobsTextCell({
                         fontWeight: 700,
                         fontSize: 10,
-                        textAlign: "center",
                         color: ring,
                         alignSelf: "center",
                       })}
@@ -1956,11 +1955,10 @@ function col(width, center = false) {
                       {fmtMMDD(shipDate)}
                     </div>
                     <div
-                      style={upcomingJobsTextCell({ fontSize: 9, textAlign: "right", alignSelf: "center" })}
+                      style={upcomingJobsTextCell({ fontSize: 9, alignSelf: "center" })}
                       title={String(pickHardSoft(job) || "")}
                     >
-                      <span>{showMMDDorRaw(pickHardSoft(job))}</span>
-                      {hardPill}
+                      {showMMDDorRaw(pickHardSoft(job))}
                     </div>
                   </div>
                 );
