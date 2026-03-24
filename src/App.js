@@ -1880,8 +1880,6 @@ useEffect(() => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: 4,
           padding: 8,
           backgroundColor: '#fafafa',
           borderBottom: '1px solid #ccc'
@@ -1904,22 +1902,23 @@ useEffect(() => {
          { to: "/kanban/queue",      label: "Kanban Queue" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
-            flex: '1 1 0',
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: 'inline-block',
+            padding: '0.5rem 1rem',
+            maxWidth: '6.75rem',
             textAlign: 'center',
-            padding: '0.5rem 0.35rem',
+            verticalAlign: 'middle',
+            lineHeight: 1.2,
+            whiteSpace: 'normal',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
+            hyphens: 'auto',
             textDecoration: 'none',
             color: '#333',
             fontWeight: isActive ? '600' : '400',
             borderBottom: isActive ? '2px solid #333' : 'none',
             boxSizing: 'border-box'
           })}>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {label}
-            </span>
+            {label}
           </NavLink>
         ))}
 
