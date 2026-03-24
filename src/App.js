@@ -1904,14 +1904,14 @@ useEffect(() => {
           <NavLink key={to} to={to} style={({ isActive }) => ({
             display: 'inline-block',
             padding: '0.5rem 1rem',
-            maxWidth: '6.75rem',
+            // Wide enough for longest single word (e.g. "Departments"); wrap only at spaces
+            maxWidth: '10.5rem',
             textAlign: 'center',
             verticalAlign: 'middle',
             lineHeight: 1.2,
             whiteSpace: 'normal',
-            wordWrap: 'break-word',
-            overflowWrap: 'break-word',
-            hyphens: 'auto',
+            wordBreak: 'normal',
+            overflowWrap: 'normal',
             textDecoration: 'none',
             color: '#333',
             fontWeight: isActive ? '600' : '400',
