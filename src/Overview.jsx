@@ -473,6 +473,38 @@ function cardUrgencyFromRing(ring) {
   };
 }
 
+/** Same green circle + check as machine scheduler job cards (Section9.js). */
+function SewingSummaryCompleteBadge({
+  title = "Sewing complete (Sewing Summary: Top ≥ order quantity)",
+}) {
+  return (
+    <div
+      title={title}
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        background: "#b8e6b8",
+        border: "1px solid #2e7d32",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style={{ display: "block" }}>
+        <path
+          d="M1 4 L4 7 L9 1"
+          stroke="#1b5e20"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
 // Parse a Drive file id from a link (works for .../file/d/<id>/... or ?id=<id>)
 function parseDriveId(s) {
   const str = String(s || "");
@@ -730,6 +762,35 @@ const imgBox = {
   justifyContent: "center",
   background: "#fafafa",
 };
+
+// Upcoming jobs: shared grid so headers line up with row cells (Production Orders columns)
+const UPCOMING_JOBS_GRID_TEMPLATE =
+  "70px minmax(40px,0.48fr) minmax(76px,1.05fr) minmax(68px,1fr) 30px minmax(60px,0.95fr) minmax(54px,0.72fr) 26px 36px minmax(58px,0.82fr)";
+
+const upcomingJobsThumbBox = {
+  width: 66,
+  height: 36,
+  borderRadius: 6,
+  overflow: "hidden",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  background: "#fafafa",
+  flexShrink: 0,
+};
+
+function upcomingJobsTextCell(extra = {}) {
+  return {
+    fontSize: 10,
+    lineHeight: 1.25,
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+    hyphens: "auto",
+    minWidth: 0,
+    color: "#374151",
+    ...extra,
+  };
+}
 
 function col(width, center = false) {
   const s = { width };
@@ -1716,63 +1777,61 @@ function col(width, center = false) {
               </div>
             )}
 
-            {/* column headers */}
-            <div
-              style={{
-                ...rowCard,
-                padding: "4px 8px",
-                marginBottom: 8,
-                background: "#fafafa",
-                borderColor: "#eee",
-                fontSize: 11,
-                fontWeight: 600,
-                color: "#666",
-                opacity: loadingUpcoming ? 0.6 : 1,
-              }}
-            >
-              <div style={{ ...imgBox, border: "0", background: "transparent" }} />
-              <div style={{ width: 58 }}>Order #</div>
-              <div style={col(250)}>Company Name</div>
-              <div style={col(150)}>Design</div>
-              <div style={{ ...col(56, true) }}>Qty</div>
-              <div style={col(120)}>Product</div>
-              <div style={col(90)}>Stage</div>
-              <div style={{ ...col(64, true) }}>Due</div>
-              <div style={{ ...col(50, true) }}>Print</div>
-              <div style={{ ...col(68, true) }}>Ship</div>
-              <div style={{ ...col(110, true) }}>Hard/Soft</div>
-            </div>
+            <div style={{ overflowX: "auto", opacity: loadingUpcoming ? 0.6 : 1 }}>
+              {/* Column headers — same grid as rows; compact single-line labels */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: UPCOMING_JOBS_GRID_TEMPLATE,
+                  columnGap: 6,
+                  alignItems: "center",
+                  padding: "6px 4px",
+                  marginBottom: 8,
+                  background: "#fafafa",
+                  border: "1px solid #eee",
+                  borderRadius: 8,
+                  minWidth: 640,
+                }}
+              >
+                <div aria-hidden style={{ ...upcomingJobsThumbBox, border: "none", background: "transparent" }} />
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", letterSpacing: "-0.03em" }}>Order</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Company</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Design</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Qty</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Product</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap" }}>Stage</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Pr</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Ship</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "right", whiteSpace: "nowrap" }}>H/S due</div>
+              </div>
 
-            {!loadingUpcoming && !upcoming.length && (
-              <div>No jobs pending.</div>
-            )}
+              {!loadingUpcoming && !upcoming.length && (
+                <div>No jobs pending.</div>
+              )}
 
-
-            <div style={{ opacity: loadingUpcoming ? 0.6 : 1 }}>
               {!loadingUpcoming && upcoming.map((job, idx) => {
-                // Get Ship Date from either field name (for compatibility)
                 const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
                 const ring = ringColorByShipDate(shipDate);
                 const isHard = /^hard/i.test(String(pickHardSoft(job)));
                 const hardPill = isHard ? (
-                  <span style={{
-                    marginLeft: 6,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "2px 6px",
-                    borderRadius: 8,
-                    background: "#fee2e2",
-                    color: "#991b1b",
-                    border: "1px solid #fecaca",
-                    letterSpacing: 0.2
-                  }}>
+                  <span
+                    style={{
+                      marginLeft: 4,
+                      fontSize: 8,
+                      fontWeight: 700,
+                      padding: "1px 5px",
+                      borderRadius: 6,
+                      background: "#fee2e2",
+                      color: "#991b1b",
+                      border: "1px solid #fecaca",
+                      verticalAlign: "middle",
+                    }}
+                  >
                     HARD
                   </span>
                 ) : null;
 
                 const primaryUrl = getJobThumbUrl(job, ROOT);
-
-                // Keep it simple: if the primary fails, hide the image (skip JSON scanning)
                 const handleImgError = (e) => {
                   e.currentTarget.style.display = "none";
                 };
@@ -1786,15 +1845,31 @@ function col(width, center = false) {
                 const urgency = cardUrgencyFromRing(ring);
                 const cardBackground = isShopifyCustomer ? SHOPIFY_CARD_BG : urgency.background;
                 const cardBorderStyle = isShopifyCustomer ? SHOPIFY_CARD_BORDER : urgency.border;
-                // Highlight the whole card; keep thumbnail border neutral
                 const thumbBoxStyle = isShopifyCustomer
                   ? { border: "2px solid #4169E1" }
                   : { border: "1px solid #e5e7eb" };
 
-                return (
-                  <div key={idx} style={{ ...rowCard, background: cardBackground, border: cardBorderStyle }}>
-                    <div style={{ ...imgBox, ...thumbBoxStyle }}>
+                const sewingDone = !!job.sewingSummaryComplete;
+                const stageLabel = getStageForDisplay(job);
 
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: UPCOMING_JOBS_GRID_TEMPLATE,
+                      columnGap: 6,
+                      alignItems: "start",
+                      minHeight: 42,
+                      padding: "4px 4px",
+                      marginBottom: 6,
+                      borderRadius: 8,
+                      background: cardBackground,
+                      border: cardBorderStyle,
+                      minWidth: 640,
+                    }}
+                  >
+                    <div style={{ ...upcomingJobsThumbBox, ...thumbBoxStyle, alignSelf: "center" }}>
                       {primaryUrl ? (
                         <img
                           src={primaryUrl}
@@ -1802,51 +1877,94 @@ function col(width, center = false) {
                           loading="lazy"
                           decoding="async"
                           referrerPolicy="no-referrer"
-                          width={160}
-                          height={80}
+                          width={132}
+                          height={72}
                           onError={handleImgError}
                           style={{ width: "100%", height: "100%", display: "block", objectFit: "cover" }}
-                          data-err-index="0"
                         />
                       ) : (
-                        <div style={{ fontSize: 13, color: "#999" }}>No img</div>
+                        <div style={{ fontSize: 9, color: "#999", textAlign: "center", padding: 2 }}>No img</div>
                       )}
                     </div>
-
-                      {/* Uniform 13px fonts; key values slightly bolder */}
-                      <div style={{ width: 58, fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Order #"] || "")}>
-                        {job["Order #"]}
-                      </div>
-                      <div style={{ ...col(250), fontSize: 13, color: "#374151" }} title={String(job["Company Name"] || "")}>
-                        {job["Company Name"]}
-                      </div>
-                      <div style={{ ...col(150), fontSize: 13, color: "#374151" }} title={String(job["Design"] || "")}>
-                        {job["Design"]}
-                      </div>
-                      <div style={{ ...col(56, true), fontWeight: 600, fontSize: 13, color: "#111827" }} title={String(job["Quantity"] || "")}>
-                        {job["Quantity"]}
-                      </div>
-                      <div style={{ ...col(120), fontSize: 13, color: "#374151" }} title={String(job["Product"] || "")}>
-                        {job["Product"]}
-                      </div>
-                      <div style={{ ...col(90), fontSize: 13, color: "#374151" }} title={String(getStageForDisplay(job) || "")}>
-                        {getStageForDisplay(job)}
-                      </div>
-                      <div style={{ ...col(64, true), fontSize: 13, color: "#374151" }} title={String(job["Due Date"] || "")}>
-                        {fmtMMDD(job["Due Date"])}{hardPill}
-                      </div>
-                      <div style={{ ...col(50, true), fontSize: 13, color: "#374151" }} title={String(job["Print"] || "")}>
-                        {job["Print"]}
-                      </div>
-                      <div style={{ ...col(68, true), fontWeight: 600, fontSize: 13, color: ring }} title={String(shipDate || "")}>
-                        {fmtMMDD(shipDate)}
-                      </div>
-                      <div style={{ ...col(110, true), fontSize: 13, color: "#374151" }} title={String(pickHardSoft(job) || "")}>
-                        {showMMDDorRaw(pickHardSoft(job))}
-                      </div>
+                    <div
+                      style={upcomingJobsTextCell({ fontWeight: 700, fontSize: 11, color: "#111827", alignSelf: "center" })}
+                      title={String(job["Order #"] || "")}
+                    >
+                      {job["Order #"]}
                     </div>
-                  );
-                })}
+                    <div style={upcomingJobsTextCell({ fontSize: 9 })} title={String(job["Company Name"] || "")}>
+                      {job["Company Name"]}
+                    </div>
+                    <div style={upcomingJobsTextCell({ fontSize: 9 })} title={String(job["Design"] || "")}>
+                      {job["Design"]}
+                    </div>
+                    <div
+                      style={upcomingJobsTextCell({ fontWeight: 700, fontSize: 11, textAlign: "center", color: "#111827", alignSelf: "center" })}
+                      title={String(job["Quantity"] ?? "")}
+                    >
+                      {job["Quantity"]}
+                    </div>
+                    <div style={upcomingJobsTextCell({ fontSize: 9 })} title={String(job["Product"] || "")}>
+                      {job["Product"]}
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 4,
+                        minWidth: 0,
+                        alignSelf: "center",
+                      }}
+                      title={
+                        sewingDone
+                          ? "Sewing complete (Sewing Summary: Top ≥ qty)"
+                          : String(stageLabel || "")
+                      }
+                    >
+                      {sewingDone ? (
+                        <SewingSummaryCompleteBadge />
+                      ) : (
+                        <span
+                          style={{
+                            fontSize: stageLabel.length > 14 ? 8 : stageLabel.length > 9 ? 9 : 10,
+                            lineHeight: 1.2,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {stageLabel}
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      style={upcomingJobsTextCell({ fontSize: 9, textAlign: "center", alignSelf: "center" })}
+                      title={String(job["Print"] || "")}
+                    >
+                      {job["Print"]}
+                    </div>
+                    <div
+                      style={upcomingJobsTextCell({
+                        fontWeight: 700,
+                        fontSize: 10,
+                        textAlign: "center",
+                        color: ring,
+                        alignSelf: "center",
+                      })}
+                      title={String(shipDate || "")}
+                    >
+                      {fmtMMDD(shipDate)}
+                    </div>
+                    <div
+                      style={upcomingJobsTextCell({ fontSize: 9, textAlign: "right", alignSelf: "center" })}
+                      title={String(pickHardSoft(job) || "")}
+                    >
+                      <span>{showMMDDorRaw(pickHardSoft(job))}</span>
+                      {hardPill}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
