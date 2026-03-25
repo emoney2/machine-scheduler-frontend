@@ -31,6 +31,8 @@ export default function Section9(props) {
     DARK_PURPLE,
     LIGHT_ORANGE,
     DARK_ORANGE,
+    LIGHT_BLUE,
+    DARK_BLUE,
     BUBBLE_START,
     BUBBLE_END,
     BUBBLE_DELIV,
@@ -218,6 +220,18 @@ export default function Section9(props) {
             style={{
               width: 12,
               height: 12,
+              background: LIGHT_BLUE,
+              border: `2px solid ${DARK_BLUE}`,
+              borderRadius: 2
+            }}
+          />
+          Shopify
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span
+            style={{
+              width: 12,
+              height: 12,
               background: LIGHT_GREY,
               border: `2px solid ${DARK_GREY}`,
               borderRadius: 2
@@ -396,9 +410,16 @@ export default function Section9(props) {
                             const isHard = job.due_type === 'Hard Date';
                             const isSoft = !isPh && !isHard;
                             const isSample = !isPh && Number(job.quantity) === 1;
+                            const isShopify =
+                              !isPh &&
+                              String(job.company ?? '')
+                                .trim()
+                                .toLowerCase() === 'shopify';
 
                             const base = isPh
                               ? LIGHT_YELLOW
+                              : isShopify
+                              ? LIGHT_BLUE
                               : isSample
                               ? LIGHT_ORANGE
                               : isSoft
@@ -406,6 +427,8 @@ export default function Section9(props) {
                               : LIGHT_PURPLE;
                             const bCol = isPh
                               ? DARK_YELLOW
+                              : isShopify
+                              ? DARK_BLUE
                               : isSample
                               ? DARK_ORANGE
                               : isSoft
