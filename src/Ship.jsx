@@ -103,6 +103,13 @@ const SHIP_BOX_PRESETS = [
   { id: "20x20x20", label: "20×20×20 (20 lbs)", L: 20, W: 20, H: 20, weight: 20 },
 ];
 
+/** Public-folder logos for ship actions (CRA/Vite: files in public/ship-icons/). */
+const _pub = (typeof process !== "undefined" && process.env && process.env.PUBLIC_URL
+  ? String(process.env.PUBLIC_URL).replace(/\/$/, "")
+  : "") || "";
+const SHIP_ICON_UPS = `${_pub}/ship-icons/ups-ship.png`;
+const SHIP_ICON_QB = `${_pub}/ship-icons/quickbooks-ship.png`;
+
 function initialBoxCounts() {
   const o = {};
   SHIP_BOX_PRESETS.forEach((p) => {
@@ -1748,83 +1755,132 @@ export default function Ship() {
       ))}
 
       {selected.length > 0 && (
-        <div style={{ marginTop: "2rem", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "stretch" }}>
+        <div style={{ marginTop: "2rem", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+          {/** Icon-only actions; title/aria-label describe behavior. */}
           <button
             type="button"
             onClick={() => openShipBoxModal(false)}
             disabled={isShippingOverlay || loading}
+            aria-label="Ship with UPS: labels and packing slip, no QuickBooks invoice"
+            title="Ship with UPS: labels and packing slip, no QuickBooks invoice"
             style={{
-              width: 124,
-              minHeight: 120,
-              fontWeight: 800,
-              borderRadius: 12,
-              border: "2px solid #0d47a1",
-              background: "linear-gradient(180deg, #1976d2 0%, #0d47a1 100%)",
-              color: "#fff",
-              boxShadow: "0 4px 12px rgba(13,71,161,0.35)",
+              width: 112,
+              height: 112,
+              borderRadius: 14,
+              border: "2px solid #1565c0",
+              background: "linear-gradient(180deg, #fafafa 0%, #eceff1 100%)",
+              boxShadow: "0 4px 14px rgba(21,101,192,0.2)",
               cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
-              opacity: (isShippingOverlay || loading) ? 0.6 : 1,
-              fontSize: 14,
-              lineHeight: 1.2,
+              opacity: (isShippingOverlay || loading) ? 0.55 : 1,
               padding: 8,
               boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-            title="UPS labels & packing slip; no QuickBooks invoice"
           >
-            Ship
-            <br />
-            <span style={{ fontSize: 10, fontWeight: 600 }}>no invoice</span>
+            <img
+              src={SHIP_ICON_UPS}
+              alt=""
+              draggable={false}
+              style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
+            />
           </button>
           <button
             type="button"
             onClick={() => openShipBoxModal(true)}
             disabled={isShippingOverlay || loading}
+            aria-label="Ship with UPS and bill in QuickBooks"
+            title="Ship with UPS and bill in QuickBooks"
             style={{
-              width: 124,
-              minHeight: 120,
-              fontWeight: 800,
-              borderRadius: 12,
-              border: "2px solid #1b5e20",
-              background: "linear-gradient(180deg, #43a047 0%, #2e7d32 100%)",
-              color: "#fff",
-              boxShadow: "0 4px 12px rgba(46,125,50,0.35)",
+              width: 112,
+              height: 112,
+              borderRadius: 14,
+              border: "2px solid #2e7d32",
+              background: "linear-gradient(180deg, #fafafa 0%, #e8f5e9 100%)",
+              boxShadow: "0 4px 14px rgba(46,125,50,0.22)",
               cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
-              opacity: (isShippingOverlay || loading) ? 0.6 : 1,
-              fontSize: 13,
-              lineHeight: 1.2,
-              padding: 8,
+              opacity: (isShippingOverlay || loading) ? 0.55 : 1,
+              padding: 6,
               boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-            title="UPS labels, packing slip, and QuickBooks invoice"
           >
-            Ship &amp; bill
-            <br />
-            <span style={{ fontSize: 10, fontWeight: 600 }}>UPS + QBO</span>
+            <div
+              style={{
+                position: "relative",
+                width: 96,
+                height: 96,
+                flexShrink: 0,
+              }}
+              aria-hidden
+            >
+              <img
+                src={SHIP_ICON_QB}
+                alt=""
+                draggable={false}
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  bottom: 0,
+                  transform: "translateX(-50%)",
+                  width: 80,
+                  height: 80,
+                  objectFit: "contain",
+                  pointerEvents: "none",
+                  userSelect: "none",
+                }}
+              />
+              <img
+                src={SHIP_ICON_UPS}
+                alt=""
+                draggable={false}
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: -4,
+                  transform: "translateX(-50%)",
+                  width: 58,
+                  height: 58,
+                  objectFit: "contain",
+                  zIndex: 1,
+                  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.35))",
+                  pointerEvents: "none",
+                  userSelect: "none",
+                }}
+              />
+            </div>
           </button>
           <button
             type="button"
             onClick={handleBillOnly}
             disabled={isShippingOverlay || loading}
+            aria-label="Bill only in QuickBooks: invoice and packing slip, no UPS"
+            title="Bill only in QuickBooks: invoice and packing slip, no UPS"
             style={{
-              width: 124,
-              minHeight: 120,
-              fontWeight: 800,
-              borderRadius: 12,
+              width: 112,
+              height: 112,
+              borderRadius: 14,
               border: "2px solid #78909c",
               background: "linear-gradient(180deg, #fff 0%, #eceff1 100%)",
-              color: "#37474f",
+              boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
               cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
-              opacity: (isShippingOverlay || loading) ? 0.6 : 1,
-              fontSize: 13,
-              lineHeight: 1.2,
+              opacity: (isShippingOverlay || loading) ? 0.55 : 1,
               padding: 8,
               boxSizing: "border-box",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
-            title="QuickBooks invoice and packing slip only (no UPS labels)"
           >
-            Bill only
-            <br />
-            <span style={{ fontSize: 10, fontWeight: 600 }}>no UPS</span>
+            <img
+              src={SHIP_ICON_QB}
+              alt=""
+              draggable={false}
+              style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
+            />
           </button>
         </div>
       )}
