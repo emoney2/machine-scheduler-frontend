@@ -254,6 +254,32 @@ function getEarliestDueDate(selected, jobs) {
   return dueDates.length > 0 ? new Date(Math.min(...dueDates.map((d) => d.getTime()))) : null;
 }
 
+/** Sheet column "Hard Date/Soft Date" → short label for UI. */
+function formatHardSoftType(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  const lower = s.toLowerCase();
+  if (lower.includes("hard")) return "Hard date";
+  if (lower.includes("soft")) return "Soft date";
+  return s;
+}
+
+/** One label when all selected rows agree; otherwise a mixed hint. */
+function hardSoftSummaryForSelection(selected, jobs) {
+  const selectedJobs = jobs.filter((j) => selected.includes(j.orderId.toString()));
+  const vals = [
+    ...new Set(
+      selectedJobs
+        .map((j) => String(j["Hard Date/Soft Date"] ?? j["Hard/Soft"] ?? "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  if (vals.length === 0) return null;
+  const labels = [...new Set(vals.map(formatHardSoftType).filter(Boolean))];
+  if (labels.length === 1) return labels[0];
+  return "Mixed (Hard/Soft)";
+}
+
 /** UPS returns "N business days" — parse N for ETA. */
 function parseBusinessDaysFromDelivery(deliveryStr) {
   if (deliveryStr == null || deliveryStr === "") return null;
@@ -550,8 +576,8 @@ export default function Ship() {
   const [showRateModal, setShowRateModal] = useState(false);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [boxCounts, setBoxCounts] = useState(() => initialBoxCounts());
-  /** When true, process-shipment skips QuickBooks invoice (labels/slip/sheet still run). */
-  const [skipInvoice, setSkipInvoice] = useState(false);
+  /** UPS wizard: whether this flow should create a QBO invoice (set when opening box modal). */
+  const upsFlowCreateInvoiceRef = useRef(true);
   const navigate = useNavigate();
 
   // === useEffect 1: Initial load ===
@@ -918,7 +944,7 @@ export default function Ship() {
       skip_invoice:
         shipmentBody.skip_invoice !== undefined
           ? Boolean(shipmentBody.skip_invoice)
-          : skipInvoice,
+          : false,
     };
 
     openedOnceRef.current = false;
@@ -935,11 +961,16 @@ export default function Ship() {
         return;
       }
 
-      setShippingStage(
-        mergedBody.skip_invoice
-          ? "📦 Creating labels & packing slip (no invoice)…"
-          : "📦 Creating labels, invoice, packing slip…"
-      );
+      {
+        const si = mergedBody.skip_invoice;
+        const su = mergedBody.skip_ups === true;
+        let msg = "📦 Processing shipment…";
+        if (!su && si) msg = "📦 Creating labels & packing slip (no invoice)…";
+        else if (!su && !si) msg = "📦 Creating labels, invoice, packing slip…";
+        else if (su && !si) msg = "📦 Creating invoice & packing slip (no UPS)…";
+        else msg = "📦 Creating packing slip…";
+        setShippingStage(msg);
+      }
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       let shipData;
       try {
@@ -1009,7 +1040,7 @@ export default function Ship() {
     }
   };
 
-  const handleManualShip = async () => {
+  const handleBillOnly = async () => {
     if (selected.length === 0) {
       alert("Select at least one job to ship.");
       return;
@@ -1024,9 +1055,10 @@ export default function Ship() {
           .filter((j) => selected.includes(j.orderId.toString()))
           .map((j) => [j.orderId, j.shipQty])
       ),
-      shipping_method: "Manual Shipping",
+      shipping_method: "Bill only (no UPS)",
       skip_ups: true,
       ups_purchased_rate: 0,
+      skip_invoice: false,
       qboEnv: "production",
     });
   };
@@ -1443,11 +1475,13 @@ export default function Ship() {
     setBoxCounts((c) => ({ ...c, [id]: v }));
   };
 
-  const openShipBoxModal = () => {
+  /** @param {boolean} createInvoice - false = Ship (UPS, no QBO invoice); true = Ship & bill */
+  const openShipBoxModal = (createInvoice) => {
     if (selected.length === 0) {
       alert("Select at least one job to ship.");
       return;
     }
+    upsFlowCreateInvoiceRef.current = Boolean(createInvoice);
     setBoxCounts(initialBoxCounts());
     setShippingOptions([]);
     setShowRateModal(false);
@@ -1477,6 +1511,7 @@ export default function Ship() {
       return;
     }
     const summary = boxesSummaryFromCounts(boxCounts);
+    const skipInv = !upsFlowCreateInvoiceRef.current;
     const isManualRate =
       SKIP_UPS ||
       !opt ||
@@ -1498,6 +1533,7 @@ export default function Ship() {
         shipping_method: "Manual Shipping",
         skip_ups: true,
         ups_purchased_rate: 0,
+        skip_invoice: skipInv,
         qboEnv: "production",
       });
       return;
@@ -1518,11 +1554,13 @@ export default function Ship() {
       shipping_method: opt.method || "UPS",
       ups_purchased_rate: rateNum,
       skip_ups: false,
+      skip_invoice: skipInv,
       qboEnv: "production",
     });
   };
 
   const earliestDueSelected = getEarliestDueDate(selected, jobs);
+  const hardSoftSummarySelected = hardSoftSummaryForSelection(selected, jobs);
 
   const shipModalFooterBtn = {
     minWidth: 88,
@@ -1655,7 +1693,7 @@ export default function Ship() {
           <div style={{ width: 120, textAlign: "center" }}>Product</div>
           <div style={{ width: 120, textAlign: "center" }}>Stage</div>
           <div style={{ width: 80, textAlign: "center" }}>Price</div>
-          <div style={{ width: 90, textAlign: "center" }}>Due</div>
+          <div style={{ width: 128, textAlign: "center" }}>Due / H·S</div>
         </div>
       )}
 
@@ -1700,39 +1738,24 @@ export default function Ship() {
           <div style={{ width: 120, textAlign: "center" }}>{job["Product"]}</div>
           <div style={{ width: 120, textAlign: "center" }}>{job["Stage"]}</div>
           <div style={{ width: 80, textAlign: "center" }}>${job["Price"]}</div>
-          <div style={{ width: 90, textAlign: "center" }}>{formatDateMMDD(job["Due Date"])}</div>
+          <div style={{ width: 128, textAlign: "center", fontSize: "0.8rem", lineHeight: 1.25 }}>
+            <div>{formatDateMMDD(job["Due Date"])}</div>
+            <div style={{ fontSize: "0.72rem", opacity: 0.92 }}>
+              {formatHardSoftType(job["Hard Date/Soft Date"] ?? job["Hard/Soft"]) || "—"}
+            </div>
+          </div>
         </div>
       ))}
 
       {selected.length > 0 && (
-        <div style={{ marginTop: "2rem", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              fontSize: 13,
-              color: "#37474f",
-              cursor: "pointer",
-              userSelect: "none",
-              maxWidth: 280,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={skipInvoice}
-              onChange={(e) => setSkipInvoice(e.target.checked)}
-              disabled={isShippingOverlay || loading}
-            />
-            Sample / no QuickBooks invoice
-          </label>
+        <div style={{ marginTop: "2rem", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "stretch" }}>
           <button
             type="button"
-            onClick={openShipBoxModal}
+            onClick={() => openShipBoxModal(false)}
             disabled={isShippingOverlay || loading}
             style={{
-              width: 132,
-              height: 132,
+              width: 124,
+              minHeight: 120,
               fontWeight: 800,
               borderRadius: 12,
               border: "2px solid #0d47a1",
@@ -1746,23 +1769,45 @@ export default function Ship() {
               padding: 8,
               boxSizing: "border-box",
             }}
-            title={
-              skipInvoice
-                ? "Choose boxes → UPS rates → labels & packing slip (no QBO invoice)"
-                : "Choose boxes → UPS rates → labels, invoice, packing slip"
-            }
+            title="UPS labels & packing slip; no QuickBooks invoice"
           >
             Ship
             <br />
-            <span style={{ fontSize: 11, fontWeight: 600 }}>(UPS)</span>
+            <span style={{ fontSize: 10, fontWeight: 600 }}>no invoice</span>
           </button>
           <button
             type="button"
-            onClick={handleManualShip}
+            onClick={() => openShipBoxModal(true)}
             disabled={isShippingOverlay || loading}
             style={{
-              width: 132,
-              height: 132,
+              width: 124,
+              minHeight: 120,
+              fontWeight: 800,
+              borderRadius: 12,
+              border: "2px solid #1b5e20",
+              background: "linear-gradient(180deg, #43a047 0%, #2e7d32 100%)",
+              color: "#fff",
+              boxShadow: "0 4px 12px rgba(46,125,50,0.35)",
+              cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
+              opacity: (isShippingOverlay || loading) ? 0.6 : 1,
+              fontSize: 13,
+              lineHeight: 1.2,
+              padding: 8,
+              boxSizing: "border-box",
+            }}
+            title="UPS labels, packing slip, and QuickBooks invoice"
+          >
+            Ship &amp; bill
+            <br />
+            <span style={{ fontSize: 10, fontWeight: 600 }}>UPS + QBO</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleBillOnly}
+            disabled={isShippingOverlay || loading}
+            style={{
+              width: 124,
+              minHeight: 120,
               fontWeight: 800,
               borderRadius: 12,
               border: "2px solid #78909c",
@@ -1775,13 +1820,9 @@ export default function Ship() {
               padding: 8,
               boxSizing: "border-box",
             }}
-            title={
-              skipInvoice
-                ? "Packing slip only — no UPS labels, no QBO invoice"
-                : "Invoice and packing slip only (no UPS labels)"
-            }
+            title="QuickBooks invoice and packing slip only (no UPS labels)"
           >
-            Manual
+            Bill only
             <br />
             <span style={{ fontSize: 10, fontWeight: 600 }}>no UPS</span>
           </button>
@@ -1825,6 +1866,9 @@ export default function Ship() {
             </h3>
             <p style={{ margin: "0 0 10px", fontSize: 12, color: "#1565c0" }}>
               Tap a square to add one · adjust qty below · due {earliestDueSelected ? formatDateMMDD(earliestDueSelected) : "—"}
+              {hardSoftSummarySelected ? (
+                <> · <strong>{hardSoftSummarySelected}</strong></>
+              ) : null}
             </p>
             <div
               style={{
@@ -2018,6 +2062,9 @@ export default function Ship() {
                 late
               </span>
               {" · "}Due <strong>{earliestDueSelected ? formatDateMMDD(earliestDueSelected) : "—"}</strong>
+              {hardSoftSummarySelected ? (
+                <> · <strong>{hardSoftSummarySelected}</strong></>
+              ) : null}
             </p>
             {ratesLoading && (
               <div style={{ padding: 24, textAlign: "center", color: "#546e7a", fontWeight: 600 }}>Loading rates…</div>
