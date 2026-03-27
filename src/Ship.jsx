@@ -94,6 +94,55 @@ const BOX_DIMENSIONS = {
   Large:  "20×20×20"
 };
 
+/** Preset boxes for Ship wizard (dims inches, weight lbs). */
+const SHIP_BOX_PRESETS = [
+  { id: "14x5x7", label: "14×5×7 (5 lbs)", L: 14, W: 5, H: 7, weight: 5 },
+  { id: "10x10x10", label: "10×10×10 (10 lbs)", L: 10, W: 10, H: 10, weight: 10 },
+  { id: "13x13x13", label: "13×13×13 (13 lbs)", L: 13, W: 13, H: 13, weight: 13 },
+  { id: "15x15x15", label: "15×15×15 (15 lbs)", L: 15, W: 15, H: 15, weight: 15 },
+  { id: "20x20x20", label: "20×20×20 (20 lbs)", L: 20, W: 20, H: 20, weight: 20 },
+];
+
+function initialBoxCounts() {
+  const o = {};
+  SHIP_BOX_PRESETS.forEach((p) => {
+    o[p.id] = 0;
+  });
+  return o;
+}
+
+function expandPackagesFromCounts(counts) {
+  const out = [];
+  SHIP_BOX_PRESETS.forEach((p) => {
+    const n = Math.max(0, Math.floor(Number(counts[p.id]) || 0));
+    for (let i = 0; i < n; i++) {
+      out.push({ L: p.L, W: p.W, H: p.H, weight: p.weight });
+    }
+  });
+  return out;
+}
+
+function boxesSummaryFromCounts(counts) {
+  return SHIP_BOX_PRESETS.filter((p) => (counts[p.id] || 0) > 0).map((p) => ({
+    label: p.label,
+    qty: counts[p.id] || 0,
+    L: p.L,
+    W: p.W,
+    H: p.H,
+    weight: p.weight,
+  }));
+}
+
+function parseUpsRateNumber(rate) {
+  if (rate == null || rate === "N/A") return 0;
+  if (typeof rate === "number" && Number.isFinite(rate)) return rate;
+  const s = String(rate).replace(/[$,]/g, "").trim();
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : 0;
+}
+
+const SKIP_UPS = false;
+
 // Replace your existing parseDateFromString + formatDateMMDD with this:
 
 // Convert Google/Excel serial date numbers to a JS Date (treat as days since 1899-12-30)
@@ -246,14 +295,17 @@ export default function Ship() {
 
     const labels = Array.isArray(data?.labels) ? data.labels : [];
     const slips  = Array.isArray(data?.slips)  ? data.slips  : [];
+    const openLabels = data?.open_label_windows !== false;
 
-    // Labels
-    labels.forEach((u) => {
-      if (isHttpUrl(u)) {
-        const w = window.open(u, "_blank", "noopener,noreferrer");
-        if (w) w.blur();
-      }
-    });
+    // Labels (skip when backend copied to Label Printer folder)
+    if (openLabels) {
+      labels.forEach((u) => {
+        if (isHttpUrl(u)) {
+          const w = window.open(u, "_blank", "noopener,noreferrer");
+          if (w) w.blur();
+        }
+      });
+    }
 
     // Slips
     slips.forEach((u) => {
@@ -385,8 +437,6 @@ export default function Ship() {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyInput, setCompanyInput] = useState("");
-  const [shippingMethod, setShippingMethod] = useState("Manual Shipping");
-
   const [isPageOverlay, setIsPageOverlay] = useState(false);
   const [pageOverlayText, setPageOverlayText] = useState("");
 
@@ -399,6 +449,10 @@ export default function Ship() {
 
   const [isShippingOverlay, setIsShippingOverlay] = useState(false);
   const [shippingStage, setShippingStage] = useState(""); // dynamic overlay message
+  const [showBoxModal, setShowBoxModal] = useState(false);
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [boxCounts, setBoxCounts] = useState(() => initialBoxCounts());
   const navigate = useNavigate();
 
   // === useEffect 1: Initial load ===
@@ -536,6 +590,7 @@ export default function Ship() {
         return;
       }
 
+      openedOnceRef.current = false;
       // Open URLs once (labels/invoice/slips)
       openResultsWindows(data);
 
@@ -757,22 +812,14 @@ export default function Ship() {
     });
   };
 
-  const handleShip = async () => {
-    if (selected.length === 0) {
-      alert("Select at least one job to ship.");
-      return;
-    }
-
-    // reset popup fence for a fresh run
+  /** Shared POST /api/process-shipment + completion navigation. */
+  const runShipmentCore = async (shipmentBody) => {
     openedOnceRef.current = false;
-
     setIsShippingOverlay(true);
-
     setShippingStage("🔐 Checking QuickBooks login…");
     setLoading(true);
 
     try {
-      // ── AUTH (QuickBooks) ────────────────────────────────
       const authed = await ensureQboAuth();
       if (!authed) {
         setIsShippingOverlay(false);
@@ -781,8 +828,7 @@ export default function Ship() {
         return;
       }
 
-      // ── PROCESS (Manual Ship, no boxes) ─────────────────
-      setShippingStage("🧾 Creating QuickBooks invoice…");
+      setShippingStage("📦 Creating labels, invoice, packing slip…");
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       let shipData;
       try {
@@ -790,107 +836,92 @@ export default function Ship() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({
-            order_ids: selected,
-            boxes:              [], // no boxes
-            shipped_quantities: Object.fromEntries(
-              jobs
-                .filter((j) => selected.includes(j.orderId.toString()))
-                .map((j) => [j.orderId, j.shipQty])
-            ),
-            shipping_method:   "Manual Shipping",
-            qboEnv:            "production",
-          }),
+          body: JSON.stringify(shipmentBody),
         });
         const data = await shipRes.json();
         if (!shipRes.ok) {
           console.warn("process-shipment error:", data.error);
-          shipData = { labels: [], slips: [], invoice: null };
-        } else {
-          shipData = data;
+          throw new Error(data.error || `HTTP ${shipRes.status}`);
         }
+        shipData = data;
       } catch (procErr) {
         console.error("process-shipment failed:", procErr);
-        shipData = { labels: [], slips: [], invoice: null };
+        throw procErr;
       }
 
-
-      // ── HANDLE QBO REDIRECT (fallback, rarely hit) ───────
       if (shipData.redirect) {
-        sessionStorage.setItem(
-          "pendingShipment",
-          JSON.stringify({
-            order_ids:         selected,
-            boxes:             [],
-            shipped_quantities: Object.fromEntries(
-              jobs
-                .filter((j) => selected.includes(j.orderId.toString()))
-                .map((j) => [j.orderId, j.shipQty])
-            ),
-            shipping_method:   "Manual Shipping",
-            qboEnv:            "production",
-          })
-        );
-        window.location.href = `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}${shipData.redirect}`;
+        sessionStorage.setItem("pendingShipment", JSON.stringify(shipmentBody));
+        window.location.href = `${API_BASE}${shipData.redirect}`;
         return;
       }
 
-
-      // ── SUCCESS ─────────────────────────────────────────
       setIsShippingOverlay(false);
       setLoading(false);
+      setShowBoxModal(false);
+      setShowRateModal(false);
+      setBoxCounts(initialBoxCounts());
 
-      // build invoiceUrl but do NOT open it here
-      // Backend already returns full URL, use it directly
-      const invoiceUrl = shipData.invoice && typeof shipData.invoice === "string"
-        ? shipData.invoice.trim()
-        : "";
+      const invoiceUrl =
+        shipData.invoice && typeof shipData.invoice === "string"
+          ? shipData.invoice.trim()
+          : "";
 
-      // Persist URLs for the completion page
       try {
         sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
         sessionStorage.setItem(
           "jrco_lastSlipUrl",
           Array.isArray(shipData.slips) && shipData.slips[0] ? shipData.slips[0] : ""
         );
-      } catch {}
+      } catch { /* ignore */ }
 
-      // Open results (labels/invoice/slips) exactly once, only for real URLs
       openResultsWindows(shipData);
-
-      // Refocus current tab (no named window)
       setTimeout(() => window.focus(), 500);
 
-      // 4e) Finalize
       setShippingStage("✅ Complete!");
       setTimeout(() => {
         navigate("/shipment-complete", {
           state: {
-            shippedOk:     true,
-            labelsPrinted: Array.isArray(shipData.labels) && shipData.labels.length > 0,
-            slipsPrinted:  Array.isArray(shipData.slips)  && shipData.slips.length  > 0,
-            invoiceUrl
+            shippedOk: true,
+            labelsPrinted:
+              Array.isArray(shipData.labels) && shipData.labels.length > 0,
+            slipsPrinted:
+              Array.isArray(shipData.slips) && shipData.slips.length > 0,
+            invoiceUrl,
           },
         });
       }, 500);
-
-
-
     } catch (err) {
       console.error(err);
-      alert("Failed to ship.");
+      alert(err?.message || "Failed to ship.");
       setLoading(false);
       setIsShippingOverlay(false);
     }
-  }; // end handleShip
+  };
 
-  // ─── 0) Feature flag at top ───
-  const SKIP_UPS = false;
+  const handleManualShip = async () => {
+    if (selected.length === 0) {
+      alert("Select at least one job to ship.");
+      return;
+    }
+    await runShipmentCore({
+      order_ids: selected,
+      boxes: [],
+      boxes_summary: [],
+      packages: [],
+      shipped_quantities: Object.fromEntries(
+        jobs
+          .filter((j) => selected.includes(j.orderId.toString()))
+          .map((j) => [j.orderId, j.shipQty])
+      ),
+      shipping_method: "Manual Shipping",
+      skip_ups: true,
+      ups_purchased_rate: 0,
+      qboEnv: "production",
+    });
+  };
 
   // 1) State for live UPS rates
   const [shippingOptions, setShippingOptions] = useState([]);
-  // Store the user’s chosen UPS option (includes .code)
-  const [shippingSelection, setShippingSelection] = useState(null);
 
   // 2) Static fallback package payloads (Customer Supplied = 02)
   const packagesPayload = [
@@ -905,11 +936,11 @@ export default function Ship() {
     AttentionName: "Justin Eckard",
     Phone:         "678-294-5350",
     Address: {
-      AddressLine1:      "3653 Lost Oak Drive",
-      AddressLine2:      "",
+      AddressLine1:      "1384 Buford Business Blvd",
+      AddressLine2:      "Suite 300",
       City:              "Buford",
       StateProvinceCode: "GA",
-      PostalCode:        "30519",
+      PostalCode:        "30518",
       CountryCode:       "US"
     }
   };
@@ -936,7 +967,8 @@ export default function Ship() {
 
 
   // 5) Helper to fetch live UPS rates (with Directory fallback + multi-endpoint retry)
-  const fetchRates = async () => {
+  /** @param {Array<{L:number,W:number,H:number,weight:number}>|null} packagesFlatOverride */
+  const fetchRates = async (packagesFlatOverride = null) => {
     if (selected.length === 0) {
       setShippingOptions([]);
       return;
@@ -1036,16 +1068,21 @@ export default function Ship() {
       return;
     }
 
-    // 4) Build packages from projectedBoxes if available
-    const boxesToUse =
-      projectedBoxes && projectedBoxes.length > 0
-        ? projectedBoxes.map((b) => {
-            const dimStr = BOX_DIMENSIONS[b.size] || "10×10×10";
-            const [L, W, H] = dimStr.split(/[x×]/i).map((n) => parseInt(n, 10) || 10);
-            const weight = Math.max(1, Math.ceil((L * W * H) / 1728)); // rough 1lb / cubic ft
-            return { PackagingType: "02", Weight: weight, Dimensions: { Length: L, Width: W, Height: H } };
-          })
-        : packagesPayload;
+    // 4) Build packages: wizard override, else defaults
+    let boxesToUse;
+    if (packagesFlatOverride && packagesFlatOverride.length > 0) {
+      boxesToUse = packagesFlatOverride.map((p) => ({
+        PackagingType: "02",
+        Weight: Number(p.weight) || 1,
+        Dimensions: {
+          Length: Number(p.L) || 10,
+          Width: Number(p.W) || 10,
+          Height: Number(p.H) || 10,
+        },
+      }));
+    } else {
+      boxesToUse = packagesPayload;
+    }
 
     // 5) Optional manual path
     if (SKIP_UPS) {
@@ -1260,7 +1297,9 @@ export default function Ship() {
         return;
       }
 
-      const optionsLocal = Array.isArray(body) ? body : (body?.rates || []);
+      const optionsLocal = Array.isArray(body)
+        ? body
+        : (body?.options || body?.rates || []);
       console.log("✅ UPS rates response ←", optionsLocal);
 
       if (!Array.isArray(optionsLocal) || optionsLocal.length === 0) {
@@ -1277,36 +1316,99 @@ export default function Ship() {
       setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
       return;
     }
-
-
-
-    console.log("✅ UPS rates response ←", options);
-    setShippingOptions(options);
   };
 
-  // 6) Auto-fetch rates whenever a job is selected
+  const bumpBoxCount = (id, delta) => {
+    setBoxCounts((c) => {
+      const next = { ...c };
+      const cur = Math.floor(Number(next[id]) || 0);
+      next[id] = Math.max(0, cur + delta);
+      return next;
+    });
+  };
 
-  // 🧠 Updated rate-based shipping handler
-  const handleRateAndShip = async (opt) => {
-    const { method, rate, delivery } = opt || {};
+  const setBoxCountDirect = (id, rawVal) => {
+    const v = Math.max(0, Math.floor(Number(rawVal) || 0));
+    setBoxCounts((c) => ({ ...c, [id]: v }));
+  };
 
-    if (SKIP_UPS) {
-      const ok = window.confirm("Ship this order now?\nThis will update the Google Sheet and create the QuickBooks invoice.");
-      if (!ok) return;
-      setShippingSelection(null);
-      setShippingMethod("Manual Shipping");
-      await handleShip();
+  const openShipBoxModal = () => {
+    if (selected.length === 0) {
+      alert("Select at least one job to ship.");
+      return;
+    }
+    setBoxCounts(initialBoxCounts());
+    setShippingOptions([]);
+    setShowRateModal(false);
+    setShowBoxModal(true);
+  };
+
+  const onContinueToRates = async () => {
+    const flat = expandPackagesFromCounts(boxCounts);
+    if (flat.length === 0) {
+      alert("Add at least one box.");
+      return;
+    }
+    setShowRateModal(true);
+    setRatesLoading(true);
+    setShippingOptions([]);
+    try {
+      await fetchRates(flat);
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  const onShipWithSelectedRate = async (opt) => {
+    const flat = expandPackagesFromCounts(boxCounts);
+    if (flat.length === 0) {
+      alert("No packages.");
+      return;
+    }
+    const summary = boxesSummaryFromCounts(boxCounts);
+    const isManualRate =
+      SKIP_UPS ||
+      !opt ||
+      opt.method === "Manual Shipping" ||
+      opt.rate === "N/A" ||
+      !opt.code;
+
+    if (isManualRate) {
+      await runShipmentCore({
+        order_ids: selected,
+        shipped_quantities: Object.fromEntries(
+          jobs
+            .filter((j) => selected.includes(j.orderId.toString()))
+            .map((j) => [j.orderId, j.shipQty])
+        ),
+        packages: [],
+        boxes_summary: summary,
+        boxes: summary,
+        shipping_method: "Manual Shipping",
+        skip_ups: true,
+        ups_purchased_rate: 0,
+        qboEnv: "production",
+      });
       return;
     }
 
-    const confirmed = window.confirm(
-      `Ship via ${method}?\nEstimated cost: ${rate}\nProjected delivery: ${delivery}\nProceed?`
-    );
-    if (!confirmed) return;
-
-    setShippingSelection(opt);
-    setShippingMethod(method || "UPS");
-    await handleShip();
+    const rateNum = parseUpsRateNumber(opt.rate);
+    await runShipmentCore({
+      order_ids: selected,
+      shipped_quantities: Object.fromEntries(
+        jobs
+          .filter((j) => selected.includes(j.orderId.toString()))
+          .map((j) => [j.orderId, j.shipQty])
+      ),
+      packages: flat,
+      boxes_summary: summary,
+      boxes: summary,
+      service_code: String(opt.code || ""),
+      shipping_method: opt.method || "UPS",
+      ups_purchased_rate: rateNum,
+      skip_ups: false,
+      qboEnv: "production",
+    });
   };
 
 
@@ -1478,32 +1580,223 @@ export default function Ship() {
       ))}
 
       {selected.length > 0 && (
-        <div style={{ marginTop: "2rem", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+        <div style={{ marginTop: "2rem", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
           <button
-            onClick={async () => {
-              const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
-              if (selectedJobs.length === 0) {
-                alert("Select at least one job.");
-                return;
-              }
-              await handleShip();
-            }}
+            type="button"
+            onClick={openShipBoxModal}
             disabled={isShippingOverlay || loading}
             style={{
               padding: "12px 18px",
               fontWeight: "bold",
               borderRadius: 8,
-              border: "1px solid #333",
-              background: "#444",
+              border: "none",
+              background: "#1a73e8",
               color: "#fff",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
               cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
-              opacity: (isShippingOverlay || loading) ? 0.6 : 1
+              opacity: (isShippingOverlay || loading) ? 0.6 : 1,
             }}
-            title="Create QuickBooks invoice → generate packing slip(s) → write Shipped"
+            title="Choose boxes → UPS rates → labels, invoice, packing slip"
           >
-            Manual Ship
+            Ship (UPS)
           </button>
+          <button
+            type="button"
+            onClick={handleManualShip}
+            disabled={isShippingOverlay || loading}
+            style={{
+              padding: "12px 18px",
+              fontWeight: "bold",
+              borderRadius: 8,
+              border: "1px solid #666",
+              background: "#fff",
+              color: "#333",
+              cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
+              opacity: (isShippingOverlay || loading) ? 0.6 : 1,
+            }}
+            title="Invoice and packing slip only (no UPS labels)"
+          >
+            Manual ship (no UPS)
+          </button>
+        </div>
+      )}
+
+      {showBoxModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 10001,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ship-box-modal-title"
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              maxWidth: 520,
+              width: "100%",
+              padding: 20,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+              maxHeight: "90vh",
+              overflow: "auto",
+            }}
+          >
+            <h3 id="ship-box-modal-title" style={{ marginTop: 0 }}>Select boxes</h3>
+            <p style={{ fontSize: 14, color: "#444", marginTop: 0 }}>
+              Tap a size to add one. Adjust quantities on the right.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {SHIP_BOX_PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => bumpBoxCount(p.id, 1)}
+                  style={{
+                    padding: "10px 14px",
+                    textAlign: "left",
+                    borderRadius: 8,
+                    border: "1px solid #ccc",
+                    background: "#f8f9fa",
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <h4 style={{ marginBottom: 8 }}>Summary</h4>
+            {SHIP_BOX_PRESETS.every((p) => !(boxCounts[p.id] > 0)) ? (
+              <p style={{ color: "#666" }}>No boxes yet.</p>
+            ) : (
+              SHIP_BOX_PRESETS.filter((p) => (boxCounts[p.id] || 0) > 0).map((p) => (
+                <div
+                  key={p.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: 8,
+                    gap: 12,
+                  }}
+                >
+                  <span style={{ flex: 1 }}>{p.label} × {boxCounts[p.id] || 0}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button
+                      type="button"
+                      aria-label="decrease"
+                      onClick={() => bumpBoxCount(p.id, -1)}
+                      style={{ width: 32, height: 32 }}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={0}
+                      value={boxCounts[p.id] ?? 0}
+                      onChange={(e) => setBoxCountDirect(p.id, e.target.value)}
+                      style={{ width: 56, textAlign: "center" }}
+                    />
+                    <button
+                      type="button"
+                      aria-label="increase"
+                      onClick={() => bumpBoxCount(p.id, 1)}
+                      style={{ width: 32, height: 32 }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => setShowBoxModal(false)}>Cancel</button>
+              <button type="button" onClick={onContinueToRates} style={{ fontWeight: "bold" }}>
+                Continue to rates
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRateModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 10002,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ship-rate-modal-title"
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              maxWidth: 480,
+              width: "100%",
+              padding: 20,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+              maxHeight: "90vh",
+              overflow: "auto",
+            }}
+          >
+            <h3 id="ship-rate-modal-title" style={{ marginTop: 0 }}>Select rate</h3>
+            {ratesLoading && <p>Loading rates…</p>}
+            {!ratesLoading &&
+              shippingOptions.map((opt, i) => (
+                <div
+                  key={`${opt.code || "x"}-${i}`}
+                  style={{
+                    border: "1px solid #ddd",
+                    borderRadius: 8,
+                    padding: 12,
+                    marginBottom: 8,
+                  }}
+                >
+                  <div>
+                    <strong>{opt.method}</strong>
+                    {" — "}
+                    {typeof opt.rate === "number"
+                      ? `$${opt.rate.toFixed(2)}`
+                      : opt.rate}
+                  </div>
+                  {opt.delivery && (
+                    <div style={{ fontSize: 13, color: "#555" }}>{opt.delivery}</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onShipWithSelectedRate(opt)}
+                    disabled={isShippingOverlay || loading}
+                    style={{ marginTop: 8, fontWeight: "bold" }}
+                  >
+                    Ship
+                  </button>
+                </div>
+              ))}
+            <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
+              <button type="button" onClick={() => { setShowRateModal(false); setShowBoxModal(true); }}>
+                Back
+              </button>
+              <button type="button" onClick={() => { setShowRateModal(false); setShowBoxModal(false); }}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
