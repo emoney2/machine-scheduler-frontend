@@ -249,9 +249,106 @@ function parseDeliveryDate(text) {
 function getEarliestDueDate(selected, jobs) {
   const selectedJobs = jobs.filter(j => selected.includes(j.orderId.toString()));
   const dueDates = selectedJobs
-    .map(j => new Date(j.due))
-    .filter(d => !isNaN(d));
-  return dueDates.length > 0 ? new Date(Math.min(...dueDates.map(d => d.getTime()))) : null;
+    .map((j) => parseDateFromString(j["Due Date"] ?? j.due ?? j.Due))
+    .filter((d) => d && !isNaN(d.getTime()));
+  return dueDates.length > 0 ? new Date(Math.min(...dueDates.map((d) => d.getTime()))) : null;
+}
+
+/** UPS returns "N business days" — parse N for ETA. */
+function parseBusinessDaysFromDelivery(deliveryStr) {
+  if (deliveryStr == null || deliveryStr === "") return null;
+  const m = String(deliveryStr).match(/(\d+)\s*business\s*day/i);
+  if (m) return Math.max(0, parseInt(m[1], 10));
+  const m2 = String(deliveryStr).match(/^(\d+)\s*$/);
+  if (m2) return Math.max(0, parseInt(m2[1], 10));
+  return null;
+}
+
+function addBusinessDays(fromDate, businessDays) {
+  const n = Math.max(0, parseInt(businessDays, 10) || 0);
+  const d = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  let added = 0;
+  while (added < n) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return d;
+}
+
+/** Parse UPS ScheduledDeliveryDate (YYYY-MM-DD or YYYYMMDD). */
+function parseUpsScheduledDate(val) {
+  if (val == null || val === "") return null;
+  const str = String(val).trim();
+  if (/^\d{8}$/.test(str)) {
+    const y = str.slice(0, 4);
+    const m = str.slice(4, 6);
+    const d = str.slice(6, 8);
+    const dt = new Date(`${y}-${m}-${d}T12:00:00`);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  return parseDateFromString(str);
+}
+
+/** Estimated delivery: prefer UPS calendar date, else today + business_days. */
+function estimatedDeliveryDate(opt) {
+  if (!opt || opt.method === "Manual Shipping") return null;
+  const sched = parseUpsScheduledDate(opt.scheduled_delivery_date);
+  if (sched) return sched;
+  const n =
+    typeof opt.business_days === "number" && Number.isFinite(opt.business_days)
+      ? Math.max(0, Math.floor(opt.business_days))
+      : parseBusinessDaysFromDelivery(opt?.delivery);
+  if (n == null) return null;
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  return addBusinessDays(start, n);
+}
+
+function formatArrivalLabel(d) {
+  if (!d || isNaN(d.getTime())) return "";
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return `${days[d.getDay()]} ${formatDateMMDD(d)}`;
+}
+
+/** Compare calendar dates only: -1 a before b, 0 same, 1 a after b. */
+function calendarDateCompare(a, b) {
+  if (!a || !b || isNaN(a.getTime()) || isNaN(b.getTime())) return 0;
+  const da = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
+  const db = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
+  if (da < db) return -1;
+  if (da > db) return 1;
+  return 0;
+}
+
+/**
+ * Same tint + border as Overview upcoming jobs (cardUrgencyFromRing / ringColorByShipDate).
+ * Logic here is delivery vs due — colors only match Overview palette.
+ */
+function rateTileDueStyle(estimatedArrival, earliestDue) {
+  if (!estimatedArrival || !earliestDue) {
+    return {
+      background: "rgba(249, 250, 251, 0.95)",
+      border: "1px solid #e5e7eb",
+    };
+  }
+  const c = calendarDateCompare(estimatedArrival, earliestDue);
+  if (c < 0) {
+    return {
+      background: "rgba(46, 204, 113, 0.16)",
+      border: "2px solid #2ecc71",
+    };
+  }
+  if (c === 0) {
+    return {
+      background: "rgba(243, 156, 18, 0.2)",
+      border: "2px solid #f39c12",
+    };
+  }
+  return {
+    background: "rgba(231, 76, 60, 0.22)",
+    border: "2px solid #e74c3c",
+  };
 }
 
 function LoginModal({ open, onClose, onLogin }) {
@@ -453,6 +550,8 @@ export default function Ship() {
   const [showRateModal, setShowRateModal] = useState(false);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [boxCounts, setBoxCounts] = useState(() => initialBoxCounts());
+  /** When true, process-shipment skips QuickBooks invoice (labels/slip/sheet still run). */
+  const [skipInvoice, setSkipInvoice] = useState(false);
   const navigate = useNavigate();
 
   // === useEffect 1: Initial load ===
@@ -814,6 +913,14 @@ export default function Ship() {
 
   /** Shared POST /api/process-shipment + completion navigation. */
   const runShipmentCore = async (shipmentBody) => {
+    const mergedBody = {
+      ...shipmentBody,
+      skip_invoice:
+        shipmentBody.skip_invoice !== undefined
+          ? Boolean(shipmentBody.skip_invoice)
+          : skipInvoice,
+    };
+
     openedOnceRef.current = false;
     setIsShippingOverlay(true);
     setShippingStage("🔐 Checking QuickBooks login…");
@@ -828,7 +935,11 @@ export default function Ship() {
         return;
       }
 
-      setShippingStage("📦 Creating labels, invoice, packing slip…");
+      setShippingStage(
+        mergedBody.skip_invoice
+          ? "📦 Creating labels & packing slip (no invoice)…"
+          : "📦 Creating labels, invoice, packing slip…"
+      );
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       let shipData;
       try {
@@ -836,7 +947,7 @@ export default function Ship() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify(shipmentBody),
+          body: JSON.stringify(mergedBody),
         });
         const data = await shipRes.json();
         if (!shipRes.ok) {
@@ -850,7 +961,7 @@ export default function Ship() {
       }
 
       if (shipData.redirect) {
-        sessionStorage.setItem("pendingShipment", JSON.stringify(shipmentBody));
+        sessionStorage.setItem("pendingShipment", JSON.stringify(mergedBody));
         window.location.href = `${API_BASE}${shipData.redirect}`;
         return;
       }
@@ -1411,6 +1522,20 @@ export default function Ship() {
     });
   };
 
+  const earliestDueSelected = getEarliestDueDate(selected, jobs);
+
+  const shipModalFooterBtn = {
+    minWidth: 88,
+    minHeight: 44,
+    padding: "0 14px",
+    borderRadius: 8,
+    border: "1px solid #90a4ae",
+    background: "#fff",
+    cursor: "pointer",
+    fontWeight: 600,
+    fontSize: 14,
+    boxSizing: "border-box",
+  };
 
   return (
     <div style={{ padding: "2rem" }}>
@@ -1580,43 +1705,85 @@ export default function Ship() {
       ))}
 
       {selected.length > 0 && (
-        <div style={{ marginTop: "2rem", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ marginTop: "2rem", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center" }}>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 13,
+              color: "#37474f",
+              cursor: "pointer",
+              userSelect: "none",
+              maxWidth: 280,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={skipInvoice}
+              onChange={(e) => setSkipInvoice(e.target.checked)}
+              disabled={isShippingOverlay || loading}
+            />
+            Sample / no QuickBooks invoice
+          </label>
           <button
             type="button"
             onClick={openShipBoxModal}
             disabled={isShippingOverlay || loading}
             style={{
-              padding: "12px 18px",
-              fontWeight: "bold",
-              borderRadius: 8,
-              border: "none",
-              background: "#1a73e8",
+              width: 132,
+              height: 132,
+              fontWeight: 800,
+              borderRadius: 12,
+              border: "2px solid #0d47a1",
+              background: "linear-gradient(180deg, #1976d2 0%, #0d47a1 100%)",
               color: "#fff",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+              boxShadow: "0 4px 12px rgba(13,71,161,0.35)",
               cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
               opacity: (isShippingOverlay || loading) ? 0.6 : 1,
+              fontSize: 14,
+              lineHeight: 1.2,
+              padding: 8,
+              boxSizing: "border-box",
             }}
-            title="Choose boxes → UPS rates → labels, invoice, packing slip"
+            title={
+              skipInvoice
+                ? "Choose boxes → UPS rates → labels & packing slip (no QBO invoice)"
+                : "Choose boxes → UPS rates → labels, invoice, packing slip"
+            }
           >
-            Ship (UPS)
+            Ship
+            <br />
+            <span style={{ fontSize: 11, fontWeight: 600 }}>(UPS)</span>
           </button>
           <button
             type="button"
             onClick={handleManualShip}
             disabled={isShippingOverlay || loading}
             style={{
-              padding: "12px 18px",
-              fontWeight: "bold",
-              borderRadius: 8,
-              border: "1px solid #666",
-              background: "#fff",
-              color: "#333",
+              width: 132,
+              height: 132,
+              fontWeight: 800,
+              borderRadius: 12,
+              border: "2px solid #78909c",
+              background: "linear-gradient(180deg, #fff 0%, #eceff1 100%)",
+              color: "#37474f",
               cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
               opacity: (isShippingOverlay || loading) ? 0.6 : 1,
+              fontSize: 13,
+              lineHeight: 1.2,
+              padding: 8,
+              boxSizing: "border-box",
             }}
-            title="Invoice and packing slip only (no UPS labels)"
+            title={
+              skipInvoice
+                ? "Packing slip only — no UPS labels, no QBO invoice"
+                : "Invoice and packing slip only (no UPS labels)"
+            }
           >
-            Manual ship (no UPS)
+            Manual
+            <br />
+            <span style={{ fontSize: 10, fontWeight: 600 }}>no UPS</span>
           </button>
         </div>
       )}
@@ -1626,12 +1793,13 @@ export default function Ship() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
+            background: "rgba(0,0,0,0.5)",
             zIndex: 10001,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 16,
+            padding: "12px",
+            boxSizing: "border-box",
           }}
           role="dialog"
           aria-modal="true"
@@ -1639,88 +1807,136 @@ export default function Ship() {
         >
           <div
             style={{
-              background: "#fff",
-              borderRadius: 12,
-              maxWidth: 520,
-              width: "100%",
-              padding: 20,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-              maxHeight: "90vh",
-              overflow: "auto",
+              background: "#fafafa",
+              borderRadius: 14,
+              width: "min(540px, 100%)",
+              maxHeight: "min(92vh, 640px)",
+              padding: "14px 16px 12px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxSizing: "border-box",
+              border: "1px solid #e0e0e0",
             }}
           >
-            <h3 id="ship-box-modal-title" style={{ marginTop: 0 }}>Select boxes</h3>
-            <p style={{ fontSize: 14, color: "#444", marginTop: 0 }}>
-              Tap a size to add one. Adjust quantities on the right.
+            <h3 id="ship-box-modal-title" style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
+              Select boxes
+            </h3>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#1565c0" }}>
+              Tap a square to add one · adjust qty below · due {earliestDueSelected ? formatDateMMDD(earliestDueSelected) : "—"}
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(5, 1fr)",
+                gap: 8,
+                width: "100%",
+              }}
+            >
               {SHIP_BOX_PRESETS.map((p) => (
                 <button
                   key={p.id}
                   type="button"
                   onClick={() => bumpBoxCount(p.id, 1)}
                   style={{
-                    padding: "10px 14px",
-                    textAlign: "left",
-                    borderRadius: 8,
-                    border: "1px solid #ccc",
-                    background: "#f8f9fa",
+                    aspectRatio: "1",
+                    width: "100%",
+                    margin: 0,
+                    borderRadius: 10,
+                    border: "2px solid #b0bec5",
+                    background: "linear-gradient(180deg, #fff 0%, #eceff1 100%)",
                     cursor: "pointer",
-                    fontWeight: 600,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 4,
+                    boxSizing: "border-box",
+                    boxShadow: "inset 0 1px 0 #fff",
                   }}
                 >
-                  {p.label}
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#263238", lineHeight: 1.1, textAlign: "center" }}>
+                    {p.L}×{p.W}×{p.H}
+                  </span>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "#546e7a", marginTop: 4 }}>
+                    {p.weight} lb
+                  </span>
                 </button>
               ))}
             </div>
-            <h4 style={{ marginBottom: 8 }}>Summary</h4>
-            {SHIP_BOX_PRESETS.every((p) => !(boxCounts[p.id] > 0)) ? (
-              <p style={{ color: "#666" }}>No boxes yet.</p>
-            ) : (
-              SHIP_BOX_PRESETS.filter((p) => (boxCounts[p.id] || 0) > 0).map((p) => (
-                <div
-                  key={p.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: 8,
-                    gap: 12,
-                  }}
-                >
-                  <span style={{ flex: 1 }}>{p.label} × {boxCounts[p.id] || 0}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <button
-                      type="button"
-                      aria-label="decrease"
-                      onClick={() => bumpBoxCount(p.id, -1)}
-                      style={{ width: 32, height: 32 }}
+            <div
+              style={{
+                marginTop: 10,
+                paddingTop: 8,
+                borderTop: "1px solid #cfd8dc",
+                flexShrink: 0,
+                maxHeight: "22vh",
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#455a64", marginBottom: 6 }}>Summary</div>
+              {SHIP_BOX_PRESETS.every((x) => !(boxCounts[x.id] > 0)) ? (
+                <div style={{ fontSize: 12, color: "#78909c" }}>None selected</div>
+              ) : (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {SHIP_BOX_PRESETS.filter((x) => (boxCounts[x.id] || 0) > 0).map((p) => (
+                    <div
+                      key={p.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 12,
+                      }}
                     >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      min={0}
-                      value={boxCounts[p.id] ?? 0}
-                      onChange={(e) => setBoxCountDirect(p.id, e.target.value)}
-                      style={{ width: 56, textAlign: "center" }}
-                    />
-                    <button
-                      type="button"
-                      aria-label="increase"
-                      onClick={() => bumpBoxCount(p.id, 1)}
-                      style={{ width: 32, height: 32 }}
-                    >
-                      +
-                    </button>
-                  </div>
+                      <span style={{ fontWeight: 600, color: "#37474f" }}>
+                        {p.L}×{p.W}×{p.H} <span style={{ color: "#78909c", fontWeight: 500 }}>× {boxCounts[p.id] || 0}</span>
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                        <button
+                          type="button"
+                          aria-label="decrease"
+                          onClick={() => bumpBoxCount(p.id, -1)}
+                          style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #90a4ae", background: "#fff", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min={0}
+                          value={boxCounts[p.id] ?? 0}
+                          onChange={(e) => setBoxCountDirect(p.id, e.target.value)}
+                          style={{ width: 40, height: 36, textAlign: "center", borderRadius: 8, border: "1px solid #90a4ae", fontSize: 13 }}
+                        />
+                        <button
+                          type="button"
+                          aria-label="increase"
+                          onClick={() => bumpBoxCount(p.id, 1)}
+                          style={{ width: 36, height: 36, borderRadius: 8, border: "1px solid #90a4ae", background: "#fff", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 0 }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))
-            )}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-              <button type="button" onClick={() => setShowBoxModal(false)}>Cancel</button>
-              <button type="button" onClick={onContinueToRates} style={{ fontWeight: "bold" }}>
-                Continue to rates
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, flexShrink: 0 }}>
+              <button type="button" onClick={() => setShowBoxModal(false)} style={shipModalFooterBtn}>Cancel</button>
+              <button
+                type="button"
+                onClick={onContinueToRates}
+                style={{
+                  ...shipModalFooterBtn,
+                  background: "#1565c0",
+                  color: "#fff",
+                  borderColor: "#0d47a1",
+                }}
+              >
+                Rates →
               </button>
             </div>
           </div>
@@ -1732,12 +1948,13 @@ export default function Ship() {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
+            background: "rgba(0,0,0,0.5)",
             zIndex: 10002,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 16,
+            padding: "12px",
+            boxSizing: "border-box",
           }}
           role="dialog"
           aria-modal="true"
@@ -1745,54 +1962,153 @@ export default function Ship() {
         >
           <div
             style={{
-              background: "#fff",
-              borderRadius: 12,
-              maxWidth: 480,
-              width: "100%",
-              padding: 20,
-              boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-              maxHeight: "90vh",
-              overflow: "auto",
+              background: "#fafafa",
+              borderRadius: 14,
+              width: "min(720px, 100%)",
+              maxHeight: "min(92vh, 720px)",
+              padding: "14px 16px 12px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              boxSizing: "border-box",
+              border: "1px solid #e0e0e0",
             }}
           >
-            <h3 id="ship-rate-modal-title" style={{ marginTop: 0 }}>Select rate</h3>
-            {ratesLoading && <p>Loading rates…</p>}
-            {!ratesLoading &&
-              shippingOptions.map((opt, i) => (
-                <div
-                  key={`${opt.code || "x"}-${i}`}
-                  style={{
-                    border: "1px solid #ddd",
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 8,
-                  }}
-                >
-                  <div>
-                    <strong>{opt.method}</strong>
-                    {" — "}
-                    {typeof opt.rate === "number"
+            <h3 id="ship-rate-modal-title" style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
+              Choose UPS rate
+            </h3>
+            <p style={{ margin: "0 0 8px", fontSize: 11, color: "#374151", lineHeight: 1.4 }}>
+              <span
+                title="Early vs due"
+                style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  background: "rgba(46, 204, 113, 0.16)",
+                  border: "2px solid #2ecc71",
+                  marginRight: 6,
+                }}
+              >
+                early
+              </span>
+              <span
+                title="On due date"
+                style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  background: "rgba(243, 156, 18, 0.2)",
+                  border: "2px solid #f39c12",
+                  margin: "0 6px",
+                }}
+              >
+                on-time
+              </span>
+              <span
+                title="After due"
+                style={{
+                  display: "inline-block",
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  background: "rgba(231, 76, 60, 0.22)",
+                  border: "2px solid #e74c3c",
+                }}
+              >
+                late
+              </span>
+              {" · "}Due <strong>{earliestDueSelected ? formatDateMMDD(earliestDueSelected) : "—"}</strong>
+            </p>
+            {ratesLoading && (
+              <div style={{ padding: 24, textAlign: "center", color: "#546e7a", fontWeight: 600 }}>Loading rates…</div>
+            )}
+            {!ratesLoading && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                  gap: 8,
+                  flex: "1 1 auto",
+                  minHeight: 0,
+                  overflow: "hidden",
+                  alignContent: "start",
+                }}
+              >
+                {shippingOptions.map((opt, i) => {
+                  const eta = estimatedDeliveryDate(opt);
+                  const tileUrgency = rateTileDueStyle(eta, earliestDueSelected);
+                  const priceStr =
+                    typeof opt.rate === "number"
                       ? `$${opt.rate.toFixed(2)}`
-                      : opt.rate}
-                  </div>
-                  {opt.delivery && (
-                    <div style={{ fontSize: 13, color: "#555" }}>{opt.delivery}</div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => onShipWithSelectedRate(opt)}
-                    disabled={isShippingOverlay || loading}
-                    style={{ marginTop: 8, fontWeight: "bold" }}
-                  >
-                    Ship
-                  </button>
-                </div>
-              ))}
-            <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
-              <button type="button" onClick={() => { setShowRateModal(false); setShowBoxModal(true); }}>
-                Back
+                      : opt.rate;
+                  return (
+                    <button
+                      key={`${opt.code || "x"}-${i}`}
+                      type="button"
+                      onClick={() => onShipWithSelectedRate(opt)}
+                      disabled={isShippingOverlay || loading}
+                      style={{
+                        aspectRatio: "1",
+                        width: "100%",
+                        minHeight: 0,
+                        margin: 0,
+                        borderRadius: 12,
+                        ...tileUrgency,
+                        cursor: isShippingOverlay || loading ? "not-allowed" : "pointer",
+                        opacity: isShippingOverlay || loading ? 0.55 : 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 6,
+                        boxSizing: "border-box",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                        textAlign: "center",
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 800, color: "#212121", lineHeight: 1.15, display: "block" }}>
+                        {(opt.method || "Rate").replace(/ UPS$/i, "").slice(0, 22)}
+                      </span>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: "#0d47a1", marginTop: 6 }}>{priceStr}</span>
+                      <span style={{ fontSize: 10, fontWeight: 600, color: "#37474f", marginTop: 6, lineHeight: 1.2 }}>
+                        {eta ? (
+                          <>
+                            Est. delivery
+                            <br />
+                            {formatArrivalLabel(eta)}
+                          </>
+                        ) : (
+                          <>
+                            {opt.delivery || "—"}
+                            <br />
+                            <span style={{ color: "#78909c" }}>Tap to ship</span>
+                          </>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 12, flexShrink: 0 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRateModal(false);
+                  setShowBoxModal(true);
+                }}
+                style={shipModalFooterBtn}
+              >
+                ← Boxes
               </button>
-              <button type="button" onClick={() => { setShowRateModal(false); setShowBoxModal(false); }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRateModal(false);
+                  setShowBoxModal(false);
+                }}
+                style={shipModalFooterBtn}
+              >
                 Cancel
               </button>
             </div>
