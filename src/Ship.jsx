@@ -107,8 +107,9 @@ const SHIP_BOX_PRESETS = [
 const _pub = (typeof process !== "undefined" && process.env && process.env.PUBLIC_URL
   ? String(process.env.PUBLIC_URL).replace(/\/$/, "")
   : "") || "";
-const SHIP_ICON_UPS = `${_pub}/ship-icons/ups-ship.png`;
-const SHIP_ICON_QB = `${_pub}/ship-icons/quickbooks-ship.png`;
+const SHIP_ICON_SHIP_ONLY = `${_pub}/ship-icons/ship-ups-only.png`;
+const SHIP_ICON_SHIP_AND_BILL = `${_pub}/ship-icons/ship-and-bill.png`;
+const SHIP_ICON_BILL_ONLY = `${_pub}/ship-icons/bill-only-qb.png`;
 
 function initialBoxCounts() {
   const o = {};
@@ -1780,7 +1781,7 @@ export default function Ship() {
             }}
           >
             <img
-              src={SHIP_ICON_UPS}
+              src={SHIP_ICON_SHIP_ONLY}
               alt=""
               draggable={false}
               style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
@@ -1801,57 +1802,19 @@ export default function Ship() {
               boxShadow: "0 4px 14px rgba(46,125,50,0.22)",
               cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
               opacity: (isShippingOverlay || loading) ? 0.55 : 1,
-              padding: 6,
+              padding: 8,
               boxSizing: "border-box",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
             }}
           >
-            <div
-              style={{
-                position: "relative",
-                width: 96,
-                height: 96,
-                flexShrink: 0,
-              }}
-              aria-hidden
-            >
-              <img
-                src={SHIP_ICON_QB}
-                alt=""
-                draggable={false}
-                style={{
-                  position: "absolute",
-                  left: "50%",
-                  bottom: 0,
-                  transform: "translateX(-50%)",
-                  width: 80,
-                  height: 80,
-                  objectFit: "contain",
-                  pointerEvents: "none",
-                  userSelect: "none",
-                }}
-              />
-              <img
-                src={SHIP_ICON_UPS}
-                alt=""
-                draggable={false}
-                style={{
-                  position: "absolute",
-                  left: "50%",
-                  top: -4,
-                  transform: "translateX(-50%)",
-                  width: 58,
-                  height: 58,
-                  objectFit: "contain",
-                  zIndex: 1,
-                  filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.35))",
-                  pointerEvents: "none",
-                  userSelect: "none",
-                }}
-              />
-            </div>
+            <img
+              src={SHIP_ICON_SHIP_AND_BILL}
+              alt=""
+              draggable={false}
+              style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
+            />
           </button>
           <button
             type="button"
@@ -1876,7 +1839,7 @@ export default function Ship() {
             }}
           >
             <img
-              src={SHIP_ICON_QB}
+              src={SHIP_ICON_BILL_ONLY}
               alt=""
               draggable={false}
               style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
