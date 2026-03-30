@@ -2,91 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 
-  // NEW: Force QuickBooks auth (popup if needed), then continue
-  async function ensureQboAuth() {
-    try {
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-
-      // 1) Initial check
-      const resp = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      let data = null;
-      try { data = await resp.json(); } catch {}
-
-      if (resp.ok && data?.ok) return true;
-
-      // If backend now returns structured error, surface the detail
-      if (!resp.ok && data?.error) {
-        alert(`QuickBooks auth failed: ${data.detail || data.error}`);
-        return false;
-      }
-
-      // 2) If we got a redirect, do popup OAuth
-      if (data?.redirect) {
-        const w = 720, h = 720;
-        const y = window.top.outerHeight / 2 + window.top.screenY - (h / 2);
-        const x = window.top.outerWidth / 2 + window.top.screenX - (w / 2);
-        const popup = window.open(
-          `${API_BASE}${data.redirect}`,
-          "qbo_oauth",
-          `toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=${w},height=${h},top=${y},left=${x}`
-        );
-        if (!popup) {
-          alert("Popup blocked. Please allow popups for QuickBooks login.");
-          return false;
-        }
-
-        // Wait until popup closes (5 min timeout)
-        await new Promise((resolve, reject) => {
-          const start = Date.now();
-          const timer = setInterval(() => {
-            if (popup.closed) {
-              clearInterval(timer);
-              resolve();
-            } else if (Date.now() - start > 5 * 60 * 1000) {
-              clearInterval(timer);
-              try { popup.close(); } catch {}
-              reject(new Error("QuickBooks login timed out"));
-            }
-          }, 800);
-        });
-
-        // 3) Re-check after popup
-        const re = await fetch(`${API_BASE}/api/ensure-qbo-auth`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        });
-
-        let redata = null;
-        try { redata = await re.json(); } catch {}
-
-        if (re.ok && redata?.ok) return true;
-
-        if (!re.ok && redata?.error) {
-          alert(`QuickBooks auth failed: ${redata.detail || redata.error}`);
-          return false;
-        }
-
-        // No explicit error but also not ok → treat as cancelled
-        return false;
-      }
-
-      // No ok, no redirect, no structured error → treat as failure
-      return false;
-    } catch (e) {
-      console.error("[ensureQboAuth] error:", e);
-      alert("QuickBooks login failed or was cancelled.");
-      return false;
-    }
-  }
-
-
-
 // Map our logical box names to their actual dimensions
 const BOX_DIMENSIONS = {
   Small:  "10×10×10",
@@ -957,16 +872,20 @@ export default function Ship() {
 
     openedOnceRef.current = false;
     setIsShippingOverlay(true);
-    setShippingStage("🔐 Checking QuickBooks login…");
     setLoading(true);
 
+    const needsQbo = !mergedBody.skip_invoice;
+
     try {
-      const authed = await ensureQboAuth();
-      if (!authed) {
-        setIsShippingOverlay(false);
-        setLoading(false);
-        alert("QuickBooks login failed or was cancelled.");
-        return;
+      if (needsQbo) {
+        setShippingStage("🔐 Checking QuickBooks login…");
+        const authed = await ensureQboAuth();
+        if (!authed) {
+          setIsShippingOverlay(false);
+          setLoading(false);
+          alert("QuickBooks login failed or was cancelled.");
+          return;
+        }
       }
 
       {
