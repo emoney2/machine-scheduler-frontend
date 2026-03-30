@@ -4,6 +4,7 @@ import axios from "axios";
 
 // ---------- Config ----------
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+const BACKEND_ROOT = API_ROOT.replace(/\/api$/, "");
 
 // ---------- Utils ----------
 function toDate(v) {
@@ -21,71 +22,151 @@ function fmtMMDD(d) {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${mm}/${dd}`;
 }
-function firstField(obj, names) {
-  for (const n of names) {
-    const val = obj?.[n];
-    if (val !== undefined && val !== null && String(val).trim() !== "") return val;
-  }
+// Same Drive parsing + **backend thumbnail proxy** as Overview (direct drive.google.com
+// thumbnails often stay blank in <img> until interaction; /api/drive/thumbnail uses server auth).
+function extractFileIdFromFormulaOrUrl(input) {
+  if (!input) return null;
+  const s = String(input);
+  let m = s.match(/IMAGE\("([^"]+)"/i);
+  if (m) return extractFileIdFromFormulaOrUrl(m[1]);
+  if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return s;
+  m = s.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = s.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = s.match(/\/(?:open|uc)[^?]*\?[^#]*\bid=([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = s.match(/"id":"([A-Za-z0-9_-]{10,})"/);
+  if (m) return m[1];
   return null;
 }
 
-// Extract Google Drive file ID from =IMAGE(...) or URL
-function extractFileIdFromFormulaOrUrl(v) {
-  try {
-    const s = String(v || "");
-    const m1 = s.match(/id=([A-Za-z0-9_-]+)/);
-    if (m1) return m1[1];
-    const m2 = s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-    if (m2) return m2[1];
-    const m3 = s.match(/IMAGE\("([^"]+)"/i);
-    if (m3) return extractFileIdFromFormulaOrUrl(m3[1]);
-  } catch {}
-  return null;
-}
+/** Thumbnail via /api/drive/thumbnail + URL to open (Overview-style popup). */
+function resolveOrderPreview(order) {
+  const proxyBase = `${BACKEND_ROOT}/api/drive/thumbnail`;
+  const proxyForId = (id) => {
+    if (!id) return null;
+    const params = new URLSearchParams({ fileId: id, sz: "w160" }).toString();
+    return `${proxyBase}?${params}`;
+  };
 
-function orderThumbUrl(order) {
-  // Prefer direct server-provided URL if any
-  const direct = firstField(order, ["imageUrl", "image", "thumbnail", "imageURL", "thumbnailUrl"]);
-  if (direct && /^https?:\/\//i.test(String(direct))) return direct;
-
-  // Extract a Drive file id from formula or any field in the row
-  const previewLike = firstField(order, ["Preview", "preview", "PreviewFormula", "previewFormula"]) || "";
-  let id = extractFileIdFromFormulaOrUrl(previewLike);
-  if (!id) {
-    for (const val of Object.values(order)) {
-      const s = String(val || "");
-      let m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-      if (m) { id = m[1]; break; }
+  const toPreview = (idOrUrl) => {
+    if (!idOrUrl) return null;
+    const id = extractFileIdFromFormulaOrUrl(idOrUrl);
+    if (id) {
+      return {
+        thumbUrl: proxyForId(id),
+        openUrl: `https://drive.google.com/file/d/${id}/view`,
+      };
     }
-  }
-  if (!id) return null;
+    const str = String(idOrUrl);
+    if (/^https?:\/\//i.test(str)) return { thumbUrl: str, openUrl: str };
+    if (/^[A-Za-z0-9_-]{12,}$/.test(str)) {
+      return {
+        thumbUrl: proxyForId(str),
+        openUrl: `https://drive.google.com/file/d/${str}/view`,
+      };
+    }
+    return null;
+  };
 
-  return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
-}
-
-/** URL to open in a new browser tab (full Drive viewer or direct image link). */
-function orderFullViewUrl(order) {
-  const direct = firstField(order, ["imageUrl", "image", "thumbnail", "imageURL", "thumbnailUrl"]);
-  if (direct && /^https?:\/\//i.test(String(direct))) {
-    const id = extractFileIdFromFormulaOrUrl(direct);
-    if (id) return `https://drive.google.com/file/d/${id}/view`;
-    return String(direct).trim();
-  }
-  const previewLike =
-    firstField(order, ["Preview", "preview", "PreviewFormula", "previewFormula"]) || "";
-  let id = extractFileIdFromFormulaOrUrl(previewLike);
-  if (!id) {
-    for (const val of Object.values(order)) {
-      const s = String(val || "");
-      const m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
-      if (m) {
-        id = m[1];
-        break;
+  const fromAny = (val) => {
+    if (!val) return null;
+    if (Array.isArray(val)) {
+      for (const v of val) {
+        const hit = fromAny(v);
+        if (hit) return hit;
       }
+      return null;
     }
+    if (typeof val === "object") {
+      const cand = [
+        val.imageUrl, val.src, val.url, val.href, val.link, val.image, val.thumbnail, val.preview,
+      ];
+      for (const c of cand) {
+        const hit = fromAny(c);
+        if (hit) return hit;
+      }
+      return toPreview(JSON.stringify(val));
+    }
+    return toPreview(val);
+  };
+
+  const fields = [
+    order.imageUrl, order.image,
+    order.thumbnailUrl, order.ImageURL,
+    order.preview, order.Preview, order.previewFormula, order.PreviewFormula,
+    order.Image, order.thumbnail, order.Thumbnail,
+    order.images, order.Images, order.imagesLabeled, order.images_labelled,
+    order.files, order.attachments, order.Attachment, order.Attachements,
+    order.Art, order["Art Link"], order["Art URL"],
+  ];
+  for (const f of fields) {
+    const hit = fromAny(f);
+    if (hit) return hit;
   }
-  if (id) return `https://drive.google.com/file/d/${id}/view`;
-  return null;
+  for (const v of Object.values(order || {})) {
+    const hit = fromAny(v);
+    if (hit) return hit;
+  }
+  return { thumbUrl: null, openUrl: null };
+}
+
+/** Match Overview upcoming-jobs image popup. */
+function openPreviewLikeOverview(url) {
+  if (!url) return;
+  try {
+    const w = window.open(url, "_blank", "noopener,width=980,height=720");
+    if (w) {
+      try { w.opener = null; } catch { /* ignore */ }
+      setTimeout(() => {
+        try { window.focus(); } catch { /* ignore */ }
+      }, 0);
+    }
+  } catch { /* ignore */ }
+}
+
+/** Production Orders material columns (same as Cut List / submit). */
+const MATERIAL_ORDER_KEYS = [
+  "Material1",
+  "Material2",
+  "Material3",
+  "Material4",
+  "Material5",
+  "Back Material",
+];
+
+function materialLabelsFromOrder(order) {
+  const seen = new Set();
+  const out = [];
+  for (const k of MATERIAL_ORDER_KEYS) {
+    const v = String(order?.[k] ?? "").trim();
+    if (!v) continue;
+    const lk = v.toLowerCase();
+    if (seen.has(lk)) continue;
+    seen.add(lk);
+    out.push(v);
+  }
+  return out;
+}
+
+function normalizeSheetColor(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return "#e5e7eb";
+  if (/^#[0-9a-f]{3,8}$/i.test(s)) return s;
+  if (/^[0-9a-f]{6}$/i.test(s)) return `#${s}`;
+  return s;
+}
+
+function contrastTextForBackground(bg) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(bg).replace(/\s/g, ""));
+  if (!m) return "#111827";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const L = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return L > 0.62 ? "#111827" : "#ffffff";
 }
 
 // Optional: grouping helper (same behavior as Fur List if you keep the mode buttons)
@@ -151,6 +232,23 @@ export default function DigitizingList() {
     toastTimer.current = setTimeout(() => setToastMsg(""), ms);
   }
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      try {
+        const res = await axios.get(`${API_ROOT}/material-inventory/colors`, {
+          withCredentials: true,
+        });
+        if (!cancel && res.data && typeof res.data === "object") {
+          setMaterialColors(res.data);
+        }
+      } catch {
+        if (!cancel) setMaterialColors({});
+      }
+    })();
+    return () => { cancel = true; };
+  }, []);
 
   // Reusable fetcher (first load sets isLoading; refreshes do not blank the UI)
   const fetchOrders = useCallback(async (opts = { refresh: false }) => {
@@ -221,9 +319,11 @@ export default function DigitizingList() {
 
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
-  // [Order#, Preview, Company, Design, Qty, Product, Stage, (Print), Fur Color, Ship, Due, (Hard/Soft)]
-  const gridFull    = "62px 56px 170px 190px 62px 120px 110px 100px 78px 78px 110px 92px";
-  const gridCompact = "62px 56px 160px 160px 60px 110px 100px 74px 74px 92px";
+  // [Order#, Preview, Company, Design, Qty, Product, Stage, (Print), Materials, Due, (Hard/Soft)]
+  const gridFull =
+    "62px 56px 170px 190px 62px 120px 110px 100px minmax(140px,1.15fr) 110px 92px";
+  const gridCompact =
+    "62px 56px 160px 160px 60px 110px 100px minmax(120px,1fr) 92px";
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const cellBase = {
@@ -270,8 +370,7 @@ export default function DigitizingList() {
         <div style={cellBase}>Product</div>
         <div style={cellBase}>Stage</div>
         {!compact && <div style={cellBase}>Print</div>}
-        <div style={cellBase}>Fur Color</div>
-        <div style={cellBase}>Ship</div>
+        <div style={cellBase}>Materials</div>
         <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
       </div>
@@ -324,43 +423,40 @@ export default function DigitizingList() {
             const stage   = order["Stage"] || "";
             const due     = toDate(order["Due Date"]);
             const print   = order["Print"] || "";
-            const color   = order["Fur Color"] || "";
-            const ship    = toDate(order["Ship Date"]); // your data seems to use "Ship Date"
             const hardSoft= order["Hard Date/Soft Date"] || "";
-            const imageUrl = orderThumbUrl(order);
-            const fullViewUrl = orderFullViewUrl(order);
+            const matLabels = materialLabelsFromOrder(order);
+            const { thumbUrl: imageUrl, openUrl } = resolveOrderPreview(order);
 
-            const openPreviewInNewTab = (e) => {
+            const onPreviewClick = (e) => {
               e.preventDefault();
               e.stopPropagation();
-              if (!fullViewUrl) return;
-              window.open(fullViewUrl, "_blank", "noopener,noreferrer");
+              openPreviewLikeOverview(openUrl);
             };
 
             return (
               <div
                 key={orderId}
                 style={{
-                  display: "grid", gridTemplateColumns: gridTemplate, alignItems: "center",
+                  display: "grid", gridTemplateColumns: gridTemplate, alignItems: "start",
                   gap: 8, padding: 10, borderRadius: 10,
                   border: "1px solid #ddd", background: "#fff"
                 }}
               >
-                <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
+                <div style={{ ...cellBase, fontWeight: 700, alignSelf: "center" }}>{orderId}</div>
 
-                {/* Preview — click opens full image / Drive file in a new browser tab */}
-                <div style={{ display: "grid", placeItems: "center" }}>
+                {/* Preview — thumbs via /api/drive/thumbnail (like Overview); click opens like scheduler */}
+                <div style={{ display: "grid", placeItems: "center", alignSelf: "center" }}>
                   <div
-                    role={fullViewUrl ? "button" : undefined}
-                    tabIndex={fullViewUrl ? 0 : undefined}
-                    title={fullViewUrl ? "Open full image in new tab" : undefined}
-                    onClick={fullViewUrl ? openPreviewInNewTab : undefined}
+                    role={openUrl ? "button" : undefined}
+                    tabIndex={openUrl ? 0 : undefined}
+                    title={openUrl ? "Open full preview" : undefined}
+                    onClick={openUrl ? onPreviewClick : undefined}
                     onKeyDown={
-                      fullViewUrl
+                      openUrl
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              openPreviewInNewTab(e);
+                              onPreviewClick(e);
                             }
                           }
                         : undefined
@@ -372,16 +468,19 @@ export default function DigitizingList() {
                       borderRadius: 6,
                       border: "1px solid rgba(0,0,0,0.08)",
                       background: "#fff",
-                      cursor: fullViewUrl ? "pointer" : "default",
+                      cursor: openUrl ? "pointer" : "default",
                     }}
                   >
                     {imageUrl ? (
                       <img
-                        loading="lazy"
+                        loading="eager"
                         decoding="async"
                         src={imageUrl}
                         alt=""
                         draggable={false}
+                        referrerPolicy="no-referrer"
+                        width={50}
+                        height={34}
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                         }}
@@ -409,16 +508,59 @@ export default function DigitizingList() {
                   </div>
                 </div>
 
-                <div style={cellBase}>{company}</div>
-                <div style={cellBase}>{design}</div>
-                <div style={cellBase}>{qty}</div>
-                <div style={cellBase}>{product}</div>
-                <div style={cellBase}>{stage}</div>
-                {!compact && <div style={cellBase}>{print}</div>}
-                <div style={cellBase}>{color}</div>
-                <div style={cellBase}>{fmtMMDD(ship)}</div>
-                <div style={{ ...cellBase, fontWeight: 700 }}>{fmtMMDD(due)}</div>
-                {!compact && <div style={cellBase}>{hardSoft}</div>}
+                <div style={{ ...cellBase, alignSelf: "center" }}>{company}</div>
+                <div style={{ ...cellBase, alignSelf: "center" }}>{design}</div>
+                <div style={{ ...cellBase, alignSelf: "center" }}>{qty}</div>
+                <div style={{ ...cellBase, alignSelf: "center" }}>{product}</div>
+                <div style={{ ...cellBase, alignSelf: "center" }}>{stage}</div>
+                {!compact && <div style={{ ...cellBase, alignSelf: "center" }}>{print}</div>}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 4,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    alignSelf: "center",
+                    minWidth: 0,
+                    padding: "4px 0",
+                  }}
+                >
+                  {matLabels.length === 0 ? (
+                    <span style={{ fontSize: 10, color: "#9ca3af" }}>—</span>
+                  ) : (
+                    matLabels.map((label) => {
+                      const raw = materialColors[label.toLowerCase()];
+                      const bg = normalizeSheetColor(raw);
+                      const fg = contrastTextForBackground(bg);
+                      const short = label.length > 24 ? `${label.slice(0, 22)}…` : label;
+                      return (
+                        <span
+                          key={`${orderId}-${label}`}
+                          title={label}
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            lineHeight: 1.2,
+                            padding: "3px 7px",
+                            borderRadius: 999,
+                            background: bg,
+                            color: fg,
+                            maxWidth: "100%",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            border: "1px solid rgba(0,0,0,0.06)",
+                          }}
+                        >
+                          {short}
+                        </span>
+                      );
+                    })
+                  )}
+                </div>
+                <div style={{ ...cellBase, fontWeight: 700, alignSelf: "center" }}>{fmtMMDD(due)}</div>
+                {!compact && <div style={{ ...cellBase, alignSelf: "center" }}>{hardSoft}</div>}
               </div>
             );
           })}
