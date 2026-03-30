@@ -63,6 +63,31 @@ function orderThumbUrl(order) {
   return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
 }
 
+/** URL to open in a new browser tab (full Drive viewer or direct image link). */
+function orderFullViewUrl(order) {
+  const direct = firstField(order, ["imageUrl", "image", "thumbnail", "imageURL", "thumbnailUrl"]);
+  if (direct && /^https?:\/\//i.test(String(direct))) {
+    const id = extractFileIdFromFormulaOrUrl(direct);
+    if (id) return `https://drive.google.com/file/d/${id}/view`;
+    return String(direct).trim();
+  }
+  const previewLike =
+    firstField(order, ["Preview", "preview", "PreviewFormula", "previewFormula"]) || "";
+  let id = extractFileIdFromFormulaOrUrl(previewLike);
+  if (!id) {
+    for (const val of Object.values(order)) {
+      const s = String(val || "");
+      const m = s.match(/id=([A-Za-z0-9_-]+)/) || s.match(/\/file\/d\/([A-Za-z0-9_-]+)/);
+      if (m) {
+        id = m[1];
+        break;
+      }
+    }
+  }
+  if (id) return `https://drive.google.com/file/d/${id}/view`;
+  return null;
+}
+
 // Optional: grouping helper (same behavior as Fur List if you keep the mode buttons)
 function priorityPartition(rows, key) {
   if (!rows.length) return rows;
@@ -302,7 +327,15 @@ export default function DigitizingList() {
             const color   = order["Fur Color"] || "";
             const ship    = toDate(order["Ship Date"]); // your data seems to use "Ship Date"
             const hardSoft= order["Hard Date/Soft Date"] || "";
-            const imageUrl= orderThumbUrl(order);
+            const imageUrl = orderThumbUrl(order);
+            const fullViewUrl = orderFullViewUrl(order);
+
+            const openPreviewInNewTab = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!fullViewUrl) return;
+              window.open(fullViewUrl, "_blank", "noopener,noreferrer");
+            };
 
             return (
               <div
@@ -315,17 +348,61 @@ export default function DigitizingList() {
               >
                 <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
 
-                {/* Preview */}
+                {/* Preview — click opens full image / Drive file in a new browser tab */}
                 <div style={{ display: "grid", placeItems: "center" }}>
-                  <div style={{ width: 50, height: 34, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
+                  <div
+                    role={fullViewUrl ? "button" : undefined}
+                    tabIndex={fullViewUrl ? 0 : undefined}
+                    title={fullViewUrl ? "Open full image in new tab" : undefined}
+                    onClick={fullViewUrl ? openPreviewInNewTab : undefined}
+                    onKeyDown={
+                      fullViewUrl
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              openPreviewInNewTab(e);
+                            }
+                          }
+                        : undefined
+                    }
+                    style={{
+                      width: 50,
+                      height: 34,
+                      overflow: "hidden",
+                      borderRadius: 6,
+                      border: "1px solid rgba(0,0,0,0.08)",
+                      background: "#fff",
+                      cursor: fullViewUrl ? "pointer" : "default",
+                    }}
+                  >
                     {imageUrl ? (
                       <img
-                        loading="lazy" decoding="async" src={imageUrl} alt="preview"
-                        onError={(e) => { e.currentTarget.style.display = "none"; }}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        loading="lazy"
+                        decoding="async"
+                        src={imageUrl}
+                        alt=""
+                        draggable={false}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
                       />
                     ) : (
-                      <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontSize: 11, color: "#666" }}>
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          display: "grid",
+                          placeItems: "center",
+                          fontSize: 11,
+                          color: "#666",
+                        }}
+                      >
                         No Preview
                       </div>
                     )}
