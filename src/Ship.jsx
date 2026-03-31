@@ -497,8 +497,21 @@ export default function Ship() {
   const [shippingStage, setShippingStage] = useState(""); // dynamic overlay message
   const [showBoxModal, setShowBoxModal] = useState(false);
   const [showRateModal, setShowRateModal] = useState(false);
+  const [showAddressChoiceModal, setShowAddressChoiceModal] = useState(false);
+  const [showOneTimeAddressModal, setShowOneTimeAddressModal] = useState(false);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [boxCounts, setBoxCounts] = useState(() => initialBoxCounts());
+  const [oneTimeShipAddress, setOneTimeShipAddress] = useState(null);
+  const [oneTimeAddressForm, setOneTimeAddressForm] = useState({
+    companyName: "",
+    contactName: "",
+    phone: "",
+    street1: "",
+    street2: "",
+    city: "",
+    state: "",
+    zip: "",
+  });
   /** UPS wizard: whether this flow should create a QBO invoice (set when opening box modal). */
   const upsFlowCreateInvoiceRef = useRef(true);
   const navigate = useNavigate();
@@ -1037,8 +1050,11 @@ export default function Ship() {
 
 
   // 5) Helper to fetch live UPS rates (with Directory fallback + multi-endpoint retry)
-  /** @param {Array<{L:number,W:number,H:number,weight:number}>|null} packagesFlatOverride */
-  const fetchRates = async (packagesFlatOverride = null) => {
+  /**
+   * @param {Array<{L:number,W:number,H:number,weight:number}>|null} packagesFlatOverride
+   * @param {{companyName:string,contactName:string,phone:string,street1:string,street2:string,city:string,state:string,zip:string,country?:string}|null} shipToOverride
+   */
+  const fetchRates = async (packagesFlatOverride = null, shipToOverride = null) => {
     if (selected.length === 0) {
       setShippingOptions([]);
       return;
@@ -1089,8 +1105,10 @@ export default function Ship() {
       }
     });
 
-    // 1) Try to build recipient from the Production Orders row (may not have address)
-    let recipient = buildRecipientFrom(jobToShip);
+    // 1) Try one-time override first, then Production Orders row (may not have address)
+    let recipient = shipToOverride
+      ? toRecipientFromOneTimeAddress(normalizeOneTimeAddress(shipToOverride))
+      : buildRecipientFrom(jobToShip);
 
     // 2) If missing anything important, fetch from Directory by company name
     const needsDirectory = !recipient.Address.AddressLine1 ||
@@ -1100,7 +1118,7 @@ export default function Ship() {
       !recipient.Address.PostalCode ||
       recipient.Address.PostalCode.length !== 5;
 
-    if (needsDirectory) {
+    if (needsDirectory && !shipToOverride) {
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       const companyName =
         get(jobToShip, "Company Name") ||
@@ -1402,6 +1420,86 @@ export default function Ship() {
     setBoxCounts((c) => ({ ...c, [id]: v }));
   };
 
+  const normalizeOneTimeAddress = (raw = {}) => {
+    const toStateAbbr = (v = "") => {
+      const s = String(v || "").trim().toUpperCase();
+      return s.slice(0, 2);
+    };
+    const toZip5 = (v = "") => {
+      const m = String(v || "").match(/(\d{5})/);
+      return m ? m[1] : "";
+    };
+    return {
+      companyName: String(raw.companyName || "").trim(),
+      contactName: String(raw.contactName || "").trim(),
+      phone: String(raw.phone || "").trim(),
+      street1: String(raw.street1 || "").trim(),
+      street2: String(raw.street2 || "").trim(),
+      city: String(raw.city || "").trim(),
+      state: toStateAbbr(raw.state),
+      zip: toZip5(raw.zip),
+      country: "US",
+    };
+  };
+
+  const validateOneTimeAddress = (raw = {}) => {
+    const a = normalizeOneTimeAddress(raw);
+    if (!a.street1 || !a.city || a.state.length !== 2 || a.zip.length !== 5) {
+      return {
+        ok: false,
+        message: "Please enter a valid one-time address (street, city, 2-letter state, 5-digit ZIP).",
+      };
+    }
+    return { ok: true, value: a };
+  };
+
+  const toRecipientFromOneTimeAddress = (addr = {}) => ({
+    Name: addr.companyName || "Recipient",
+    AttentionName: addr.contactName || "",
+    Phone: addr.phone || "",
+    Address: {
+      AddressLine1: addr.street1 || "",
+      AddressLine2: addr.street2 || "",
+      City: addr.city || "",
+      StateProvinceCode: addr.state || "",
+      PostalCode: addr.zip || "",
+      CountryCode: "US",
+    },
+  });
+
+  const beginRatesFlowWithAddressChoice = () => {
+    const flat = expandPackagesFromCounts(boxCounts);
+    if (flat.length === 0) {
+      alert("Add at least one box.");
+      return;
+    }
+    setShowAddressChoiceModal(true);
+  };
+
+  const proceedToRatesWithAddress = async (overrideAddress = null) => {
+    const flat = expandPackagesFromCounts(boxCounts);
+    if (flat.length === 0) {
+      alert("Add at least one box.");
+      return;
+    }
+    setOneTimeShipAddress(overrideAddress || null);
+    setShowAddressChoiceModal(false);
+    setShowOneTimeAddressModal(false);
+    setShowRateModal(true);
+    setRatesLoading(true);
+    setShippingOptions([]);
+    try {
+      await fetchRates(flat, overrideAddress || null);
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  const handleOneTimeAddressInputChange = (e) => {
+    const { name, value } = e.target;
+    setOneTimeAddressForm((prev) => ({ ...prev, [name]: value }));
+  };
+
   /** @param {boolean} createInvoice - false = Ship (UPS, no QBO invoice); true = Ship & bill */
   const openShipBoxModal = (createInvoice) => {
     if (selected.length === 0) {
@@ -1412,23 +1510,24 @@ export default function Ship() {
     setBoxCounts(initialBoxCounts());
     setShippingOptions([]);
     setShowRateModal(false);
+    setShowAddressChoiceModal(false);
+    setShowOneTimeAddressModal(false);
+    setOneTimeShipAddress(null);
+    setOneTimeAddressForm({
+      companyName: "",
+      contactName: "",
+      phone: "",
+      street1: "",
+      street2: "",
+      city: "",
+      state: "",
+      zip: "",
+    });
     setShowBoxModal(true);
   };
 
   const onContinueToRates = async () => {
-    const flat = expandPackagesFromCounts(boxCounts);
-    if (flat.length === 0) {
-      alert("Add at least one box.");
-      return;
-    }
-    setShowRateModal(true);
-    setRatesLoading(true);
-    setShippingOptions([]);
-    try {
-      await fetchRates(flat);
-    } finally {
-      setRatesLoading(false);
-    }
+    beginRatesFlowWithAddressChoice();
   };
 
   const onShipWithSelectedRate = async (opt) => {
@@ -1439,6 +1538,7 @@ export default function Ship() {
     }
     const summary = boxesSummaryFromCounts(boxCounts);
     const skipInv = !upsFlowCreateInvoiceRef.current;
+    const shipToOverride = oneTimeShipAddress ? { ...oneTimeShipAddress } : null;
     const isManualRate =
       SKIP_UPS ||
       !opt ||
@@ -1462,6 +1562,7 @@ export default function Ship() {
         ups_purchased_rate: 0,
         skip_invoice: skipInv,
         qboEnv: "production",
+        ...(shipToOverride ? { ship_to_override: shipToOverride } : {}),
       });
       return;
     }
@@ -1483,6 +1584,7 @@ export default function Ship() {
       skip_ups: false,
       skip_invoice: skipInv,
       qboEnv: "production",
+      ...(shipToOverride ? { ship_to_override: shipToOverride } : {}),
     });
   };
 
@@ -1919,6 +2021,164 @@ export default function Ship() {
                 }}
               >
                 Rates →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddressChoiceModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 10003,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "12px",
+            boxSizing: "border-box",
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ship-address-choice-title"
+        >
+          <div
+            style={{
+              background: "#fafafa",
+              borderRadius: 14,
+              width: "min(520px, 100%)",
+              padding: "16px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+              border: "1px solid #e0e0e0",
+            }}
+          >
+            <h3 id="ship-address-choice-title" style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
+              Ship to a different address?
+            </h3>
+            <p style={{ margin: "0 0 14px", fontSize: 14, color: "#37474f", lineHeight: 1.4 }}>
+              Use your default address from Directory, or enter a one-time shipping address for this shipment only.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddressChoiceModal(false);
+                  setShowOneTimeAddressModal(false);
+                }}
+                style={shipModalFooterBtn}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => proceedToRatesWithAddress(null)}
+                style={shipModalFooterBtn}
+              >
+                No, use default
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddressChoiceModal(false);
+                  setShowOneTimeAddressModal(true);
+                }}
+                style={{
+                  ...shipModalFooterBtn,
+                  background: "#1565c0",
+                  color: "#fff",
+                  borderColor: "#0d47a1",
+                }}
+              >
+                Yes, different address
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOneTimeAddressModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 10004,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "12px",
+            boxSizing: "border-box",
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ship-one-time-address-title"
+        >
+          <div
+            style={{
+              background: "#fafafa",
+              borderRadius: 14,
+              width: "min(620px, 100%)",
+              maxHeight: "min(92vh, 740px)",
+              padding: "14px 16px 12px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+              border: "1px solid #e0e0e0",
+              overflow: "auto",
+            }}
+          >
+            <h3 id="ship-one-time-address-title" style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
+              One-time shipping address
+            </h3>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#546e7a" }}>
+              This address is used for this shipment only and is not saved.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              <input name="companyName" value={oneTimeAddressForm.companyName} onChange={handleOneTimeAddressInputChange} placeholder="Company Name (optional)" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="contactName" value={oneTimeAddressForm.contactName} onChange={handleOneTimeAddressInputChange} placeholder="Contact Name (optional)" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="phone" value={oneTimeAddressForm.phone} onChange={handleOneTimeAddressInputChange} placeholder="Phone (optional)" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <div />
+              <input name="street1" value={oneTimeAddressForm.street1} onChange={handleOneTimeAddressInputChange} placeholder="Street Address 1 *" style={{ gridColumn: "1 / span 2", padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="street2" value={oneTimeAddressForm.street2} onChange={handleOneTimeAddressInputChange} placeholder="Street Address 2" style={{ gridColumn: "1 / span 2", padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="city" value={oneTimeAddressForm.city} onChange={handleOneTimeAddressInputChange} placeholder="City *" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="state" value={oneTimeAddressForm.state} onChange={handleOneTimeAddressInputChange} placeholder="State (2-letter) *" maxLength={2} style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5", textTransform: "uppercase" }} />
+              <input name="zip" value={oneTimeAddressForm.zip} onChange={handleOneTimeAddressInputChange} placeholder="ZIP (5-digit) *" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOneTimeAddressModal(false);
+                  setShowAddressChoiceModal(true);
+                }}
+                style={shipModalFooterBtn}
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const checked = validateOneTimeAddress(oneTimeAddressForm);
+                  if (!checked.ok) {
+                    alert(checked.message);
+                    return;
+                  }
+                  proceedToRatesWithAddress(checked.value);
+                }}
+                style={{
+                  ...shipModalFooterBtn,
+                  background: "#1565c0",
+                  color: "#fff",
+                  borderColor: "#0d47a1",
+                }}
+              >
+                Continue to rates
               </button>
             </div>
           </div>
