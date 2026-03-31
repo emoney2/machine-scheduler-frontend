@@ -342,6 +342,7 @@ export default function Ship() {
     const labels = Array.isArray(data?.labels) ? data.labels : [];
     const slips  = Array.isArray(data?.slips)  ? data.slips  : [];
     const openLabels = data?.open_label_windows !== false;
+    const openSlips = data?.open_slip_windows === true;
 
     // Labels (skip when backend copied to Label Printer folder)
     if (openLabels) {
@@ -353,13 +354,15 @@ export default function Ship() {
       });
     }
 
-    // Slips
-    slips.forEach((u) => {
-      if (isHttpUrl(u)) {
-        const w = window.open(u, "_blank", "noopener,noreferrer");
-        if (w) w.blur();
-      }
-    });
+    // Slips: backend prints directly, so popup only when explicitly requested.
+    if (openSlips) {
+      slips.forEach((u) => {
+        if (isHttpUrl(u)) {
+          const w = window.open(u, "_blank", "noopener,noreferrer");
+          if (w) w.blur();
+        }
+      });
+    }
   }
 
   // NEW: Force QuickBooks auth (popup if needed), then continue
@@ -1667,7 +1670,7 @@ export default function Ship() {
           top: 0, left: 0,
           width: "100vw", height: "100vh",
           backgroundColor: "rgba(255, 247, 194, 0.85)",
-          zIndex: 9999,
+          zIndex: 10010,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",

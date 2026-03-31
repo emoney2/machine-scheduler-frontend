@@ -13,9 +13,22 @@ export default function ShipmentComplete() {
   // Prefer state.invoiceUrl (the invoice we just created this run); use sessionStorage only when state is missing (e.g. page refresh)
   const invoiceUrl = useMemo(() => {
     const fromState = (state?.invoiceUrl || "").trim();
-    if (fromState) return fromState;
+    const normalizeInvoiceUrl = (raw) => {
+      const src = String(raw || "").trim();
+      if (!src) return "";
+      try {
+        const u = new URL(src);
+        const txnId = (u.searchParams.get("txnId") || "").trim();
+        if (!txnId) return src;
+        u.search = "";
+        return `${u.origin}${u.pathname}?txnId=${encodeURIComponent(txnId)}`;
+      } catch {
+        return src;
+      }
+    };
+    if (fromState) return normalizeInvoiceUrl(fromState);
     try {
-      return (sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
+      return normalizeInvoiceUrl(sessionStorage.getItem("jrco_lastInvoiceUrl") || "");
     } catch {
       return "";
     }
