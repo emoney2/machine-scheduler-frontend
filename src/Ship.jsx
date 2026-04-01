@@ -56,6 +56,41 @@ function boxesSummaryFromCounts(counts) {
   }));
 }
 
+/** Preset counts + user-entered custom boxes → flat package list for rates / UPS. */
+function buildShipmentPackages(counts, customBoxes) {
+  const fromPresets = expandPackagesFromCounts(counts);
+  const fromCustom = (customBoxes || []).map((c) => ({
+    L: c.L,
+    W: c.W,
+    H: c.H,
+    weight: c.weight,
+  }));
+  return [...fromPresets, ...fromCustom];
+}
+
+function buildBoxesSummary(counts, customBoxes) {
+  const presetPart = boxesSummaryFromCounts(counts);
+  const customPart = (customBoxes || []).map((c) => ({
+    label: `${c.L}×${c.W}×${c.H} (${c.weight} lb) custom`,
+    qty: 1,
+    L: c.L,
+    W: c.W,
+    H: c.H,
+    weight: c.weight,
+    customId: c.id,
+  }));
+  return [...presetPart, ...customPart];
+}
+
+function summaryForShipmentApi(rows) {
+  return (rows || []).map(({ customId, ...rest }) => rest);
+}
+
+function hasAnyBoxesSelected(counts, customBoxes) {
+  const presetAny = SHIP_BOX_PRESETS.some((p) => (counts[p.id] || 0) > 0);
+  return presetAny || (customBoxes && customBoxes.length > 0);
+}
+
 function parseUpsRateNumber(rate) {
   if (rate == null || rate === "N/A") return 0;
   if (typeof rate === "number" && Number.isFinite(rate)) return rate;
@@ -504,6 +539,15 @@ export default function Ship() {
   const [showOneTimeAddressModal, setShowOneTimeAddressModal] = useState(false);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [boxCounts, setBoxCounts] = useState(() => initialBoxCounts());
+  /** @type {Array<{ id: string, L: number, W: number, H: number, weight: number }>} */
+  const [customBoxes, setCustomBoxes] = useState([]);
+  const [showCustomBoxModal, setShowCustomBoxModal] = useState(false);
+  const [customBoxForm, setCustomBoxForm] = useState({
+    L: "",
+    W: "",
+    H: "",
+    weight: "",
+  });
   const [oneTimeShipAddress, setOneTimeShipAddress] = useState(null);
   const [oneTimeAddressForm, setOneTimeAddressForm] = useState({
     companyName: "",
@@ -1423,6 +1467,32 @@ export default function Ship() {
     setBoxCounts((c) => ({ ...c, [id]: v }));
   };
 
+  const handleCustomBoxFormChange = (e) => {
+    const { name, value } = e.target;
+    setCustomBoxForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const submitCustomBox = () => {
+    const L = parseFloat(String(customBoxForm.L).trim());
+    const W = parseFloat(String(customBoxForm.W).trim());
+    const H = parseFloat(String(customBoxForm.H).trim());
+    const weight = parseFloat(String(customBoxForm.weight).trim());
+    if (![L, W, H, weight].every((n) => Number.isFinite(n) && n > 0)) {
+      alert(
+        "Enter positive numbers for length, width, height (inches) and weight (lbs)."
+      );
+      return;
+    }
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    setCustomBoxes((prev) => [...prev, { id, L, W, H, weight }]);
+    setCustomBoxForm({ L: "", W: "", H: "", weight: "" });
+    setShowCustomBoxModal(false);
+  };
+
+  const removeCustomBox = (id) => {
+    setCustomBoxes((prev) => prev.filter((c) => c.id !== id));
+  };
+
   const normalizeOneTimeAddress = (raw = {}) => {
     const toStateAbbr = (v = "") => {
       const s = String(v || "").trim().toUpperCase();
@@ -1471,7 +1541,7 @@ export default function Ship() {
   });
 
   const beginRatesFlowWithAddressChoice = () => {
-    const flat = expandPackagesFromCounts(boxCounts);
+    const flat = buildShipmentPackages(boxCounts, customBoxes);
     if (flat.length === 0) {
       alert("Add at least one box.");
       return;
@@ -1480,7 +1550,7 @@ export default function Ship() {
   };
 
   const proceedToRatesWithAddress = async (overrideAddress = null) => {
-    const flat = expandPackagesFromCounts(boxCounts);
+    const flat = buildShipmentPackages(boxCounts, customBoxes);
     if (flat.length === 0) {
       alert("Add at least one box.");
       return;
@@ -1511,6 +1581,9 @@ export default function Ship() {
     }
     upsFlowCreateInvoiceRef.current = Boolean(createInvoice);
     setBoxCounts(initialBoxCounts());
+    setCustomBoxes([]);
+    setShowCustomBoxModal(false);
+    setCustomBoxForm({ L: "", W: "", H: "", weight: "" });
     setShippingOptions([]);
     setShowRateModal(false);
     setShowAddressChoiceModal(false);
@@ -1534,12 +1607,14 @@ export default function Ship() {
   };
 
   const onShipWithSelectedRate = async (opt) => {
-    const flat = expandPackagesFromCounts(boxCounts);
+    const flat = buildShipmentPackages(boxCounts, customBoxes);
     if (flat.length === 0) {
       alert("No packages.");
       return;
     }
-    const summary = boxesSummaryFromCounts(boxCounts);
+    const summary = summaryForShipmentApi(
+      buildBoxesSummary(boxCounts, customBoxes)
+    );
     const skipInv = !upsFlowCreateInvoiceRef.current;
     const shipToOverride = oneTimeShipAddress ? { ...oneTimeShipAddress } : null;
     const isManualRate =
@@ -1916,7 +1991,7 @@ export default function Ship() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(5, 1fr)",
+                gridTemplateColumns: "repeat(auto-fill, minmax(92px, 1fr))",
                 gap: 8,
                 width: "100%",
               }}
@@ -1951,6 +2026,33 @@ export default function Ship() {
                   </span>
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setShowCustomBoxModal(true)}
+                style={{
+                  aspectRatio: "1",
+                  width: "100%",
+                  margin: 0,
+                  borderRadius: 10,
+                  border: "2px solid #1565c0",
+                  background: "linear-gradient(180deg, #e3f2fd 0%, #bbdefb 100%)",
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 4,
+                  boxSizing: "border-box",
+                  boxShadow: "inset 0 1px 0 #fff",
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 800, color: "#0d47a1", lineHeight: 1.1, textAlign: "center" }}>
+                  Custom
+                </span>
+                <span style={{ fontSize: 10, fontWeight: 600, color: "#1565c0", marginTop: 4 }}>
+                  L × W × H
+                </span>
+              </button>
             </div>
             <div
               style={{
@@ -1963,7 +2065,7 @@ export default function Ship() {
               }}
             >
               <div style={{ fontSize: 11, fontWeight: 700, color: "#455a64", marginBottom: 6 }}>Summary</div>
-              {SHIP_BOX_PRESETS.every((x) => !(boxCounts[x.id] > 0)) ? (
+              {!hasAnyBoxesSelected(boxCounts, customBoxes) ? (
                 <div style={{ fontSize: 12, color: "#78909c" }}>None selected</div>
               ) : (
                 <div style={{ display: "grid", gap: 6 }}>
@@ -2008,6 +2110,36 @@ export default function Ship() {
                       </div>
                     </div>
                   ))}
+                  {customBoxes.map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto",
+                        alignItems: "center",
+                        gap: 8,
+                        fontSize: 12,
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, color: "#37474f" }}>
+                        {c.L}×{c.W}×{c.H}{" "}
+                        <span style={{ color: "#78909c", fontWeight: 500 }}>({c.weight} lb) × 1</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeCustomBox(c.id)}
+                        style={{
+                          ...shipModalFooterBtn,
+                          minWidth: 72,
+                          fontSize: 12,
+                          color: "#c62828",
+                          borderColor: "#e57373",
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -2024,6 +2156,118 @@ export default function Ship() {
                 }}
               >
                 Rates →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustomBoxModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 10002,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 12,
+            boxSizing: "border-box",
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ship-custom-box-title"
+        >
+          <div
+            style={{
+              background: "#fafafa",
+              borderRadius: 14,
+              width: "min(400px, 100%)",
+              padding: "16px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+              border: "1px solid #e0e0e0",
+              boxSizing: "border-box",
+            }}
+          >
+            <h3 id="ship-custom-box-title" style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
+              Custom box
+            </h3>
+            <p style={{ margin: "0 0 12px", fontSize: 12, color: "#546e7a" }}>
+              Enter inside dimensions (inches) and total package weight (lbs).
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600, color: "#37474f" }}>
+                Length (in)
+                <input
+                  name="L"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={customBoxForm.L}
+                  onChange={handleCustomBoxFormChange}
+                  style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5", fontSize: 14 }}
+                />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600, color: "#37474f" }}>
+                Width (in)
+                <input
+                  name="W"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={customBoxForm.W}
+                  onChange={handleCustomBoxFormChange}
+                  style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5", fontSize: 14 }}
+                />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600, color: "#37474f" }}>
+                Height (in)
+                <input
+                  name="H"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={customBoxForm.H}
+                  onChange={handleCustomBoxFormChange}
+                  style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5", fontSize: 14 }}
+                />
+              </label>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600, color: "#37474f" }}>
+                Weight (lb)
+                <input
+                  name="weight"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={customBoxForm.weight}
+                  onChange={handleCustomBoxFormChange}
+                  style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5", fontSize: 14 }}
+                />
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCustomBoxModal(false);
+                  setCustomBoxForm({ L: "", W: "", H: "", weight: "" });
+                }}
+                style={shipModalFooterBtn}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitCustomBox}
+                style={{
+                  ...shipModalFooterBtn,
+                  background: "#1565c0",
+                  color: "#fff",
+                  borderColor: "#0d47a1",
+                }}
+              >
+                Add box
               </button>
             </div>
           </div>
