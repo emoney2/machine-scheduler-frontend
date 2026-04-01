@@ -210,6 +210,7 @@ export default function DigitizingList() {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mode, setMode] = useState("Main"); // Main | Fur Color | Product (optional grouping)
+  const [materialColors, setMaterialColors] = useState({});
   const inFlight = useRef(false);
 
   // (Optional) toast state — safe to leave
