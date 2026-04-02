@@ -20,8 +20,16 @@ export default function ShipmentComplete() {
         const u = new URL(src);
         const txnId = (u.searchParams.get("txnId") || "").trim();
         if (!txnId) return src;
-        u.search = "";
-        return `${u.origin}${u.pathname}?txnId=${encodeURIComponent(txnId)}`;
+        // Keep deeplinkcompanyid so QuickBooks opens this company + txn (txnId alone can show a new invoice).
+        const company = (
+          u.searchParams.get("deeplinkcompanyid") ||
+          u.searchParams.get("companyId") ||
+          ""
+        ).trim();
+        const q = new URLSearchParams();
+        q.set("txnId", txnId);
+        if (company) q.set("deeplinkcompanyid", company);
+        return `${u.origin}${u.pathname}?${q.toString()}`;
       } catch {
         return src;
       }
