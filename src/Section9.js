@@ -590,6 +590,12 @@ export default function Section9(props) {
         if (statuses.some(s => s === 'red')) mStatus = 'red';
         else if (statuses.some(s => s === 'yellow')) mStatus = 'yellow';
       }
+      // At Embroidery, the job was already cut — material was available for this job. Sheet-level
+      // "on order" can be yellow for restocks for other orders using the same material; show M green here.
+      const jobStage = String(job.Stage ?? job.stage ?? '').trim().toLowerCase();
+      if (jobStage === 'embroidery') {
+        mStatus = 'green';
+      }
       const allGreen = dStatus === 'green' && tStatus === 'green' && mStatus === 'green';
       const letterStyle = (color) => {
         if (color === 'gray') {
