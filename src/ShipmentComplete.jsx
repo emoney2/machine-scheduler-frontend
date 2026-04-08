@@ -4,7 +4,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
-  const { state } = useLocation();
+  const location = useLocation();
+  const { state } = location;
 
   const shippedOk     = state?.shippedOk     ?? false;
   const slipsPrinted  = state?.slipsPrinted  ?? false;
@@ -20,7 +21,7 @@ export default function ShipmentComplete() {
         const u = new URL(src);
         const txnId = (u.searchParams.get("txnId") || "").trim();
         if (!txnId) return src;
-        // Keep deeplinkcompanyid so QuickBooks opens this company + txn (txnId alone can show a new invoice).
+        // Keep company scope so QBO opens this realm + txn (txnId alone can show a new invoice).
         const company = (
           u.searchParams.get("deeplinkcompanyid") ||
           u.searchParams.get("companyId") ||
@@ -28,12 +29,15 @@ export default function ShipmentComplete() {
         ).trim();
         const q = new URLSearchParams();
         q.set("txnId", txnId);
-        if (company) q.set("deeplinkcompanyid", company);
-        // QBO uses /app/invoices?txnId=… for an existing invoice. /app/invoice (singular) is the
-        // "new invoice" editor, so old links would open a blank invoice.
+        if (company) {
+          q.set("deeplinkcompanyid", company);
+          q.set("companyId", company);
+        }
+        // QBO transaction deep links use /app/invoicing?txnId=…. /app/invoice (singular) is the
+        // new-invoice editor; /app/invoices often ignores txnId in newer UI and opens blank.
         let path = u.pathname.replace(/\/$/, "") || "/";
-        if (/^\/app\/invoice$/i.test(path)) {
-          path = "/app/invoices";
+        if (/^\/app\/invoice$/i.test(path) || /^\/app\/invoices$/i.test(path)) {
+          path = "/app/invoicing";
         }
         return `${u.origin}${path}?${q.toString()}`;
       } catch {
@@ -46,7 +50,7 @@ export default function ShipmentComplete() {
     } catch {
       return "";
     }
-  }, [state]);
+  }, [location.key, state]);
 
   const renderStatus = (ok, label) => (
     <li style={{ marginBottom: "0.75rem", fontSize: "1.1rem" }}>
