@@ -21,7 +21,6 @@ export default function ShipmentComplete() {
         const u = new URL(src);
         const txnId = (u.searchParams.get("txnId") || "").trim();
         if (!txnId) return src;
-        // Keep company scope so QBO opens this realm + txn (txnId alone can show a new invoice).
         const company = (
           u.searchParams.get("deeplinkcompanyid") ||
           u.searchParams.get("companyId") ||
@@ -33,13 +32,20 @@ export default function ShipmentComplete() {
           q.set("deeplinkcompanyid", company);
           q.set("companyId", company);
         }
-        // QBO transaction deep links use /app/invoicing?txnId=…. /app/invoice (singular) is the
-        // new-invoice editor; /app/invoices often ignores txnId in newer UI and opens blank.
+        // QBO opens the saved invoice at /app/invoice?txnId=<API Id>. Do not rewrite to
+        // /app/invoicing — that route can open the wrong screen for some accounts.
         let path = u.pathname.replace(/\/$/, "") || "/";
-        if (/^\/app\/invoice$/i.test(path) || /^\/app\/invoices$/i.test(path)) {
-          path = "/app/invoicing";
+        if (/^\/app\/invoices$/i.test(path) || /^\/app\/invoicing$/i.test(path)) {
+          path = "/app/invoice";
         }
-        return `${u.origin}${path}?${q.toString()}`;
+        const host = u.hostname.toLowerCase();
+        let origin = u.origin;
+        if (host === "app.qbo.intuit.com" || host === "qbo.intuit.com") {
+          origin = "https://qbo.intuit.com";
+        } else if (host.includes("sandbox")) {
+          origin = "https://app.sandbox.qbo.intuit.com";
+        }
+        return `${origin}${path}?${q.toString()}`;
       } catch {
         return src;
       }
