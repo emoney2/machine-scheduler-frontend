@@ -305,6 +305,35 @@ function calendarDateCompare(a, b) {
   return 0;
 }
 
+/** Due vs today — same green / yellow / red palette as rate tiles / Overview-style urgency. */
+function queueCardDueStyle(dueVal) {
+  const due = parseDateFromString(dueVal);
+  if (!due) {
+    return {
+      background: "rgba(249, 250, 251, 0.95)",
+      border: "1px solid #e5e7eb",
+    };
+  }
+  const today = new Date();
+  const c = calendarDateCompare(due, today);
+  if (c < 0) {
+    return {
+      background: "rgba(231, 76, 60, 0.18)",
+      border: "2px solid #e74c3c",
+    };
+  }
+  if (c === 0) {
+    return {
+      background: "rgba(243, 156, 18, 0.2)",
+      border: "2px solid #f39c12",
+    };
+  }
+  return {
+    background: "rgba(46, 204, 113, 0.12)",
+    border: "2px solid #2ecc71",
+  };
+}
+
 /**
  * Same tint + border as Overview upcoming jobs (cardUrgencyFromRing / ringColorByShipDate).
  * Logic here is delivery vs due — colors only match Overview palette.
@@ -521,6 +550,9 @@ export default function Ship() {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyInput, setCompanyInput] = useState("");
+  /** Embroidery / Sewing jobs for quick-pick cards (sorted on server). */
+  const [productionQueue, setProductionQueue] = useState([]);
+  const [productionQueueLoading, setProductionQueueLoading] = useState(false);
   const [isPageOverlay, setIsPageOverlay] = useState(false);
   const [pageOverlayText, setPageOverlayText] = useState("");
 
@@ -568,22 +600,23 @@ export default function Ship() {
     async function loadJobsForCompany(company) {
       try {
         const res = await fetch(
-          `${API_BASE}/api/company-list`,
+          `${API_BASE}/api/jobs-for-company?company=${encodeURIComponent(company)}`,
           { credentials: "include" }
         );
+        if (res.status === 401) {
+          setShowLoginModal(true);
+          return;
+        }
         const data = await res.json();
 
         if (res.ok) {
-          // 1) Filter out COMPLETE jobs
-          const incompleteJobs = data.jobs.filter((job) => {
+          const incompleteJobs = (data.jobs || []).filter((job) => {
             const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
             const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
             return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
           });
 
-          // 2) Build job array and initialize shipQty from the sheet quantity
           const updatedJobs = incompleteJobs.map((job) => {
-            // Pull from the sheet's "Quantity" column (capital Q)
             const qty = Number(job.Quantity ?? job.quantity ?? 0);
             return {
               ...job,
@@ -592,10 +625,8 @@ export default function Ship() {
             };
           });
 
-          // 3) Push into state
           setJobs(updatedJobs);
 
-          // 3) Drop any selected IDs that no longer exist
           setSelected((prevSelected) =>
             prevSelected.filter((id) =>
               updatedJobs.some((j) => j.orderId.toString() === id)
@@ -620,6 +651,39 @@ export default function Ship() {
     setup();
   }, []);
   // === End useEffect 1 ===
+
+  // Embroidery / Sewing queue for cards under the search bar
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProductionQueue() {
+      try {
+        setProductionQueueLoading(true);
+        const res = await fetch(`${API_BASE}/api/ship-production-queue`, {
+          credentials: "include",
+        });
+        if (res.status === 401) {
+          if (!cancelled) setShowLoginModal(true);
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled && res.ok && Array.isArray(data.jobs)) {
+          setProductionQueue(data.jobs);
+        }
+      } catch (e) {
+        console.error("ship-production-queue:", e);
+      } finally {
+        if (!cancelled) setProductionQueueLoading(false);
+      }
+    }
+
+    loadProductionQueue();
+    const t = setInterval(loadProductionQueue, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [API_BASE]);
 
   // === useEffect 2: Live update polling ===
   useEffect(() => {
@@ -809,6 +873,14 @@ export default function Ship() {
     if (allCompanies.includes(value)) {
       fetchJobs(value);
     }
+  };
+
+  /** Same outcome as choosing a valid company in the search field. */
+  const openCompanyInShip = (companyName) => {
+    const name = String(companyName || "").trim();
+    if (!name) return;
+    setCompanyInput(name);
+    fetchJobs(name);
   };
 
   const toggleSelect = (orderId) => {
@@ -1763,13 +1835,153 @@ export default function Ship() {
         placeholder="Start typing a company..."
         value={companyInput}
         onChange={handleSelectCompany}
-        style={{ fontSize: "1rem", padding: "0.5rem", width: "300px", marginBottom: "2rem" }}
+        style={{ fontSize: "1rem", padding: "0.5rem", width: "300px", marginBottom: "1rem" }}
       />
       <datalist id="company-options">
         {allCompanies.map((c) => (
           <option key={c} value={c} />
         ))}
       </datalist>
+
+      <div style={{ marginBottom: "1.75rem" }}>
+        <div style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: "0.5rem", color: "#374151" }}>
+          In production (Embroidery / Sewing)
+        </div>
+        {productionQueueLoading && productionQueue.length === 0 ? (
+          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>Loading queue…</div>
+        ) : productionQueue.length === 0 ? (
+          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>No open jobs in Embroidery or Sewing.</div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+              gap: 12,
+            }}
+          >
+            {productionQueue.map((row, idx) => {
+              const company = row["Company Name"] || "";
+              const oid = row.orderId || row["Order #"] || "";
+              const dueStyle = queueCardDueStyle(row["Due Date"]);
+              const stageLabel = String(row["Stage"] || "").trim() || "—";
+              const onCardActivate = () => openCompanyInShip(company);
+              return (
+                <div
+                  key={`${company}-${oid}-${idx}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={onCardActivate}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onCardActivate();
+                    }
+                  }}
+                  style={{
+                    borderRadius: 10,
+                    padding: 10,
+                    cursor: "pointer",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                    ...dueStyle,
+                  }}
+                >
+                  <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                    <div
+                      style={{
+                        width: 56,
+                        height: 56,
+                        flexShrink: 0,
+                        borderRadius: 6,
+                        overflow: "hidden",
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        background: "#fff",
+                      }}
+                    >
+                      {row.image ? (
+                        <img
+                          src={row.image}
+                          alt=""
+                          loading="lazy"
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "grid",
+                            placeItems: "center",
+                            fontSize: 10,
+                            color: "#9ca3af",
+                          }}
+                        >
+                          No preview
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "0.95rem",
+                          lineHeight: 1.25,
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {company}
+                      </div>
+                      <div style={{ fontSize: "0.8rem", color: "#4b5563", marginTop: 4 }}>
+                        Order #{oid}
+                      </div>
+                      <div style={{ fontSize: "0.8rem", marginTop: 4 }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: "rgba(0,0,0,0.06)",
+                            fontWeight: 600,
+                            fontSize: "0.72rem",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.02em",
+                          }}
+                        >
+                          {stageLabel}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 6,
+                      fontSize: "0.78rem",
+                      color: "#374151",
+                      borderTop: "1px solid rgba(0,0,0,0.06)",
+                      paddingTop: 8,
+                    }}
+                  >
+                    <div>
+                      <div style={{ color: "#9ca3af", fontWeight: 600 }}>Due</div>
+                      <div style={{ fontWeight: 600 }}>{formatDateMMDD(row["Due Date"]) || "—"}</div>
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ color: "#9ca3af", fontWeight: 600 }}>Design</div>
+                      <div style={{ fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row["Design"]}>
+                        {row["Design"] || "—"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {jobs.length > 0 && (
         <button
