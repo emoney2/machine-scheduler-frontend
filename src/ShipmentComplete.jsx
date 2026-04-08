@@ -29,7 +29,13 @@ export default function ShipmentComplete() {
         const q = new URLSearchParams();
         q.set("txnId", txnId);
         if (company) q.set("deeplinkcompanyid", company);
-        return `${u.origin}${u.pathname}?${q.toString()}`;
+        // QBO uses /app/invoices?txnId=… for an existing invoice. /app/invoice (singular) is the
+        // "new invoice" editor, so old links would open a blank invoice.
+        let path = u.pathname.replace(/\/$/, "") || "/";
+        if (/^\/app\/invoice$/i.test(path)) {
+          path = "/app/invoices";
+        }
+        return `${u.origin}${path}?${q.toString()}`;
       } catch {
         return src;
       }
