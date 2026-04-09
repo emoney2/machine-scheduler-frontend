@@ -1729,7 +1729,12 @@ export default function Ship() {
       boxes_summary: summary,
       boxes: summary,
       service_code: String(opt.code || ""),
-      shipping_method: opt.method || "UPS",
+      shipping_method: (() => {
+        const m = String(opt.method || "").trim();
+        if (!m) return "UPS";
+        if (/^ups\b/i.test(m)) return m;
+        return `UPS ${m}`;
+      })(),
       ups_purchased_rate: rateNum,
       skip_ups: false,
       skip_invoice: skipInv,
