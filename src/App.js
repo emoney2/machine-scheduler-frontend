@@ -10,8 +10,8 @@ import Ship from "./Ship";
 import FurList from "./FurList";
 import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
-import { io } from 'socket.io-client';
 import axios from 'axios';
+import { socket } from "./socketClient";
 import Inventory from "./Inventory";
 import InventoryOrdered from "./InventoryOrdered";
 import "./axios-setup";
@@ -226,46 +226,6 @@ axios.interceptors.response.use(
 const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
 const API_ROOT      = (RAW_API_ROOT || '/api').replace(/\/$/, '');
 BACKEND_ORIGIN_FOR_REDIRECT = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
-// Socket must still reach Render (Netlify doesn't proxy WebSockets). Backend must allow origin.
-const SOCKET_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : 'https://machine-scheduler-backend.onrender.com';
-const SOCKET_PATH   = '/socket.io';
-
-let socket = null;
-let socketErrorLogged = false;
-try {
-  socket = io(SOCKET_ORIGIN, {
-    path: SOCKET_PATH,
-    transports: ['websocket'],
-    upgrade: false,
-    timeout: 60000,  // 60s for Render cold start
-    reconnection: true,
-    reconnectionAttempts: 10,
-    reconnectionDelay: 2000,
-    reconnectionDelayMax: 10000,
-    withCredentials: true
-  });
-
-  socket.on("connect", () => { socketErrorLogged = false; });
-  socket.on("connect_error", (err) => {
-    window.__SOCKET_DOWN__ = true;
-    if (!socketErrorLogged) {
-      socketErrorLogged = true;
-      console.warn("🟡 Socket connection failed (backend may be waking up). Real-time updates disabled until connected.");
-    }
-  });
-  socket.on("error", (err) => {
-    if (!socketErrorLogged) {
-      socketErrorLogged = true;
-      console.warn("🟡 socket error:", err?.message || err);
-    }
-  });
-} catch (e) {
-  console.warn("🟡 socket init failed:", e);
-  window.__SOCKET_DOWN__ = true;
-}
-
-// Optional helper if you emit elsewhere:
-const isSocketLive = () => !!(socket && socket.connected);
 
 // WORK HOURS / HOLIDAYS
 const WORK_START_HR  = 8;

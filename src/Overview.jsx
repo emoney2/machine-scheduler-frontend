@@ -1,7 +1,7 @@
 // src/Overview.jsx
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
-import { io } from "socket.io-client";
+import { socket } from "./socketClient";
 import { supabase } from "./supabaseClient";
 
 export default function Overview() {
@@ -115,14 +115,6 @@ function getJobThumbUrl(job, ROOT) {
   return null;
 }
 
-
-// 🔌 lightweight socket just for invalidations
-const socket = io(BACKEND_ROOT, {
-  path: "/socket.io",
-  transports: ["websocket"],
-  upgrade: false,
-  withCredentials: true,
-});
 
 const LS_OVERVIEW_KEY = "jrco.overview.cache.v1";
 
@@ -1011,11 +1003,13 @@ function col(width, center = false) {
         t = setTimeout(() => { if (alive) loadFresh(); }, 1000);
       };
     })();
-    socket.on("ordersUpdated", debounced);
-    socket.on("manualStateUpdated", debounced);
-    socket.on("placeholdersUpdated", debounced);
-    socket.on("materialsUpdated", debounced); // Listen for material updates
-    
+    if (socket) {
+      socket.on("ordersUpdated", debounced);
+      socket.on("manualStateUpdated", debounced);
+      socket.on("placeholdersUpdated", debounced);
+      socket.on("materialsUpdated", debounced);
+    }
+
     // Listen for custom event when materials are ordered
     const handleMaterialsOrdered = () => {
       if (alive) {
@@ -1030,10 +1024,12 @@ function col(width, center = false) {
       alive = false;
       try { overviewCtrlRef.current?.abort(); } catch {}
       clearInterval(id);
-      socket.off("ordersUpdated", debounced);
-      socket.off("manualStateUpdated", debounced);
-      socket.off("placeholdersUpdated", debounced);
-      socket.off("materialsUpdated", debounced);
+      if (socket) {
+        socket.off("ordersUpdated", debounced);
+        socket.off("manualStateUpdated", debounced);
+        socket.off("placeholdersUpdated", debounced);
+        socket.off("materialsUpdated", debounced);
+      }
       window.removeEventListener("materialsOrdered", handleMaterialsOrdered);
     };
   }, [daysWindow]);
