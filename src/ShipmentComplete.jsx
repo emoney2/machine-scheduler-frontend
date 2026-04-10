@@ -1,6 +1,7 @@
 // src/ShipmentComplete.jsx
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { postShipQboClientLog } from "./shipQboClientLog";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
@@ -58,6 +59,25 @@ export default function ShipmentComplete() {
     }
   }, [location.key, state]);
 
+  useEffect(() => {
+    let fromSession = "";
+    try {
+      fromSession = sessionStorage.getItem("jrco_lastInvoiceUrl") || "";
+    } catch {
+      fromSession = "";
+    }
+    postShipQboClientLog([
+      {
+        message: "shipment_complete_mount",
+        hasStateInvoice: !!(state?.invoiceUrl && String(state.invoiceUrl).trim()),
+        resolvedInvoiceUrlLen: invoiceUrl.length,
+        sessionStorageInvoiceLen: fromSession.trim().length,
+        stateMatchesResolved:
+          !!(state?.invoiceUrl && String(state.invoiceUrl).trim() === invoiceUrl),
+      },
+    ]);
+  }, [invoiceUrl, location.key, state]);
+
   const renderStatus = (ok, label) => (
     <li style={{ marginBottom: "0.75rem", fontSize: "1.1rem" }}>
       {ok ? "✅" : "❌"} {label}
@@ -88,6 +108,29 @@ export default function ShipmentComplete() {
           type="button"
           onClick={() => {
             if (invoiceUrl) {
+              let txn = "";
+              let company = "";
+              let host = "";
+              try {
+                const u = new URL(invoiceUrl);
+                host = u.hostname || "";
+                txn = u.searchParams.get("txnId") || "";
+                company =
+                  u.searchParams.get("companyId") ||
+                  u.searchParams.get("deeplinkcompanyid") ||
+                  "";
+              } catch {
+                /* ignore */
+              }
+              postShipQboClientLog([
+                {
+                  message: "open_invoice_click",
+                  invoiceHost: host,
+                  txnId: txn,
+                  companyId_param: company,
+                  urlLength: invoiceUrl.length,
+                },
+              ]);
               window.open(invoiceUrl, "_blank", "noopener,noreferrer");
             }
           }}

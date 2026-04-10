@@ -1,6 +1,27 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+import { postShipQboClientLog } from "./shipQboClientLog";
+
+function summarizeInvoiceForLog(inv) {
+  if (!inv || typeof inv !== "string") return { hasInvoiceInPayload: false };
+  const t = inv.trim();
+  if (!t) return { hasInvoiceInPayload: false };
+  try {
+    const u = new URL(t);
+    return {
+      hasInvoiceInPayload: true,
+      invoiceHost: u.hostname,
+      invoiceTxnId: u.searchParams.get("txnId") || "",
+      invoiceCompanyId:
+        u.searchParams.get("companyId") ||
+        u.searchParams.get("deeplinkcompanyid") ||
+        "",
+    };
+  } catch {
+    return { hasInvoiceInPayload: true, invoiceUrlPrefix: t.slice(0, 200) };
+  }
+}
 
 // Map our logical box names to their actual dimensions
 const BOX_DIMENSIONS = {
@@ -408,6 +429,19 @@ export default function Ship() {
     const openLabels = data?.open_label_windows !== false;
     const openSlips = data?.open_slip_windows === true;
 
+    const labelHttp = labels.filter(isHttpUrl);
+    const slipHttp = slips.filter(isHttpUrl);
+    postShipQboClientLog([
+      {
+        message: "openResultsWindows",
+        openLabels,
+        openSlips,
+        labelUrls: labelHttp,
+        slipUrls: slipHttp,
+        labels_copied_to_folder: data?.labels_copied_to_folder,
+      },
+    ]);
+
     // Labels (skip when backend copied to Label Printer folder)
     if (openLabels) {
       labels.forEach((u) => {
@@ -763,6 +797,19 @@ export default function Ship() {
       }
 
       openedOnceRef.current = false;
+      postShipQboClientLog([
+        {
+          message: "pending_shipment_resume_ok",
+          labels: data?.labels,
+          open_label_windows: data?.open_label_windows,
+          open_slip_windows: data?.open_slip_windows,
+          labels_copied_to_folder: data?.labels_copied_to_folder,
+          tracking_numbers: data?.tracking_numbers,
+          ...summarizeInvoiceForLog(
+            data?.invoice && typeof data.invoice === "string" ? data.invoice : ""
+          ),
+        },
+      ]);
       // Open URLs once (labels/invoice/slips)
       openResultsWindows(data);
 
@@ -1049,6 +1096,25 @@ export default function Ship() {
         console.error("process-shipment failed:", procErr);
         throw procErr;
       }
+
+      postShipQboClientLog([
+        {
+          message: "process_shipment_client_received",
+          skip_invoice: mergedBody.skip_invoice,
+          skip_ups: mergedBody.skip_ups,
+          order_ids: mergedBody.order_ids,
+          labels: shipData?.labels,
+          open_label_windows: shipData?.open_label_windows,
+          open_slip_windows: shipData?.open_slip_windows,
+          labels_copied_to_folder: shipData?.labels_copied_to_folder,
+          tracking_numbers: shipData?.tracking_numbers,
+          ...summarizeInvoiceForLog(
+            shipData?.invoice && typeof shipData.invoice === "string"
+              ? shipData.invoice
+              : ""
+          ),
+        },
+      ]);
 
       if (shipData.redirect) {
         sessionStorage.setItem("pendingShipment", JSON.stringify(mergedBody));
