@@ -17,8 +17,10 @@ let socketErrorLogged = false;
 try {
   socket = io(SOCKET_ORIGIN, {
     path: SOCKET_PATH,
-    transports: ["websocket"],
-    upgrade: false,
+    // Polling first: Render/free tiers often drop pure-WebSocket handshakes; the
+    // browser then reports a misleading "CORS" error because the 502/HTML body
+    // has no Access-Control-Allow-Origin. Upgrade to websocket when available.
+    transports: ["polling", "websocket"],
     timeout: 60000,
     reconnection: true,
     reconnectionAttempts: 10,
