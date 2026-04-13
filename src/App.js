@@ -255,10 +255,6 @@ export default function App() {
   const BACKEND_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
   const [manualReorder, setManualReorder] = useState(false);
 
-  useEffect(() => {
-    fetchAllCombined();
-  }, []);
-
   // NEW: prevent overlapping combined fetches
   const combinedInFlightRef = useRef(false);
 
@@ -270,34 +266,46 @@ export default function App() {
     // console.log("🔔 App component mounted");
   }, []);
 
-
-  // Session check: if not logged in, bounce to backend /login and return here after
+  // Session check + initial load: hit /ping first (cheap wake on Render), then
+  // /combined. Running both at t=0 alongside Socket.IO and Section9 inventory
+  // overloads a single worker and yields 502 + fake CORS errors.
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
+        const ac = new AbortController();
+        const to = setTimeout(() => ac.abort(), 8000);
         const res = await fetch(`${API_ROOT}/ping`, {
           method: "GET",
           credentials: "include",
-          headers: { "Content-Type": "application/json" }
+          headers: { "Content-Type": "application/json" },
+          signal: ac.signal,
         });
+        clearTimeout(to);
+        if (cancelled) return;
 
         if (res.status === 200) {
-          // console.log("✅ /api/ping OK (session present)");
-          return;
-        }
-
-        if (res.status === 401) {
+          // ok
+        } else if (res.status === 401) {
           console.warn("🔒 /api/ping 401 — redirecting to backend login");
           const next = encodeURIComponent(window.location.href);
           window.location.href = `${BACKEND_ORIGIN}/login?next=${next}`;
           return;
+        } else {
+          console.warn("⚠️ /api/ping unexpected status:", res.status);
         }
-
-        console.warn("⚠️ /api/ping unexpected status:", res.status);
       } catch (err) {
-        console.warn("🟡 /api/ping failed:", err?.message || err);
+        if (!cancelled) {
+          console.warn("🟡 /api/ping failed:", err?.message || err);
+        }
+      }
+      if (!cancelled) {
+        fetchAllCombined();
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // ─── Section 1.5: Auto‐bump setup ────────────────────────────────────────────

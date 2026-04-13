@@ -21,6 +21,7 @@ try {
     // browser then reports a misleading "CORS" error because the 502/HTML body
     // has no Access-Control-Allow-Origin. Upgrade to websocket when available.
     transports: ["polling", "websocket"],
+    autoConnect: false,
     timeout: 60000,
     reconnection: true,
     reconnectionAttempts: 10,
@@ -48,6 +49,15 @@ try {
       console.warn("🟡 socket error:", err?.message || err);
     }
   });
+
+  // Defer first connect so /ping + /combined are not racing the same cold worker.
+  setTimeout(() => {
+    try {
+      if (socket && !socket.connected) socket.connect();
+    } catch (e) {
+      console.warn("🟡 socket connect failed:", e);
+    }
+  }, 1000);
 } catch (e) {
   console.warn("🟡 socket init failed:", e);
   window.__SOCKET_DOWN__ = true;

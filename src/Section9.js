@@ -82,9 +82,15 @@ export default function Section9(props) {
         setThreadInventoryStatus(map);
       } catch (_) {}
     };
-    fetchThreadStatus();
-    const interval = setInterval(fetchThreadStatus, 180000);
-    return () => clearInterval(interval);
+    let interval = null;
+    const boot = setTimeout(() => {
+      fetchThreadStatus();
+      interval = setInterval(fetchThreadStatus, 180000);
+    }, 1400);
+    return () => {
+      clearTimeout(boot);
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   // Fetch material inventory: try status endpoint first, else try GET /materialInventory and derive status
@@ -114,9 +120,15 @@ export default function Section9(props) {
         setMaterialInventoryStatus(map);
       } catch (_) {}
     };
-    fetchMaterialStatus();
-    const interval = setInterval(fetchMaterialStatus, 180000);
-    return () => clearInterval(interval);
+    let interval = null;
+    const boot = setTimeout(() => {
+      fetchMaterialStatus();
+      interval = setInterval(fetchMaterialStatus, 180000);
+    }, 2800);
+    return () => {
+      clearTimeout(boot);
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   // Helper: get thread status (red | yellow | green). Supports API returning string or object with inventory/onOrder.
