@@ -2,6 +2,27 @@ import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
+import { appendShipmentHistory } from "./shipmentHistoryStorage";
+
+function recordShipmentHistoryEntry(shipData, orderIds, jobs, companyHint) {
+  const tracking = shipData?.tracking_numbers;
+  if (!Array.isArray(tracking) || tracking.length === 0) return;
+  const ids = (orderIds || []).map(String);
+  let company = (companyHint != null ? String(companyHint) : "").trim();
+  if (!company && jobs && jobs.length) {
+    const first = jobs.find((j) => ids.includes(String(j.orderId)));
+    const c =
+      first &&
+      (first["Company Name"] || first.companyName || first.company);
+    company = (c != null ? String(c) : "").trim();
+  }
+  appendShipmentHistory({
+    shippedAt: new Date().toISOString(),
+    company: company || "—",
+    trackingNumbers: tracking,
+    labelUrls: Array.isArray(shipData?.labels) ? shipData.labels : [],
+  });
+}
 
 function summarizeInvoiceForLog(inv) {
   if (!inv || typeof inv !== "string") return { hasInvoiceInPayload: false };
@@ -780,7 +801,10 @@ export default function Ship() {
 
       console.log("🔁 Resuming pending shipment...");
       sessionStorage.removeItem("pendingShipment");
-      const payload = JSON.parse(pending);
+      const rawPending = JSON.parse(pending);
+      const historyCompany = rawPending._ship_history_company;
+      const payload = { ...rawPending };
+      delete payload._ship_history_company;
 
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       const res = await fetch(`${API_BASE}/api/process-shipment`, {
@@ -815,6 +839,13 @@ export default function Ship() {
 
       // Refocus current tab
       setTimeout(() => window.focus(), 500);
+
+      recordShipmentHistoryEntry(
+        data,
+        payload.order_ids,
+        jobs,
+        historyCompany
+      );
 
       // Build invoice URL for summary page (use the one we just created)
       const invoiceUrl = data?.invoice && typeof data.invoice === "string"
@@ -1129,7 +1160,22 @@ export default function Ship() {
       ]);
 
       if (shipData.redirect) {
-        sessionStorage.setItem("pendingShipment", JSON.stringify(mergedBody));
+        const firstId = (mergedBody.order_ids || [])[0];
+        const firstJob = jobs.find((j) => String(j.orderId) === String(firstId));
+        const companyHint =
+          (firstJob &&
+            (firstJob["Company Name"] ||
+              firstJob.companyName ||
+              firstJob.company)) ||
+          companyInput.trim() ||
+          "";
+        sessionStorage.setItem(
+          "pendingShipment",
+          JSON.stringify({
+            ...mergedBody,
+            _ship_history_company: String(companyHint || "").trim(),
+          })
+        );
         window.location.href = `${API_BASE}${shipData.redirect}`;
         return;
       }
@@ -1165,6 +1211,13 @@ export default function Ship() {
 
       openResultsWindows(shipData);
       setTimeout(() => window.focus(), 500);
+
+      recordShipmentHistoryEntry(
+        shipData,
+        mergedBody.order_ids,
+        jobs,
+        companyInput.trim()
+      );
 
       setShippingStage("✅ Complete!");
       setTimeout(() => {
@@ -1924,7 +1977,34 @@ export default function Ship() {
       )}
 
       {/* ✅ Success Overlay */}
-      <h2>📦 Ship Jobs</h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: "0.75rem",
+        }}
+      >
+        <h2 style={{ margin: 0 }}>📦 Ship Jobs</h2>
+        <button
+          type="button"
+          onClick={() => navigate("/shipments")}
+          style={{
+            padding: "0.45rem 0.9rem",
+            fontSize: "0.9rem",
+            fontWeight: 600,
+            cursor: "pointer",
+            borderRadius: 8,
+            border: "1px solid #64748b",
+            background: "#fff",
+            color: "#334155",
+          }}
+        >
+          Shipping History
+        </button>
+      </div>
       <input
         list="company-options"
         placeholder="Start typing a company..."

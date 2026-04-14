@@ -7,6 +7,7 @@ import Departments from "./Departments";
 import MaterialLog from "./MaterialLog";
 import CutList from "./CutList";
 import Ship from "./Ship";
+import ShipmentsHistory from "./ShipmentsHistory";
 import FurList from "./FurList";
 import React, { useState, useEffect, useRef } from 'react';
 import debounce from "lodash.debounce";
@@ -1961,6 +1962,7 @@ useEffect(() => {
           <Route path="/digitizing" element={<DigitizingList />} />
           <Route path="/cut" element={<CutList />} />
           <Route path="/ship" element={<Ship />} />
+          <Route path="/shipments" element={<ShipmentsHistory />} />
           <Route path="/fur" element={<FurList />} />
           <Route path="/queue" element={<QueueTab />} />
           <Route path="/material-log" element={<MaterialLog />} />
