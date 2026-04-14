@@ -12,9 +12,8 @@ export default function ShipmentComplete() {
   const slipsPrinted  = state?.slipsPrinted  ?? false;
   const labelsPrinted = state?.labelsPrinted ?? false;
 
-  // Prefer state.invoiceUrl (the invoice we just created this run); use sessionStorage only when state is missing (e.g. page refresh)
+  // Prefer txnId + realm from this shipment (fixes wrong / new-invoice tabs). Else normalize backend URL.
   const invoiceUrl = useMemo(() => {
-    const fromState = (state?.invoiceUrl || "").trim();
     const normalizeInvoiceUrl = (raw) => {
       const src = String(raw || "").trim();
       if (!src) return "";
@@ -33,31 +32,52 @@ export default function ShipmentComplete() {
           q.set("deeplinkcompanyid", company);
           q.set("companyId", company);
         }
-        // QBO opens the saved invoice at /app/invoice?txnId=<API Id>. Do not rewrite to
-        // /app/invoicing — that route can open the wrong screen for some accounts.
         let path = u.pathname.replace(/\/$/, "") || "/";
         if (/^\/app\/invoices$/i.test(path) || /^\/app\/invoicing$/i.test(path)) {
           path = "/app/invoice";
         }
-        const host = u.hostname.toLowerCase();
-        let origin = u.origin;
-        if (host === "app.qbo.intuit.com" || host === "qbo.intuit.com") {
-          origin = "https://qbo.intuit.com";
-        } else if (host.includes("sandbox")) {
-          origin = "https://app.sandbox.qbo.intuit.com";
-        }
+        // Keep the same hostname the API used; forcing qbo.intuit.com can open a blank/new invoice for some sessions.
+        const origin = u.origin;
         return `${origin}${path}?${q.toString()}`;
       } catch {
         return src;
       }
     };
+
+    const buildFromTxnRealm = (txnId, realmId, hintUrl) => {
+      const t = String(txnId || "").trim();
+      const r = String(realmId || "").trim();
+      if (!t || !r) return "";
+      const hint = String(hintUrl || "").toLowerCase();
+      const origin = hint.includes("sandbox") ? "https://app.sandbox.qbo.intuit.com" : "https://app.qbo.intuit.com";
+      const q = new URLSearchParams();
+      q.set("txnId", t);
+      q.set("companyId", r);
+      q.set("deeplinkcompanyid", r);
+      return `${origin}/app/invoice?${q.toString()}`;
+    };
+
+    let txn = "";
+    let realm = "";
+    let hint = "";
+    try {
+      txn = (state?.qbo_invoice_id || sessionStorage.getItem("jrco_lastQboInvoiceId") || "").trim();
+      realm = (state?.qbo_realm_id || sessionStorage.getItem("jrco_lastQboRealmId") || "").trim();
+      hint = (state?.invoiceUrl || sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
+    } catch {
+      /* ignore */
+    }
+    const rebuilt = buildFromTxnRealm(txn, realm, hint);
+    if (rebuilt) return rebuilt;
+
+    const fromState = (state?.invoiceUrl || "").trim();
     if (fromState) return normalizeInvoiceUrl(fromState);
     try {
       return normalizeInvoiceUrl(sessionStorage.getItem("jrco_lastInvoiceUrl") || "");
     } catch {
       return "";
     }
-  }, [location.key, state]);
+  }, [location.key, state?.invoiceUrl, state?.qbo_invoice_id, state?.qbo_realm_id]);
 
   useEffect(() => {
     let fromSession = "";

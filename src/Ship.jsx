@@ -820,16 +820,28 @@ export default function Ship() {
       const invoiceUrl = data?.invoice && typeof data.invoice === "string"
         ? data.invoice.trim()
         : "";
+      const qboInvoiceId =
+        data?.qbo_invoice_id && typeof data.qbo_invoice_id === "string"
+          ? data.qbo_invoice_id.trim()
+          : "";
+      const qboRealmId =
+        data?.qbo_realm_id && typeof data.qbo_realm_id === "string"
+          ? data.qbo_realm_id.trim()
+          : "";
       try {
         sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
+        sessionStorage.setItem("jrco_lastQboInvoiceId", qboInvoiceId || "");
+        sessionStorage.setItem("jrco_lastQboRealmId", qboRealmId || "");
       } catch {}
 
       navigate("/shipment-complete", {
         state: {
           shippedOk: true,
           labelsPrinted: Array.isArray(data?.labels) && data.labels.length > 0,
-          slipsSaved: Array.isArray(data?.slips) && data.slips.length > 0,
+          slipsPrinted: Array.isArray(data?.slips) && data.slips.length > 0,
           invoiceUrl,
+          qbo_invoice_id: qboInvoiceId,
+          qbo_realm_id: qboRealmId,
         },
       });
     };
@@ -1132,9 +1144,19 @@ export default function Ship() {
         shipData.invoice && typeof shipData.invoice === "string"
           ? shipData.invoice.trim()
           : "";
+      const qboInvoiceId =
+        shipData.qbo_invoice_id && typeof shipData.qbo_invoice_id === "string"
+          ? shipData.qbo_invoice_id.trim()
+          : "";
+      const qboRealmId =
+        shipData.qbo_realm_id && typeof shipData.qbo_realm_id === "string"
+          ? shipData.qbo_realm_id.trim()
+          : "";
 
       try {
         sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
+        sessionStorage.setItem("jrco_lastQboInvoiceId", qboInvoiceId || "");
+        sessionStorage.setItem("jrco_lastQboRealmId", qboRealmId || "");
         sessionStorage.setItem(
           "jrco_lastSlipUrl",
           Array.isArray(shipData.slips) && shipData.slips[0] ? shipData.slips[0] : ""
@@ -1154,6 +1176,8 @@ export default function Ship() {
             slipsPrinted:
               Array.isArray(shipData.slips) && shipData.slips.length > 0,
             invoiceUrl,
+            qbo_invoice_id: qboInvoiceId,
+            qbo_realm_id: qboRealmId,
           },
         });
       }, 500);
