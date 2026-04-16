@@ -257,6 +257,9 @@ export default function ShipmentsHistory() {
             border: "1px solid #fecaca",
             color: "#991b1b",
             fontSize: "0.9rem",
+            lineHeight: 1.45,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
           }}
         >
           <strong>Could not load from UPS.</strong> {upsPayload.error}

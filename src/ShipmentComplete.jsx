@@ -57,21 +57,32 @@ export default function ShipmentComplete() {
       return `${origin}/app/invoice?${q.toString()}`;
     };
 
+    // Prefer the exact URL from this shipment (avoids stale session txnId/realm after UPS+QB flows).
+    const fromState = String(state?.invoiceUrl || "").trim();
+    if (fromState) {
+      const normalized = normalizeInvoiceUrl(fromState);
+      if (normalized) return normalized;
+    }
+
     let txn = "";
     let realm = "";
     let hint = "";
     try {
-      txn = (state?.qbo_invoice_id || sessionStorage.getItem("jrco_lastQboInvoiceId") || "").trim();
-      realm = (state?.qbo_realm_id || sessionStorage.getItem("jrco_lastQboRealmId") || "").trim();
-      hint = (state?.invoiceUrl || sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
+      const sid = state?.qbo_invoice_id;
+      const srealm = state?.qbo_realm_id;
+      txn = (sid != null && String(sid).trim() !== ""
+        ? String(sid).trim()
+        : (sessionStorage.getItem("jrco_lastQboInvoiceId") || "").trim());
+      realm = (srealm != null && String(srealm).trim() !== ""
+        ? String(srealm).trim()
+        : (sessionStorage.getItem("jrco_lastQboRealmId") || "").trim());
+      hint = (fromState || sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
     } catch {
       /* ignore */
     }
     const rebuilt = buildFromTxnRealm(txn, realm, hint);
     if (rebuilt) return rebuilt;
 
-    const fromState = (state?.invoiceUrl || "").trim();
-    if (fromState) return normalizeInvoiceUrl(fromState);
     try {
       return normalizeInvoiceUrl(sessionStorage.getItem("jrco_lastInvoiceUrl") || "");
     } catch {

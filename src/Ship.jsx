@@ -447,10 +447,17 @@ export default function Ship() {
 
     const labels = Array.isArray(data?.labels) ? data.labels : [];
     const slips  = Array.isArray(data?.slips)  ? data.slips  : [];
+    const labelRaw = Array.isArray(data?.labels_api_raw) ? data.labels_api_raw : [];
     const openLabels = data?.open_label_windows !== false;
     const openSlips = data?.open_slip_windows === true;
 
     const labelHttp = labels.filter(isHttpUrl);
+    if (labelRaw.length) {
+      console.info(
+        "[UPS] Pre-trim (API raw) label PDF/PNG — open in browser to see exactly what UPS returned before crop:",
+        labelRaw
+      );
+    }
     const slipHttp = slips.filter(isHttpUrl);
     postShipQboClientLog([
       {
@@ -851,14 +858,8 @@ export default function Ship() {
       const invoiceUrl = data?.invoice && typeof data.invoice === "string"
         ? data.invoice.trim()
         : "";
-      const qboInvoiceId =
-        data?.qbo_invoice_id && typeof data.qbo_invoice_id === "string"
-          ? data.qbo_invoice_id.trim()
-          : "";
-      const qboRealmId =
-        data?.qbo_realm_id && typeof data.qbo_realm_id === "string"
-          ? data.qbo_realm_id.trim()
-          : "";
+      const qboInvoiceId = String(data?.qbo_invoice_id ?? "").trim();
+      const qboRealmId = String(data?.qbo_realm_id ?? "").trim();
       try {
         sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
         sessionStorage.setItem("jrco_lastQboInvoiceId", qboInvoiceId || "");
@@ -1190,14 +1191,8 @@ export default function Ship() {
         shipData.invoice && typeof shipData.invoice === "string"
           ? shipData.invoice.trim()
           : "";
-      const qboInvoiceId =
-        shipData.qbo_invoice_id && typeof shipData.qbo_invoice_id === "string"
-          ? shipData.qbo_invoice_id.trim()
-          : "";
-      const qboRealmId =
-        shipData.qbo_realm_id && typeof shipData.qbo_realm_id === "string"
-          ? shipData.qbo_realm_id.trim()
-          : "";
+      const qboInvoiceId = String(shipData?.qbo_invoice_id ?? "").trim();
+      const qboRealmId = String(shipData?.qbo_realm_id ?? "").trim();
 
       try {
         sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
