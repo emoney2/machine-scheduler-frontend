@@ -602,12 +602,17 @@ export default function Section9(props) {
         if (statuses.some(s => s === 'red')) mStatus = 'red';
         else if (statuses.some(s => s === 'yellow')) mStatus = 'yellow';
       }
-      // Production stage lives on `status` from App.js (/combined); keep fallbacks for older shapes.
+      // Cut List status from /api/combined (cutStatus) is authoritative: Stage can still say CUT
+      // briefly or when the sheet formula lags. If Cut Status is COMPLETE, material was pulled for cut.
+      const cutSt = String(job.cutStatus ?? job['Cut Status'] ?? '').trim().toUpperCase();
       const jobStage = String(job.Stage ?? job.stage ?? job.status ?? job.Status ?? '').trim().toLowerCase();
-      // Shared material can show yellow (inventory depleted but on order) while this job already
-      // consumed stock for cut. Only upgrade yellow → green; leave red as real shortage signal.
       const preCutStages = new Set(['ordered', 'fur', 'cut']);
-      if (mStatus === 'yellow' && jobStage && !preCutStages.has(jobStage)) {
+      let pastCutForMaterial = cutSt === 'COMPLETE';
+      if (!pastCutForMaterial && !cutSt) {
+        pastCutForMaterial = !!(jobStage && !preCutStages.has(jobStage));
+      }
+      // Shared inventory can be yellow (restock on order) after this job already used stock at cut.
+      if (mStatus === 'yellow' && pastCutForMaterial) {
         mStatus = 'green';
       }
       const allGreen = dStatus === 'green' && tStatus === 'green' && mStatus === 'green';

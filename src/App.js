@@ -1139,6 +1139,8 @@ const fetchOrdersEmbroLinksCore = async () => {
         embroidery_start: persistedStart,
         start_date:       persistedStart,
         status:           o['Stage'] || '',
+        // Merged on server from Cut List (see /api/combined); Stage can lag behind this.
+        cutStatus:        o['Cut Status'] || o['Cut status'] || '',
         threadColors:     o['Threads'] || '',
         imageLink:        rawImageLink,
         imageFileId:      fileId || '',
