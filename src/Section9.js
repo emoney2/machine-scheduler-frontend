@@ -602,10 +602,12 @@ export default function Section9(props) {
         if (statuses.some(s => s === 'red')) mStatus = 'red';
         else if (statuses.some(s => s === 'yellow')) mStatus = 'yellow';
       }
-      // At Embroidery, the job was already cut — material was available for this job. Sheet-level
-      // "on order" can be yellow for restocks for other orders using the same material; show M green here.
-      const jobStage = String(job.Stage ?? job.stage ?? '').trim().toLowerCase();
-      if (jobStage === 'embroidery') {
+      // Production stage lives on `status` from App.js (/combined); keep fallbacks for older shapes.
+      const jobStage = String(job.Stage ?? job.stage ?? job.status ?? job.Status ?? '').trim().toLowerCase();
+      // Shared material can show yellow (inventory depleted but on order) while this job already
+      // consumed stock for cut. Only upgrade yellow → green; leave red as real shortage signal.
+      const preCutStages = new Set(['ordered', 'fur', 'cut']);
+      if (mStatus === 'yellow' && jobStage && !preCutStages.has(jobStage)) {
         mStatus = 'green';
       }
       const allGreen = dStatus === 'green' && tStatus === 'green' && mStatus === 'green';
