@@ -602,17 +602,9 @@ export default function Section9(props) {
         if (statuses.some(s => s === 'red')) mStatus = 'red';
         else if (statuses.some(s => s === 'yellow')) mStatus = 'yellow';
       }
-      // Cut List status from /api/combined (cutStatus) is authoritative: Stage can still say CUT
-      // briefly or when the sheet formula lags. If Cut Status is COMPLETE, material was pulled for cut.
-      const cutSt = String(job.cutStatus ?? job['Cut Status'] ?? '').trim().toUpperCase();
+      // At Cut or Embroidery, treat material as OK for this card (inventory yellow/red is sheet-wide).
       const jobStage = String(job.Stage ?? job.stage ?? job.status ?? job.Status ?? '').trim().toLowerCase();
-      const preCutStages = new Set(['ordered', 'fur', 'cut']);
-      let pastCutForMaterial = cutSt === 'COMPLETE';
-      if (!pastCutForMaterial && !cutSt) {
-        pastCutForMaterial = !!(jobStage && !preCutStages.has(jobStage));
-      }
-      // Shared inventory can be yellow (restock on order) after this job already used stock at cut.
-      if (mStatus === 'yellow' && pastCutForMaterial) {
+      if (jobStage === 'cut' || jobStage === 'embroidery') {
         mStatus = 'green';
       }
       const allGreen = dStatus === 'green' && tStatus === 'green' && mStatus === 'green';
