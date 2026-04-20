@@ -116,7 +116,7 @@ function getJobThumbUrl(job, ROOT) {
 }
 
 
-const LS_OVERVIEW_KEY = "jrco.overview.cache.v1";
+const LS_OVERVIEW_KEY = "jrco.overview.cache.v2";
 
 const LS_METRICS_KEY = "jrco.metrics.cache.v1";
 
@@ -195,6 +195,9 @@ function getOverviewCacheMeta() {
       ageMs,
       upcomingCount: Array.isArray(parsed?.data?.upcoming) ? parsed.data.upcoming.length : 0,
       materialsCount: Array.isArray(parsed?.data?.materials) ? parsed.data.materials.length : 0,
+      materialsFutureCount: Array.isArray(parsed?.data?.materialsFuture)
+        ? parsed.data.materialsFuture.length
+        : 0,
     };
   } catch (e) {
     return { present: false, parseError: e?.message || String(e) };
@@ -797,6 +800,7 @@ function col(width, center = false) {
 
   // Materials (grouped by vendor)
   const [materials, setMaterials] = useState([]);
+  const [materialsFuture, setMaterialsFuture] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
 
   const [selections, setSelections] = useState({});
@@ -811,7 +815,9 @@ function col(width, center = false) {
   const metricsLockRef = useRef(false);
 
   // Order modal
-  const [modalOpenForVendor, setModalOpenForVendor] = useState(null);
+  /** Vendor modal: which vendor row and whether items came from "now" or "plan ahead" column */
+  const [modalVendor, setModalVendor] = useState(null);
+  const [modalBucket, setModalBucket] = useState("now");
   const [modalSelections, setModalSelections] = useState({}); // key: `${vendor}:::${name}` -> { selected, qty, unit, type }
 
   // Vendor directory (from Material Inventory!K:O)
@@ -843,7 +849,7 @@ function col(width, center = false) {
     // 1) Hydrate instantly from cache (if any) - always fetch fresh on mount
     const cached = loadOverviewCache();
     if (cached) {
-      const { upcoming = [], materials = [] } = cached;
+      const { upcoming = [], materials = [], materialsFuture = [] } = cached;
       const baseJobs = (upcoming ?? []).filter(j => {
         if (isStageCompleted(j)) return false;
         return isJobInTimeWindow(j, parseInt(daysWindow, 10) || 7);
@@ -853,8 +859,10 @@ function col(width, center = false) {
       setUpcoming(baseJobs);
       // Ensure materials is always an array
       const materialsArray = Array.isArray(materials) ? materials : [];
+      const materialsFutureArray = Array.isArray(materialsFuture) ? materialsFuture : [];
       setMaterials(materialsArray);
-      console.log("📦 Cached materials loaded:", materialsArray.length, "vendors");
+      setMaterialsFuture(materialsFutureArray);
+      console.log("📦 Cached materials loaded:", materialsArray.length, "now vendors,", materialsFutureArray.length, "future vendors");
       console.log("[Overview upcoming] hydrated from cache", {
         cachedUpcomingCount: Array.isArray(upcoming) ? upcoming.length : 0,
         renderedUpcomingCount: Array.isArray(baseJobs) ? baseJobs.length : 0,
@@ -897,6 +905,7 @@ function col(width, center = false) {
       try {
         let upcoming = [];
         let materials = [];
+        let materialsFuture = [];
 
         // Single source: GET /overview only (Production Orders via backend). Do not merge /combined —
         // that produced two stacked blocks (duplicate / mixed rows vs the overview payload).
@@ -915,12 +924,16 @@ function col(width, center = false) {
           status: overRes?.status,
           upcomingCountRaw: Array.isArray(overRes?.data?.upcoming) ? overRes.data.upcoming.length : 0,
           materialsCountRaw: Array.isArray(overRes?.data?.materials) ? overRes.data.materials.length : 0,
+          materialsFutureCountRaw: Array.isArray(overRes?.data?.materialsFuture)
+            ? overRes.data.materialsFuture.length
+            : 0,
           jobsSource: overRes?.data?.jobsSource,
         });
 
         if (!alive) return;
         const data = overRes?.data || {};
         materials = data.materials || [];
+        materialsFuture = data.materialsFuture || [];
         const rawUpcoming = data.upcoming || [];
         const daysWindowNum = parseInt(daysWindow, 10) || 7;
         const sheetJobs = (rawUpcoming ?? []).filter(j => {
@@ -940,7 +953,11 @@ function col(width, center = false) {
           seen.add(k);
           upcoming.push(j);
         }
-        console.log("📦 Overview data received:", { upcomingCount: upcoming?.length || 0, materialsCount: materials?.length || 0 });
+        console.log("📦 Overview data received:", {
+          upcomingCount: upcoming?.length || 0,
+          materialsCount: materials?.length || 0,
+          materialsFutureCount: materialsFuture?.length || 0,
+        });
         console.log("[Overview upcoming] filtered counts", {
           rawUpcomingCount: Array.isArray(rawUpcoming) ? rawUpcoming.length : 0,
           afterWindowFilter: sheetJobs.length,
@@ -948,7 +965,7 @@ function col(width, center = false) {
         });
 
         if (!alive) return;
-        saveOverviewCache({ upcoming, materials });
+        saveOverviewCache({ upcoming, materials, materialsFuture });
 
         // Sort by Ship Date then Due Date then Order #
         const sorted = (upcoming ?? []).slice().sort((a, b) => {
@@ -974,13 +991,24 @@ function col(width, center = false) {
         setUpcoming(sorted);
         // Ensure materials is always an array
         const materialsArray = Array.isArray(materials) ? materials : [];
+        const materialsFutureArray = Array.isArray(materialsFuture) ? materialsFuture : [];
         setMaterials(materialsArray);
-        console.log("📦 Fresh materials loaded:", materialsArray.length, "vendors", materialsArray);
+        setMaterialsFuture(materialsFutureArray);
+        console.log(
+          "📦 Fresh materials loaded:",
+          materialsArray.length,
+          "now vendors,",
+          materialsFutureArray.length,
+          "future vendors",
+          materialsArray,
+          materialsFutureArray
+        );
         markUpdated();
       } catch (e) {
         console.error("Overview loadFresh failed:", e);
         // Ensure materials is set to empty array on error
         setMaterials([]);
+        setMaterialsFuture([]);
       } finally {
         fetchLockRef.current = false;
         if (!alive) return;
@@ -1192,14 +1220,15 @@ function col(width, center = false) {
 
   // Modal rows
   const modalRows = useMemo(() => {
-    if (!modalOpenForVendor) return [];
-    const grp = materials.find(g => g.vendor === modalOpenForVendor);
+    if (!modalVendor) return [];
+    const list = modalBucket === "future" ? materialsFuture : materials;
+    const grp = list.find(g => g.vendor === modalVendor);
     if (!grp) return [];
     return (grp.items || []).map(it => {
-      const key = `${grp.vendor}:::${it.name}`;
+      const key = `${modalBucket}:::${grp.vendor}:::${it.name}`;
       const base =
         modalSelections[key] ||
-        selections[key] || // use the prebuilt defaults if present
+        selections[key] ||
         {
           selected: true,
           qty: String(it.qty ?? "1"),
@@ -1208,8 +1237,7 @@ function col(width, center = false) {
         };
       return { vendor: grp.vendor, name: it.name, ...base, key };
     });
-
-  }, [modalOpenForVendor, modalSelections, materials]);
+  }, [modalVendor, modalBucket, modalSelections, materials, materialsFuture]);
 
   // Submit order: email (or open website) + log to inventory
   async function submitOrder() {
@@ -1221,7 +1249,7 @@ function col(width, center = false) {
       }
 
       // Vendor info from directory
-      const v = vendorDir[(modalOpenForVendor || "").trim().toLowerCase()] || {};
+      const v = vendorDir[(modalVendor || "").trim().toLowerCase()] || {};
       const vMethod = (v.method || "").toLowerCase();
       const defaultMethod = (vMethod.includes("online") || vMethod.includes("website")) ? "website" : "email";
       const effectiveMethod = orderMethod || defaultMethod;
@@ -1233,7 +1261,7 @@ function col(width, center = false) {
       const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
 
       // Madeira threads: email contactus@madeirausa.com and list only thread items
-      if ((modalOpenForVendor || "").toLowerCase().includes("madeira")) {
+      if ((modalVendor || "").toLowerCase().includes("madeira")) {
         const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
         if (threadRows.length) {
           emailRows = threadRows;
@@ -1241,7 +1269,7 @@ function col(width, center = false) {
         }
       }
 
-      const { subject, body } = buildEmailText(modalOpenForVendor, emailRows, {
+      const { subject, body } = buildEmailText(modalVendor, emailRows, {
         notes: poNotes,
         requestBy,
       });
@@ -1256,7 +1284,7 @@ function col(width, center = false) {
       if (method === "website" && v.website) {
         // For website method, open immediately (synchronously)
         popupWindow = window.open(v.website, "_blank", "noopener");
-      } else if (method !== "website" || !(modalOpenForVendor || "").toLowerCase().includes("madeira")) {
+      } else if (method !== "website" || !(modalVendor || "").toLowerCase().includes("madeira")) {
         // For email method, prepare Gmail URL and open immediately
         gmailUrl = buildGmailCompose({ to: emailTo, cc, subject, body, authUser });
         popupWindow = openUrlReturn(gmailUrl);
@@ -1266,7 +1294,7 @@ function col(width, center = false) {
       }
 
       // WEBSITE path — Madeira (special) - needs async call first
-      if (method === "website" && (modalOpenForVendor || "").toLowerCase().includes("madeira")) {
+      if (method === "website" && (modalVendor || "").toLowerCase().includes("madeira")) {
         // Only send thread items for Madeira
         const threadRows = rows.filter(r => (r.type || "Material").toLowerCase() === "thread");
         if (!threadRows.length) {
@@ -1331,7 +1359,7 @@ function col(width, center = false) {
       }
 
       alert((method === "website" ? "Website opened." : "Gmail compose opened.") + " Order logged.");
-      setModalOpenForVendor(null);
+      setModalVendor(null);
       setPoNotes("");
       setRequestBy("");
       if (!popupWindow || popupWindow.closed) {
@@ -1505,8 +1533,8 @@ function col(width, center = false) {
               position: "relative",
             }}
           >
-            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8 }}>
-              <span>Materials To Order (Grouped by Vendor)</span>
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Materials To Order</span>
               <span style={subtleUpdatedStyle}>
                 {lastUpdated ? `Updated ${formatClock(lastUpdated)} · ${timeAgo(lastUpdated)}` : "Loading…"}
               </span>
@@ -1542,173 +1570,353 @@ function col(width, center = false) {
               </div>
             )}
 
-            {!loadingMaterials && !materials.length && (
+            {!loadingMaterials && !materials.length && !materialsFuture.length && (
               <div>No materials currently flagged.</div>
             )}
 
-            <div style={{ opacity: loadingMaterials ? 0.6 : 1 }}>
-              {!loadingMaterials &&
-                materials.map((grp, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      border: "1px solid #eee",
-                      borderRadius: 10,
-                      padding: 10,
-                      marginBottom: 10,
-                    }}
-                  >
+            <div
+              style={{
+                opacity: loadingMaterials ? 0.6 : 1,
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+                gap: 12,
+                alignItems: "start",
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, color: "#111827" }}>
+                  Order now
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+                  Grouped by vendor · earliest open job due within 60 days
+                </div>
+                {!materials.length ? (
+                  <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing in this column.</div>
+                ) : (
+                  materials.map((grp, idx) => (
                     <div
+                      key={`now-${idx}`}
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
+                        border: "1px solid #eee",
+                        borderRadius: 10,
+                        padding: 10,
+                        marginBottom: 10,
                       }}
                     >
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>
-                        {grp.vendor || "Unknown Vendor"}
-                      </div>
-                      <button
-                        onClick={() => {
-                          const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
-                          const vMethod = (v.method || "").toLowerCase();
-                          setOrderMethod(
-                            (orderMethod || "").toLowerCase().includes("website")
-                              ? "website"
-                              : "email"
-                          );
-                          setModalOpenForVendor(grp.vendor);
-
-                          // Seed defaults so the modal is ready to send
-                          setModalSelections((s) => {
-                            const next = { ...s };
-                            for (const it of (grp.items || [])) {
-                              const key = `${grp.vendor}:::${it.name}`;
-                              if (!next[key]) {
-                                next[key] = {
-                                  selected: true,
-                                  qty: String(it.qty ?? "1"),
-                                  unit: it.unit ?? "",
-                                  type: it.type ?? "Material",
-                                };
-                              }
-                            }
-                            return next;
-                          });
-
-                        }}
+                      <div
                         style={{
-                          padding: "5px 8px",
-                          fontSize: 12,
-                          borderRadius: 8,
-                          border: "1px solid #ccc",
-                          cursor: "pointer",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
                         }}
                       >
-                        Order Material
-                      </button>
-                    </div>
-                    <div style={{ marginTop: 6 }}>
-                      {(grp.items || []).map((it, j) => {
-                        const isThread =
-                          String(it.type || "Material").toLowerCase() === "thread";
-                        const swatch = isThread ? colorFromName(it.name) : null;
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          {grp.vendor || "Unknown Vendor"}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
+                            const vMethod = (v.method || "").toLowerCase();
+                            setOrderMethod(
+                              (orderMethod || "").toLowerCase().includes("website")
+                                ? "website"
+                                : "email"
+                            );
+                            setModalBucket("now");
+                            setModalVendor(grp.vendor);
 
-                        return (
-                          <div
-                            key={j}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              fontSize: 12,
-                              lineHeight: "16px",
-                              padding: "2px 0",
-                            }}
-                          >
-                            {/* Thumb */}
+                            setModalSelections((s) => {
+                              const next = { ...s };
+                              for (const it of grp.items || []) {
+                                const key = `now:::${grp.vendor}:::${it.name}`;
+                                if (!next[key]) {
+                                  next[key] = {
+                                    selected: true,
+                                    qty: String(it.qty ?? "1"),
+                                    unit: it.unit ?? "",
+                                    type: it.type ?? "Material",
+                                  };
+                                }
+                              }
+                              return next;
+                            });
+                          }}
+                          style={{
+                            padding: "5px 8px",
+                            fontSize: 12,
+                            borderRadius: 8,
+                            border: "1px solid #ccc",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Order Material
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 6 }}>
+                        {(grp.items || []).map((it, j) => {
+                          const isThread =
+                            String(it.type || "Material").toLowerCase() === "thread";
+                          const swatch = isThread ? colorFromName(it.name) : null;
+
+                          return (
                             <div
+                              key={j}
                               style={{
-                                width: 36,
-                                height: 24,
-                                borderRadius: 4,
-                                border: "1px solid #ddd",
-                                overflow: "hidden",
                                 display: "flex",
                                 alignItems: "center",
-                                justifyContent: "center",
-                                background: "#fafafa",
-                                flex: "0 0 36px",
+                                gap: 10,
+                                fontSize: 12,
+                                lineHeight: "16px",
+                                padding: "2px 0",
                               }}
-                              aria-label={isThread ? "Thread image" : "Material image"}
-                              title={it.name}
                             >
-                              {isThread ? (
-                                <ThreadThumb name={it.name} fallbackColor={swatch} />
-                              ) : it.color ? (
-                                // Show color box if color is available
-                                <div 
-                                  style={{ 
-                                    width: "100%",
-                                    height: "100%",
-                                    background: it.color,
-                                    borderRadius: "4px",
-                                  }} 
-                                />
-                              ) : (
-                                // Fallback to image if no color
-                                <BasicImg
-                                  src={materialImgUrl(ROOT, grp.vendor, it.name)}
-                                  alt=""
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    objectFit: "cover",
-                                    display: "block",
-                                  }}
-                                />
-                              )}
-                            </div>
-                            {/* Name */}
-                            <div
-                              style={{
-                                width: 240,
-                                whiteSpace: "nowrap",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                              }}
-                              title={it.label || it.name}
-                            >
-                              {/* If thread has a label (pretty text), show it. Otherwise show plain name */}
-                              <div style={{ fontWeight: it.type === "Thread" ? "600" : "normal" }}>
-                                {it.label || it.name}
+                              <div
+                                style={{
+                                  width: 36,
+                                  height: 24,
+                                  borderRadius: 4,
+                                  border: "1px solid #ddd",
+                                  overflow: "hidden",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  background: "#fafafa",
+                                  flex: "0 0 36px",
+                                }}
+                                aria-label={isThread ? "Thread image" : "Material image"}
+                                title={it.name}
+                              >
+                                {isThread ? (
+                                  <ThreadThumb name={it.name} fallbackColor={swatch} />
+                                ) : it.color ? (
+                                  <div
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      background: it.color,
+                                      borderRadius: "4px",
+                                    }}
+                                  />
+                                ) : (
+                                  <BasicImg
+                                    src={materialImgUrl(ROOT, grp.vendor, it.name)}
+                                    alt=""
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                      display: "block",
+                                    }}
+                                  />
+                                )}
                               </div>
-
-                              {/* Only threads get a second line showing the % */}
-                              {it.type === "Thread" && it.pct !== undefined && (
-                                <div style={{ fontSize: 11, color: "#666" }}>
-                                  (Inventory: {it.pct}%)
+                              <div
+                                style={{
+                                  width: 240,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                                title={it.label || it.name}
+                              >
+                                <div style={{ fontWeight: it.type === "Thread" ? "600" : "normal" }}>
+                                  {it.label || it.name}
                                 </div>
-                              )}
+                                {it.type === "Thread" && it.pct !== undefined && (
+                                  <div style={{ fontSize: 11, color: "#666" }}>
+                                    (Inventory: {it.pct}%)
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
+                                {it.qty}
+                              </div>
+                              <div style={{ width: 60 }} title={it.unit || ""}>
+                                {it.unit || ""}
+                              </div>
+                              <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
+                                {it.type || "Material"}
+                              </div>
                             </div>
-
-
-                            {/* Qty / Unit / Type */}
-                            <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
-                              {it.qty}
-                            </div>
-                            <div style={{ width: 60 }} title={it.unit || ""}>
-                              {it.unit || ""}
-                            </div>
-                            <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
-                              {it.type || "Material"}
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                )}
+              </div>
+
+              <div
+                style={{
+                  minWidth: 0,
+                  borderLeft: "1px solid #e5e7eb",
+                  paddingLeft: 12,
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2, color: "#9a3412" }}>
+                  Plan ahead
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+                  Same shortage rules · earliest open job due in more than 60 days (bulk-buy reference)
+                </div>
+                {!materialsFuture.length ? (
+                  <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing deferred to this column.</div>
+                ) : (
+                  materialsFuture.map((grp, idx) => (
+                    <div
+                      key={`fut-${idx}`}
+                      style={{
+                        border: "1px solid #fed7aa",
+                        borderRadius: 10,
+                        padding: 10,
+                        marginBottom: 10,
+                        background: "#fffbeb",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          {grp.vendor || "Unknown Vendor"}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const v = vendorDir[(grp.vendor || "").trim().toLowerCase()] || {};
+                            const vMethod = (v.method || "").toLowerCase();
+                            setOrderMethod(
+                              (orderMethod || "").toLowerCase().includes("website")
+                                ? "website"
+                                : "email"
+                            );
+                            setModalBucket("future");
+                            setModalVendor(grp.vendor);
+
+                            setModalSelections((s) => {
+                              const next = { ...s };
+                              for (const it of grp.items || []) {
+                                const key = `future:::${grp.vendor}:::${it.name}`;
+                                if (!next[key]) {
+                                  next[key] = {
+                                    selected: true,
+                                    qty: String(it.qty ?? "1"),
+                                    unit: it.unit ?? "",
+                                    type: it.type ?? "Material",
+                                  };
+                                }
+                              }
+                              return next;
+                            });
+                          }}
+                          style={{
+                            padding: "5px 8px",
+                            fontSize: 12,
+                            borderRadius: 8,
+                            border: "1px solid #ccc",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Order Material
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 6 }}>
+                        {(grp.items || []).map((it, j) => {
+                          const isThread =
+                            String(it.type || "Material").toLowerCase() === "thread";
+                          const swatch = isThread ? colorFromName(it.name) : null;
+
+                          return (
+                            <div
+                              key={j}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 10,
+                                fontSize: 12,
+                                lineHeight: "16px",
+                                padding: "2px 0",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 36,
+                                  height: 24,
+                                  borderRadius: 4,
+                                  border: "1px solid #ddd",
+                                  overflow: "hidden",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  background: "#fafafa",
+                                  flex: "0 0 36px",
+                                }}
+                                aria-label={isThread ? "Thread image" : "Material image"}
+                                title={it.name}
+                              >
+                                {isThread ? (
+                                  <ThreadThumb name={it.name} fallbackColor={swatch} />
+                                ) : it.color ? (
+                                  <div
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      background: it.color,
+                                      borderRadius: "4px",
+                                    }}
+                                  />
+                                ) : (
+                                  <BasicImg
+                                    src={materialImgUrl(ROOT, grp.vendor, it.name)}
+                                    alt=""
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      objectFit: "cover",
+                                      display: "block",
+                                    }}
+                                  />
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  width: 240,
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                                title={it.label || it.name}
+                              >
+                                <div style={{ fontWeight: it.type === "Thread" ? "600" : "normal" }}>
+                                  {it.label || it.name}
+                                </div>
+                                {it.type === "Thread" && it.pct !== undefined && (
+                                  <div style={{ fontSize: 11, color: "#666" }}>
+                                    (Inventory: {it.pct}%)
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
+                                {it.qty}
+                              </div>
+                              <div style={{ width: 60 }} title={it.unit || ""}>
+                                {it.unit || ""}
+                              </div>
+                              <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
+                                {it.type || "Material"}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1967,7 +2175,7 @@ function col(width, center = false) {
 
 
       {/* Order modal */}
-      {modalOpenForVendor && (
+      {modalVendor && (
         <div
           style={{
             position: "fixed",
@@ -1990,7 +2198,12 @@ function col(width, center = false) {
             }}
           >
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10 }}>
-              Order from {modalOpenForVendor}
+              Order from {modalVendor}
+              {modalBucket === "future" ? (
+                <span style={{ fontSize: 13, fontWeight: 500, color: "#92400e", marginLeft: 8 }}>
+                  (plan ahead list)
+                </span>
+              ) : null}
             </div>
             <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
               All items are pre-selected. Unselect anything you don’t want to order.
@@ -2090,7 +2303,7 @@ function col(width, center = false) {
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 12 }}>
               <button
                 onClick={() => {
-                  setModalOpenForVendor(null);
+                  setModalVendor(null);
                   setGmailPopup(null);
                 }}
                 style={{ padding: "8px 12px", border: "1px solid #ccc", borderRadius: 8 }}
