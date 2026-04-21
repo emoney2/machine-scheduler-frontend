@@ -760,7 +760,7 @@ const imgBox = {
 
 // Upcoming jobs: shared grid (tight gaps/columns to avoid horizontal scroll on typical widths)
 const UPCOMING_JOBS_GRID_TEMPLATE =
-  "58px minmax(34px,0.42fr) minmax(56px,0.95fr) minmax(52px,0.88fr) 26px minmax(48px,0.85fr) minmax(44px,0.62fr) 22px 30px minmax(46px,0.72fr)";
+  "58px minmax(34px,0.42fr) minmax(56px,0.95fr) minmax(52px,0.88fr) 26px minmax(48px,0.85fr) minmax(44px,0.62fr) 22px 30px 30px minmax(46px,0.72fr)";
 
 const upcomingJobsThumbBox = {
   width: 56,
@@ -2009,6 +2009,7 @@ function col(width, center = false) {
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", whiteSpace: "nowrap", textAlign: "center" }}>Stage</div>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Pr</div>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Ship</div>
+                <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>Due</div>
                 <div style={{ fontSize: 8, fontWeight: 700, color: "#6b7280", textAlign: "center", whiteSpace: "nowrap" }}>H/S due</div>
               </div>
 
@@ -2018,7 +2019,9 @@ function col(width, center = false) {
 
               {!loadingUpcoming && upcoming.map((job, idx) => {
                 const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
+                const dueDate = job["Due Date"] ?? job["Due"] ?? null;
                 const ring = ringColorByShipDate(shipDate);
+                const dueRing = ringColorByShipDate(dueDate);
 
                 const primaryUrl = getJobThumbUrl(job, ROOT);
                 const handleImgError = (e) => {
@@ -2154,9 +2157,20 @@ function col(width, center = false) {
                         color: ring,
                         alignSelf: "center",
                       })}
-                      title={String(shipDate || "")}
+                      title={shipDate ? `Ship: ${String(shipDate)}` : "Ship date"}
                     >
                       {fmtMMDD(shipDate)}
+                    </div>
+                    <div
+                      style={upcomingJobsTextCell({
+                        fontWeight: 700,
+                        fontSize: 10,
+                        color: dueRing,
+                        alignSelf: "center",
+                      })}
+                      title={dueDate ? `Due: ${String(dueDate)}` : "Due date"}
+                    >
+                      {fmtMMDD(dueDate)}
                     </div>
                     <div
                       style={upcomingJobsTextCell({ fontSize: 9, alignSelf: "center" })}
