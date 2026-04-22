@@ -28,6 +28,7 @@ export default function ShipmentComplete() {
         ).trim();
         const q = new URLSearchParams();
         q.set("txnId", txnId);
+        q.set("txnType", "Invoice");
         if (company) {
           q.set("deeplinkcompanyid", company);
           q.set("companyId", company);
@@ -52,21 +53,17 @@ export default function ShipmentComplete() {
       const origin = hint.includes("sandbox") ? "https://app.sandbox.qbo.intuit.com" : "https://app.qbo.intuit.com";
       const q = new URLSearchParams();
       q.set("txnId", t);
+      q.set("txnType", "Invoice");
       q.set("companyId", r);
       q.set("deeplinkcompanyid", r);
       return `${origin}/app/invoice?${q.toString()}`;
     };
 
-    // Prefer the exact URL from this shipment (avoids stale session txnId/realm after UPS+QB flows).
-    const fromState = String(state?.invoiceUrl || "").trim();
-    if (fromState) {
-      const normalized = normalizeInvoiceUrl(fromState);
-      if (normalized) return normalized;
-    }
-
+    // Prefer API entity Id + realm from this shipment (reliable). A bare invoice URL without
+    // companyId often opens a blank "new invoice" when another QBO tab/session is active.
     let txn = "";
     let realm = "";
-    let hint = "";
+    let hintFromState = "";
     try {
       const sid = state?.qbo_invoice_id;
       const srealm = state?.qbo_realm_id;
@@ -76,12 +73,30 @@ export default function ShipmentComplete() {
       realm = (srealm != null && String(srealm).trim() !== ""
         ? String(srealm).trim()
         : (sessionStorage.getItem("jrco_lastQboRealmId") || "").trim());
-      hint = (fromState || sessionStorage.getItem("jrco_lastInvoiceUrl") || "").trim();
+      hintFromState = String(state?.invoiceUrl || "").trim();
     } catch {
       /* ignore */
     }
-    const rebuilt = buildFromTxnRealm(txn, realm, hint);
-    if (rebuilt) return rebuilt;
+    const hint = hintFromState || (() => {
+      try {
+        return sessionStorage.getItem("jrco_lastInvoiceUrl") || "";
+      } catch {
+        return "";
+      }
+    })();
+    if (txn && realm) {
+      const rebuilt = buildFromTxnRealm(txn, realm, hint);
+      if (rebuilt) {
+        const normalized = normalizeInvoiceUrl(rebuilt);
+        if (normalized) return normalized;
+      }
+    }
+
+    const fromState = String(state?.invoiceUrl || "").trim();
+    if (fromState) {
+      const normalized = normalizeInvoiceUrl(fromState);
+      if (normalized) return normalized;
+    }
 
     try {
       return normalizeInvoiceUrl(sessionStorage.getItem("jrco_lastInvoiceUrl") || "");
