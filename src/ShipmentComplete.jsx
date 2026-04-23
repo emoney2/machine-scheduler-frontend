@@ -1,12 +1,15 @@
 // src/ShipmentComplete.jsx
 import React, { useEffect, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { state } = location;
+  const qi = (searchParams.get("qi") || "").trim();
+  const qr = (searchParams.get("qr") || "").trim();
 
   const shippedOk     = state?.shippedOk     ?? false;
   const slipsPrinted  = state?.slipsPrinted  ?? false;
@@ -59,21 +62,49 @@ export default function ShipmentComplete() {
       return `${origin}/app/invoice?${q.toString()}`;
     };
 
-    // Prefer API entity Id + realm from this shipment (reliable). A bare invoice URL without
-    // companyId often opens a blank "new invoice" when another QBO tab/session is active.
+    // Use txnId + company (realm) as a *pair* from one source. Mixing e.g. invoice id from
+    // navigation state with an older realm from sessionStorage can open the wrong or blank QBO.
+    // Query string qi/qr survive refresh; state does not.
     let txn = "";
     let realm = "";
     let hintFromState = "";
     try {
-      const sid = state?.qbo_invoice_id;
-      const srealm = state?.qbo_realm_id;
-      txn = (sid != null && String(sid).trim() !== ""
-        ? String(sid).trim()
-        : (sessionStorage.getItem("jrco_lastQboInvoiceId") || "").trim());
-      realm = (srealm != null && String(srealm).trim() !== ""
-        ? String(srealm).trim()
-        : (sessionStorage.getItem("jrco_lastQboRealmId") || "").trim());
-      hintFromState = String(state?.invoiceUrl || "").trim();
+      const sid = String(state?.qbo_invoice_id ?? "").trim();
+      const srealm = String(state?.qbo_realm_id ?? "").trim();
+      if (sid && srealm) {
+        txn = sid;
+        realm = srealm;
+        hintFromState = String(state?.invoiceUrl || "").trim();
+      } else if (qi && qr) {
+        txn = qi;
+        realm = qr;
+        hintFromState = String(state?.invoiceUrl || "").trim();
+      } else {
+        try {
+          const blob = sessionStorage.getItem("jrco_lastShipmentQbo");
+          if (blob) {
+            const p = JSON.parse(blob);
+            const a = String(p?.qbo_invoice_id ?? "").trim();
+            const b = String(p?.qbo_realm_id ?? "").trim();
+            if (a && b) {
+              txn = a;
+              realm = b;
+              hintFromState = String(p?.invoiceUrl || "").trim();
+            }
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (!txn || !realm) {
+        const stTxn = (sessionStorage.getItem("jrco_lastQboInvoiceId") || "").trim();
+        const stRe = (sessionStorage.getItem("jrco_lastQboRealmId") || "").trim();
+        if (stTxn && stRe) {
+          txn = stTxn;
+          realm = stRe;
+          hintFromState = String(state?.invoiceUrl || "").trim();
+        }
+      }
     } catch {
       /* ignore */
     }
@@ -103,7 +134,7 @@ export default function ShipmentComplete() {
     } catch {
       return "";
     }
-  }, [location.key, state?.invoiceUrl, state?.qbo_invoice_id, state?.qbo_realm_id]);
+  }, [location.key, state?.invoiceUrl, state?.qbo_invoice_id, state?.qbo_realm_id, qi, qr]);
 
   useEffect(() => {
     let fromSession = "";

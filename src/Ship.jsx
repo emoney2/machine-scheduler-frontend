@@ -434,6 +434,35 @@ export default function Ship() {
   // Helpers must live inside the component (hooks rule)
   const openedOnceRef = useRef(false);
 
+  /** Kept in sync: invoice id + realm (pair), plus ?qi=&qr= for refresh-safe Open Invoice. */
+  function persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId) {
+    const inv = String(invoiceUrl || "").trim();
+    const id = String(qboInvoiceId || "").trim();
+    const re = String(qboRealmId || "").trim();
+    try {
+      sessionStorage.setItem("jrco_lastInvoiceUrl", inv || "");
+      sessionStorage.setItem("jrco_lastQboInvoiceId", id || "");
+      sessionStorage.setItem("jrco_lastQboRealmId", re || "");
+      if (id && re) {
+        sessionStorage.setItem(
+          "jrco_lastShipmentQbo",
+          JSON.stringify({
+            qbo_invoice_id: id,
+            qbo_realm_id: re,
+            invoiceUrl: inv,
+            t: Date.now(),
+          })
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+    const qs = new URLSearchParams();
+    if (id) qs.set("qi", id);
+    if (re) qs.set("qr", re);
+    return qs.toString() ? `?${qs.toString()}` : "";
+  }
+
   function isHttpUrl(u) {
     return typeof u === "string" && /^https?:\/\//i.test(u);
   }
@@ -860,13 +889,11 @@ export default function Ship() {
         : "";
       const qboInvoiceId = String(data?.qbo_invoice_id ?? "").trim();
       const qboRealmId = String(data?.qbo_realm_id ?? "").trim();
-      try {
-        sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
-        sessionStorage.setItem("jrco_lastQboInvoiceId", qboInvoiceId || "");
-        sessionStorage.setItem("jrco_lastQboRealmId", qboRealmId || "");
-      } catch {}
+      const search = persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId);
 
-      navigate("/shipment-complete", {
+      navigate({
+        pathname: "/shipment-complete",
+        search,
         state: {
           shippedOk: true,
           labelsPrinted: Array.isArray(data?.labels) && data.labels.length > 0,
@@ -1193,11 +1220,9 @@ export default function Ship() {
           : "";
       const qboInvoiceId = String(shipData?.qbo_invoice_id ?? "").trim();
       const qboRealmId = String(shipData?.qbo_realm_id ?? "").trim();
+      const search = persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId);
 
       try {
-        sessionStorage.setItem("jrco_lastInvoiceUrl", invoiceUrl || "");
-        sessionStorage.setItem("jrco_lastQboInvoiceId", qboInvoiceId || "");
-        sessionStorage.setItem("jrco_lastQboRealmId", qboRealmId || "");
         sessionStorage.setItem(
           "jrco_lastSlipUrl",
           Array.isArray(shipData.slips) && shipData.slips[0] ? shipData.slips[0] : ""
@@ -1216,7 +1241,9 @@ export default function Ship() {
 
       setShippingStage("✅ Complete!");
       setTimeout(() => {
-        navigate("/shipment-complete", {
+        navigate({
+          pathname: "/shipment-complete",
+          search,
           state: {
             shippedOk: true,
             labelsPrinted:
