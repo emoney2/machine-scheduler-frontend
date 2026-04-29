@@ -1132,7 +1132,11 @@ function col(width, center = false) {
         return;
       }
       const qtyStr =
-        row["Reorder Qty Basis"] || row["Reorder Qty"] || row["Event Qty"] || "1";
+        row["Reorder Qty (basis)"] ||
+        row["Reorder Qty Basis"] ||
+        row["Reorder Qty"] ||
+        row["Event Qty"] ||
+        "1";
       const orderedQty = Number(qtyStr) || 1;
 
       setKanbanMarkingOverlay("Marking ordered…");
@@ -2072,9 +2076,10 @@ function col(width, center = false) {
                   const name = (r["Item Name"] || "").trim() || "(unnamed)";
                   const photo = (r["Photo URL"] || "").trim();
                   const qtyRaw =
-                    r["Event Qty"] ??
+                    r["Reorder Qty (basis)"] ??
                     r["Reorder Qty Basis"] ??
                     r["Reorder Qty"] ??
+                    r["Event Qty"] ??
                     "";
                   const qtyLabel =
                     qtyRaw !== "" && qtyRaw != null ? String(qtyRaw).trim() : "—";
