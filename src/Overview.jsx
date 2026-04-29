@@ -1068,7 +1068,7 @@ function col(width, center = false) {
   }, [daysWindow]);
 
   // Kanban queue summary (GET /api/kanban/queue — same payload as Kanban Queue tab)
-  const kanbanQueueSorted = useMemo(() => {
+  const kanbanQueueGrouped = useMemo(() => {
     const statusForRow = (r) => {
       const raw =
         r["Event Status"] ??
@@ -1089,7 +1089,7 @@ function col(width, center = false) {
       new Date(b["Timestamp"] || 0).getTime() - new Date(a["Timestamp"] || 0).getTime();
     open.sort(byTimeDesc);
     ordered.sort(byTimeDesc);
-    return [...open, ...ordered];
+    return { open, ordered, all: [...open, ...ordered] };
   }, [kanbanQueueRows]);
 
   const fetchKanbanQueue = useCallback(
@@ -1119,6 +1119,9 @@ function col(width, center = false) {
 
   const markKanbanOrdered = useCallback(
     async (row) => {
+      const eventIdKey = Object.keys(row || {}).find(
+        (k) => k && String(k).toLowerCase().replace(/\s+/g, "") === "eventid"
+      );
       const eventId =
         row["Event ID"] ||
         row["EventID"] ||
@@ -1126,7 +1129,7 @@ function col(width, center = false) {
         row["Event Id"] ||
         row["ID"] ||
         row["Id"] ||
-        "";
+        (eventIdKey ? row[eventIdKey] : "");
       if (!String(eventId).trim()) {
         alert("No Event ID on this row; cannot mark ordered.");
         return;
@@ -1154,6 +1157,53 @@ function col(width, center = false) {
           e?.message ||
           String(e);
         alert(`Could not mark ordered: ${msg}`);
+      } finally {
+        setKanbanMarkingOverlay(null);
+      }
+    },
+    [ROOT, fetchKanbanQueue]
+  );
+
+  const markKanbanReceived = useCallback(
+    async (row) => {
+      const eventIdKey = Object.keys(row || {}).find(
+        (k) => k && String(k).toLowerCase().replace(/\s+/g, "") === "eventid"
+      );
+      const eventId =
+        row["Event ID"] ||
+        row["EventID"] ||
+        row["eventId"] ||
+        row["Event Id"] ||
+        row["ID"] ||
+        row["Id"] ||
+        (eventIdKey ? row[eventIdKey] : "");
+      if (!String(eventId).trim()) {
+        alert("No Event ID on this row; cannot mark received.");
+        return;
+      }
+      const qtyStr =
+        row["Reorder Qty (basis)"] ||
+        row["Reorder Qty Basis"] ||
+        row["Reorder Qty"] ||
+        row["Event Qty"] ||
+        "1";
+      const receivedQty = Number(qtyStr) || 1;
+
+      setKanbanMarkingOverlay("Marking received…");
+      try {
+        await axios.post(
+          `${ROOT}/kanban/received`,
+          { eventId: String(eventId).trim(), receivedQty },
+          { withCredentials: true, timeout: 30000 }
+        );
+        await fetchKanbanQueue({ showLoading: false });
+      } catch (e) {
+        const msg =
+          e?.response?.data?.error ||
+          e?.response?.data?.details ||
+          e?.message ||
+          String(e);
+        alert(`Could not mark received: ${msg}`);
       } finally {
         setKanbanMarkingOverlay(null);
       }
@@ -2054,17 +2104,179 @@ function col(width, center = false) {
               </a>
             </div>
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
-              Open and ordered requests: quantity, photo, name, buy link when set. Mark ordered records the PO line on the sheet.
+              Left: needs order. Right: ordered and waiting on receipt. Mark ordered/received updates the Kanban sheet status.
             </div>
             {loadingKanbanQueue && (
               <div style={{ fontSize: 12, color: "#9ca3af" }}>Loading Kanban…</div>
             )}
-            {!loadingKanbanQueue && kanbanQueueSorted.length === 0 && (
+            {!loadingKanbanQueue && kanbanQueueGrouped.all.length === 0 && (
               <div style={{ fontSize: 12, color: "#6b7280" }}>No open or ordered Kanban requests.</div>
             )}
-            {!loadingKanbanQueue && kanbanQueueSorted.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {kanbanQueueSorted.map((r) => {
+            {!loadingKanbanQueue && kanbanQueueGrouped.all.length > 0 && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)",
+                  gap: 10,
+                  alignItems: "start",
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 6 }}>
+                    Needs order
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {kanbanQueueGrouped.open.map((r) => {
+                      const st = String(
+                        r["Event Status"] ?? r["Status"] ?? r["Event status"] ?? ""
+                      )
+                        .trim()
+                        .toLowerCase();
+                      const isOpen = st === "open";
+                      const orderUrl = String(r["Order URL"] || "").trim();
+                      const buyUrl = /^https?:\/\//i.test(orderUrl) ? orderUrl : "";
+                      const name = (r["Item Name"] || "").trim() || "(unnamed)";
+                      const photo = (r["Photo URL"] || "").trim();
+                      const qtyRaw =
+                        r["Reorder Qty (basis)"] ??
+                        r["Reorder Qty Basis"] ??
+                        r["Reorder Qty"] ??
+                        r["Event Qty"] ??
+                        "";
+                      const qtyLabel =
+                        qtyRaw !== "" && qtyRaw != null ? String(qtyRaw).trim() : "—";
+                      const key =
+                        r["Event ID"] ||
+                        `${r["Kanban ID"] || ""}-${r["Timestamp"] || ""}-${name}`;
+
+                      return (
+                        <div
+                          key={key}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "auto 1fr auto",
+                            gap: 10,
+                            alignItems: "center",
+                            padding: "8px 10px",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            background: isOpen ? "rgba(254, 243, 199, 0.35)" : "#f8fafc",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                            {photo ? (
+                              <img
+                                src={photo}
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                                referrerPolicy="no-referrer"
+                                style={{
+                                  width: 48,
+                                  height: 48,
+                                  objectFit: "cover",
+                                  borderRadius: 8,
+                                  border: "1px solid #e5e7eb",
+                                  flexShrink: 0,
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: 48,
+                                  height: 48,
+                                  borderRadius: 8,
+                                  border: "1px dashed #e5e7eb",
+                                  flexShrink: 0,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  color: "#9ca3af",
+                                  fontSize: 10,
+                                  textAlign: "center",
+                                }}
+                              >
+                                No photo
+                              </div>
+                            )}
+                            <div
+                              title={`Requested qty: ${qtyLabel}`}
+                              style={{
+                                minWidth: 40,
+                                padding: "6px 8px",
+                                borderRadius: 8,
+                                background: isOpen ? "#fde68a" : "#e2e8f0",
+                                border: "1px solid #cbd5e1",
+                                fontSize: 14,
+                                fontWeight: 800,
+                                color: "#111827",
+                                textAlign: "center",
+                                lineHeight: 1.1,
+                              }}
+                            >
+                              <div style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}>Qty</div>
+                              {qtyLabel}
+                            </div>
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            {buyUrl ? (
+                              <a
+                                href={buyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontWeight: 700,
+                                  color: "#111827",
+                                  textDecoration: "underline",
+                                  fontSize: 13,
+                                  wordBreak: "break-word",
+                                }}
+                              >
+                                {name}
+                              </a>
+                            ) : (
+                              <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{name}</div>
+                            )}
+                            <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                              Needs order
+                              {r["SKU"] ? ` · ${r["SKU"]}` : ""}
+                            </div>
+                          </div>
+                          <div style={{ justifySelf: "end" }}>
+                            <button
+                              type="button"
+                              onClick={() => markKanbanOrdered(r)}
+                              disabled={!!kanbanMarkingOverlay}
+                              style={{
+                                padding: "6px 10px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                borderRadius: 8,
+                                border: "1px solid #b45309",
+                                background: "#f59e0b",
+                                color: "#1c1917",
+                                cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Mark ordered
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {kanbanQueueGrouped.open.length === 0 && (
+                      <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing waiting to order.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ minWidth: 0, borderLeft: "1px solid #e5e7eb", paddingLeft: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#1e3a8a", marginBottom: 6 }}>
+                    Ordered, not received
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {kanbanQueueGrouped.ordered.map((r) => {
                   const st = String(
                     r["Event Status"] ?? r["Status"] ?? r["Event status"] ?? ""
                   )
@@ -2176,37 +2388,38 @@ function col(width, center = false) {
                           <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{name}</div>
                         )}
                         <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                          {isOpen ? "Needs order" : st === "ordered" ? "Ordered" : st || "—"}
+                          Ordered, waiting on delivery
                           {r["SKU"] ? ` · ${r["SKU"]}` : ""}
                         </div>
                       </div>
                       <div style={{ justifySelf: "end" }}>
-                        {isOpen ? (
-                          <button
-                            type="button"
-                            onClick={() => markKanbanOrdered(r)}
-                            disabled={!!kanbanMarkingOverlay}
-                            style={{
-                              padding: "6px 10px",
-                              fontSize: 11,
-                              fontWeight: 700,
-                              borderRadius: 8,
-                              border: "1px solid #b45309",
-                              background: "#f59e0b",
-                              color: "#1c1917",
-                              cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            Mark ordered
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: 11, color: "#94a3b8" }}> </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => markKanbanReceived(r)}
+                          disabled={!!kanbanMarkingOverlay}
+                          style={{
+                            padding: "6px 10px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            borderRadius: 8,
+                            border: "1px solid #0369a1",
+                            background: "#38bdf8",
+                            color: "#082f49",
+                            cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Mark received
+                        </button>
                       </div>
                     </div>
                   );
                 })}
+                    {kanbanQueueGrouped.ordered.length === 0 && (
+                      <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing currently ordered.</div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>

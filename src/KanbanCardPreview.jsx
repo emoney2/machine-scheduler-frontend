@@ -158,11 +158,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
-  // ✅ Add this: build the scan QR URL manually
-  // Use correct field name from your sheet ("Kanban ID")
+  // Build public QR endpoints from canonical Kanban ID
+  const kanbanIdForQr = item["Kanban ID"] || item.kanbanId || routeKanbanId;
+  const defaultQty = String(item.reorderQtyBasis || 1).trim() || "1";
   const scanUrl = `https://machine-scheduler-backend.onrender.com/kanban/scan?id=${encodeURIComponent(
-    item["Kanban ID"] || routeKanbanId
-  )}&qty=1`;
+    kanbanIdForQr
+  )}&qty=${encodeURIComponent(defaultQty)}`;
+  const receiveUrl = `https://machine-scheduler-backend.onrender.com/kanban/receive?id=${encodeURIComponent(
+    kanbanIdForQr
+  )}&qty=${encodeURIComponent(defaultQty)}`;
 
   const scanQr = makeQr(scanUrl);
 
@@ -189,9 +193,8 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const ENTRY_KANBAN = "entry.1189949378"; // Kanban ID field
   const ENTRY_QTY = "entry.312175649";     // Quantity field
   // Use backend route instead of frontend or Google Form
-  const reorderScanUrl = `https://machine-scheduler-backend.onrender.com/kanban/scan?id=${encodeURIComponent(
-    item.kanbanId || routeKanbanId
-  )}&qty=1`;
+  const reorderScanUrl = scanUrl;
+  const receiveQr = makeQr(receiveUrl);
 
 
 
@@ -420,11 +423,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         </div>
                 </div>
 
-                {/* BOTTOM THIRD: QRs — far left and far right */}
+                {/* BOTTOM THIRD: QRs — product, reorder, receive */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
+                    gridTemplateColumns: "1fr 1fr 1fr",
                     alignItems: "start",
                     padding: "10px 10px 0",
                     boxSizing: "border-box",
@@ -443,8 +446,8 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                   alt="Product Link"
                                   src={makeQr(orderQrUrl, 480)}
                                   style={{
-                                    width: "64%",          // slightly smaller
-                                    maxWidth: 228,         // tighter cap
+                                    width: "58%",
+                                    maxWidth: 168,
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
@@ -465,14 +468,14 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                 </div>
                         </div>
 
-                        {/* Right QR: Reorder Request */}
-                        <div style={{ justifySelf: "end", display: "grid", rowGap: 6, justifyItems: "center" }}>
+                        {/* Middle QR: Reorder Request */}
+                        <div style={{ justifySelf: "center", display: "grid", rowGap: 6, justifyItems: "center" }}>
                                 <img
                                   alt="Reorder Request QR"
                                   src={scanQr}
                                   style={{
-                                    width: "64%",
-                                    maxWidth: 228,
+                                    width: "58%",
+                                    maxWidth: 168,
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
@@ -490,6 +493,32 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
                                 >
                                         Reorder Request QR
+                                </div>
+                        </div>
+
+                        {/* Right QR: Receive Delivery */}
+                        <div style={{ justifySelf: "end", display: "grid", rowGap: 6, justifyItems: "center" }}>
+                                <img
+                                  alt="Receive Delivery QR"
+                                  src={receiveQr}
+                                  style={{
+                                    width: "58%",
+                                    maxWidth: 168,
+                                    height: "auto",
+                                    aspectRatio: "1 / 1",
+                                    boxSizing: "border-box",
+                                    marginTop: 2,
+                                  }}
+                                />
+                                <div
+                                        style={{
+                                          fontSize: "clamp(11px, 1.25vw, 15px)",
+                                          lineHeight: 1.1,
+                                          fontWeight: 700,
+                                          textAlign: "center",
+                                        }}
+                                >
+                                        Receive Delivery QR
                                 </div>
                         </div>
                 </div>
