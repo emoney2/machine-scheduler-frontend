@@ -434,6 +434,23 @@ export default function Ship() {
   // Helpers must live inside the component (hooks rule)
   const openedOnceRef = useRef(false);
 
+  /** Stable browser deeplink (txnId + realm). Prefer over raw invoice URLs that may omit txnId after redirects. */
+  function buildCanonicalQboInvoiceOpenUrl(txnId, realmId, invoiceUrlHint) {
+    const tid = String(txnId || "").trim();
+    const rid = String(realmId || "").trim();
+    if (!tid || !rid) return "";
+    const hint = String(invoiceUrlHint || "").toLowerCase();
+    const origin = hint.includes("sandbox")
+      ? "https://app.sandbox.qbo.intuit.com"
+      : "https://app.qbo.intuit.com";
+    const q = new URLSearchParams();
+    q.set("txnId", tid);
+    q.set("txnType", "Invoice");
+    q.set("companyId", rid);
+    q.set("deeplinkcompanyid", rid);
+    return `${origin}/app/invoice?${q.toString()}`;
+  }
+
   /** Kept in sync: invoice id + realm (pair), plus ?qi=&qr= for refresh-safe Open Invoice. */
   function persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId) {
     const inv = String(invoiceUrl || "").trim();
@@ -443,6 +460,10 @@ export default function Ship() {
       sessionStorage.setItem("jrco_lastInvoiceUrl", inv || "");
       sessionStorage.setItem("jrco_lastQboInvoiceId", id || "");
       sessionStorage.setItem("jrco_lastQboRealmId", re || "");
+      const canon = buildCanonicalQboInvoiceOpenUrl(id, re, inv);
+      if (canon) {
+        sessionStorage.setItem("jrco_lastInvoiceDeeplink", canon);
+      }
       if (id && re) {
         sessionStorage.setItem(
           "jrco_lastShipmentQbo",
@@ -450,6 +471,7 @@ export default function Ship() {
             qbo_invoice_id: id,
             qbo_realm_id: re,
             invoiceUrl: inv,
+            canonicalInvoiceUrl: canon || inv,
             t: Date.now(),
           })
         );
@@ -1242,6 +1264,22 @@ export default function Ship() {
           Array.isArray(shipData.slips) && shipData.slips[0] ? shipData.slips[0] : ""
         );
       } catch { /* ignore */ }
+
+      try {
+        sessionStorage.setItem(
+          "jrco_lastShipmentCompleteSummary",
+          JSON.stringify({
+            shippedOk: true,
+            labelsPrinted:
+              Array.isArray(shipData.labels) && shipData.labels.length > 0,
+            slipsPrinted:
+              Array.isArray(shipData.slips) && shipData.slips.length > 0,
+            t: Date.now(),
+          })
+        );
+      } catch {
+        /* ignore */
+      }
 
       openResultsWindows(shipData);
       setTimeout(() => window.focus(), 500);

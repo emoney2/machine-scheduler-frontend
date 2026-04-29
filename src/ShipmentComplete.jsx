@@ -11,9 +11,25 @@ export default function ShipmentComplete() {
   const qi = (searchParams.get("qi") || "").trim();
   const qr = (searchParams.get("qr") || "").trim();
 
-  const shippedOk     = state?.shippedOk     ?? false;
-  const slipsPrinted  = state?.slipsPrinted  ?? false;
-  const labelsPrinted = state?.labelsPrinted ?? false;
+  function mergedShipmentFlags(navState) {
+    let shippedOk = navState?.shippedOk ?? false;
+    let slipsPrinted = navState?.slipsPrinted ?? false;
+    let labelsPrinted = navState?.labelsPrinted ?? false;
+    try {
+      const raw = sessionStorage.getItem("jrco_lastShipmentCompleteSummary");
+      if (!raw) return { shippedOk, slipsPrinted, labelsPrinted };
+      const p = JSON.parse(raw);
+      if (!p || typeof p !== "object") return { shippedOk, slipsPrinted, labelsPrinted };
+      if (typeof p.shippedOk === "boolean") shippedOk = shippedOk || p.shippedOk;
+      if (typeof p.slipsPrinted === "boolean") slipsPrinted = slipsPrinted || p.slipsPrinted;
+      if (typeof p.labelsPrinted === "boolean") labelsPrinted = labelsPrinted || p.labelsPrinted;
+    } catch {
+      /* ignore */
+    }
+    return { shippedOk, slipsPrinted, labelsPrinted };
+  }
+
+  const { shippedOk, slipsPrinted, labelsPrinted } = mergedShipmentFlags(state);
 
   // Prefer txnId + realm from this shipment (fixes wrong / new-invoice tabs). Else normalize backend URL.
   const invoiceUrl = useMemo(() => {
@@ -23,7 +39,8 @@ export default function ShipmentComplete() {
       try {
         const u = new URL(src);
         const txnId = (u.searchParams.get("txnId") || "").trim();
-        if (!txnId) return src;
+        // URLs with companyId but no txnId open QBO's blank composer — discard so fallbacks run.
+        if (!txnId) return "";
         const company = (
           u.searchParams.get("deeplinkcompanyid") ||
           u.searchParams.get("companyId") ||
@@ -44,7 +61,7 @@ export default function ShipmentComplete() {
         const origin = u.origin;
         return `${origin}${path}?${q.toString()}`;
       } catch {
-        return src;
+        return "";
       }
     };
 
@@ -61,6 +78,16 @@ export default function ShipmentComplete() {
       q.set("deeplinkcompanyid", r);
       return `${origin}/app/invoice?${q.toString()}`;
     };
+
+    try {
+      const dl = (sessionStorage.getItem("jrco_lastInvoiceDeeplink") || "").trim();
+      if (dl && /^https:\/\//i.test(dl)) {
+        const normalizedDl = normalizeInvoiceUrl(dl);
+        if (normalizedDl) return normalizedDl;
+      }
+    } catch {
+      /* ignore */
+    }
 
     // Use txnId + company (realm) as a *pair* from one source. Mixing e.g. invoice id from
     // navigation state with an older realm from sessionStorage can open the wrong or blank QBO.
@@ -130,10 +157,12 @@ export default function ShipmentComplete() {
     }
 
     try {
-      return normalizeInvoiceUrl(sessionStorage.getItem("jrco_lastInvoiceUrl") || "");
+      const nu = normalizeInvoiceUrl(sessionStorage.getItem("jrco_lastInvoiceUrl") || "");
+      if (nu) return nu;
     } catch {
-      return "";
+      /* ignore */
     }
+    return "";
   }, [location.key, state?.invoiceUrl, state?.qbo_invoice_id, state?.qbo_realm_id, qi, qr]);
 
   useEffect(() => {
@@ -148,6 +177,13 @@ export default function ShipmentComplete() {
         message: "shipment_complete_mount",
         qi_present: !!qi,
         qr_present: !!qr,
+        deeplinkStoredLen: (() => {
+          try {
+            return (sessionStorage.getItem("jrco_lastInvoiceDeeplink") || "").trim().length;
+          } catch {
+            return 0;
+          }
+        })(),
         hasStateInvoice: !!(state?.invoiceUrl && String(state.invoiceUrl).trim()),
         resolvedInvoiceUrlLen: invoiceUrl.length,
         sessionStorageInvoiceLen: fromSession.trim().length,
