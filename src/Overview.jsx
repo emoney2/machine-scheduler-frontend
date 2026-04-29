@@ -803,6 +803,10 @@ function col(width, center = false) {
   const [materialsFuture, setMaterialsFuture] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
 
+  // Kanban queue (same data as Kanban Queue tab — consolidated summary)
+  const [kanbanQueueRows, setKanbanQueueRows] = useState([]);
+  const [loadingKanbanQueue, setLoadingKanbanQueue] = useState(true);
+
   const [selections, setSelections] = useState({});
   const [daysWindow, setDaysWindow] = useState("7");
   const overviewCtrlRef = useRef(null);
@@ -1061,6 +1065,66 @@ function col(width, center = false) {
       window.removeEventListener("materialsOrdered", handleMaterialsOrdered);
     };
   }, [daysWindow]);
+
+  // Kanban queue summary (GET /api/kanban/queue — same payload as Kanban Queue tab)
+  const kanbanQueueSorted = useMemo(() => {
+    const statusForRow = (r) => {
+      const raw =
+        r["Event Status"] ??
+        r["Status"] ??
+        r["Event status"] ??
+        r["event status"] ??
+        "";
+      return String(raw).trim().toLowerCase();
+    };
+    const open = [];
+    const ordered = [];
+    for (const r of kanbanQueueRows || []) {
+      const s = statusForRow(r);
+      if (s === "open") open.push(r);
+      else if (s === "ordered") ordered.push(r);
+    }
+    const byTimeDesc = (a, b) =>
+      new Date(b["Timestamp"] || 0).getTime() - new Date(a["Timestamp"] || 0).getTime();
+    open.sort(byTimeDesc);
+    ordered.sort(byTimeDesc);
+    return [...open, ...ordered];
+  }, [kanbanQueueRows]);
+
+  useEffect(() => {
+    let alive = true;
+    const ctrl = new AbortController();
+
+    async function loadKanbanQueue() {
+      try {
+        setLoadingKanbanQueue(true);
+        const res = await axios.get(`${ROOT}/kanban/queue`, {
+          withCredentials: true,
+          signal: ctrl.signal,
+          timeout: 20000,
+        });
+        if (!alive) return;
+        setKanbanQueueRows(Array.isArray(res.data?.rows) ? res.data.rows : []);
+      } catch (e) {
+        if (axios.isCancel(e) || e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
+        if (!alive) return;
+        console.warn("Overview kanban queue fetch failed:", e);
+        setKanbanQueueRows([]);
+      } finally {
+        if (alive) setLoadingKanbanQueue(false);
+      }
+    }
+
+    loadKanbanQueue();
+    const id = setInterval(loadKanbanQueue, 300000);
+    return () => {
+      alive = false;
+      try {
+        ctrl.abort();
+      } catch {}
+      clearInterval(id);
+    };
+  }, [ROOT]);
 
   // Load vendor directory once
   useEffect(() => {
@@ -1918,6 +1982,141 @@ function col(width, center = false) {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Kanban queue — same items as Kanban Queue tab (photo, name, buy link) */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div
+              style={{
+                ...header,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <span>Kanban queue</span>
+              <a
+                href="/kanban/queue"
+                style={{ fontSize: 12, fontWeight: 600, color: "#2563eb" }}
+              >
+                Open full queue →
+              </a>
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
+              Same rows as the Kanban Queue tab: photo, item name, and buy link when an order URL is set.
+            </div>
+            {loadingKanbanQueue && (
+              <div style={{ fontSize: 12, color: "#9ca3af" }}>Loading Kanban…</div>
+            )}
+            {!loadingKanbanQueue && kanbanQueueSorted.length === 0 && (
+              <div style={{ fontSize: 12, color: "#6b7280" }}>No open or ordered Kanban requests.</div>
+            )}
+            {!loadingKanbanQueue && kanbanQueueSorted.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {kanbanQueueSorted.map((r) => {
+                  const st = String(
+                    r["Event Status"] ?? r["Status"] ?? r["Event status"] ?? ""
+                  )
+                    .trim()
+                    .toLowerCase();
+                  const isOpen = st === "open";
+                  const orderUrl = String(r["Order URL"] || "").trim();
+                  const buyUrl = /^https?:\/\//i.test(orderUrl) ? orderUrl : "";
+                  const name = (r["Item Name"] || "").trim() || "(unnamed)";
+                  const photo = (r["Photo URL"] || "").trim();
+                  const key =
+                    r["Event ID"] ||
+                    `${r["Kanban ID"] || ""}-${r["Timestamp"] || ""}-${name}`;
+
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 10px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 8,
+                        background: isOpen ? "rgba(254, 243, 199, 0.35)" : "#f8fafc",
+                      }}
+                    >
+                      {photo ? (
+                        <img
+                          src={photo}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          referrerPolicy="no-referrer"
+                          style={{
+                            width: 48,
+                            height: 48,
+                            objectFit: "cover",
+                            borderRadius: 8,
+                            border: "1px solid #e5e7eb",
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: 8,
+                            border: "1px dashed #e5e7eb",
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: "#9ca3af",
+                            fontSize: 10,
+                            textAlign: "center",
+                          }}
+                        >
+                          No photo
+                        </div>
+                      )}
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        {buyUrl ? (
+                          <a
+                            href={buyUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              fontWeight: 700,
+                              color: "#111827",
+                              textDecoration: "underline",
+                              fontSize: 13,
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {name}
+                          </a>
+                        ) : (
+                          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{name}</div>
+                        )}
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                          {isOpen ? "Needs order" : st === "ordered" ? "Ordered" : st || "—"}
+                          {r["SKU"] ? ` · ${r["SKU"]}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
