@@ -1,5 +1,5 @@
 // src/Overview.jsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { socket } from "./socketClient";
 import { supabase } from "./supabaseClient";
@@ -806,6 +806,7 @@ function col(width, center = false) {
   // Kanban queue (same data as Kanban Queue tab — consolidated summary)
   const [kanbanQueueRows, setKanbanQueueRows] = useState([]);
   const [loadingKanbanQueue, setLoadingKanbanQueue] = useState(true);
+  const [kanbanMarkingOverlay, setKanbanMarkingOverlay] = useState(null);
 
   const [selections, setSelections] = useState({});
   const [daysWindow, setDaysWindow] = useState("7");
@@ -1091,40 +1092,70 @@ function col(width, center = false) {
     return [...open, ...ordered];
   }, [kanbanQueueRows]);
 
-  useEffect(() => {
-    let alive = true;
-    const ctrl = new AbortController();
-
-    async function loadKanbanQueue() {
+  const fetchKanbanQueue = useCallback(
+    async ({ showLoading = true } = {}) => {
+      if (showLoading) setLoadingKanbanQueue(true);
       try {
-        setLoadingKanbanQueue(true);
         const res = await axios.get(`${ROOT}/kanban/queue`, {
           withCredentials: true,
-          signal: ctrl.signal,
           timeout: 20000,
         });
-        if (!alive) return;
         setKanbanQueueRows(Array.isArray(res.data?.rows) ? res.data.rows : []);
       } catch (e) {
-        if (axios.isCancel(e) || e?.name === "CanceledError" || e?.code === "ERR_CANCELED") return;
-        if (!alive) return;
         console.warn("Overview kanban queue fetch failed:", e);
         setKanbanQueueRows([]);
       } finally {
-        if (alive) setLoadingKanbanQueue(false);
+        if (showLoading) setLoadingKanbanQueue(false);
       }
-    }
+    },
+    [ROOT]
+  );
 
-    loadKanbanQueue();
-    const id = setInterval(loadKanbanQueue, 300000);
-    return () => {
-      alive = false;
+  useEffect(() => {
+    fetchKanbanQueue({ showLoading: true });
+    const id = setInterval(() => fetchKanbanQueue({ showLoading: false }), 300000);
+    return () => clearInterval(id);
+  }, [fetchKanbanQueue]);
+
+  const markKanbanOrdered = useCallback(
+    async (row) => {
+      const eventId =
+        row["Event ID"] ||
+        row["EventID"] ||
+        row["eventId"] ||
+        row["Event Id"] ||
+        row["ID"] ||
+        row["Id"] ||
+        "";
+      if (!String(eventId).trim()) {
+        alert("No Event ID on this row; cannot mark ordered.");
+        return;
+      }
+      const qtyStr =
+        row["Reorder Qty Basis"] || row["Reorder Qty"] || row["Event Qty"] || "1";
+      const orderedQty = Number(qtyStr) || 1;
+
+      setKanbanMarkingOverlay("Marking ordered…");
       try {
-        ctrl.abort();
-      } catch {}
-      clearInterval(id);
-    };
-  }, [ROOT]);
+        await axios.post(
+          `${ROOT}/kanban/ordered`,
+          { eventId: String(eventId).trim(), orderedQty, po: "N/A" },
+          { withCredentials: true, timeout: 30000 }
+        );
+        await fetchKanbanQueue({ showLoading: false });
+      } catch (e) {
+        const msg =
+          e?.response?.data?.error ||
+          e?.response?.data?.details ||
+          e?.message ||
+          String(e);
+        alert(`Could not mark ordered: ${msg}`);
+      } finally {
+        setKanbanMarkingOverlay(null);
+      }
+    },
+    [ROOT, fetchKanbanQueue]
+  );
 
   // Load vendor directory once
   useEffect(() => {
@@ -1435,9 +1466,6 @@ function col(width, center = false) {
     }
   }
 
-  // Departments (placeholder)
-  const departments = ["Digitizing", "Fur", "Cut", "Print", "Embroidery", "Sewing"];
-
   return (
     <div style={{ padding: 12 }}>
       <div
@@ -1449,7 +1477,7 @@ function col(width, center = false) {
           alignItems: "start", // keep columns from stretching to match heights
         }}
       >
-        {/* LEFT COLUMN: Performance Metrics + Department Status */}
+        {/* LEFT COLUMN: Performance Metrics, Materials, Kanban */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Performance Metrics (Headcovers / Day + Goal) */}
           <div
@@ -1561,28 +1589,6 @@ function col(width, center = false) {
               </div>
 
               </div>  {/* <-- closes the grid */}
-          </div>
-          {/* Department Status */}
-          <div
-            style={{
-              background: "#fff",
-              border: "1px solid #e5e7eb",
-              borderRadius: 10,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-              padding: 12,
-              overflow: "hidden",
-            }}
-          >
-            <div style={header}>Department Status</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
-              {["Digitizing", "Fur", "Cut", "Print", "Embroidery", "Sewing"].map((d, i) => (
-                <div key={i} style={{ border: "1px solid #eee", borderRadius: 10, padding: 10, minHeight: 72 }}>
-                  <div style={{ fontSize: 12, color: "#666" }}>{d}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700 }}>—</div>
-                  <div style={{ fontSize: 11, color: "#888" }}>calculating…</div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Materials To Order */}
@@ -1984,7 +1990,7 @@ function col(width, center = false) {
             </div>
           </div>
 
-          {/* Kanban queue — same items as Kanban Queue tab (photo, name, buy link) */}
+          {/* Kanban queue — same items as Kanban Queue tab (photo, qty, name, buy link, mark ordered) */}
           <div
             style={{
               background: "#fff",
@@ -1996,6 +2002,35 @@ function col(width, center = false) {
               position: "relative",
             }}
           >
+            {kanbanMarkingOverlay && (
+              <div
+                aria-live="assertive"
+                role="alert"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 2,
+                  background: "rgba(250, 204, 21, 0.45)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 10,
+                }}
+              >
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    background: "#fef3c7",
+                    border: "1px solid #f59e0b",
+                    fontWeight: 700,
+                    color: "#713f12",
+                  }}
+                >
+                  {kanbanMarkingOverlay}
+                </div>
+              </div>
+            )}
             <div
               style={{
                 ...header,
@@ -2015,7 +2050,7 @@ function col(width, center = false) {
               </a>
             </div>
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
-              Same rows as the Kanban Queue tab: photo, item name, and buy link when an order URL is set.
+              Open and ordered requests: quantity, photo, name, buy link when set. Mark ordered records the PO line on the sheet.
             </div>
             {loadingKanbanQueue && (
               <div style={{ fontSize: 12, color: "#9ca3af" }}>Loading Kanban…</div>
@@ -2036,6 +2071,13 @@ function col(width, center = false) {
                   const buyUrl = /^https?:\/\//i.test(orderUrl) ? orderUrl : "";
                   const name = (r["Item Name"] || "").trim() || "(unnamed)";
                   const photo = (r["Photo URL"] || "").trim();
+                  const qtyRaw =
+                    r["Event Qty"] ??
+                    r["Reorder Qty Basis"] ??
+                    r["Reorder Qty"] ??
+                    "";
+                  const qtyLabel =
+                    qtyRaw !== "" && qtyRaw != null ? String(qtyRaw).trim() : "—";
                   const key =
                     r["Event ID"] ||
                     `${r["Kanban ID"] || ""}-${r["Timestamp"] || ""}-${name}`;
@@ -2044,51 +2086,72 @@ function col(width, center = false) {
                     <div
                       key={key}
                       style={{
-                        display: "flex",
-                        alignItems: "center",
+                        display: "grid",
+                        gridTemplateColumns: "auto 1fr auto",
                         gap: 10,
+                        alignItems: "center",
                         padding: "8px 10px",
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
                         background: isOpen ? "rgba(254, 243, 199, 0.35)" : "#f8fafc",
                       }}
                     >
-                      {photo ? (
-                        <img
-                          src={photo}
-                          alt=""
-                          loading="lazy"
-                          decoding="async"
-                          referrerPolicy="no-referrer"
-                          style={{
-                            width: 48,
-                            height: 48,
-                            objectFit: "cover",
-                            borderRadius: 8,
-                            border: "1px solid #e5e7eb",
-                            flexShrink: 0,
-                          }}
-                        />
-                      ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        {photo ? (
+                          <img
+                            src={photo}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            referrerPolicy="no-referrer"
+                            style={{
+                              width: 48,
+                              height: 48,
+                              objectFit: "cover",
+                              borderRadius: 8,
+                              border: "1px solid #e5e7eb",
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 48,
+                              height: 48,
+                              borderRadius: 8,
+                              border: "1px dashed #e5e7eb",
+                              flexShrink: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: "#9ca3af",
+                              fontSize: 10,
+                              textAlign: "center",
+                            }}
+                          >
+                            No photo
+                          </div>
+                        )}
                         <div
+                          title={`Requested qty: ${qtyLabel}`}
                           style={{
-                            width: 48,
-                            height: 48,
+                            minWidth: 40,
+                            padding: "6px 8px",
                             borderRadius: 8,
-                            border: "1px dashed #e5e7eb",
-                            flexShrink: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "#9ca3af",
-                            fontSize: 10,
+                            background: isOpen ? "#fde68a" : "#e2e8f0",
+                            border: "1px solid #cbd5e1",
+                            fontSize: 14,
+                            fontWeight: 800,
+                            color: "#111827",
                             textAlign: "center",
+                            lineHeight: 1.1,
                           }}
                         >
-                          No photo
+                          <div style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}>Qty</div>
+                          {qtyLabel}
                         </div>
-                      )}
-                      <div style={{ minWidth: 0, flex: 1 }}>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
                         {buyUrl ? (
                           <a
                             href={buyUrl}
@@ -2112,6 +2175,30 @@ function col(width, center = false) {
                           {r["SKU"] ? ` · ${r["SKU"]}` : ""}
                         </div>
                       </div>
+                      <div style={{ justifySelf: "end" }}>
+                        {isOpen ? (
+                          <button
+                            type="button"
+                            onClick={() => markKanbanOrdered(r)}
+                            disabled={!!kanbanMarkingOverlay}
+                            style={{
+                              padding: "6px 10px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              borderRadius: 8,
+                              border: "1px solid #b45309",
+                              background: "#f59e0b",
+                              color: "#1c1917",
+                              cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            Mark ordered
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}> </span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -2120,8 +2207,32 @@ function col(width, center = false) {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Upcoming Jobs */}
+        {/* RIGHT COLUMN: Department Status, then Upcoming Jobs */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
+          {/* Department Status */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              minWidth: 0,
+            }}
+          >
+            <div style={header}>Department Status</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
+              {["Digitizing", "Fur", "Cut", "Print", "Embroidery", "Sewing"].map((d, i) => (
+                <div key={i} style={{ border: "1px solid #eee", borderRadius: 10, padding: 10, minHeight: 72 }}>
+                  <div style={{ fontSize: 12, color: "#666" }}>{d}</div>
+                  <div style={{ fontSize: 22, fontWeight: 700 }}>—</div>
+                  <div style={{ fontSize: 11, color: "#888" }}>calculating…</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Upcoming Jobs */}
           <div
             style={{
