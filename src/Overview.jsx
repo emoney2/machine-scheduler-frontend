@@ -1130,8 +1130,11 @@ function col(width, center = false) {
         row["ID"] ||
         row["Id"] ||
         (eventIdKey ? row[eventIdKey] : "");
-      if (!String(eventId).trim()) {
-        alert("No Event ID on this row; cannot mark ordered.");
+      const kanbanId = String(
+        row["Kanban ID"] || row["KanbanID"] || row["kanbanId"] || ""
+      ).trim();
+      if (!String(eventId).trim() && !kanbanId) {
+        alert("No Event ID or Kanban ID on this row; cannot mark ordered.");
         return;
       }
       const qtyStr =
@@ -1146,7 +1149,12 @@ function col(width, center = false) {
       try {
         await axios.post(
           `${ROOT}/kanban/ordered`,
-          { eventId: String(eventId).trim(), orderedQty, po: "N/A" },
+          {
+            eventId: String(eventId || "").trim(),
+            kanbanId,
+            orderedQty,
+            po: "N/A",
+          },
           { withCredentials: true, timeout: 30000 }
         );
         await fetchKanbanQueue({ showLoading: false });
@@ -1177,8 +1185,11 @@ function col(width, center = false) {
         row["ID"] ||
         row["Id"] ||
         (eventIdKey ? row[eventIdKey] : "");
-      if (!String(eventId).trim()) {
-        alert("No Event ID on this row; cannot mark received.");
+      const kanbanId = String(
+        row["Kanban ID"] || row["KanbanID"] || row["kanbanId"] || ""
+      ).trim();
+      if (!String(eventId).trim() && !kanbanId) {
+        alert("No Event ID or Kanban ID on this row; cannot mark received.");
         return;
       }
       const qtyStr =
@@ -1193,7 +1204,7 @@ function col(width, center = false) {
       try {
         await axios.post(
           `${ROOT}/kanban/received`,
-          { eventId: String(eventId).trim(), receivedQty },
+          { eventId: String(eventId || "").trim(), kanbanId, receivedQty },
           { withCredentials: true, timeout: 30000 }
         );
         await fetchKanbanQueue({ showLoading: false });
