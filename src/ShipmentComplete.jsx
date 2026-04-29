@@ -71,13 +71,13 @@ export default function ShipmentComplete() {
     try {
       const sid = String(state?.qbo_invoice_id ?? "").trim();
       const srealm = String(state?.qbo_realm_id ?? "").trim();
-      if (sid && srealm) {
-        txn = sid;
-        realm = srealm;
-        hintFromState = String(state?.invoiceUrl || "").trim();
-      } else if (qi && qr) {
+      if (qi && qr) {
         txn = qi;
         realm = qr;
+        hintFromState = String(state?.invoiceUrl || "").trim();
+      } else if (sid && srealm) {
+        txn = sid;
+        realm = srealm;
         hintFromState = String(state?.invoiceUrl || "").trim();
       } else {
         try {
@@ -146,6 +146,8 @@ export default function ShipmentComplete() {
     postShipQboClientLog([
       {
         message: "shipment_complete_mount",
+        qi_present: !!qi,
+        qr_present: !!qr,
         hasStateInvoice: !!(state?.invoiceUrl && String(state.invoiceUrl).trim()),
         resolvedInvoiceUrlLen: invoiceUrl.length,
         sessionStorageInvoiceLen: fromSession.trim().length,
@@ -202,6 +204,8 @@ export default function ShipmentComplete() {
               postShipQboClientLog([
                 {
                   message: "open_invoice_click",
+                  qi_present: !!qi,
+                  qr_present: !!qr,
                   invoiceHost: host,
                   txnId: txn,
                   companyId_param: company,

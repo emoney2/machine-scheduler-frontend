@@ -1151,6 +1151,18 @@ export default function Ship() {
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       let shipData;
       try {
+        postShipQboClientLog([
+          {
+            message: "process_shipment_client_send",
+            skip_invoice: mergedBody.skip_invoice,
+            skip_ups: mergedBody.skip_ups,
+            shipping_method: mergedBody.shipping_method,
+            service_code: mergedBody.service_code,
+            ups_purchased_rate: mergedBody.ups_purchased_rate,
+            package_count: Array.isArray(mergedBody.packages) ? mergedBody.packages.length : 0,
+            order_ids: mergedBody.order_ids,
+          },
+        ]);
         const shipRes = await fetch(`${API_BASE}/api/process-shipment`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1179,6 +1191,8 @@ export default function Ship() {
           open_slip_windows: shipData?.open_slip_windows,
           labels_copied_to_folder: shipData?.labels_copied_to_folder,
           tracking_numbers: shipData?.tracking_numbers,
+          qbo_invoice_id: shipData?.qbo_invoice_id,
+          qbo_realm_id: shipData?.qbo_realm_id,
           ...summarizeInvoiceForLog(
             shipData?.invoice && typeof shipData.invoice === "string"
               ? shipData.invoice
