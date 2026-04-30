@@ -2165,9 +2165,10 @@ function col(width, center = false) {
                           key={key}
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "auto 1fr auto",
+                            gridTemplateColumns: "minmax(0,1fr) auto",
+                            gridTemplateRows: "auto auto",
                             gap: 10,
-                            alignItems: "center",
+                            alignItems: "start",
                             padding: "8px 10px",
                             border: "1px solid #e5e7eb",
                             borderRadius: 8,
@@ -2229,7 +2230,7 @@ function col(width, center = false) {
                               {qtyLabel}
                             </div>
                           </div>
-                          <div style={{ minWidth: 0 }}>
+                          <div style={{ minWidth: 0, gridColumn: "1 / -1" }}>
                             {buyUrl ? (
                               <a
                                 href={buyUrl}
@@ -2240,13 +2241,27 @@ function col(width, center = false) {
                                   color: "#111827",
                                   textDecoration: "underline",
                                   fontSize: 13,
-                                  wordBreak: "break-word",
+                                  display: "block",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
                                 }}
                               >
                                 {name}
                               </a>
                             ) : (
-                              <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{name}</div>
+                              <div
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                                  color: "#111827",
+                                  whiteSpace: "nowrap",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                }}
+                              >
+                                {name}
+                              </div>
                             )}
                             <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
                               Needs order
@@ -2315,9 +2330,10 @@ function col(width, center = false) {
                       key={key}
                       style={{
                         display: "grid",
-                        gridTemplateColumns: "auto 1fr auto",
+                            gridTemplateColumns: "minmax(0,1fr) auto",
+                            gridTemplateRows: "auto auto",
                         gap: 10,
-                        alignItems: "center",
+                            alignItems: "start",
                         padding: "8px 10px",
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
@@ -2379,7 +2395,7 @@ function col(width, center = false) {
                           {qtyLabel}
                         </div>
                       </div>
-                      <div style={{ minWidth: 0 }}>
+                      <div style={{ minWidth: 0, gridColumn: "1 / -1" }}>
                         {buyUrl ? (
                           <a
                             href={buyUrl}
@@ -2390,13 +2406,27 @@ function col(width, center = false) {
                               color: "#111827",
                               textDecoration: "underline",
                               fontSize: 13,
-                              wordBreak: "break-word",
+                              display: "block",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
                           >
                             {name}
                           </a>
                         ) : (
-                          <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>{name}</div>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: "#111827",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {name}
+                          </div>
                         )}
                         <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
                           Ordered, waiting on delivery
