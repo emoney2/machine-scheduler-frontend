@@ -2164,18 +2164,26 @@ function col(width, center = false) {
                         <div
                           key={key}
                           style={{
-                            display: "grid",
-                            gridTemplateColumns: "minmax(0,1fr) auto",
-                            gridTemplateRows: "auto auto",
+                            display: "flex",
+                            flexDirection: "column",
                             gap: 10,
-                            alignItems: "start",
                             padding: "8px 10px",
                             border: "1px solid #e5e7eb",
                             borderRadius: 8,
                             background: isOpen ? "rgba(254, 243, 199, 0.35)" : "#f8fafc",
+                            minWidth: 0,
                           }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              justifyContent: "space-between",
+                              gap: 10,
+                              minWidth: 0,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
                             {photo ? (
                               <img
                                 src={photo}
@@ -2229,8 +2237,29 @@ function col(width, center = false) {
                               <div style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}>Qty</div>
                               {qtyLabel}
                             </div>
+                            </div>
+                            <div style={{ flexShrink: 0 }}>
+                            <button
+                              type="button"
+                              onClick={() => markKanbanOrdered(r)}
+                              disabled={!!kanbanMarkingOverlay}
+                              style={{
+                                padding: "6px 10px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                borderRadius: 8,
+                                border: "1px solid #b45309",
+                                background: "#f59e0b",
+                                color: "#1c1917",
+                                cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Mark ordered
+                            </button>
+                            </div>
                           </div>
-                          <div style={{ minWidth: 0, gridColumn: "1 / -1" }}>
+                          <div style={{ minWidth: 0 }}>
                             {buyUrl ? (
                               <a
                                 href={buyUrl}
@@ -2267,26 +2296,6 @@ function col(width, center = false) {
                               Needs order
                               {r["SKU"] ? ` · ${r["SKU"]}` : ""}
                             </div>
-                          </div>
-                          <div style={{ justifySelf: "end" }}>
-                            <button
-                              type="button"
-                              onClick={() => markKanbanOrdered(r)}
-                              disabled={!!kanbanMarkingOverlay}
-                              style={{
-                                padding: "6px 10px",
-                                fontSize: 11,
-                                fontWeight: 700,
-                                borderRadius: 8,
-                                border: "1px solid #b45309",
-                                background: "#f59e0b",
-                                color: "#1c1917",
-                                cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              Mark ordered
-                            </button>
                           </div>
                         </div>
                       );
@@ -2329,18 +2338,26 @@ function col(width, center = false) {
                     <div
                       key={key}
                       style={{
-                        display: "grid",
-                            gridTemplateColumns: "minmax(0,1fr) auto",
-                            gridTemplateRows: "auto auto",
+                        display: "flex",
+                        flexDirection: "column",
                         gap: 10,
-                            alignItems: "start",
                         padding: "8px 10px",
                         border: "1px solid #e5e7eb",
                         borderRadius: 8,
                         background: isOpen ? "rgba(254, 243, 199, 0.35)" : "#f8fafc",
+                        minWidth: 0,
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "space-between",
+                          gap: 10,
+                          minWidth: 0,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0, flex: "1 1 auto" }}>
                         {photo ? (
                           <img
                             src={photo}
@@ -2394,8 +2411,29 @@ function col(width, center = false) {
                           <div style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}>Qty</div>
                           {qtyLabel}
                         </div>
+                        </div>
+                        <div style={{ flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => markKanbanReceived(r)}
+                          disabled={!!kanbanMarkingOverlay}
+                          style={{
+                            padding: "6px 10px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                            borderRadius: 8,
+                            border: "1px solid #0369a1",
+                            background: "#38bdf8",
+                            color: "#082f49",
+                            cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Mark received
+                        </button>
+                        </div>
                       </div>
-                      <div style={{ minWidth: 0, gridColumn: "1 / -1" }}>
+                      <div style={{ minWidth: 0 }}>
                         {buyUrl ? (
                           <a
                             href={buyUrl}
@@ -2432,26 +2470,6 @@ function col(width, center = false) {
                           Ordered, waiting on delivery
                           {r["SKU"] ? ` · ${r["SKU"]}` : ""}
                         </div>
-                      </div>
-                      <div style={{ justifySelf: "end" }}>
-                        <button
-                          type="button"
-                          onClick={() => markKanbanReceived(r)}
-                          disabled={!!kanbanMarkingOverlay}
-                          style={{
-                            padding: "6px 10px",
-                            fontSize: 11,
-                            fontWeight: 700,
-                            borderRadius: 8,
-                            border: "1px solid #0369a1",
-                            background: "#38bdf8",
-                            color: "#082f49",
-                            cursor: kanbanMarkingOverlay ? "not-allowed" : "pointer",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          Mark received
-                        </button>
                       </div>
                     </div>
                   );
