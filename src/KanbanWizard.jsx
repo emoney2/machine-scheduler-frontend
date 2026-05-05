@@ -80,6 +80,17 @@ export default function KanbanWizard() {
   const [croppedImage, setCroppedImage] = useState(null);
   const cropImageRef = React.useRef(null);
   const [completedCrop, setCompletedCrop] = useState(null);
+  /** Step 2 field keys for inline validation messages */
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  function clearFieldError(key) {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
 
 function applyCrop() {
   if (!completedCrop || !cropImageRef.current) return;
@@ -108,6 +119,7 @@ function applyCrop() {
   const base64 = canvas.toDataURL("image/jpeg", 0.9);
   setPhotoUrl(base64);
   setCropModalOpen(false);
+  clearFieldError("photoUrl");
 }
 
 
@@ -168,8 +180,37 @@ function applyCrop() {
 
 
 
-  function next() { setStep((s) => Math.min(3, s + 1)); }
-  function back() { setStep((s) => Math.max(1, s - 1)); }
+  function next() {
+    if (step === 2) {
+      const errs = {};
+      if (orderMethod === "Online") {
+        if (!String(url).trim()) errs.url = "Product URL is required.";
+      } else {
+        if (!String(orderEmail).trim())
+          errs.orderEmail = "Contact info (email or phone) is required.";
+      }
+      if (!String(supplier).trim()) errs.supplier = "Vendor name is required.";
+      if (!String(itemName).trim()) errs.itemName = "Item name is required.";
+      if (!String(dept).trim()) errs.dept = "Dept is required.";
+      if (!String(location).trim()) errs.location = "Location is required.";
+      if (!String(packageSize).trim()) errs.packageSize = "Package size is required.";
+      if (!String(costPerPkg).trim()) errs.costPerPkg = "Cost (per pkg) is required.";
+      if (!String(photoUrl).trim())
+        errs.photoUrl = "A photo is required. Use the camera or paste an image URL.";
+
+      if (Object.keys(errs).length > 0) {
+        setFieldErrors(errs);
+        return;
+      }
+      setFieldErrors({});
+    }
+    setStep((s) => Math.min(3, s + 1));
+  }
+
+  function back() {
+    if (step === 3) setFieldErrors({});
+    setStep((s) => Math.max(1, s - 1));
+  }
 
   async function save() {
     if (!location || !location.trim()) {
@@ -323,6 +364,8 @@ function applyCrop() {
                    value={url}
                    setValue={setUrl}
                    placeholder="https://vendor.com/product"
+                   error={fieldErrors.url}
+                   onEdit={() => clearFieldError("url")}
                  />
                ) : (
                  <Field
@@ -330,6 +373,8 @@ function applyCrop() {
                    value={orderEmail}
                    setValue={setOrderEmail}
                    placeholder="purchasing@vendor.com or 555-123-4567"
+                   error={fieldErrors.orderEmail}
+                   onEdit={() => clearFieldError("orderEmail")}
                  />
                )}
 
@@ -337,12 +382,16 @@ function applyCrop() {
                  label="Vendor name (required)"
                  value={supplier}
                  setValue={setSupplier}
+                 error={fieldErrors.supplier}
+                 onEdit={() => clearFieldError("supplier")}
                />
 
                <Field
                  label="Item Name (required)"
                  value={itemName}
                  setValue={setItemName}
+                 error={fieldErrors.itemName}
+                 onEdit={() => clearFieldError("itemName")}
                />
 
                {/* PHOTO SECTION */}
@@ -355,6 +404,7 @@ function applyCrop() {
                      setPhotoUrl(img);
                      setCropSrc(img);
                      setCropModalOpen(true);
+                     clearFieldError("photoUrl");
                    }}
                  />
 
@@ -378,10 +428,14 @@ function applyCrop() {
                    onChange={(e) => {
                      setPhotoUrl(e.target.value);
                      setCameraImage(null);
+                     clearFieldError("photoUrl");
                    }}
                    placeholder="https://image..."
                    style={inp}
                  />
+                 {fieldErrors.photoUrl ? (
+                   <div style={{ color: "#b91c1c", fontSize: 13 }}>{fieldErrors.photoUrl}</div>
+                 ) : null}
 
                  {/* Preview */}
                  {photoUrl && (
@@ -400,10 +454,36 @@ function applyCrop() {
                  )}
                </div>
 
-               <Field label="Dept (required)" value={dept} setValue={setDept} />
-               <Select label="Location (required)" value={location} setValue={setLocation} options={LOCATIONS} />
-               <Field label="Package Size (required)" value={packageSize} setValue={setPackageSize} />
-               <Field label="Cost (per pkg) — required" value={costPerPkg} setValue={setCostPerPkg} mono />
+               <Field
+                 label="Dept (required)"
+                 value={dept}
+                 setValue={setDept}
+                 error={fieldErrors.dept}
+                 onEdit={() => clearFieldError("dept")}
+               />
+               <Select
+                 label="Location (required)"
+                 value={location}
+                 setValue={setLocation}
+                 options={LOCATIONS}
+                 error={fieldErrors.location}
+                 onEdit={() => clearFieldError("location")}
+               />
+               <Field
+                 label="Package Size (required)"
+                 value={packageSize}
+                 setValue={setPackageSize}
+                 error={fieldErrors.packageSize}
+                 onEdit={() => clearFieldError("packageSize")}
+               />
+               <Field
+                 label="Cost (per pkg) — required"
+                 value={costPerPkg}
+                 setValue={setCostPerPkg}
+                 mono
+                 error={fieldErrors.costPerPkg}
+                 onEdit={() => clearFieldError("costPerPkg")}
+               />
                <Field label="Category (optional)" value={category} setValue={setCategory} />
 
             </div>
@@ -455,17 +535,10 @@ function applyCrop() {
           <div style={{ display: "flex", gap: 10 }}>
               {step < 3 ? (
                 <button
+                  type="button"
                   onClick={next}
                   style={btnPrimary}
-                  disabled={
-                    (step === 2 &&
-                      (orderMethod === "Online"
-                        ? (!url || !supplier)
-                        : (!orderEmail || !supplier))) ||
-                    (step === 2 &&
-                      (!itemName || !dept || !packageSize || !costPerPkg || !photoUrl))
-                  }
-                  title="Complete required fields to continue"
+                  title="Continue to the next step"
                 >
                   Next
                 </button>
@@ -559,34 +632,55 @@ function canContinue() {
   return true;
 }
 
-function Field({ label, value, setValue, placeholder, mono }) {
+function Field({ label, value, setValue, placeholder, mono, error, onEdit }) {
   return (
     <label style={{ display: "grid", gap: 6 }}>
       <div style={{ fontWeight: 600 }}>{label}</div>
       <input
         value={value}
-        onChange={(e) => setValue(e.target.value)}
+        onChange={(e) => {
+          setValue(e.target.value);
+          onEdit?.();
+        }}
         placeholder={placeholder}
         style={{
           ...inp,
           fontFamily: mono
             ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
             : "inherit",
+          border: error ? "1px solid #fca5a5" : inp.border,
+          boxShadow: error ? "0 0 0 1px #fecaca" : undefined,
         }}
       />
+      {error ? (
+        <div style={{ color: "#b91c1c", fontSize: 13, lineHeight: 1.35 }}>{error}</div>
+      ) : null}
     </label>
   );
 }
 
-function Select({ label, value, setValue, options }) {
+function Select({ label, value, setValue, options, error, onEdit }) {
   return (
     <label style={{ display: "grid", gap: 6 }}>
       <div style={{ fontWeight: 600 }}>{label}</div>
-      <select value={value} onChange={(e) => setValue(e.target.value)} style={inp}>
+      <select
+        value={value}
+        onChange={(e) => {
+          setValue(e.target.value);
+          onEdit?.();
+        }}
+        style={{
+          ...inp,
+          ...(error ? { borderColor: "#fecaca", boxShadow: "0 0 0 1px #fecaca" } : {}),
+        }}
+      >
         {options.map((o) => (
           <option key={o} value={o}>{o}</option>
         ))}
       </select>
+      {error ? (
+        <div style={{ color: "#b91c1c", fontSize: 13, lineHeight: 1.35 }}>{error}</div>
+      ) : null}
     </label>
   );
 }
