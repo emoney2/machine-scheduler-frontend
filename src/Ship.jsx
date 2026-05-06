@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
@@ -22,6 +22,31 @@ function recordShipmentHistoryEntry(shipData, orderIds, jobs, companyHint) {
     trackingNumbers: tracking,
     labelUrls: Array.isArray(shipData?.labels) ? shipData.labels : [],
   });
+}
+
+/** Shopify retail rows (sheet + Company Name). */
+function getShopifyOrderId(job) {
+  const v = job?.["Shopify Order ID"] ?? job?.["Shopify ID"];
+  return String(v ?? "").trim();
+}
+
+function isShopifyJob(job) {
+  if (!job) return false;
+  if (getShopifyOrderId(job)) return true;
+  return /^shopify$/i.test(String(job["Company Name"] ?? "").trim());
+}
+
+/** Distinct numeric Shopify order IDs among selected production rows. */
+function getShopifyIdsForSelection(selectedIds, jobsList) {
+  const seen = new Set();
+  for (const id of selectedIds || []) {
+    const j = jobsList.find((x) => String(x.orderId) === String(id));
+    if (j && isShopifyJob(j)) {
+      const sid = getShopifyOrderId(j);
+      if (sid) seen.add(sid);
+    }
+  }
+  return [...seen];
 }
 
 function summarizeInvoiceForLog(inv) {
@@ -708,6 +733,20 @@ export default function Ship() {
   const upsFlowCreateInvoiceRef = useRef(true);
   const navigate = useNavigate();
 
+  /** Live Shopify Admin payload while shipping a retail order (shipping_lines refresh at ship time). */
+  const [shopifyLiveOrder, setShopifyLiveOrder] = useState(null);
+  const [shopifyLiveLoading, setShopifyLiveLoading] = useState(false);
+  const [shopifyLiveError, setShopifyLiveError] = useState("");
+
+  const selectedJobsForShip = useMemo(
+    () => jobs.filter((j) => selected.includes(j.orderId.toString())),
+    [jobs, selected]
+  );
+  const selectionIncludesShopify = useMemo(
+    () => selectedJobsForShip.some(isShopifyJob),
+    [selectedJobsForShip]
+  );
+
   // === useEffect 1: Initial load ===
   useEffect(() => {
     async function loadJobsForCompany(company) {
@@ -850,6 +889,53 @@ export default function Ship() {
   }, [companyInput, allCompanies]);
 
   // === End useEffect 2 ===
+
+  // Live Shopify order while “Select boxes” is open (checkout shipping may change up to ship time).
+  useEffect(() => {
+    if (!showBoxModal || !selectionIncludesShopify) {
+      setShopifyLiveOrder(null);
+      setShopifyLiveError("");
+      setShopifyLiveLoading(false);
+      return;
+    }
+    const ids = getShopifyIdsForSelection(selected, jobs);
+    if (ids.length !== 1) {
+      setShopifyLiveOrder(null);
+      setShopifyLiveError("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setShopifyLiveLoading(true);
+      setShopifyLiveError("");
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/shopify/admin/order?shopify_order_id=${encodeURIComponent(ids[0])}`,
+          { credentials: "include" }
+        );
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            data.error ||
+              data.hint ||
+              (typeof data.errors === "string" ? data.errors : "") ||
+              `HTTP ${res.status}`
+          );
+        }
+        if (!cancelled) setShopifyLiveOrder(data);
+      } catch (e) {
+        if (!cancelled) {
+          setShopifyLiveOrder(null);
+          setShopifyLiveError(e?.message || String(e));
+        }
+      } finally {
+        if (!cancelled) setShopifyLiveLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showBoxModal, selectionIncludesShopify, selected, jobs, API_BASE]);
 
   useEffect(() => {
     // 1) Retry any pending shipment
@@ -1134,12 +1220,19 @@ export default function Ship() {
 
   /** Shared POST /api/process-shipment + completion navigation. */
   const runShipmentCore = async (shipmentBody) => {
+    const oidList = [...(shipmentBody.order_ids || [])].map(String);
+    const jobsInvolved = jobs.filter((j) =>
+      oidList.includes(String(j.orderId))
+    );
+    const shipmentHasShopify = jobsInvolved.some(isShopifyJob);
+
     const mergedBody = {
       ...shipmentBody,
       skip_invoice:
-        shipmentBody.skip_invoice !== undefined
+        shipmentHasShopify ||
+        (shipmentBody.skip_invoice !== undefined
           ? Boolean(shipmentBody.skip_invoice)
-          : false,
+          : false),
     };
 
     openedOnceRef.current = false;
@@ -1284,6 +1377,55 @@ export default function Ship() {
       openResultsWindows(shipData);
       setTimeout(() => window.focus(), 500);
 
+      const tracks = shipData?.tracking_numbers;
+      if (
+        shipmentHasShopify &&
+        Array.isArray(tracks) &&
+        tracks.length > 0
+      ) {
+        const sidList = getShopifyIdsForSelection(
+          mergedBody.order_ids,
+          jobs
+        );
+        if (sidList.length === 1) {
+          try {
+            const res = await fetch(
+              `${API_BASE}/api/shopify/admin/fulfill`,
+              {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  shopify_order_id: sidList[0],
+                  tracking_numbers: tracks,
+                  notify_customer: true,
+                }),
+              }
+            );
+            const fd = await res.json().catch(() => ({}));
+            const adminUrl =
+              fd.admin_order_url || shopifyLiveOrder?.admin_order_url || "";
+            if (!res.ok) {
+              console.warn("Shopify fulfill:", fd);
+              alert(
+                fd.error ||
+                  (typeof fd.errors === "string" ? fd.errors : "") ||
+                  `Shopify fulfill failed (${res.status}). You can still fulfill and print the packing slip from Shopify admin.`
+              );
+            }
+            if (adminUrl) {
+              window.open(adminUrl, "_blank", "noopener,noreferrer");
+            }
+          } catch (fe) {
+            console.error(fe);
+            alert(
+              fe?.message ||
+                "Shopify fulfillment request failed. Add tracking in Shopify admin if needed."
+            );
+          }
+        }
+      }
+
       recordShipmentHistoryEntry(
         shipData,
         mergedBody.order_ids,
@@ -1319,6 +1461,10 @@ export default function Ship() {
   const handleBillOnly = async () => {
     if (selected.length === 0) {
       alert("Select at least one job to ship.");
+      return;
+    }
+    if (selectionIncludesShopify) {
+      alert("QuickBooks billing is not used for Shopify retail orders.");
       return;
     }
     await runShipmentCore({
@@ -1868,6 +2014,24 @@ export default function Ship() {
       alert("Select at least one job to ship.");
       return;
     }
+    const sj = jobs.filter((j) => selected.includes(j.orderId.toString()));
+    const anyShopify = sj.some(isShopifyJob);
+    const allShopify = sj.length > 0 && sj.every(isShopifyJob);
+    if (anyShopify && !allShopify) {
+      alert(
+        "Cannot mix Shopify retail jobs with wholesale jobs in one shipment. Ship them separately."
+      );
+      return;
+    }
+    if (anyShopify) {
+      const sids = getShopifyIdsForSelection(selected, jobs);
+      if (sids.length !== 1) {
+        alert(
+          "Select rows from exactly one Shopify order (they must share the same Shopify Order ID)."
+        );
+        return;
+      }
+    }
     upsFlowCreateInvoiceRef.current = Boolean(createInvoice);
     setBoxCounts(initialBoxCounts());
     setCustomBoxes([]);
@@ -1904,7 +2068,9 @@ export default function Ship() {
     const summary = summaryForShipmentApi(
       buildBoxesSummary(boxCounts, customBoxes)
     );
-    const skipInv = !upsFlowCreateInvoiceRef.current;
+    const skipInv = selectionIncludesShopify
+      ? true
+      : !upsFlowCreateInvoiceRef.current;
     const shipToOverride = oneTimeShipAddress ? { ...oneTimeShipAddress } : null;
     const isManualRate =
       SKIP_UPS ||
@@ -2322,8 +2488,16 @@ export default function Ship() {
             type="button"
             onClick={() => openShipBoxModal(false)}
             disabled={isShippingOverlay || loading}
-            aria-label="Ship with UPS: labels and packing slip, no QuickBooks invoice"
-            title="Ship with UPS: labels and packing slip, no QuickBooks invoice"
+            aria-label={
+              selectionIncludesShopify
+                ? "Ship Shopify order with UPS: labels, then tracking in Shopify (no QuickBooks)"
+                : "Ship with UPS: labels and packing slip, no QuickBooks invoice"
+            }
+            title={
+              selectionIncludesShopify
+                ? "Ship Shopify order with UPS: labels, then tracking in Shopify (no QuickBooks)"
+                : "Ship with UPS: labels and packing slip, no QuickBooks invoice"
+            }
             style={{
               width: 112,
               height: 112,
@@ -2347,64 +2521,74 @@ export default function Ship() {
               style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
             />
           </button>
-          <button
-            type="button"
-            onClick={() => openShipBoxModal(true)}
-            disabled={isShippingOverlay || loading}
-            aria-label="Ship with UPS and bill in QuickBooks"
-            title="Ship with UPS and bill in QuickBooks"
-            style={{
-              width: 112,
-              height: 112,
-              borderRadius: 14,
-              border: "2px solid #2e7d32",
-              background: "linear-gradient(180deg, #fafafa 0%, #e8f5e9 100%)",
-              boxShadow: "0 4px 14px rgba(46,125,50,0.22)",
-              cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
-              opacity: (isShippingOverlay || loading) ? 0.55 : 1,
-              padding: 8,
-              boxSizing: "border-box",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <img
-              src={SHIP_ICON_SHIP_AND_BILL}
-              alt=""
-              draggable={false}
-              style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
-            />
-          </button>
-          <button
-            type="button"
-            onClick={handleBillOnly}
-            disabled={isShippingOverlay || loading}
-            aria-label="Bill only in QuickBooks: invoice and packing slip, no UPS"
-            title="Bill only in QuickBooks: invoice and packing slip, no UPS"
-            style={{
-              width: 112,
-              height: 112,
-              borderRadius: 14,
-              border: "2px solid #78909c",
-              background: "linear-gradient(180deg, #fff 0%, #eceff1 100%)",
-              boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
-              cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
-              opacity: (isShippingOverlay || loading) ? 0.55 : 1,
-              padding: 8,
-              boxSizing: "border-box",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <img
-              src={SHIP_ICON_BILL_ONLY}
-              alt=""
-              draggable={false}
-              style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
-            />
-          </button>
+          {!selectionIncludesShopify && (
+            <button
+              type="button"
+              onClick={() => openShipBoxModal(true)}
+              disabled={isShippingOverlay || loading}
+              aria-label="Ship with UPS and bill in QuickBooks"
+              title="Ship with UPS and bill in QuickBooks"
+              style={{
+                width: 112,
+                height: 112,
+                borderRadius: 14,
+                border: "2px solid #2e7d32",
+                background: "linear-gradient(180deg, #fafafa 0%, #e8f5e9 100%)",
+                boxShadow: "0 4px 14px rgba(46,125,50,0.22)",
+                cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
+                opacity: (isShippingOverlay || loading) ? 0.55 : 1,
+                padding: 8,
+                boxSizing: "border-box",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <img
+                src={SHIP_ICON_SHIP_AND_BILL}
+                alt=""
+                draggable={false}
+                style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
+              />
+            </button>
+          )}
+          {!selectionIncludesShopify && (
+            <button
+              type="button"
+              onClick={handleBillOnly}
+              disabled={isShippingOverlay || loading}
+              aria-label="Bill only in QuickBooks: invoice and packing slip, no UPS"
+              title="Bill only in QuickBooks: invoice and packing slip, no UPS"
+              style={{
+                width: 112,
+                height: 112,
+                borderRadius: 14,
+                border: "2px solid #78909c",
+                background: "linear-gradient(180deg, #fff 0%, #eceff1 100%)",
+                boxShadow: "0 2px 10px rgba(0,0,0,0.08)",
+                cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
+                opacity: (isShippingOverlay || loading) ? 0.55 : 1,
+                padding: 8,
+                boxSizing: "border-box",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <img
+                src={SHIP_ICON_BILL_ONLY}
+                alt=""
+                draggable={false}
+                style={{ width: 88, height: 88, objectFit: "contain", pointerEvents: "none", userSelect: "none" }}
+              />
+            </button>
+          )}
+          {selectionIncludesShopify && (
+            <span style={{ fontSize: 13, color: "#1565c0", maxWidth: 420, lineHeight: 1.35 }}>
+              Shopify retail: no QuickBooks. UPS labels first — then we attach tracking in Shopify and open the admin order so you can use{" "}
+              <strong>Print → Print packing slip</strong>.
+            </span>
+          )}
         </div>
       )}
 
@@ -2449,6 +2633,46 @@ export default function Ship() {
                 <> · <strong>{hardSoftSummarySelected}</strong></>
               ) : null}
             </p>
+            {selectionIncludesShopify && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #90caf9",
+                  background: "#e3f2fd",
+                  fontSize: 12,
+                  color: "#0d47a1",
+                  lineHeight: 1.4,
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 4 }}>Live Shopify checkout shipping</div>
+                {shopifyLiveLoading && <div>Loading current shipping from Shopify…</div>}
+                {shopifyLiveError && (
+                  <div style={{ color: "#b71c1c" }}>
+                    Could not load Shopify order: {shopifyLiveError}
+                  </div>
+                )}
+                {!shopifyLiveLoading &&
+                  !shopifyLiveError &&
+                  Array.isArray(shopifyLiveOrder?.shipping_lines) &&
+                  shopifyLiveOrder.shipping_lines.length > 0 &&
+                  shopifyLiveOrder.shipping_lines.map((sl, i) => (
+                    <div key={i}>
+                      {(sl.title || sl.source || "Shipping").trim()}
+                      {sl.price != null && sl.price !== ""
+                        ? ` — ${typeof sl.price === "string" ? sl.price : `$${Number(sl.price).toFixed(2)}`}`
+                        : ""}
+                    </div>
+                  ))}
+                {!shopifyLiveLoading &&
+                  !shopifyLiveError &&
+                  (!shopifyLiveOrder?.shipping_lines ||
+                    shopifyLiveOrder.shipping_lines.length === 0) && (
+                  <div>No shipping lines on the Shopify order (verify Admin API credentials).</div>
+                )}
+              </div>
+            )}
             <div
               style={{
                 display: "grid",
