@@ -813,6 +813,11 @@ function col(width, center = false) {
   const overviewCtrlRef = useRef(null);
   const fetchLockRef = useRef(false);      // prevents re-entrant loadFresh()
   const lastFetchAtRef = useRef(0);        // debounce rapid triggers
+  /** Set in overview useEffect — call with { bypassDebounce: true } after manual rebuild */
+  const refreshOverviewRef = useRef(null);
+
+  const [rebuildingMaterials, setRebuildingMaterials] = useState(false);
+  const [materialsRebuildErr, setMaterialsRebuildErr] = useState(null);
 
   const vendorsCtrlRef = useRef(null);
   const vendorsLockRef = useRef(false);
@@ -885,14 +890,21 @@ function col(width, center = false) {
     }
 
     // 2) Fetch fresh in background (stale-while-revalidate)
-    async function loadFresh() {
-      // ⛔ Debounce: skip if last fetch < 5s ago
-      const now = Date.now();
-      if (now - (lastFetchAtRef.current || 0) < 5000) return;
-      lastFetchAtRef.current = now;
+    async function loadFresh(opts = {}) {
+      const bypassDebounce = !!(opts && opts.bypassDebounce);
+      // ⛔ Debounce: skip if last fetch < 5s ago (unless rebuilding / explicit refresh)
+      const nowTs = Date.now();
+      if (!bypassDebounce && nowTs - (lastFetchAtRef.current || 0) < 5000) return;
+      lastFetchAtRef.current = nowTs;
 
-      // 🔒 Single-flight: if already fetching, do nothing
-      if (fetchLockRef.current) return;
+      // 🔒 Single-flight — unless this is an explicit refresh (e.g. after rebuild): then wait briefly
+      if (fetchLockRef.current) {
+        if (!bypassDebounce) return;
+        for (let i = 0; i < 300 && fetchLockRef.current; i++) {
+          await new Promise((r) => setTimeout(r, 100)); // ≤ ~30s
+        }
+        if (fetchLockRef.current) return;
+      }
       fetchLockRef.current = true;
 
       // Only show loading if we don't have cached data to display
@@ -1022,11 +1034,13 @@ function col(width, center = false) {
       }
     }
 
+    refreshOverviewRef.current = (o) => loadFresh(o || {});
+
     // ✅ Fire once on mount so we don’t sit on “Loading…” when there’s no cache
     loadFresh();
 
     // slow safety poll (5 minutes)
-    const id = setInterval(loadFresh, 300000);
+    const id = setInterval(() => loadFresh(), 300000);
 
     // refresh when backend emits updates (debounced 1s)
     const debounced = (() => {
@@ -1055,6 +1069,7 @@ function col(width, center = false) {
 
     return () => {
       alive = false;
+      refreshOverviewRef.current = null;
       try { overviewCtrlRef.current?.abort(); } catch {}
       clearInterval(id);
       if (socket) {
@@ -1066,6 +1081,38 @@ function col(width, center = false) {
       window.removeEventListener("materialsOrdered", handleMaterialsOrdered);
     };
   }, [daysWindow]);
+
+  const recalculateMaterialsToOrder = useCallback(async () => {
+    setMaterialsRebuildErr(null);
+    setRebuildingMaterials(true);
+    setLoadingMaterials(true);
+    try {
+      await axios.post(
+        `${ROOT}/overview/rebuild-materials`,
+        {},
+        {
+          withCredentials: true,
+          timeout: 270000,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+      try {
+        localStorage.removeItem(LS_OVERVIEW_KEY);
+      } catch {}
+      const rf = refreshOverviewRef.current;
+      if (typeof rf === "function") await rf({ bypassDebounce: true });
+    } catch (err) {
+      const body = err?.response?.data;
+      const msg =
+        (body && (body.error || body.message)) ||
+        err?.message ||
+        String(err);
+      setMaterialsRebuildErr(msg);
+    } finally {
+      setRebuildingMaterials(false);
+      setLoadingMaterials(false);
+    }
+  }, [ROOT]);
 
   // Kanban queue summary (GET /api/kanban/queue — same payload as Kanban Queue tab)
   const kanbanQueueGrouped = useMemo(() => {
@@ -1673,7 +1720,31 @@ function col(width, center = false) {
               <span style={subtleUpdatedStyle}>
                 {lastUpdated ? `Updated ${formatClock(lastUpdated)} · ${timeAgo(lastUpdated)}` : "Loading…"}
               </span>
+              <button
+                type="button"
+                onClick={() => recalculateMaterialsToOrder()}
+                disabled={rebuildingMaterials || loadingMaterials}
+                title="Runs the sheet script that rebuilds Overview columns M and N, then refreshes this list"
+                style={{
+                  marginLeft: "auto",
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  background: rebuildingMaterials || loadingMaterials ? "#f3f4f6" : "#fff",
+                  color: "#111827",
+                  cursor: rebuildingMaterials || loadingMaterials ? "not-allowed" : "pointer",
+                }}
+              >
+                {rebuildingMaterials ? "Recalculating…" : "Recalculate lists"}
+              </button>
             </div>
+            {materialsRebuildErr ? (
+              <div style={{ fontSize: 12, color: "#b45309", marginTop: 6 }} role="alert">
+                {materialsRebuildErr}
+              </div>
+            ) : null}
 
             {/* Yellow transparent overlay while loading this block */}
             {loadingMaterials && (
