@@ -55,6 +55,75 @@ function extractOrderNumbersFromSubmitResponse(data) {
   return { primary: p, back: b };
 }
 
+function extractPrimaryFileIdFromSubmitResponse(data) {
+  if (!data || typeof data !== "object") return null;
+  const d = data.data && typeof data.data === "object" ? data.data : data;
+  const raw = d.primaryFileId ?? d.primary_file_id ?? d.fileId;
+  if (raw != null && String(raw).trim() !== "") return String(raw).trim();
+  return null;
+}
+
+/** Same-origin API path for Drive thumbnail proxy (works with <img src>). */
+function driveThumbnailSrc(fileId) {
+  if (!fileId) return "";
+  const root = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+  return `${root}/drive/thumbnail?fileId=${encodeURIComponent(fileId)}&sz=w120`;
+}
+
+function extractDriveIdFromAny(link) {
+  if (!link || typeof link !== "string") return null;
+  const m =
+    link.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/) ||
+    link.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Tiny JPEG for localStorage when API did not return primaryFileId (older backend).
+ */
+function compressBlobPreviewToDataUrl(blobUrl, maxSide = 96, maxLen = 96000) {
+  return new Promise((resolve) => {
+    if (!blobUrl || typeof blobUrl !== "string") {
+      resolve(null);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        if (!w || !h) {
+          resolve(null);
+          return;
+        }
+        const scale = Math.min(1, maxSide / Math.max(w, h));
+        const cw = Math.max(1, Math.round(w * scale));
+        const ch = Math.max(1, Math.round(h * scale));
+        const c = document.createElement("canvas");
+        c.width = cw;
+        c.height = ch;
+        const ctx = c.getContext("2d");
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, cw, ch);
+        let q = 0.72;
+        let dataUrl = c.toDataURL("image/jpeg", q);
+        while (dataUrl.length > maxLen && q > 0.38) {
+          q -= 0.06;
+          dataUrl = c.toDataURL("image/jpeg", q);
+        }
+        resolve(dataUrl.length <= maxLen ? dataUrl : null);
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = blobUrl;
+  });
+}
+
 export default function OrderSubmission() {
   const [form, setForm] = useState({
     company: "",
@@ -96,6 +165,15 @@ export default function OrderSubmission() {
   const [lastAcceptedCustomerJob, setLastAcceptedCustomerJob] = useState(() =>
     loadLastAcceptedCustomerJob()
   );
+  const [lastJobThumbFailed, setLastJobThumbFailed] = useState(false);
+
+  useEffect(() => {
+    setLastJobThumbFailed(false);
+  }, [
+    lastAcceptedCustomerJob?.orderNumber,
+    lastAcceptedCustomerJob?.previewFileId,
+    lastAcceptedCustomerJob?.thumbDataUrl,
+  ]);
 
   useEffect(() => {
     const syncFromStorage = () => {
@@ -904,6 +982,16 @@ const submitForm = async () => {
     // ⬇️ keep the response so we can use any returned IDs/fields
     const { data } = await axios.post(submitUrl, fd, config);
 
+    let previewFileId =
+      extractPrimaryFileIdFromSubmitResponse(data) ||
+      extractDriveIdFromAny(reorderData?.previewUrl || "") ||
+      extractDriveIdFromAny(form?.prodLink || "");
+
+    let thumbDataUrl = null;
+    if (!previewFileId && prodPreviews.length > 0 && prodPreviews[0]?.url) {
+      thumbDataUrl = await compressBlobPreviewToDataUrl(prodPreviews[0].url);
+    }
+
     const { primary: ordPrimary, back: ordBack } = extractOrderNumbersFromSubmitResponse(data);
     if (!ordPrimary) {
       console.warn(
@@ -920,6 +1008,8 @@ const submitForm = async () => {
         designName: String(form.designName || "").trim(),
         product: String(form.product || "").trim(),
         quantity: String(form.quantity || "").trim(),
+        ...(previewFileId ? { previewFileId } : {}),
+        ...(thumbDataUrl ? { thumbDataUrl } : {}),
       };
       setLastAcceptedCustomerJob(snap);
       saveLastAcceptedCustomerJob(snap);
@@ -1366,6 +1456,27 @@ const handleSaveNewCompany = async () => {
         <span style={{ fontWeight: 700, color: "#374151", flexShrink: 0 }}>🛒 Last job</span>
         {lastAcceptedCustomerJob ? (
           <>
+            {!lastJobThumbFailed &&
+              (lastAcceptedCustomerJob.previewFileId || lastAcceptedCustomerJob.thumbDataUrl) && (
+                <img
+                  alt=""
+                  src={
+                    lastAcceptedCustomerJob.previewFileId
+                      ? driveThumbnailSrc(lastAcceptedCustomerJob.previewFileId)
+                      : lastAcceptedCustomerJob.thumbDataUrl
+                  }
+                  onError={() => setLastJobThumbFailed(true)}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    objectFit: "contain",
+                    borderRadius: 6,
+                    border: "1px solid #e5e7eb",
+                    flexShrink: 0,
+                    background: "#f3f4f6",
+                  }}
+                />
+              )}
             <span style={{ color: "#111827", fontWeight: 700, flexShrink: 0 }}>
               #{lastAcceptedCustomerJob.orderNumber}
               {lastAcceptedCustomerJob.backOrderNumber
