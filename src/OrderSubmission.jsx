@@ -1425,7 +1425,7 @@ const handleSaveNewCompany = async () => {
 
   return (
     <>
-      {/* Slim horizontal “cart” strip — always visible; sticky under app chrome when scrolling */}
+      {/* Last submitted order — production preview thumbnail + summary; sticky when scrolling */}
       <div
         role="region"
         aria-label="Last submitted production order"
@@ -1453,13 +1453,12 @@ const handleSaveNewCompany = async () => {
             : "Submit an order once to see the last job # here"
         }
       >
-        <span style={{ fontWeight: 700, color: "#374151", flexShrink: 0 }}>🛒 Last job</span>
         {lastAcceptedCustomerJob ? (
           <>
             {!lastJobThumbFailed &&
               (lastAcceptedCustomerJob.previewFileId || lastAcceptedCustomerJob.thumbDataUrl) && (
                 <img
-                  alt=""
+                  alt="Production file preview for last submitted order"
                   src={
                     lastAcceptedCustomerJob.previewFileId
                       ? driveThumbnailSrc(lastAcceptedCustomerJob.previewFileId)
@@ -1467,8 +1466,8 @@ const handleSaveNewCompany = async () => {
                   }
                   onError={() => setLastJobThumbFailed(true)}
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: 48,
+                    height: 48,
                     objectFit: "contain",
                     borderRadius: 6,
                     border: "1px solid #e5e7eb",
