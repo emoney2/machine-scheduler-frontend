@@ -10,22 +10,49 @@ const LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY = "jrco.last_accepted_customer_job.v1";
 
 function loadLastAcceptedCustomerJob() {
   try {
-    const raw = localStorage.getItem(LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed;
+    for (const store of [localStorage, sessionStorage]) {
+      const raw = store.getItem(LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return parsed;
+    }
   } catch {
     return null;
   }
+  return null;
 }
 
 function saveLastAcceptedCustomerJob(job) {
+  const payload = JSON.stringify(job);
   try {
-    localStorage.setItem(LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY, JSON.stringify(job));
+    localStorage.setItem(LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY, payload);
   } catch {
     // ignore quota / private mode
   }
+  try {
+    sessionStorage.setItem(LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY, payload);
+  } catch {
+    // ignore
+  }
+}
+
+/** Normalize varied /submit JSON shapes (axios unwraps response.data). */
+function extractOrderNumbersFromSubmitResponse(data) {
+  if (!data || typeof data !== "object") return { primary: null, back: null };
+  const d = data.data && typeof data.data === "object" ? data.data : data;
+  const primary =
+    d.order ??
+    d.orderNumber ??
+    d.order_no ??
+    d.orderNum ??
+    (d.result && typeof d.result === "object" ? d.result.order : undefined);
+  const back =
+    d.back_order ?? d.backOrder ?? d.backOrderNumber ?? (d.result && d.result.back_order);
+  const p =
+    primary != null && String(primary).trim() !== "" ? String(primary).trim() : null;
+  const b =
+    back != null && String(back).trim() !== "" ? String(back).trim() : null;
+  return { primary: p, back: b };
 }
 
 export default function OrderSubmission() {
@@ -69,6 +96,22 @@ export default function OrderSubmission() {
   const [lastAcceptedCustomerJob, setLastAcceptedCustomerJob] = useState(() =>
     loadLastAcceptedCustomerJob()
   );
+
+  useEffect(() => {
+    const syncFromStorage = () => {
+      const j = loadLastAcceptedCustomerJob();
+      setLastAcceptedCustomerJob(j);
+    };
+    window.addEventListener("storage", syncFromStorage);
+    const onVis = () => {
+      if (document.visibilityState === "visible") syncFromStorage();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("storage", syncFromStorage);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
 
   // NEW: loading flags for catalog fetches
   const [loadingDirectory, setLoadingDirectory] = useState(false);
@@ -861,15 +904,18 @@ const submitForm = async () => {
     // ⬇️ keep the response so we can use any returned IDs/fields
     const { data } = await axios.post(submitUrl, fd, config);
 
-    const primaryOrder = data?.order ?? data?.orderNumber;
-    if (primaryOrder != null && String(primaryOrder).trim() !== "") {
+    const { primary: ordPrimary, back: ordBack } = extractOrderNumbersFromSubmitResponse(data);
+    if (!ordPrimary) {
+      console.warn(
+        "[OrderSubmission] Submit succeeded but no order # parsed from response; check backend JSON keys.",
+        data
+      );
+    }
+    if (ordPrimary) {
       const snap = {
         acceptedAt: new Date().toISOString(),
-        orderNumber: String(primaryOrder).trim(),
-        backOrderNumber:
-          data?.back_order != null && String(data.back_order).trim() !== ""
-            ? String(data.back_order).trim()
-            : "",
+        orderNumber: ordPrimary,
+        backOrderNumber: ordBack || "",
         company: String(form.company || "").trim(),
         designName: String(form.designName || "").trim(),
         product: String(form.product || "").trim(),
@@ -1289,50 +1335,68 @@ const handleSaveNewCompany = async () => {
 
   return (
     <>
-      {lastAcceptedCustomerJob && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 10px",
-            margin: "0 0 10px 0",
-            border: "1px solid #e5e7eb",
-            borderRadius: 8,
-            background: "#f9fafb",
-            fontSize: 11,
-            whiteSpace: "nowrap",
-            overflowX: "auto",
-          }}
-          title="Most recent customer job accepted from Order Submission (Production Orders)"
-        >
-          <span style={{ fontWeight: 700, color: "#374151" }}>Last accepted job:</span>
-          <span style={{ color: "#111827", fontWeight: 600 }}>
-            #{lastAcceptedCustomerJob.orderNumber}
-            {lastAcceptedCustomerJob.backOrderNumber
-              ? ` / #${lastAcceptedCustomerJob.backOrderNumber}`
-              : ""}
+      {/* Slim horizontal “cart” strip — always visible; sticky under app chrome when scrolling */}
+      <div
+        role="region"
+        aria-label="Last submitted production order"
+        style={{
+          position: "sticky",
+          top: 4,
+          zIndex: 900,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          minHeight: 34,
+          padding: "4px 12px",
+          margin: "0 0 8px 0",
+          border: "1px solid #e5e7eb",
+          borderRadius: 6,
+          background: "#fff",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+          fontSize: 12,
+          whiteSpace: "nowrap",
+          overflowX: "auto",
+        }}
+        title={
+          lastAcceptedCustomerJob
+            ? "Most recent job submitted from this page (saved in this browser)"
+            : "Submit an order once to see the last job # here"
+        }
+      >
+        <span style={{ fontWeight: 700, color: "#374151", flexShrink: 0 }}>🛒 Last job</span>
+        {lastAcceptedCustomerJob ? (
+          <>
+            <span style={{ color: "#111827", fontWeight: 700, flexShrink: 0 }}>
+              #{lastAcceptedCustomerJob.orderNumber}
+              {lastAcceptedCustomerJob.backOrderNumber
+                ? ` · #${lastAcceptedCustomerJob.backOrderNumber}`
+                : ""}
+            </span>
+            <span style={{ color: "#6b7280", flexShrink: 0 }}>
+              {lastAcceptedCustomerJob.company || "—"}
+            </span>
+            <span style={{ color: "#4b5563" }}>
+              {lastAcceptedCustomerJob.designName
+                ? `${lastAcceptedCustomerJob.designName} · `
+                : ""}
+              {lastAcceptedCustomerJob.product || "—"}
+              {lastAcceptedCustomerJob.quantity
+                ? ` · qty ${lastAcceptedCustomerJob.quantity}`
+                : ""}
+            </span>
+            <span style={{ color: "#9ca3af", marginLeft: "auto", flexShrink: 0 }}>
+              {(() => {
+                const ms = Date.parse(lastAcceptedCustomerJob.acceptedAt || "");
+                return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "";
+              })()}
+            </span>
+          </>
+        ) : (
+          <span style={{ color: "#9ca3af", fontSize: 11 }}>
+            No submission recorded in this browser yet — after you submit, order # and details appear here.
           </span>
-          <span style={{ color: "#6b7280" }}>
-            {lastAcceptedCustomerJob.company || "—"}
-          </span>
-          <span style={{ color: "#4b5563" }}>
-            {lastAcceptedCustomerJob.designName
-              ? `${lastAcceptedCustomerJob.designName} · `
-              : ""}
-            {lastAcceptedCustomerJob.product || "—"}
-            {lastAcceptedCustomerJob.quantity
-              ? ` · qty ${lastAcceptedCustomerJob.quantity}`
-              : ""}
-          </span>
-          <span style={{ color: "#9ca3af" }}>
-            {(() => {
-              const ms = Date.parse(lastAcceptedCustomerJob.acceptedAt || "");
-              return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "";
-            })()}
-          </span>
-        </div>
-      )}
+        )}
+      </div>
       {isLoadingCatalog && (
         <div
           style={{
