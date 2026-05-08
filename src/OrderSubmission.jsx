@@ -6,6 +6,28 @@ import { useNavigate } from "react-router-dom";
 
 const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
+const LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY = "jrco.last_accepted_customer_job.v1";
+
+function loadLastAcceptedCustomerJob() {
+  try {
+    const raw = localStorage.getItem(LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveLastAcceptedCustomerJob(job) {
+  try {
+    localStorage.setItem(LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY, JSON.stringify(job));
+  } catch {
+    // ignore quota / private mode
+  }
+}
+
 export default function OrderSubmission() {
   const [form, setForm] = useState({
     company: "",
@@ -44,6 +66,9 @@ export default function OrderSubmission() {
   const [printFilesLoading, setPrintFilesLoading] = useState(false);
   const [overlayVisibleOnce, setOverlayVisibleOnce] = useState(false);
   const [hasStartedLoadingFiles, setHasStartedLoadingFiles] = useState(false);
+  const [lastAcceptedCustomerJob, setLastAcceptedCustomerJob] = useState(() =>
+    loadLastAcceptedCustomerJob()
+  );
 
   // NEW: loading flags for catalog fetches
   const [loadingDirectory, setLoadingDirectory] = useState(false);
@@ -836,9 +861,27 @@ const submitForm = async () => {
     // ⬇️ keep the response so we can use any returned IDs/fields
     const { data } = await axios.post(submitUrl, fd, config);
 
+    const primaryOrder = data?.order ?? data?.orderNumber;
+    if (primaryOrder != null && String(primaryOrder).trim() !== "") {
+      const snap = {
+        acceptedAt: new Date().toISOString(),
+        orderNumber: String(primaryOrder).trim(),
+        backOrderNumber:
+          data?.back_order != null && String(data.back_order).trim() !== ""
+            ? String(data.back_order).trim()
+            : "",
+        company: String(form.company || "").trim(),
+        designName: String(form.designName || "").trim(),
+        product: String(form.product || "").trim(),
+        quantity: String(form.quantity || "").trim(),
+      };
+      setLastAcceptedCustomerJob(snap);
+      saveLastAcceptedCustomerJob(snap);
+    }
+
     // ⬇️ If backend returns a Drive fileId for the primary production file,
     // write the Preview cell formula immediately (so the sheet shows the thumbnail now).
-    if (data?.primaryFileId && data?.orderNumber) {
+    if (data?.primaryFileId && (data?.orderNumber ?? data?.order)) {
       const f = buildPreviewFormulaFromId(data.primaryFileId);
       try {
         try {
@@ -852,9 +895,10 @@ const submitForm = async () => {
 
           const fileId = fromFormula || fromProdLink;
           if (fileId) {
+            const ordKey = String(data.orderNumber ?? data.order ?? "");
             await axios.post(
               `${API_ROOT}/drive/warmThumbnails`,
-              { pairs: [ { id: fileId, v: String(data.orderNumber), sz: "w160" } ] },
+              { pairs: [ { id: fileId, v: ordKey, sz: "w160" } ] },
               { withCredentials: true }
             );
           }
@@ -1245,6 +1289,50 @@ const handleSaveNewCompany = async () => {
 
   return (
     <>
+      {lastAcceptedCustomerJob && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 10px",
+            margin: "0 0 10px 0",
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            background: "#f9fafb",
+            fontSize: 11,
+            whiteSpace: "nowrap",
+            overflowX: "auto",
+          }}
+          title="Most recent customer job accepted from Order Submission (Production Orders)"
+        >
+          <span style={{ fontWeight: 700, color: "#374151" }}>Last accepted job:</span>
+          <span style={{ color: "#111827", fontWeight: 600 }}>
+            #{lastAcceptedCustomerJob.orderNumber}
+            {lastAcceptedCustomerJob.backOrderNumber
+              ? ` / #${lastAcceptedCustomerJob.backOrderNumber}`
+              : ""}
+          </span>
+          <span style={{ color: "#6b7280" }}>
+            {lastAcceptedCustomerJob.company || "—"}
+          </span>
+          <span style={{ color: "#4b5563" }}>
+            {lastAcceptedCustomerJob.designName
+              ? `${lastAcceptedCustomerJob.designName} · `
+              : ""}
+            {lastAcceptedCustomerJob.product || "—"}
+            {lastAcceptedCustomerJob.quantity
+              ? ` · qty ${lastAcceptedCustomerJob.quantity}`
+              : ""}
+          </span>
+          <span style={{ color: "#9ca3af" }}>
+            {(() => {
+              const ms = Date.parse(lastAcceptedCustomerJob.acceptedAt || "");
+              return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "";
+            })()}
+          </span>
+        </div>
+      )}
       {isLoadingCatalog && (
         <div
           style={{

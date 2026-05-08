@@ -119,7 +119,6 @@ function getJobThumbUrl(job, ROOT) {
 const LS_OVERVIEW_KEY = "jrco.overview.cache.v2";
 
 const LS_METRICS_KEY = "jrco.metrics.cache.v1";
-const LS_LAST_SUBMITTED_ORDER_KEY = "jrco.last_submitted_order.v1";
 
 // Backend `/overview` keeps a 30s in-memory cache; bypass unless explicitly disabled.
 const OVERVIEW_BYPASS_SERVER_CACHE =
@@ -128,26 +127,6 @@ const OVERVIEW_BYPASS_SERVER_CACHE =
 function withOverviewNoCache(url) {
   if (!OVERVIEW_BYPASS_SERVER_CACHE) return url;
   return url.includes("?") ? `${url}&nocache=1` : `${url}?nocache=1`;
-}
-
-function loadLastSubmittedOrder() {
-  try {
-    const raw = localStorage.getItem(LS_LAST_SUBMITTED_ORDER_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function saveLastSubmittedOrder(order) {
-  try {
-    localStorage.setItem(LS_LAST_SUBMITTED_ORDER_KEY, JSON.stringify(order));
-  } catch {
-    // Ignore localStorage failures and keep order flow moving.
-  }
 }
 
 // Simple Axios GET with per-attempt timeouts and exponential backoff
@@ -858,7 +837,6 @@ function col(width, center = false) {
   const [orderMethod, setOrderMethod] = useState("email"); // "email" or "website"
   const [poNotes, setPoNotes] = useState("");
   const [requestBy, setRequestBy] = useState("");
-  const [lastSubmittedOrder, setLastSubmittedOrder] = useState(() => loadLastSubmittedOrder());
 
   const [gmailPopup, setGmailPopup] = useState(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
@@ -1587,22 +1565,6 @@ function col(width, center = false) {
         }
       }
 
-      const submittedOrder = {
-        submittedAt: new Date().toISOString(),
-        vendor: modalVendor || "",
-        method,
-        totalItems: rows.length,
-        notes: String(poNotes || "").trim(),
-        requestedBy: requestBy || "",
-        itemsPreview: rows.slice(0, 3).map((r) => ({
-          name: String(r.name || ""),
-          qty: String(r.qty || "1"),
-          unit: String(r.unit || "").trim(),
-        })),
-      };
-      setLastSubmittedOrder(submittedOrder);
-      saveLastSubmittedOrder(submittedOrder);
-
       alert((method === "website" ? "Website opened." : "Gmail compose opened.") + " Order logged.");
       setModalVendor(null);
       setPoNotes("");
@@ -1618,45 +1580,6 @@ function col(width, center = false) {
 
   return (
     <div style={{ padding: 12 }}>
-      {lastSubmittedOrder && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 10px",
-            marginBottom: 10,
-            border: "1px solid #e5e7eb",
-            borderRadius: 8,
-            background: "#f9fafb",
-            fontSize: 11,
-            whiteSpace: "nowrap",
-            overflowX: "auto",
-          }}
-          title="Most recent submitted order"
-        >
-          <span style={{ fontWeight: 700, color: "#374151" }}>Last submitted order:</span>
-          <span style={{ color: "#111827", fontWeight: 600 }}>
-            {lastSubmittedOrder.vendor || "Unknown vendor"}
-          </span>
-          <span style={{ color: "#6b7280" }}>
-            {(() => {
-              const ms = Date.parse(lastSubmittedOrder.submittedAt || "");
-              return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "Unknown time";
-            })()}
-          </span>
-          <span style={{ color: "#6b7280" }}>
-            {lastSubmittedOrder.totalItems || 0} item{(lastSubmittedOrder.totalItems || 0) === 1 ? "" : "s"}
-          </span>
-          {Array.isArray(lastSubmittedOrder.itemsPreview) && lastSubmittedOrder.itemsPreview.length > 0 && (
-            <span style={{ color: "#4b5563" }}>
-              {lastSubmittedOrder.itemsPreview
-                .map((it) => `${it.qty}${it.unit ? ` ${it.unit}` : ""} ${it.name}`.trim())
-                .join(" • ")}
-            </span>
-          )}
-        </div>
-      )}
       <div
         style={{
           display: "grid",
@@ -2957,51 +2880,6 @@ function col(width, center = false) {
             <div style={{ fontSize: 12, color: "#666", marginBottom: 10 }}>
               All items are pre-selected. Unselect anything you don’t want to order.
             </div>
-            {lastSubmittedOrder && (
-              (() => {
-                const submittedAtText = (() => {
-                  const ms = Date.parse(lastSubmittedOrder.submittedAt || "");
-                  return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "Unknown time";
-                })();
-                return (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  padding: "6px 10px",
-                  marginBottom: 10,
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 8,
-                  background: "#f9fafb",
-                  fontSize: 11,
-                  whiteSpace: "nowrap",
-                  overflowX: "auto",
-                }}
-                title="Most recent submitted order"
-              >
-                <span style={{ fontWeight: 700, color: "#374151" }}>Last:</span>
-                <span style={{ color: "#111827", fontWeight: 600 }}>
-                  {lastSubmittedOrder.vendor || "Unknown vendor"}
-                </span>
-                <span style={{ color: "#6b7280" }}>
-                  {submittedAtText}
-                </span>
-                <span style={{ color: "#6b7280" }}>
-                  {lastSubmittedOrder.totalItems || 0} item{(lastSubmittedOrder.totalItems || 0) === 1 ? "" : "s"}
-                </span>
-                {Array.isArray(lastSubmittedOrder.itemsPreview) &&
-                  lastSubmittedOrder.itemsPreview.length > 0 && (
-                    <span style={{ color: "#4b5563" }}>
-                      {lastSubmittedOrder.itemsPreview
-                        .map((it) => `${it.qty}${it.unit ? ` ${it.unit}` : ""} ${it.name}`.trim())
-                        .join(" • ")}
-                    </span>
-                  )}
-              </div>
-                );
-              })()
-            )}
 
             <div
               style={{
