@@ -1618,6 +1618,45 @@ function col(width, center = false) {
 
   return (
     <div style={{ padding: 12 }}>
+      {lastSubmittedOrder && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 10px",
+            marginBottom: 10,
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            background: "#f9fafb",
+            fontSize: 11,
+            whiteSpace: "nowrap",
+            overflowX: "auto",
+          }}
+          title="Most recent submitted order"
+        >
+          <span style={{ fontWeight: 700, color: "#374151" }}>Last submitted order:</span>
+          <span style={{ color: "#111827", fontWeight: 600 }}>
+            {lastSubmittedOrder.vendor || "Unknown vendor"}
+          </span>
+          <span style={{ color: "#6b7280" }}>
+            {(() => {
+              const ms = Date.parse(lastSubmittedOrder.submittedAt || "");
+              return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "Unknown time";
+            })()}
+          </span>
+          <span style={{ color: "#6b7280" }}>
+            {lastSubmittedOrder.totalItems || 0} item{(lastSubmittedOrder.totalItems || 0) === 1 ? "" : "s"}
+          </span>
+          {Array.isArray(lastSubmittedOrder.itemsPreview) && lastSubmittedOrder.itemsPreview.length > 0 && (
+            <span style={{ color: "#4b5563" }}>
+              {lastSubmittedOrder.itemsPreview
+                .map((it) => `${it.qty}${it.unit ? ` ${it.unit}` : ""} ${it.name}`.trim())
+                .join(" • ")}
+            </span>
+          )}
+        </div>
+      )}
       <div
         style={{
           display: "grid",
