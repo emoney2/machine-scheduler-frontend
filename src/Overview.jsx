@@ -1649,9 +1649,9 @@ function col(width, center = false) {
             >
 
 
-              {/* Headcovers Sold / Day */}
+              {/* Products sold / day (current calendar year YTD; excludes product names containing "back") */}
               <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>Headcovers Sold / Day</div>
+                <div style={{ fontSize: 12, color: "#666" }}>Products Sold / Day</div>
                 <div style={{ fontSize: 28, fontWeight: 800 }}>
                   {metrics?.headcovers_sold_per_day
                     ? metrics.headcovers_sold_per_day.toFixed(2)
