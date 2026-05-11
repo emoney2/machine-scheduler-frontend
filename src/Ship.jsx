@@ -166,6 +166,22 @@ function parseUpsRateNumber(rate) {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Matches the chosen UPS rate tile — sent to QBO as Ship Via / shipping line description. */
+function upsShippingMethodLabelForInvoice(opt) {
+  if (!opt || typeof opt !== "object") return "UPS";
+  const desc = String(
+    opt.description || opt.serviceName || opt.service || opt.name || ""
+  ).trim();
+  if (desc) {
+    if (/^ups\b/i.test(desc)) return desc;
+    return `UPS ${desc}`;
+  }
+  const m = String(opt.method || "").trim();
+  if (!m) return "UPS";
+  if (/^ups\b/i.test(m)) return m;
+  return `UPS ${m}`;
+}
+
 const SKIP_UPS = false;
 
 // Replace your existing parseDateFromString + formatDateMMDD with this:
@@ -2112,12 +2128,7 @@ export default function Ship() {
       boxes_summary: summary,
       boxes: summary,
       service_code: String(opt.code || ""),
-      shipping_method: (() => {
-        const m = String(opt.method || "").trim();
-        if (!m) return "UPS";
-        if (/^ups\b/i.test(m)) return m;
-        return `UPS ${m}`;
-      })(),
+      shipping_method: upsShippingMethodLabelForInvoice(opt),
       ups_purchased_rate: rateNum,
       skip_ups: false,
       skip_invoice: skipInv,
@@ -3244,7 +3255,7 @@ export default function Ship() {
                       }}
                     >
                       <span style={{ fontSize: 11, fontWeight: 800, color: "#212121", lineHeight: 1.15, display: "block" }}>
-                        {(opt.method || "Rate").replace(/ UPS$/i, "").slice(0, 22)}
+                        {(opt.method || "Rate").replace(/\s+/g, " ").trim().slice(0, 36) || "Rate"}
                       </span>
                       <span style={{ fontSize: 15, fontWeight: 800, color: "#0d47a1", marginTop: 6 }}>{priceStr}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, color: "#37474f", marginTop: 6, lineHeight: 1.2 }}>

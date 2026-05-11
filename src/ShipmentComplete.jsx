@@ -79,6 +79,17 @@ export default function ShipmentComplete() {
       return `${origin}/app/invoice?${q.toString()}`;
     };
 
+    // Query string qi/qr must win over jrco_lastInvoiceDeeplink. Otherwise a stale deeplink from an
+    // earlier session opens the wrong txn or a blank "new invoice" when companyId does not match.
+    if (qi && qr) {
+      const hintFromQuery = String(state?.invoiceUrl || "").trim();
+      const rebuilt = buildFromTxnRealm(qi, qr, hintFromQuery);
+      if (rebuilt) {
+        const normalized = normalizeInvoiceUrl(rebuilt);
+        if (normalized) return normalized;
+      }
+    }
+
     try {
       const dl = (sessionStorage.getItem("jrco_lastInvoiceDeeplink") || "").trim();
       if (dl && /^https:\/\//i.test(dl)) {
