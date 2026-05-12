@@ -36,6 +36,7 @@ import KanbanScanPublic from "./KanbanScanPublic";
 import KanbanPrint from "./KanbanPrint";
 import ProductionOrders from './ProductionOrders';
 import QueueTab from './QueueTab';
+import SalesPortal from "./SalesPortal";
 
 window._isSubmittingOrder = false;
 
@@ -1872,7 +1873,8 @@ useEffect(() => {
          { to: "/ship",              label: "Ship" },
          { to: "/material-log",      label: "Material Log" },
          { to: "/departments",       label: "Departments" },
-         { to: "/kanban/queue",      label: "Kanban Queue" }
+         { to: "/kanban/queue",      label: "Kanban Queue" },
+         { to: "/sales",             label: "Sales" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
             display: 'inline-block',
@@ -1990,6 +1992,7 @@ useEffect(() => {
           <Route path="/order" element={<OrderSubmission />} />
           <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
           <Route path="/shipment-complete" element={<ShipmentComplete />} />
+          <Route path="/sales" element={<SalesPortal />} />
         </Routes>
     </>
   );
