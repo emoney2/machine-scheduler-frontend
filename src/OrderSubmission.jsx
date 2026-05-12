@@ -133,7 +133,7 @@ export default function OrderSubmission() {
     price: "",
     dueDate: "",
     dateType: "Hard Date",
-    referral: "",
+    salesRep: "",
     materials: ["", "", "", "", ""],
     materialPercents: ["", "", "", "", ""],  // ← new
     backMaterial: "",
@@ -195,14 +195,16 @@ export default function OrderSubmission() {
   const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [loadingProducts, setLoadingProducts]   = useState(false);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
+  const [loadingSalesReps, setLoadingSalesReps] = useState(false);
 
   const isLoadingCatalog =
-    loadingDirectory || loadingProducts || loadingMaterials;
+    loadingDirectory || loadingProducts || loadingMaterials || loadingSalesReps;
 
   const getLoadingMessage = () => {
     if (loadingDirectory) return "Loading customers…";
     if (loadingProducts)  return "Loading products…";
     if (loadingMaterials) return "Loading materials…";
+    if (loadingSalesReps) return "Loading sales reps…";
     return "Loading…";
   };
 
@@ -210,6 +212,9 @@ export default function OrderSubmission() {
   // list of company‐name options from Directory sheet
   const [companies, setCompanies] = useState([]);
   const companyInputRef = useRef(null);
+
+  // Sales Rep names from "Sales Rep" sheet (Order Submission REP dropdown)
+  const [salesReps, setSalesReps] = useState([]);
 
   // product list + input ref
   const [products, setProducts] = useState([]);
@@ -638,6 +643,26 @@ useEffect(() => {
     .finally(() => setLoadingMaterials(false));
 }, []);
 
+  useEffect(() => {
+    setLoadingSalesReps(true);
+    const cfg = {
+      withCredentials: true,
+      timeout: 30000,
+      validateStatus: (s) => s >= 200 && s < 400,
+    };
+    axios
+      .get(`${API_ROOT}/sales-reps`, cfg)
+      .then((res) => {
+        const arr = Array.isArray(res.data) ? res.data : [];
+        setSalesReps(arr);
+      })
+      .catch((err) => {
+        console.error("Failed to load sales reps:", err?.message || err);
+        setSalesReps([]);
+      })
+      .finally(() => setLoadingSalesReps(false));
+  }, []);
+
   // ─── Fetch vendors (Material Inventory column K) for New Material dropdown ───
   useEffect(() => {
     const cfg = {
@@ -1062,7 +1087,7 @@ const submitForm = async () => {
       price: "",
       dueDate: "",
       dateType: "Hard Date",
-      referral: "",
+      salesRep: "",
       materials: ["", "", "", "", ""],
       materialPercents: ["", "", "", "", ""],  // ← add this
       backMaterial: "",
@@ -1221,7 +1246,11 @@ const handleSaveNewCompany = async () => {
         price: reorderJob["Price"] || "",
         dueDate: "", // force user to select a new one
         dateType: reorderJob["Hard Date/Soft Date"] || "Hard Date",
-        referral: reorderJob["Referral"] || "",
+        salesRep:
+          reorderJob["REP"] ??
+          reorderJob["Sales Rep"] ??
+          reorderJob["Referral"] ??
+          "",
         notes: reorderJob["Notes"] || "",
         materials: [
           reorderJob["Material1"] || "",
@@ -2575,13 +2604,20 @@ const handleSaveNewCompany = async () => {
             </div>
             <div>
               <label>
-                Referral<br />
-                <input
-                  name="referral"
-                  value={form.referral}
+                REP<br />
+                <select
+                  name="salesRep"
+                  value={form.salesRep}
                   onChange={handleChange}
                   style={{ width: "80%" }}
-                />
+                >
+                  <option value="">—</option>
+                  {salesReps.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           </div>
