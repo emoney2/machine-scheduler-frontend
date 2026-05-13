@@ -10,6 +10,7 @@ export default function ShipmentComplete() {
   const { state } = location;
   const qi = (searchParams.get("qi") || "").trim();
   const qr = (searchParams.get("qr") || "").trim();
+  const qeParam = (searchParams.get("qe") || "").trim().toLowerCase();
 
   function mergedShipmentFlags(navState) {
     let shippedOk = navState?.shippedOk ?? false;
@@ -33,6 +34,24 @@ export default function ShipmentComplete() {
 
   // Prefer txnId + realm from this shipment (fixes wrong / new-invoice tabs). Else normalize backend URL.
   const invoiceUrl = useMemo(() => {
+    let qeEffective = qeParam === "sandbox" || qeParam === "production" ? qeParam : "";
+    if (!qeEffective) {
+      const stE = String(state?.qbo_invoice_env || "").trim().toLowerCase();
+      if (stE === "sandbox" || stE === "production") qeEffective = stE;
+    }
+    if (!qeEffective) {
+      try {
+        const blob = sessionStorage.getItem("jrco_lastShipmentQbo");
+        if (blob) {
+          const p = JSON.parse(blob);
+          const qev = String(p?.qbo_invoice_env || "").trim().toLowerCase();
+          if (qev === "sandbox" || qev === "production") qeEffective = qev;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     const normalizeInvoiceUrl = (raw) => {
       const src = String(raw || "").trim();
       if (!src) return "";
@@ -65,12 +84,22 @@ export default function ShipmentComplete() {
       }
     };
 
-    const buildFromTxnRealm = (txnId, realmId, hintUrl) => {
+    const buildFromTxnRealm = (txnId, realmId, hintUrl, qeHint) => {
       const t = String(txnId || "").trim();
       const r = String(realmId || "").trim();
       if (!t || !r) return "";
-      const hint = String(hintUrl || "").toLowerCase();
-      const origin = hint.includes("sandbox") ? "https://app.sandbox.qbo.intuit.com" : "https://app.qbo.intuit.com";
+      const qev = String(qeHint || "").trim().toLowerCase();
+      let origin;
+      if (qev === "sandbox") {
+        origin = "https://app.sandbox.qbo.intuit.com";
+      } else if (qev === "production") {
+        origin = "https://app.qbo.intuit.com";
+      } else {
+        const hint = String(hintUrl || "").toLowerCase();
+        origin = hint.includes("sandbox")
+          ? "https://app.sandbox.qbo.intuit.com"
+          : "https://app.qbo.intuit.com";
+      }
       const q = new URLSearchParams();
       q.set("txnId", t);
       q.set("txnType", "Invoice");
@@ -83,7 +112,7 @@ export default function ShipmentComplete() {
     // earlier session opens the wrong txn or a blank "new invoice" when companyId does not match.
     if (qi && qr) {
       const hintFromQuery = String(state?.invoiceUrl || "").trim();
-      const rebuilt = buildFromTxnRealm(qi, qr, hintFromQuery);
+      const rebuilt = buildFromTxnRealm(qi, qr, hintFromQuery, qeEffective);
       if (rebuilt) {
         const normalized = normalizeInvoiceUrl(rebuilt);
         if (normalized) return normalized;
@@ -154,7 +183,7 @@ export default function ShipmentComplete() {
       }
     })();
     if (txn && realm) {
-      const rebuilt = buildFromTxnRealm(txn, realm, hint);
+      const rebuilt = buildFromTxnRealm(txn, realm, hint, qeEffective);
       if (rebuilt) {
         const normalized = normalizeInvoiceUrl(rebuilt);
         if (normalized) return normalized;
@@ -174,7 +203,16 @@ export default function ShipmentComplete() {
       /* ignore */
     }
     return "";
-  }, [location.key, state?.invoiceUrl, state?.qbo_invoice_id, state?.qbo_realm_id, qi, qr]);
+  }, [
+    location.key,
+    state?.invoiceUrl,
+    state?.qbo_invoice_id,
+    state?.qbo_realm_id,
+    state?.qbo_invoice_env,
+    qi,
+    qr,
+    qeParam,
+  ]);
 
   useEffect(() => {
     let fromSession = "";
@@ -188,6 +226,7 @@ export default function ShipmentComplete() {
         message: "shipment_complete_mount",
         qi_present: !!qi,
         qr_present: !!qr,
+        qe_param: qeParam || null,
         deeplinkStoredLen: (() => {
           try {
             return (sessionStorage.getItem("jrco_lastInvoiceDeeplink") || "").trim().length;

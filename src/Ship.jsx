@@ -69,6 +69,15 @@ function summarizeInvoiceForLog(inv) {
   }
 }
 
+/** Must match backend QBO env so Open Invoice uses app vs sandbox host (wrong host → blank / new invoice). */
+function inferQboInvoiceEnv(shipData, invoiceUrl) {
+  const v = String(shipData?.qbo_invoice_env ?? "").trim().toLowerCase();
+  if (v === "sandbox" || v === "production") return v;
+  const u = String(invoiceUrl || "").toLowerCase();
+  if (u.includes("sandbox")) return "sandbox";
+  return "production";
+}
+
 // Map our logical box names to their actual dimensions
 const BOX_DIMENSIONS = {
   Small:  "10×10×10",
@@ -166,20 +175,28 @@ function parseUpsRateNumber(rate) {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** Matches the chosen UPS rate tile — sent to QBO as Ship Via / shipping line description. */
+/**
+ * Matches the chosen UPS rate tile — sent to QBO as Ship Via / shipping line description.
+ * Uses the same wording the user sees on the tile (e.g. Ground → "UPS - Ground"), not a separate API mapping.
+ */
 function upsShippingMethodLabelForInvoice(opt) {
-  if (!opt || typeof opt !== "object") return "UPS";
-  const desc = String(
+  if (!opt || typeof opt !== "object") return "UPS - Ground";
+  const fromTile = String(opt.method || "").trim();
+  const fromApi = String(
     opt.description || opt.serviceName || opt.service || opt.name || ""
   ).trim();
-  if (desc) {
-    if (/^ups\b/i.test(desc)) return desc;
-    return `UPS ${desc}`;
+  let part = fromTile || fromApi;
+  if (!part) return "UPS - Ground";
+  // Avoid "UPS - UPS Ground": strip a leading UPS prefix from the tier text.
+  part = part
+    .replace(/^\s*ups\s*[-–—]?\s*/i, "")
+    .replace(/^\s*ups\s+/i, "")
+    .trim();
+  if (!part) return "UPS - Ground";
+  if (/^ups\s*[-–—]/i.test(part)) {
+    return part.replace(/\s+/g, " ").trim().slice(0, 80);
   }
-  const m = String(opt.method || "").trim();
-  if (!m) return "UPS";
-  if (/^ups\b/i.test(m)) return m;
-  return `UPS ${m}`;
+  return `UPS - ${part.replace(/\s+/g, " ").trim()}`.slice(0, 80);
 }
 
 const SKIP_UPS = false;
@@ -476,14 +493,22 @@ export default function Ship() {
   const openedOnceRef = useRef(false);
 
   /** Stable browser deeplink (txnId + realm). Prefer over raw invoice URLs that may omit txnId after redirects. */
-  function buildCanonicalQboInvoiceOpenUrl(txnId, realmId, invoiceUrlHint) {
+  function buildCanonicalQboInvoiceOpenUrl(txnId, realmId, invoiceUrlHint, qeLabel) {
     const tid = String(txnId || "").trim();
     const rid = String(realmId || "").trim();
     if (!tid || !rid) return "";
-    const hint = String(invoiceUrlHint || "").toLowerCase();
-    const origin = hint.includes("sandbox")
-      ? "https://app.sandbox.qbo.intuit.com"
-      : "https://app.qbo.intuit.com";
+    const qev = String(qeLabel || "").trim().toLowerCase();
+    let origin;
+    if (qev === "sandbox") {
+      origin = "https://app.sandbox.qbo.intuit.com";
+    } else if (qev === "production") {
+      origin = "https://app.qbo.intuit.com";
+    } else {
+      const hint = String(invoiceUrlHint || "").toLowerCase();
+      origin = hint.includes("sandbox")
+        ? "https://app.sandbox.qbo.intuit.com"
+        : "https://app.qbo.intuit.com";
+    }
     const q = new URLSearchParams();
     q.set("txnId", tid);
     q.set("txnType", "Invoice");
@@ -492,16 +517,20 @@ export default function Ship() {
     return `${origin}/app/invoice?${q.toString()}`;
   }
 
-  /** Kept in sync: invoice id + realm (pair), plus ?qi=&qr= for refresh-safe Open Invoice. */
-  function persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId) {
+  /** Kept in sync: invoice id + realm (pair), plus ?qi=&qr=&qe= for refresh-safe Open Invoice. */
+  function persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId, qboInvoiceEnv) {
     const inv = String(invoiceUrl || "").trim();
     const id = String(qboInvoiceId || "").trim();
     const re = String(qboRealmId || "").trim();
+    const qe =
+      String(qboInvoiceEnv || "").trim().toLowerCase() === "sandbox"
+        ? "sandbox"
+        : "production";
     try {
       sessionStorage.setItem("jrco_lastInvoiceUrl", inv || "");
       sessionStorage.setItem("jrco_lastQboInvoiceId", id || "");
       sessionStorage.setItem("jrco_lastQboRealmId", re || "");
-      const canon = buildCanonicalQboInvoiceOpenUrl(id, re, inv);
+      const canon = buildCanonicalQboInvoiceOpenUrl(id, re, inv, qe);
       if (canon) {
         sessionStorage.setItem("jrco_lastInvoiceDeeplink", canon);
       }
@@ -511,6 +540,7 @@ export default function Ship() {
           JSON.stringify({
             qbo_invoice_id: id,
             qbo_realm_id: re,
+            qbo_invoice_env: qe,
             invoiceUrl: inv,
             canonicalInvoiceUrl: canon || inv,
             t: Date.now(),
@@ -523,6 +553,7 @@ export default function Ship() {
     const qs = new URLSearchParams();
     if (id) qs.set("qi", id);
     if (re) qs.set("qr", re);
+    if (id && re) qs.set("qe", qe);
     return qs.toString() ? `?${qs.toString()}` : "";
   }
 
@@ -1013,7 +1044,13 @@ export default function Ship() {
         : "";
       const qboInvoiceId = String(data?.qbo_invoice_id ?? "").trim();
       const qboRealmId = String(data?.qbo_realm_id ?? "").trim();
-      const search = persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId);
+      const qboInvoiceEnv = inferQboInvoiceEnv(data, invoiceUrl);
+      const search = persistShipmentCompleteQbo(
+        invoiceUrl,
+        qboInvoiceId,
+        qboRealmId,
+        qboInvoiceEnv
+      );
 
       navigate({
         pathname: "/shipment-complete",
@@ -1025,6 +1062,7 @@ export default function Ship() {
           invoiceUrl,
           qbo_invoice_id: qboInvoiceId,
           qbo_realm_id: qboRealmId,
+          qbo_invoice_env: qboInvoiceEnv,
         },
       });
     };
@@ -1365,7 +1403,13 @@ export default function Ship() {
           : "";
       const qboInvoiceId = String(shipData?.qbo_invoice_id ?? "").trim();
       const qboRealmId = String(shipData?.qbo_realm_id ?? "").trim();
-      const search = persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId);
+      const qboInvoiceEnv = inferQboInvoiceEnv(shipData, invoiceUrl);
+      const search = persistShipmentCompleteQbo(
+        invoiceUrl,
+        qboInvoiceId,
+        qboRealmId,
+        qboInvoiceEnv
+      );
 
       try {
         sessionStorage.setItem(
@@ -1463,6 +1507,7 @@ export default function Ship() {
             invoiceUrl,
             qbo_invoice_id: qboInvoiceId,
             qbo_realm_id: qboRealmId,
+            qbo_invoice_env: qboInvoiceEnv,
           },
         });
       }, 500);
