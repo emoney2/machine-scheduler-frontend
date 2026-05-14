@@ -1643,7 +1643,7 @@ function col(width, center = false) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
+                gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
                 gap: 10,
               }}
             >
@@ -1655,6 +1655,21 @@ function col(width, center = false) {
                 <div style={{ fontSize: 28, fontWeight: 800 }}>
                   {metrics?.headcovers_sold_per_day
                     ? metrics.headcovers_sold_per_day.toFixed(2)
+                    : "—"}
+                </div>
+              </div>
+
+              {/* Headcovers sold Mon–Fri this week (ET); resets Monday; excludes Product containing "back") */}
+              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
+                <div style={{ fontSize: 12, color: "#666" }}>Headcovers Sold This Week</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2, lineHeight: 1.2 }}>
+                  Mon–Fri · no “back” lines
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4 }}>
+                  {metrics?.headcovers_sold_this_week != null
+                    ? Number.isInteger(metrics.headcovers_sold_this_week)
+                      ? String(metrics.headcovers_sold_this_week)
+                      : metrics.headcovers_sold_this_week.toFixed(2)
                     : "—"}
                 </div>
               </div>
