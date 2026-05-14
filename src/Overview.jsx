@@ -1659,7 +1659,7 @@ function col(width, center = false) {
                 </div>
               </div>
 
-              {/* Headcovers sold Mon–Fri this week (ET); resets Monday; excludes Product containing "back") */}
+              {/* Headcovers sold this calendar week (Mon–Sun ET, through today); excludes lines with "back" in Product */}
               <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
                 <div style={{ fontSize: 12, color: "#666" }}>Headcovers Sold This Week</div>
                 <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4 }}>
