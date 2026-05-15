@@ -736,6 +736,36 @@ function LastUpdatedBadge({ at }) {
 const header = { fontSize: 14, fontWeight: 700, marginBottom: 8 };
 const subtleUpdatedStyle = { fontSize: 12, color: "#9CA3AF", fontStyle: "italic" };
 
+const metricBox = {
+  border: "1px solid #eee",
+  borderRadius: 10,
+  padding: "10px 8px",
+  display: "flex",
+  flexDirection: "column",
+  minWidth: 0,
+};
+const metricLabel = {
+  fontSize: 11,
+  fontWeight: 600,
+  color: "#666",
+  lineHeight: 1.2,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  marginBottom: 6,
+};
+const metricValue = {
+  fontSize: 28,
+  fontWeight: 800,
+  lineHeight: 1.1,
+  fontVariantNumeric: "tabular-nums",
+};
+const metricSubValue = {
+  ...metricValue,
+  fontSize: 28,
+  marginTop: 4,
+};
+
 const rowCard = {
   display: "flex",
   alignItems: "center",
@@ -1650,9 +1680,11 @@ function col(width, center = false) {
 
 
               {/* Products sold / day (current calendar year YTD; excludes product names containing "back") */}
-              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>Products Sold / Day</div>
-                <div style={{ fontSize: 28, fontWeight: 800 }}>
+              <div style={metricBox}>
+                <div style={metricLabel} title="Products Sold / Day">
+                  Products Sold / Day
+                </div>
+                <div style={metricValue}>
                   {metrics?.headcovers_sold_per_day
                     ? metrics.headcovers_sold_per_day.toFixed(2)
                     : "—"}
@@ -1660,9 +1692,11 @@ function col(width, center = false) {
               </div>
 
               {/* Headcovers sold this calendar week (Mon–Sun ET, through today); excludes lines with "back" in Product */}
-              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>Headcovers Sold This Week</div>
-                <div style={{ fontSize: 28, fontWeight: 800, marginTop: 4 }}>
+              <div style={metricBox}>
+                <div style={metricLabel} title="Sold This Week">
+                  Sold This Week
+                </div>
+                <div style={metricValue}>
                   {metrics?.headcovers_sold_this_week != null
                     ? Number.isInteger(metrics.headcovers_sold_this_week)
                       ? String(metrics.headcovers_sold_this_week)
@@ -1672,17 +1706,19 @@ function col(width, center = false) {
               </div>
 
               {/* Goal */}
-              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>Goal</div>
-                <div style={{ fontSize: 28, fontWeight: 800 }}>
-                  {metrics?.goal ?? "—"}
+              <div style={metricBox}>
+                <div style={metricLabel} title="Goal">
+                  Goal
                 </div>
+                <div style={metricValue}>{metrics?.goal ?? "—"}</div>
               </div>
 
               {/* Average Price per Cover */}
-              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>Average Price per Cover</div>
-                <div style={{ fontSize: 28, fontWeight: 800 }}>
+              <div style={metricBox}>
+                <div style={metricLabel} title="Avg Price / Cover">
+                  Avg Price / Cover
+                </div>
+                <div style={metricValue}>
                   {metrics?.average_price_per_cover
                     ? metrics.average_price_per_cover.toLocaleString(undefined, {
                         style: "currency",
@@ -1694,22 +1730,21 @@ function col(width, center = false) {
               </div>
 
               {/* Embroidery Backlog */}
-              <div style={{ border: "1px solid #eee", borderRadius: 10, padding: 10 }}>
-                <div style={{ fontSize: 12, color: "#666" }}>
+              <div style={metricBox}>
+                <div style={metricLabel} title="Embroidery Backlog">
                   Embroidery Backlog
                 </div>
-
-                <div style={{ fontSize: 26, fontWeight: 800 }}>
+                <div style={metricValue}>
                   {metrics?.embroidery_backlog_hours != null
                     ? `${metrics.embroidery_backlog_hours} hrs`
                     : "—"}
                 </div>
 
-                <div style={{ fontSize: 13, color: "#666", marginTop: 4 }}>
-                  {metrics?.embroidery_backlog_weeks != null
-                    ? `${metrics.embroidery_backlog_weeks} weeks`
-                    : ""}
-                </div>
+                {metrics?.embroidery_backlog_weeks != null ? (
+                  <div style={metricSubValue}>
+                    {`${metrics.embroidery_backlog_weeks} wks`}
+                  </div>
+                ) : null}
               </div>
 
               </div>  {/* <-- closes the grid */}
