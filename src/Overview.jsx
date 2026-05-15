@@ -760,10 +760,33 @@ const metricValue = {
   lineHeight: 1.1,
   fontVariantNumeric: "tabular-nums",
 };
-const metricSubValue = {
-  ...metricValue,
-  fontSize: 28,
-  marginTop: 4,
+const metricBoxEmbroidery = {
+  ...metricBox,
+  padding: "8px 6px",
+};
+const metricLabelEmbroidery = {
+  ...metricLabel,
+  marginBottom: 4,
+};
+const metricEmbroideryStack = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+};
+const metricEmbroideryNumber = {
+  fontSize: 22,
+  fontWeight: 800,
+  lineHeight: 1.05,
+  fontVariantNumeric: "tabular-nums",
+};
+const metricEmbroideryUnit = {
+  fontSize: 9,
+  fontWeight: 600,
+  color: "#9ca3af",
+  letterSpacing: "0.05em",
+  lineHeight: 1.2,
+  marginTop: 1,
+  marginBottom: 2,
 };
 
 const rowCard = {
@@ -1730,19 +1753,26 @@ function col(width, center = false) {
               </div>
 
               {/* Embroidery Backlog */}
-              <div style={metricBox}>
-                <div style={metricLabel} title="Embroidery Backlog">
+              <div style={metricBoxEmbroidery}>
+                <div style={metricLabelEmbroidery} title="Embroidery Backlog">
                   Embroidery Backlog
                 </div>
-                <div style={metricValue}>
-                  {metrics?.embroidery_backlog_hours != null
-                    ? `${metrics.embroidery_backlog_hours} hrs`
-                    : "—"}
-                </div>
-
+                {metrics?.embroidery_backlog_hours != null ? (
+                  <div style={metricEmbroideryStack}>
+                    <div style={metricEmbroideryNumber}>
+                      {metrics.embroidery_backlog_hours}
+                    </div>
+                    <div style={metricEmbroideryUnit}>HOURS</div>
+                  </div>
+                ) : (
+                  <div style={metricValue}>—</div>
+                )}
                 {metrics?.embroidery_backlog_weeks != null ? (
-                  <div style={metricSubValue}>
-                    {`${metrics.embroidery_backlog_weeks} wks`}
+                  <div style={{ ...metricEmbroideryStack, marginTop: 4 }}>
+                    <div style={metricEmbroideryNumber}>
+                      {metrics.embroidery_backlog_weeks}
+                    </div>
+                    <div style={metricEmbroideryUnit}>WEEKS</div>
                   </div>
                 ) : null}
               </div>
