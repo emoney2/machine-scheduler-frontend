@@ -742,6 +742,8 @@ const metricBox = {
   padding: "10px 8px",
   display: "flex",
   flexDirection: "column",
+  alignItems: "center",
+  textAlign: "center",
   minWidth: 0,
 };
 const metricLabel = {
@@ -753,12 +755,16 @@ const metricLabel = {
   overflow: "hidden",
   textOverflow: "ellipsis",
   marginBottom: 6,
+  width: "100%",
+  textAlign: "center",
 };
 const metricValue = {
   fontSize: 28,
   fontWeight: 800,
   lineHeight: 1.1,
   fontVariantNumeric: "tabular-nums",
+  width: "100%",
+  textAlign: "center",
 };
 const metricBoxEmbroidery = {
   ...metricBox,
@@ -771,13 +777,17 @@ const metricLabelEmbroidery = {
 const metricEmbroideryStack = {
   display: "flex",
   flexDirection: "column",
-  alignItems: "flex-start",
+  alignItems: "center",
+  width: "100%",
+  textAlign: "center",
 };
 const metricEmbroideryNumber = {
   fontSize: 22,
   fontWeight: 800,
   lineHeight: 1.05,
   fontVariantNumeric: "tabular-nums",
+  width: "100%",
+  textAlign: "center",
 };
 const metricEmbroideryUnit = {
   fontSize: 9,
@@ -787,6 +797,8 @@ const metricEmbroideryUnit = {
   lineHeight: 1.2,
   marginTop: 1,
   marginBottom: 2,
+  width: "100%",
+  textAlign: "center",
 };
 
 const rowCard = {
