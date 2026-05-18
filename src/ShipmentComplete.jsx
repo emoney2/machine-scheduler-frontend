@@ -1,7 +1,8 @@
-// src/ShipmentComplete.jsx
-import React, { useEffect, useMemo } from "react";
+﻿// src/ShipmentComplete.jsx
+import React, { useCallback, useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
+import { resolveShipmentInvoiceUrl } from "./qboInvoiceOpenUrl";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
@@ -11,6 +12,58 @@ export default function ShipmentComplete() {
   const qi = (searchParams.get("qi") || "").trim();
   const qr = (searchParams.get("qr") || "").trim();
   const qeParam = (searchParams.get("qe") || "").trim().toLowerCase();
+
+  const [invoiceUrl, setInvoiceUrl] = useState("");
+  const [resolvingInvoice, setResolvingInvoice] = useState(true);
+
+  const resolveNow = useCallback(() => {
+    return resolveShipmentInvoiceUrl({ qi, qr, qeParam, state });
+  }, [qi, qr, qeParam, state]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const delays = [0, 50, 150, 400, 800, 1200];
+    const timers = [];
+    setResolvingInvoice(true);
+
+    delays.forEach((ms, index) => {
+      const timer = setTimeout(() => {
+        if (cancelled) return;
+        const url = resolveNow();
+        if (url) {
+          setInvoiceUrl(url);
+          setResolvingInvoice(false);
+        } else if (index === delays.length - 1) {
+          setResolvingInvoice(false);
+        }
+      }, ms);
+      timers.push(timer);
+    });
+
+    return () => {
+      cancelled = true;
+      timers.forEach(clearTimeout);
+    };
+  }, [location.key, resolveNow]);
+
+  useEffect(() => {
+    let fromSession = "";
+    try {
+      fromSession = sessionStorage.getItem("jrco_lastInvoiceUrl") || "";
+    } catch {
+      fromSession = "";
+    }
+    postShipQboClientLog([
+      {
+        message: "shipment_complete_mount",
+        qi_present: !!qi,
+        qr_present: !!qr,
+        qe_param: qeParam || null,
+        resolvedInvoiceUrlLen: invoiceUrl.length,
+        sessionStorageInvoiceLen: fromSession.trim().length,
+      },
+    ]);
+  }, [invoiceUrl, location.key, qi, qr, qeParam]);
 
   function mergedShipmentFlags(navState) {
     let shippedOk = navState?.shippedOk ?? false;
@@ -32,222 +85,67 @@ export default function ShipmentComplete() {
 
   const { shippedOk, slipsPrinted, labelsPrinted } = mergedShipmentFlags(state);
 
-  // Prefer txnId + realm from this shipment (fixes wrong / new-invoice tabs). Else normalize backend URL.
-  const invoiceUrl = useMemo(() => {
-    let qeEffective = qeParam === "sandbox" || qeParam === "production" ? qeParam : "";
-    if (!qeEffective) {
-      const stE = String(state?.qbo_invoice_env || "").trim().toLowerCase();
-      if (stE === "sandbox" || stE === "production") qeEffective = stE;
+  const handleOpenInvoice = (e) => {
+    const url = resolveNow() || invoiceUrl;
+    if (!url) {
+      e.preventDefault();
+      return;
     }
-    if (!qeEffective) {
-      try {
-        const blob = sessionStorage.getItem("jrco_lastShipmentQbo");
-        if (blob) {
-          const p = JSON.parse(blob);
-          const qev = String(p?.qbo_invoice_env || "").trim().toLowerCase();
-          if (qev === "sandbox" || qev === "production") qeEffective = qev;
-        }
-      } catch {
-        /* ignore */
-      }
+    if (url !== invoiceUrl) {
+      setInvoiceUrl(url);
     }
-
-    const normalizeInvoiceUrl = (raw) => {
-      const src = String(raw || "").trim();
-      if (!src) return "";
-      try {
-        const u = new URL(src);
-        const txnId = (u.searchParams.get("txnId") || "").trim();
-        // URLs with companyId but no txnId open QBO's blank composer — discard so fallbacks run.
-        if (!txnId) return "";
-        const company = (
-          u.searchParams.get("deeplinkcompanyid") ||
-          u.searchParams.get("companyId") ||
-          ""
-        ).trim();
-        const q = new URLSearchParams();
-        q.set("txnId", txnId);
-        q.set("txnType", "Invoice");
-        if (company) {
-          q.set("deeplinkcompanyid", company);
-          q.set("companyId", company);
-        }
-        let path = u.pathname.replace(/\/$/, "") || "/";
-        if (/^\/app\/invoices$/i.test(path) || /^\/app\/invoicing$/i.test(path)) {
-          path = "/app/invoice";
-        }
-        // Keep the same hostname the API used; forcing qbo.intuit.com can open a blank/new invoice for some sessions.
-        const origin = u.origin;
-        return `${origin}${path}?${q.toString()}`;
-      } catch {
-        return "";
-      }
-    };
-
-    const buildFromTxnRealm = (txnId, realmId, hintUrl, qeHint) => {
-      const t = String(txnId || "").trim();
-      const r = String(realmId || "").trim();
-      if (!t || !r) return "";
-      const qev = String(qeHint || "").trim().toLowerCase();
-      let origin;
-      if (qev === "sandbox") {
-        origin = "https://app.sandbox.qbo.intuit.com";
-      } else if (qev === "production") {
-        origin = "https://app.qbo.intuit.com";
-      } else {
-        const hint = String(hintUrl || "").toLowerCase();
-        origin = hint.includes("sandbox")
-          ? "https://app.sandbox.qbo.intuit.com"
-          : "https://app.qbo.intuit.com";
-      }
-      const q = new URLSearchParams();
-      q.set("txnId", t);
-      q.set("txnType", "Invoice");
-      q.set("companyId", r);
-      q.set("deeplinkcompanyid", r);
-      return `${origin}/app/invoice?${q.toString()}`;
-    };
-
-    // Query string qi/qr must win over jrco_lastInvoiceDeeplink. Otherwise a stale deeplink from an
-    // earlier session opens the wrong txn or a blank "new invoice" when companyId does not match.
-    if (qi && qr) {
-      const hintFromQuery = String(state?.invoiceUrl || "").trim();
-      const rebuilt = buildFromTxnRealm(qi, qr, hintFromQuery, qeEffective);
-      if (rebuilt) {
-        const normalized = normalizeInvoiceUrl(rebuilt);
-        if (normalized) return normalized;
-      }
-    }
-
-    try {
-      const dl = (sessionStorage.getItem("jrco_lastInvoiceDeeplink") || "").trim();
-      if (dl && /^https:\/\//i.test(dl)) {
-        const normalizedDl = normalizeInvoiceUrl(dl);
-        if (normalizedDl) return normalizedDl;
-      }
-    } catch {
-      /* ignore */
-    }
-
-    // Use txnId + company (realm) as a *pair* from one source. Mixing e.g. invoice id from
-    // navigation state with an older realm from sessionStorage can open the wrong or blank QBO.
-    // Query string qi/qr survive refresh; state does not.
     let txn = "";
-    let realm = "";
-    let hintFromState = "";
+    let company = "";
+    let host = "";
     try {
-      const sid = String(state?.qbo_invoice_id ?? "").trim();
-      const srealm = String(state?.qbo_realm_id ?? "").trim();
-      if (qi && qr) {
-        txn = qi;
-        realm = qr;
-        hintFromState = String(state?.invoiceUrl || "").trim();
-      } else if (sid && srealm) {
-        txn = sid;
-        realm = srealm;
-        hintFromState = String(state?.invoiceUrl || "").trim();
-      } else {
-        try {
-          const blob = sessionStorage.getItem("jrco_lastShipmentQbo");
-          if (blob) {
-            const p = JSON.parse(blob);
-            const a = String(p?.qbo_invoice_id ?? "").trim();
-            const b = String(p?.qbo_realm_id ?? "").trim();
-            if (a && b) {
-              txn = a;
-              realm = b;
-              hintFromState = String(p?.invoiceUrl || "").trim();
-            }
-          }
-        } catch {
-          /* ignore */
-        }
-      }
-      if (!txn || !realm) {
-        const stTxn = (sessionStorage.getItem("jrco_lastQboInvoiceId") || "").trim();
-        const stRe = (sessionStorage.getItem("jrco_lastQboRealmId") || "").trim();
-        if (stTxn && stRe) {
-          txn = stTxn;
-          realm = stRe;
-          hintFromState = String(state?.invoiceUrl || "").trim();
-        }
-      }
+      const u = new URL(url);
+      host = u.hostname || "";
+      txn = u.searchParams.get("txnId") || "";
+      company =
+        u.searchParams.get("companyId") ||
+        u.searchParams.get("deeplinkcompanyid") ||
+        "";
     } catch {
       /* ignore */
-    }
-    const hint = hintFromState || (() => {
-      try {
-        return sessionStorage.getItem("jrco_lastInvoiceUrl") || "";
-      } catch {
-        return "";
-      }
-    })();
-    if (txn && realm) {
-      const rebuilt = buildFromTxnRealm(txn, realm, hint, qeEffective);
-      if (rebuilt) {
-        const normalized = normalizeInvoiceUrl(rebuilt);
-        if (normalized) return normalized;
-      }
-    }
-
-    const fromState = String(state?.invoiceUrl || "").trim();
-    if (fromState) {
-      const normalized = normalizeInvoiceUrl(fromState);
-      if (normalized) return normalized;
-    }
-
-    try {
-      const nu = normalizeInvoiceUrl(sessionStorage.getItem("jrco_lastInvoiceUrl") || "");
-      if (nu) return nu;
-    } catch {
-      /* ignore */
-    }
-    return "";
-  }, [
-    location.key,
-    state?.invoiceUrl,
-    state?.qbo_invoice_id,
-    state?.qbo_realm_id,
-    state?.qbo_invoice_env,
-    qi,
-    qr,
-    qeParam,
-  ]);
-
-  useEffect(() => {
-    let fromSession = "";
-    try {
-      fromSession = sessionStorage.getItem("jrco_lastInvoiceUrl") || "";
-    } catch {
-      fromSession = "";
     }
     postShipQboClientLog([
       {
-        message: "shipment_complete_mount",
+        message: "open_invoice_click",
         qi_present: !!qi,
         qr_present: !!qr,
-        qe_param: qeParam || null,
-        deeplinkStoredLen: (() => {
-          try {
-            return (sessionStorage.getItem("jrco_lastInvoiceDeeplink") || "").trim().length;
-          } catch {
-            return 0;
-          }
-        })(),
-        hasStateInvoice: !!(state?.invoiceUrl && String(state.invoiceUrl).trim()),
-        resolvedInvoiceUrlLen: invoiceUrl.length,
-        sessionStorageInvoiceLen: fromSession.trim().length,
-        stateMatchesResolved:
-          !!(state?.invoiceUrl && String(state.invoiceUrl).trim() === invoiceUrl),
+        invoiceHost: host,
+        txnId: txn,
+        companyId_param: company,
+        urlLength: url.length,
       },
     ]);
-  }, [invoiceUrl, location.key, state]);
+    if (e.currentTarget.getAttribute("href") !== url) {
+      e.preventDefault();
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
 
   const renderStatus = (ok, label) => (
     <li style={{ marginBottom: "0.75rem", fontSize: "1.1rem" }}>
-      {ok ? "✅" : "❌"} {label}
+      {ok ? "âœ…" : "âŒ"} {label}
     </li>
   );
+
+  const canOpenInvoice = !!invoiceUrl;
+  const openBtnStyle = {
+    margin: "0.5rem",
+    padding: "0.75rem 1.5rem",
+    fontSize: "1rem",
+    display: "inline-block",
+    textDecoration: "none",
+    borderRadius: 4,
+    color: "#fff",
+    backgroundColor: canOpenInvoice ? "#0d6efd" : "#6c757d",
+    border: "1px solid transparent",
+    cursor: canOpenInvoice ? "pointer" : "not-allowed",
+    opacity: canOpenInvoice ? 1 : 0.55,
+    pointerEvents: canOpenInvoice ? "auto" : "none",
+  };
 
   return (
     <div
@@ -265,52 +163,30 @@ export default function ShipmentComplete() {
       <ul style={{ listStyle: "none", padding: 0, lineHeight: 1.6 }}>
         {renderStatus(shippedOk, "Order Marked Shipped")}
         {renderStatus(slipsPrinted, "Packing Slips Generated")}
-        {renderStatus(!!invoiceUrl, "Invoice Created")}
+        {renderStatus(canOpenInvoice, "Invoice Created")}
       </ul>
 
       <div style={{ marginTop: "2rem", textAlign: "center" }}>
-        <button
-          type="button"
-          onClick={() => {
-            if (invoiceUrl) {
-              let txn = "";
-              let company = "";
-              let host = "";
-              try {
-                const u = new URL(invoiceUrl);
-                host = u.hostname || "";
-                txn = u.searchParams.get("txnId") || "";
-                company =
-                  u.searchParams.get("companyId") ||
-                  u.searchParams.get("deeplinkcompanyid") ||
-                  "";
-              } catch {
-                /* ignore */
-              }
-              postShipQboClientLog([
-                {
-                  message: "open_invoice_click",
-                  qi_present: !!qi,
-                  qr_present: !!qr,
-                  invoiceHost: host,
-                  txnId: txn,
-                  companyId_param: company,
-                  urlLength: invoiceUrl.length,
-                },
-              ]);
-              window.open(invoiceUrl, "_blank", "noopener,noreferrer");
-            }
-          }}
-          disabled={!invoiceUrl}
-          className="btn btn-primary"
-          style={{ margin: "0.5rem", padding: "0.75rem 1.5rem", fontSize: "1rem" }}
-        >
-          Open Invoice
-        </button>
+        {canOpenInvoice ? (
+          <a
+            href={invoiceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleOpenInvoice}
+            style={openBtnStyle}
+          >
+            Open Invoice
+          </a>
+        ) : (
+          <button type="button" disabled style={openBtnStyle}>
+            {resolvingInvoice ? "Loading invoice..." : "Open Invoice"}
+          </button>
+        )}
       </div>
 
       <div style={{ textAlign: "center", marginTop: "2rem" }}>
         <button
+          type="button"
           onClick={() => navigate("/")}
           style={{
             color: "#666",
@@ -326,3 +202,4 @@ export default function ShipmentComplete() {
     </div>
   );
 }
+

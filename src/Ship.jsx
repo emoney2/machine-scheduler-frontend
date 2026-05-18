@@ -3,6 +3,10 @@ import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
 import { appendShipmentHistory } from "./shipmentHistoryStorage";
+import {
+  buildQboInvoiceOpenUrl,
+  parseTxnRealmFromInvoiceUrl,
+} from "./qboInvoiceOpenUrl";
 
 function recordShipmentHistoryEntry(shipData, orderIds, jobs, companyHint) {
   const tracking = shipData?.tracking_numbers;
@@ -520,8 +524,13 @@ export default function Ship() {
   /** Kept in sync: invoice id + realm (pair), plus ?qi=&qr=&qe= for refresh-safe Open Invoice. */
   function persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId, qboInvoiceEnv) {
     const inv = String(invoiceUrl || "").trim();
-    const id = String(qboInvoiceId || "").trim();
-    const re = String(qboRealmId || "").trim();
+    let id = String(qboInvoiceId || "").trim();
+    let re = String(qboRealmId || "").trim();
+    if (!id || !re) {
+      const parsed = parseTxnRealmFromInvoiceUrl(inv);
+      if (!id) id = String(parsed.txnId || "").trim();
+      if (!re) re = String(parsed.realmId || "").trim();
+    }
     const qe =
       String(qboInvoiceEnv || "").trim().toLowerCase() === "sandbox"
         ? "sandbox"
@@ -530,7 +539,7 @@ export default function Ship() {
       sessionStorage.setItem("jrco_lastInvoiceUrl", inv || "");
       sessionStorage.setItem("jrco_lastQboInvoiceId", id || "");
       sessionStorage.setItem("jrco_lastQboRealmId", re || "");
-      const canon = buildCanonicalQboInvoiceOpenUrl(id, re, inv, qe);
+      const canon = buildQboInvoiceOpenUrl(id, re, qe, inv);
       if (canon) {
         sessionStorage.setItem("jrco_lastInvoiceDeeplink", canon);
       }
@@ -1494,23 +1503,21 @@ export default function Ship() {
       );
 
       setShippingStage("✅ Complete!");
-      setTimeout(() => {
-        navigate({
-          pathname: "/shipment-complete",
-          search,
-          state: {
-            shippedOk: true,
-            labelsPrinted:
-              Array.isArray(shipData.labels) && shipData.labels.length > 0,
-            slipsPrinted:
-              Array.isArray(shipData.slips) && shipData.slips.length > 0,
-            invoiceUrl,
-            qbo_invoice_id: qboInvoiceId,
-            qbo_realm_id: qboRealmId,
-            qbo_invoice_env: qboInvoiceEnv,
-          },
-        });
-      }, 500);
+      navigate({
+        pathname: "/shipment-complete",
+        search,
+        state: {
+          shippedOk: true,
+          labelsPrinted:
+            Array.isArray(shipData.labels) && shipData.labels.length > 0,
+          slipsPrinted:
+            Array.isArray(shipData.slips) && shipData.slips.length > 0,
+          invoiceUrl,
+          qbo_invoice_id: qboInvoiceId,
+          qbo_realm_id: qboRealmId,
+          qbo_invoice_env: qboInvoiceEnv,
+        },
+      });
     } catch (err) {
       console.error(err);
       alert(err?.message || "Failed to ship.");
