@@ -127,7 +127,7 @@ export default function ShipmentComplete() {
 
   const renderStatus = (ok, label) => (
     <li style={{ marginBottom: "0.75rem", fontSize: "1.1rem" }}>
-      {ok ? "âœ…" : "âŒ"} {label}
+      <span aria-hidden="true">{ok ? "\u2705" : "\u274C"}</span> {label}
     </li>
   );
 
@@ -196,7 +196,7 @@ export default function ShipmentComplete() {
             fontSize: "0.9rem",
           }}
         >
-          ← Back to Shipping
+          {"\u2190"} Back to Shipping
         </button>
       </div>
     </div>
