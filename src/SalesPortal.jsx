@@ -254,7 +254,9 @@ export default function SalesPortal() {
       <p style={{ color: "#666", fontSize: "0.88rem" }}>
         Owed to rep = sum of commission $ where customer has paid QuickBooks and rep has not been
         marked paid. Use Render cron to call <code>POST /api/sales/cron/sync-qbo</code> with{" "}
-        <code>X-Sales-Cron-Secret</code>.
+        <code>X-Sales-Cron-Secret</code>. On the web service, set <code>QBO_TOKEN_JSON</code> (or{" "}
+        <code>QBO_TOKEN_JSON_B64</code>) to the same JSON as <code>qbo_token.json</code> so QuickBooks
+        auth survives deploys; update that secret after reconnecting QuickBooks.
       </p>
       {syncMsg ? <p style={{ fontSize: "0.85rem" }}>{syncMsg}</p> : null}
       <h2 style={{ fontSize: "1.05rem", marginTop: "1.25rem" }}>Outstanding by rep</h2>
