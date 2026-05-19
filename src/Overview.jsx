@@ -780,28 +780,11 @@ const WEEKLY_SALES_GOAL = 375;
 const DAILY_SALES_GOAL = 75;
 const WORK_DAYS_PER_WEEK = 5;
 
-function getEtIsoWeekday() {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    weekday: "short",
-  }).formatToParts(new Date());
-  const wd = parts.find((p) => p.type === "weekday")?.value || "";
-  const map = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 };
-  return map[wd] || 7;
-}
-
 function computeWeeklySalesGoalStats(soldThisWeek) {
   const sold = Number(soldThisWeek);
   if (!Number.isFinite(sold)) return null;
   const remaining = Math.max(0, WEEKLY_SALES_GOAL - sold);
-  const isoWeekday = getEtIsoWeekday();
-  const workDaysLeft =
-    isoWeekday <= WORK_DAYS_PER_WEEK
-      ? WORK_DAYS_PER_WEEK - isoWeekday + 1
-      : 0;
-  const perDayNeeded =
-    workDaysLeft > 0 ? Math.ceil(remaining / workDaysLeft) : remaining;
-  return { remaining, perDayNeeded, workDaysLeft };
+  return { remaining };
 }
 const metricBoxEmbroidery = {
   ...metricBox,
@@ -1780,7 +1763,7 @@ function col(width, center = false) {
                     metrics?.headcovers_sold_this_week
                   );
                   if (!goalStats) return null;
-                  const { remaining, perDayNeeded, workDaysLeft } = goalStats;
+                  const { remaining } = goalStats;
                   return (
                     <>
                       <div style={metricSubtext}>
@@ -1791,15 +1774,6 @@ function col(width, center = false) {
                         {remaining > 0
                           ? `${remaining} more to reach ${WEEKLY_SALES_GOAL}`
                           : `Goal reached (${WEEKLY_SALES_GOAL})`}
-                      </div>
-                      <div style={metricSubtext}>
-                        {remaining > 0 && workDaysLeft > 0
-                          ? `${perDayNeeded}/day needed (${workDaysLeft} work day${
-                              workDaysLeft === 1 ? "" : "s"
-                            } left)`
-                          : remaining > 0
-                            ? `${remaining} remaining`
-                            : "On pace for the week"}
                       </div>
                     </>
                   );
