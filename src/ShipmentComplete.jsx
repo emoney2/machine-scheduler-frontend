@@ -1,69 +1,25 @@
 ﻿// src/ShipmentComplete.jsx
-import React, { useCallback, useEffect, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import React, { useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
-import { resolveShipmentInvoiceUrl } from "./qboInvoiceOpenUrl";
+
+/** QBO sales invoices list — reliable target vs per-invoice deeplinks. */
+export const QBO_OPEN_INVOICES_URL =
+  "https://qbo.intuit.com/app/invoices?jobId=sales-payments";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [searchParams] = useSearchParams();
   const { state } = location;
-  const qi = (searchParams.get("qi") || "").trim();
-  const qr = (searchParams.get("qr") || "").trim();
-  const qeParam = (searchParams.get("qe") || "").trim().toLowerCase();
-
-  const [invoiceUrl, setInvoiceUrl] = useState("");
-  const [resolvingInvoice, setResolvingInvoice] = useState(true);
-
-  const resolveNow = useCallback(() => {
-    return resolveShipmentInvoiceUrl({ qi, qr, qeParam, state });
-  }, [qi, qr, qeParam, state]);
 
   useEffect(() => {
-    let cancelled = false;
-    const delays = [0, 50, 150, 400, 800, 1200];
-    const timers = [];
-    setResolvingInvoice(true);
-
-    delays.forEach((ms, index) => {
-      const timer = setTimeout(() => {
-        if (cancelled) return;
-        const url = resolveNow();
-        if (url) {
-          setInvoiceUrl(url);
-          setResolvingInvoice(false);
-        } else if (index === delays.length - 1) {
-          setResolvingInvoice(false);
-        }
-      }, ms);
-      timers.push(timer);
-    });
-
-    return () => {
-      cancelled = true;
-      timers.forEach(clearTimeout);
-    };
-  }, [location.key, resolveNow]);
-
-  useEffect(() => {
-    let fromSession = "";
-    try {
-      fromSession = sessionStorage.getItem("jrco_lastInvoiceUrl") || "";
-    } catch {
-      fromSession = "";
-    }
     postShipQboClientLog([
       {
         message: "shipment_complete_mount",
-        qi_present: !!qi,
-        qr_present: !!qr,
-        qe_param: qeParam || null,
-        resolvedInvoiceUrlLen: invoiceUrl.length,
-        sessionStorageInvoiceLen: fromSession.trim().length,
+        openInvoicesUrl: QBO_OPEN_INVOICES_URL,
       },
     ]);
-  }, [invoiceUrl, location.key, qi, qr, qeParam]);
+  }, [location.key]);
 
   function mergedShipmentFlags(navState) {
     let shippedOk = navState?.shippedOk ?? false;
@@ -85,44 +41,14 @@ export default function ShipmentComplete() {
 
   const { shippedOk, slipsPrinted, labelsPrinted } = mergedShipmentFlags(state);
 
-  const handleOpenInvoice = (e) => {
-    const url = resolveNow() || invoiceUrl;
-    if (!url) {
-      e.preventDefault();
-      return;
-    }
-    if (url !== invoiceUrl) {
-      setInvoiceUrl(url);
-    }
-    let txn = "";
-    let company = "";
-    let host = "";
-    try {
-      const u = new URL(url);
-      host = u.hostname || "";
-      txn = u.searchParams.get("txnId") || "";
-      company =
-        u.searchParams.get("companyId") ||
-        u.searchParams.get("deeplinkcompanyid") ||
-        "";
-    } catch {
-      /* ignore */
-    }
+  const handleOpenInvoice = () => {
     postShipQboClientLog([
       {
         message: "open_invoice_click",
-        qi_present: !!qi,
-        qr_present: !!qr,
-        invoiceHost: host,
-        txnId: txn,
-        companyId_param: company,
-        urlLength: url.length,
+        openInvoicesUrl: QBO_OPEN_INVOICES_URL,
       },
     ]);
-    if (e.currentTarget.getAttribute("href") !== url) {
-      e.preventDefault();
-      window.open(url, "_blank", "noopener,noreferrer");
-    }
+    window.open(QBO_OPEN_INVOICES_URL, "_blank", "noopener,noreferrer");
   };
 
   const renderStatus = (ok, label) => (
@@ -131,7 +57,7 @@ export default function ShipmentComplete() {
     </li>
   );
 
-  const canOpenInvoice = !!invoiceUrl;
+  const canOpenInvoice = shippedOk;
   const openBtnStyle = {
     margin: "0.5rem",
     padding: "0.75rem 1.5rem",
@@ -163,23 +89,26 @@ export default function ShipmentComplete() {
       <ul style={{ listStyle: "none", padding: 0, lineHeight: 1.6 }}>
         {renderStatus(shippedOk, "Order Marked Shipped")}
         {renderStatus(slipsPrinted, "Packing Slips Generated")}
-        {renderStatus(canOpenInvoice, "Invoice Created")}
+        {renderStatus(shippedOk, "Invoice Created")}
       </ul>
 
       <div style={{ marginTop: "2rem", textAlign: "center" }}>
         {canOpenInvoice ? (
           <a
-            href={invoiceUrl}
+            href={QBO_OPEN_INVOICES_URL}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={handleOpenInvoice}
+            onClick={(e) => {
+              e.preventDefault();
+              handleOpenInvoice();
+            }}
             style={openBtnStyle}
           >
             Open Invoice
           </a>
         ) : (
           <button type="button" disabled style={openBtnStyle}>
-            {resolvingInvoice ? "Loading invoice..." : "Open Invoice"}
+            Open Invoice
           </button>
         )}
       </div>
@@ -202,4 +131,3 @@ export default function ShipmentComplete() {
     </div>
   );
 }
-
