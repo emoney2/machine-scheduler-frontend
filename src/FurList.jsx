@@ -29,6 +29,19 @@ function firstField(obj, names) {
   return null;
 }
 
+/** True when Production Orders / Fur List marks the stamped sheet as printed. */
+function isProcessSheetPrinted(order) {
+  const v = firstField(order, [
+    "Process Sheet Printed",
+    "Process sheet printed",
+    "Fur Printed",
+    "Stamped Printed",
+  ]);
+  if (v === true || v === 1) return true;
+  const s = String(v ?? "").trim().toLowerCase();
+  return s === "yes" || s === "true" || s === "y" || s === "1" || s === "printed";
+}
+
 function businessDaysUntil(target) {
   if (!target) return null;
   const t = new Date(target); t.setHours(0,0,0,0);
@@ -205,7 +218,6 @@ export default function FurList() {
   const [printOrder, setPrintOrder] = useState(null);
   const [printServiceOnline, setPrintServiceOnline] = useState(true);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [printedOrders, setPrintedOrders] = useState({}); // { [orderId]: true }
 
 
 
@@ -373,13 +385,17 @@ export default function FurList() {
     setSelected(next);
   }
 
-  function markOrdersPrinted(orderIds) {
-    if (!orderIds?.length) return;
-    setPrintedOrders(prev => {
-      const next = { ...prev };
-      for (const id of orderIds) next[String(id)] = true;
-      return next;
-    });
+  function applyPrintedToOrders(orderIds) {
+    const ids = new Set((orderIds || []).map(String));
+    if (!ids.size) return;
+    const col = "Process Sheet Printed";
+    setOrders(prev =>
+      prev.map(o => {
+        const id = String(o["Order #"] || "");
+        if (!ids.has(id)) return o;
+        return { ...o, [col]: "Yes" };
+      })
+    );
   }
 
   async function submitPrint(body, { batch = false, batchTotal = 0, orderIdsToMark = [] } = {}) {
@@ -408,7 +424,9 @@ export default function FurList() {
           const detail = result.errors?.[0];
           throw new Error(detail || "No orders printed");
         }
-        markOrdersPrinted(printed.length ? printed : fallback);
+        const ids = printed.length ? printed : fallback;
+        applyPrintedToOrders(ids);
+        await fetchOrders({ refresh: true });
         showToast(`Print sent: ${successCount}/${total} orders`, "success", 3000);
         setSelected({});
       } else {
@@ -416,7 +434,8 @@ export default function FurList() {
         if (!ids.length) {
           throw new Error(result.error || "Print request failed");
         }
-        markOrdersPrinted(ids);
+        applyPrintedToOrders(ids);
+        await fetchOrders({ refresh: true });
         showToast("Print sent to PackingSlipPrinter", "success");
       }
     } catch (err) {
@@ -464,9 +483,8 @@ export default function FurList() {
     70px   /* Ship */
     70px   /* Due */
     90px   /* Hard/Soft */
-    90px   /* Open button */
-    110px  /* Print button */
-    120px  /* Complete button */
+    320px  /* Open + Print + Complete */
+    22px   /* Printed check */
   `;
 
   const gridCompact = `
@@ -480,12 +498,19 @@ export default function FurList() {
     100px  /* Fur Color */
     70px   /* Ship */
     70px   /* Due */
-    90px   /* Open button */
-    110px  /* Print button */
-    120px  /* Complete button */
+    320px  /* Open + Print + Complete */
+    22px   /* Printed check */
   `;
 
   const gridTemplate = compact ? gridCompact : gridFull;
+
+  const actionBtnGrid = {
+    display: "grid",
+    gridTemplateColumns: "90px 110px 120px",
+    gap: "10px",
+    justifyContent: "end",
+    alignItems: "center",
+  };
 
   const cellBase = {
     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textAlign: "center"
@@ -584,7 +609,16 @@ export default function FurList() {
         <div style={cellBase}>Ship</div>
         <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
-        <div style={{ ...cellBase, ...stickyRight(0, "#fafafa"), textAlign: "right" }}>Complete</div>
+        <div
+          style={{
+            ...cellBase,
+            gridColumn: "span 2",
+            ...stickyRight(0, "#fafafa"),
+            textAlign: "right",
+          }}
+        >
+          Actions
+        </div>
       </div>
 
       {/* Content + overlay */}
@@ -637,7 +671,7 @@ export default function FurList() {
             const imageUrl= orderThumbUrl(order);
             const isSaving = !!saving[orderId];
             const sel = !!selected[orderId];
-            const wasPrinted = !!printedOrders[orderId];
+            const wasPrinted = isProcessSheetPrinted(order);
 
             // Card background from Fur Color (with readable text)
             const bg = (() => {
@@ -823,26 +857,14 @@ export default function FurList() {
 
 
 
-                {/* Complete (final sticky cell). Stop click from toggling the card */}
-                {/* Actions (Print, Open, Complete). Stop click from toggling the card */}
+                {/* Actions: fixed-width button grid (aligned across all cards) */}
                 <div
                   onClick={(e) => e.stopPropagation()}
                   style={{
-                    gridColumn: "span 3",
-                    display: "flex",
-                    gap: "10px",
-                    minWidth: 318,
-                    flexShrink: 0,
-                    justifyContent: "flex-end",
-                    alignItems: "center",
-                    whiteSpace: "nowrap",
-                    overflow: "visible",
-                    ...stickyRight(0, sel ? "rgba(37, 99, 235, 0.05)" : bg),
+                    ...actionBtnGrid,
+                    ...stickyRight(22, sel ? "rgba(37, 99, 235, 0.05)" : bg),
                   }}
                 >
-
-
-                  {/* Open */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -850,12 +872,11 @@ export default function FurList() {
                       window.open(url, "_self");
                     }}
                     className="btn"
-                    style={{ background: "#eef6ff", borderColor: "#8cb4ff" }}
+                    style={{ background: "#eef6ff", borderColor: "#8cb4ff", width: "100%" }}
                   >
                     Open
                   </button>
 
-                  {/* Print / Reprint */}
                   <button
                     disabled={!printServiceOnline}
                     onClick={(e) => {
@@ -868,7 +889,8 @@ export default function FurList() {
                       background: printServiceOnline ? "#f0f0f0" : "#ddd",
                       borderColor: printServiceOnline ? "#ccc" : "#999",
                       opacity: printServiceOnline ? 1 : 0.5,
-                      cursor: printServiceOnline ? "pointer" : "not-allowed"
+                      cursor: printServiceOnline ? "pointer" : "not-allowed",
+                      width: "100%",
                     }}
                   >
                     {printServiceOnline
@@ -876,7 +898,6 @@ export default function FurList() {
                       : "Offline"}
                   </button>
 
-                  {/* Complete */}
                   <button
                     disabled={isSaving}
                     onClick={(e) => {
@@ -884,15 +905,24 @@ export default function FurList() {
                       markComplete(order);
                     }}
                     className="btn"
-                    style={{ background: "#e6ffe6", borderColor: "#8ce68c" }}
+                    style={{ background: "#e6ffe6", borderColor: "#8ce68c", width: "100%" }}
                   >
                     {isSaving ? "Saving..." : "Complete"}
                   </button>
+                </div>
 
+                {/* Printed indicator — own column, does not shift buttons */}
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    ...stickyRight(0, sel ? "rgba(37, 99, 235, 0.05)" : bg),
+                  }}
+                >
                   {wasPrinted && (
-                    <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
-                      <PrintedBadge title="Stamped PDF sent to PackingSlipPrinter" />
-                    </div>
+                    <PrintedBadge title="Stamped PDF sent to PackingSlipPrinter" />
                   )}
                 </div>
               </div>
