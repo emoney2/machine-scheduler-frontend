@@ -134,6 +134,36 @@ function priorityPartition(rows, key) {
   return [...yes, ...no];
 }
 
+/** Green circle + check (matches Overview / machine scheduler job cards). */
+function PrintedBadge({ title = "Sent to printer" }) {
+  return (
+    <div
+      title={title}
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: "50%",
+        background: "#b8e6b8",
+        border: "1px solid #2e7d32",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style={{ display: "block" }}>
+        <path
+          d="M1 4 L4 7 L9 1"
+          stroke="#1b5e20"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
 // ---------- Toast ----------
 function Toast({ kind = "success", message, onClose }) {
   if (!message) return null;
@@ -175,6 +205,7 @@ export default function FurList() {
   const [printOrder, setPrintOrder] = useState(null);
   const [printServiceOnline, setPrintServiceOnline] = useState(true);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [printedOrders, setPrintedOrders] = useState({}); // { [orderId]: true }
 
 
 
@@ -342,27 +373,48 @@ export default function FurList() {
     setSelected(next);
   }
 
-  // 🆕 Print handler function
-  async function handlePrint(mode) {
-    if (isPrinting) return; // Prevent double-clicks
-    
+  function markOrdersPrinted(orderIds) {
+    if (!orderIds?.length) return;
+    setPrintedOrders(prev => {
+      const next = { ...prev };
+      for (const id of orderIds) next[String(id)] = true;
+      return next;
+    });
+  }
+
+  async function submitPrint(body, { batch = false, batchTotal = 0 } = {}) {
+    if (isPrinting) return;
     setIsPrinting(true);
     try {
       const response = await fetch(`${BACKEND_ROOT}/print`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order: printOrder,
-          mode
-        })
+        body: JSON.stringify(body),
       });
 
+      const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Print request failed");
+        throw new Error(result.error || "Print request failed");
       }
 
-      showToast(`Print sent (${mode})`, "success");
+      const printed = result.printedOrders || [];
+      if (batch) {
+        const successCount = result.successCount ?? printed.length;
+        const total = result.totalCount ?? batchTotal;
+        if (!successCount) {
+          const detail = result.errors?.[0];
+          throw new Error(detail || "No orders printed");
+        }
+        markOrdersPrinted(printed);
+        showToast(`Print sent: ${successCount}/${total} orders`, "success", 3000);
+        setSelected({});
+      } else {
+        if (!printed.length) {
+          throw new Error(result.error || "Print request failed");
+        }
+        markOrdersPrinted(printed);
+        showToast("Print sent to PackingSlipPrinter", "success");
+      }
     } catch (err) {
       console.error(err);
       showToast(err.message || "Print failed", "error", 2600);
@@ -372,37 +424,18 @@ export default function FurList() {
     }
   }
 
-  // 🆕 Batch print handler function
-  async function handleBatchPrint(mode) {
+  function handlePrint() {
+    if (!printOrder) return;
+    submitPrint({ order: printOrder, mode: "stamped" });
+  }
+
+  function handleBatchPrint() {
     const selectedOrderIds = Object.keys(selected).filter(id => selected[id]);
-    if (!selectedOrderIds.length || isPrinting) return;
-    
-    setIsPrinting(true);
-    try {
-      const response = await fetch(`${BACKEND_ROOT}/print`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orders: selectedOrderIds,
-          mode
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Batch print request failed");
-      }
-
-      const result = await response.json();
-      const successCount = result.successCount || selectedOrderIds.length;
-      showToast(`Batch print sent: ${successCount}/${selectedOrderIds.length} orders (${mode})`, "success", 3000);
-      setSelected({}); // Clear selection after successful batch print
-    } catch (err) {
-      console.error(err);
-      showToast(err.message || "Batch print failed", "error", 2600);
-    } finally {
-      setIsPrinting(false);
-    }
+    if (!selectedOrderIds.length) return;
+    submitPrint(
+      { orders: selectedOrderIds, mode: "stamped" },
+      { batch: true, batchTotal: selectedOrderIds.length }
+    );
   }
 
 
@@ -596,7 +629,7 @@ export default function FurList() {
             const imageUrl= orderThumbUrl(order);
             const isSaving = !!saving[orderId];
             const sel = !!selected[orderId];
-            const processSheetPrinted = order["Process Sheet Printed"] || "";
+            const wasPrinted = !!printedOrders[orderId];
 
             // Card background from Fur Color (with readable text)
             const bg = (() => {
@@ -788,7 +821,7 @@ export default function FurList() {
                   style={{
                     display: "flex",
                     gap: "10px",
-                    width: "300px",        // ⭐ fixed space reserved for all buttons
+                    width: "318px",        // ⭐ fixed space reserved for all buttons + printed badge
                     flexShrink: 0,         // ⭐ prevents shrinking when screen gets tight
                     justifyContent: "flex-end",
                     alignItems: "center",
@@ -827,7 +860,7 @@ export default function FurList() {
                     }}
                   >
                     {printServiceOnline
-                      ? (processSheetPrinted ? "Reprint" : "Print")
+                      ? (wasPrinted ? "Reprint" : "Print")
                       : "Offline"}
                   </button>
 
@@ -843,6 +876,10 @@ export default function FurList() {
                   >
                     {isSaving ? "Saving..." : "Complete"}
                   </button>
+
+                  {wasPrinted && (
+                    <PrintedBadge title="Stamped PDF sent to PackingSlipPrinter" />
+                  )}
                 </div>
               </div>
             );
@@ -878,53 +915,31 @@ export default function FurList() {
               gap: 12
             }}
           >
-            <div style={{ fontSize: 18, marginBottom: 12 }}>
+            <div style={{ fontSize: 18, marginBottom: 8 }}>
               {printOrder ? `Print Order #${printOrder}` : `Print ${selectedCount} Selected Orders`}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 500, color: "#555", marginBottom: 12 }}>
+              {printOrder
+                ? `Sends the newest ${printOrder}_Stamped PDF to PackingSlipPrinter`
+                : "Sends the newest stamped PDF for each selected order to PackingSlipPrinter"}
             </div>
 
             <button
               className="btn"
-              style={{ padding: "14px 10px" }}
-              onClick={() => {
-                if (printOrder) {
-                  handlePrint("both");
-                } else {
-                  handleBatchPrint("both");
-                }
-              }}
+              style={{ padding: "14px 10px", background: "#e6ffe6", borderColor: "#8ce68c" }}
+              onClick={() => (printOrder ? handlePrint() : handleBatchPrint())}
               disabled={isPrinting}
             >
-              Bin sheet + Process Sheet
+              Print
             </button>
 
             <button
               className="btn"
-              style={{ padding: "14px 10px" }}
-              onClick={() => {
-                if (printOrder) {
-                  handlePrint("process");
-                } else {
-                  handleBatchPrint("process");
-                }
-              }}
+              style={{ padding: "10px 10px" }}
+              onClick={() => setShowPrintModal(false)}
               disabled={isPrinting}
             >
-              Process sheet
-            </button>
-
-            <button
-              className="btn"
-              style={{ padding: "14px 10px" }}
-              onClick={() => {
-                if (printOrder) {
-                  handlePrint("binsheet");
-                } else {
-                  handleBatchPrint("binsheet");
-                }
-              }}
-              disabled={isPrinting}
-            >
-              Bin sheet
+              Cancel
             </button>
           </div>
         </div>
