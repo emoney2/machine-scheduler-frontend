@@ -382,7 +382,7 @@ export default function FurList() {
     });
   }
 
-  async function submitPrint(body, { batch = false, batchTotal = 0 } = {}) {
+  async function submitPrint(body, { batch = false, batchTotal = 0, orderIdsToMark = [] } = {}) {
     if (isPrinting) return;
     setIsPrinting(true);
     try {
@@ -397,7 +397,10 @@ export default function FurList() {
         throw new Error(result.error || "Print request failed");
       }
 
-      const printed = result.printedOrders || [];
+      const fromApi = (result.printedOrders || []).map(String);
+      const fallback = (orderIdsToMark || []).map(String);
+      const printed = fromApi.length ? fromApi : fallback;
+
       if (batch) {
         const successCount = result.successCount ?? printed.length;
         const total = result.totalCount ?? batchTotal;
@@ -405,14 +408,15 @@ export default function FurList() {
           const detail = result.errors?.[0];
           throw new Error(detail || "No orders printed");
         }
-        markOrdersPrinted(printed);
+        markOrdersPrinted(printed.length ? printed : fallback);
         showToast(`Print sent: ${successCount}/${total} orders`, "success", 3000);
         setSelected({});
       } else {
-        if (!printed.length) {
+        const ids = printed.length ? printed : fallback;
+        if (!ids.length) {
           throw new Error(result.error || "Print request failed");
         }
-        markOrdersPrinted(printed);
+        markOrdersPrinted(ids);
         showToast("Print sent to PackingSlipPrinter", "success");
       }
     } catch (err) {
@@ -426,7 +430,11 @@ export default function FurList() {
 
   function handlePrint() {
     if (!printOrder) return;
-    submitPrint({ order: printOrder, mode: "stamped" });
+    const id = String(printOrder);
+    submitPrint(
+      { order: id, mode: "stamped" },
+      { orderIdsToMark: [id] }
+    );
   }
 
   function handleBatchPrint() {
@@ -434,7 +442,7 @@ export default function FurList() {
     if (!selectedOrderIds.length) return;
     submitPrint(
       { orders: selectedOrderIds, mode: "stamped" },
-      { batch: true, batchTotal: selectedOrderIds.length }
+      { batch: true, batchTotal: selectedOrderIds.length, orderIdsToMark: selectedOrderIds }
     );
   }
 
@@ -818,14 +826,18 @@ export default function FurList() {
                 {/* Complete (final sticky cell). Stop click from toggling the card */}
                 {/* Actions (Print, Open, Complete). Stop click from toggling the card */}
                 <div
+                  onClick={(e) => e.stopPropagation()}
                   style={{
+                    gridColumn: "span 3",
                     display: "flex",
                     gap: "10px",
-                    width: "318px",        // ⭐ fixed space reserved for all buttons + printed badge
-                    flexShrink: 0,         // ⭐ prevents shrinking when screen gets tight
+                    minWidth: 318,
+                    flexShrink: 0,
                     justifyContent: "flex-end",
                     alignItems: "center",
-                    whiteSpace: "nowrap"
+                    whiteSpace: "nowrap",
+                    overflow: "visible",
+                    ...stickyRight(0, sel ? "rgba(37, 99, 235, 0.05)" : bg),
                   }}
                 >
 
@@ -878,7 +890,9 @@ export default function FurList() {
                   </button>
 
                   {wasPrinted && (
-                    <PrintedBadge title="Stamped PDF sent to PackingSlipPrinter" />
+                    <div onClick={(e) => e.stopPropagation()} style={{ flexShrink: 0 }}>
+                      <PrintedBadge title="Stamped PDF sent to PackingSlipPrinter" />
+                    </div>
                   )}
                 </div>
               </div>
