@@ -472,7 +472,8 @@ export default function FurList() {
   // Added 3 dedicated action columns: Open | Print | Complete
   const gridFull = `
     62px   /* Order */
-    56px   /* Preview */
+    84px   /* Preview (image is 72px wide) */
+    16px   /* Spacer after preview */
     140px  /* Company */
     160px  /* Design */
     50px   /* Qty */
@@ -489,7 +490,8 @@ export default function FurList() {
 
   const gridCompact = `
     62px   /* Order */
-    56px   /* Preview */
+    84px   /* Preview (image is 72px wide) */
+    16px   /* Spacer after preview */
     150px  /* Company */
     140px  /* Design */
     50px   /* Qty */
@@ -599,6 +601,7 @@ export default function FurList() {
       >
         <div style={cellBase}>Order #</div>
         <div style={cellBase}>Preview</div>
+        <div aria-hidden="true" />
         <div style={cellBase}>Company Name</div>
         <div style={cellBase}>Design</div>
         <div style={cellBase}>Qty</div>
@@ -771,8 +774,8 @@ export default function FurList() {
                 <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
 
                 {/* Preview */}
-                <div style={{ display: "grid", placeItems: "center" }}>
-                  <div style={{ width: 72, height: 52, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
+                <div style={{ display: "grid", placeItems: "center", minWidth: 0, overflow: "hidden" }}>
+                  <div style={{ width: 72, maxWidth: "100%", height: 52, overflow: "hidden", borderRadius: 6, border: "1px solid rgba(0,0,0,0.08)", background: "#fff" }}>
                     {imageUrl ? (
                       <img
                         loading="lazy" decoding="async" src={imageUrl} alt="preview"
@@ -787,24 +790,27 @@ export default function FurList() {
                   </div>
                 </div>
 
-                {/* Company Name (shorter + ellipsis) */}
-                <div style={{ 
-                  ...cellBase, 
-                  maxWidth: 100, 
-                  overflow: "hidden", 
-                  textOverflow: "ellipsis", 
-                  whiteSpace: "nowrap" 
+                {/* Spacer — keeps company+ columns clear of preview */}
+                <div aria-hidden="true" />
+
+                {/* Company Name */}
+                <div style={{
+                  ...cellBase,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}>
                   {company}
                 </div>
 
                 {/* Design (usually long, trim) */}
-                <div style={{ 
-                  ...cellBase, 
-                  maxWidth: 120, 
-                  overflow: "hidden", 
-                  textOverflow: "ellipsis", 
-                  whiteSpace: "nowrap" 
+                <div style={{
+                  ...cellBase,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}>
                   {design}
                 </div>
@@ -813,12 +819,12 @@ export default function FurList() {
                 <div style={{ ...cellBase, width: 40 }}>{qty}</div>
 
                 {/* Product — shorten */}
-                <div style={{ 
-                  ...cellBase, 
-                  maxWidth: 90, 
-                  overflow: "hidden", 
-                  textOverflow: "ellipsis", 
-                  whiteSpace: "nowrap" 
+                <div style={{
+                  ...cellBase,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}>
                   {product}
                 </div>
@@ -832,12 +838,12 @@ export default function FurList() {
                 )}
 
                 {/* Fur Color */}
-                <div style={{ 
-                  ...cellBase, 
-                  maxWidth: 90, 
-                  overflow: "hidden", 
-                  textOverflow: "ellipsis", 
-                  whiteSpace: "nowrap" 
+                <div style={{
+                  ...cellBase,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}>
                   {color}
                 </div>
