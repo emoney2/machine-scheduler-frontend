@@ -323,7 +323,21 @@ export default function App() {
 
   // ── Write-guard to prevent snap-back after saving manual state ──
   const manualStateSaveInFlight   = useRef(false);
-  const manualStateWriteGuardUntil = useRef(0); 
+  const manualStateWriteGuardUntil = useRef(0);
+  const MANUAL_STATE_GUARD_MS = 5000;
+  const columnsRef = useRef(null);
+  const placeholdersRef = useRef([]);
+
+  const isManualStateGuarded = () =>
+    manualStateSaveInFlight.current ||
+    Date.now() < manualStateWriteGuardUntil.current;
+
+  const extendManualStateGuard = (ms = MANUAL_STATE_GUARD_MS) => {
+    manualStateWriteGuardUntil.current = Math.max(
+      manualStateWriteGuardUntil.current,
+      Date.now() + ms
+    );
+  };
 
   // Which route are we on? (Scheduler is at "/")
   const location = useLocation();
@@ -419,6 +433,12 @@ export default function App() {
       jobs: []
     },
   });
+  useEffect(() => {
+    columnsRef.current = columns;
+  }, [columns]);
+  useEffect(() => {
+    placeholdersRef.current = placeholders;
+  }, [placeholders]);
   const [links, setLinks]           = useState(() => {
     try { return JSON.parse(localStorage.getItem('jobLinks') || '{}'); }
     catch { return {}; }
@@ -528,7 +548,10 @@ useEffect(() => {
   if (!socket) return;
 
   const onStartTimeUpdated = () => {
-    // Re-fetch from backend so the UI reflects the new timestamp immediately
+    if (isManualStateGuarded()) {
+      console.log("[startTimeUpdated] skip fetch (manual-state guarded)");
+      return;
+    }
     fetchAllCombined();
   };
 
@@ -1171,18 +1194,20 @@ const fetchOrdersEmbroLinksCore = async () => {
       kickMetaWorker();
     }
 
+    const liveCols = columnsRef.current || columns;
+
     // 6) Initialize newCols from current columns (retaining headCount)
     const newCols = {
-      queue:    { ...columns.queue,    jobs: [] },
-      machine1: { ...columns.machine1, jobs: [] },
-      machine2: { ...columns.machine2, jobs: [] },
+      queue:    { ...liveCols.queue,    jobs: [] },
+      machine1: { ...liveCols.machine1, jobs: [] },
+      machine2: { ...liveCols.machine2, jobs: [] },
     };
 
     // 7) Preserve any manual placements
-    columns.machine1.jobs.forEach(job => {
+    liveCols.machine1.jobs.forEach(job => {
       if (jobById[job.id]) jobById[job.id].machineId = 'machine1';
     });
-    columns.machine2.jobs.forEach(job => {
+    liveCols.machine2.jobs.forEach(job => {
       if (jobById[job.id]) jobById[job.id].machineId = 'machine2';
     });
 
@@ -1228,9 +1253,9 @@ const fetchOrdersEmbroLinksCore = async () => {
 const fetchManualStateCore = async (previousCols) => {
   try {
     // If a save just happened (or is happening), skip applying GETs to avoid snap-back
-    if (manualStateSaveInFlight.current || Date.now() < manualStateWriteGuardUntil.current) {
+    if (isManualStateGuarded()) {
       console.log("[manual-state] skip GET (write in-flight or guarded)");
-      return previousCols;
+      return columnsRef.current || previousCols;
     }
 
     // Robust fetch with one quick retry and longer timeout.
@@ -1251,9 +1276,9 @@ const fetchManualStateCore = async (previousCols) => {
     }
 
     // Guard again immediately before applying, in case a save occurred during the GET
-    if (manualStateSaveInFlight.current || Date.now() < manualStateWriteGuardUntil.current) {
+    if (isManualStateGuarded()) {
       console.log("[manual-state] skip APPLY (write in-flight or guarded)");
-      return previousCols;
+      return columnsRef.current || previousCols;
     }
 
     // 2) Overwrite local placeholders state
@@ -1340,6 +1365,11 @@ const fetchManualStateCore = async (previousCols) => {
       return;
     }
 
+    if (isManualStateGuarded()) {
+      console.log("⏸ fetchAllCombined skipped (manual-state guarded)");
+      return;
+    }
+
     if (combinedInFlightRef.current) return;
     combinedInFlightRef.current = true;
 
@@ -1350,8 +1380,13 @@ const fetchManualStateCore = async (previousCols) => {
       // ✅ Step 2: apply manualState on top (machines + placeholders)
       const finalCols = await fetchManualStateCore(cols);
 
-      // ✅ Step 3: commit once
+      // ✅ Step 3: commit once (drop if user dragged while we were fetching)
+      if (isManualStateGuarded()) {
+        console.log("⏸ fetchAllCombined discard (manual-state guarded after fetch)");
+        return;
+      }
       setColumns(finalCols);
+      columnsRef.current = finalCols;
     } catch (err) {
       console.warn("fetchAllCombined failed", err?.message || err);
     } finally {
@@ -1629,15 +1664,10 @@ async function maybeSetStartTimeOnAssign(job) {
 }
 
 const onDragEnd = async (result) => {
-  // 🔍 DEBUGGING INSTRUMENTATION
-  // console.log("🔍 DRAG-END result:", result);
-  // console.log("🔍 BEFORE COLUMNS:", JSON.stringify(columns, null, 2));
+  extendManualStateGuard(MANUAL_STATE_GUARD_MS);
 
   const { source, destination, draggableId } = result;
-  if (!destination) {
-    // console.log("→ No destination, aborting");
-    return;
-  }
+  if (!destination) return;
 
   const srcCol = source.droppableId;
   const dstCol = destination.droppableId;
@@ -1646,8 +1676,10 @@ const onDragEnd = async (result) => {
 
   if (srcCol === dstCol && srcIdxVisual === dstIdxVisual) return;
 
+  const cur = columnsRef.current || columns;
+
   // 1) Extract the full chain from the source column
-  const srcJobs = Array.from(columns[srcCol].jobs);
+  const srcJobs = Array.from(cur[srcCol].jobs);
   const chainIds = getChain(srcJobs, draggableId);
   const chainJobs = chainIds.map(id => srcJobs.find(j => j.id === id));
 
@@ -1679,20 +1711,16 @@ const onDragEnd = async (result) => {
       (a, b) => (indexOf.get(a.id) ?? 1e9) - (indexOf.get(b.id) ?? 1e9)
     );
 
-    // 2a) Update local state
-    setColumns(cols => ({
-      ...cols,
-      [srcCol]: { ...cols[srcCol], jobs: updatedJobs }
-    }));
-
-    // 2b) Persist manual ordering back to the server
     const nextCols = {
-      ...columns,
-      [srcCol]: { ...columns[srcCol], jobs: updatedJobs }
+      ...cur,
+      [srcCol]: { ...cur[srcCol], jobs: updatedJobs }
     };
 
-    const oldTop1 = columns.machine1.jobs[0]?.id || null;
-    const oldTop2 = columns.machine2.jobs[0]?.id || null;
+    setColumns(nextCols);
+    columnsRef.current = nextCols;
+
+    const oldTop1 = cur.machine1.jobs[0]?.id || null;
+    const oldTop2 = cur.machine2.jobs[0]?.id || null;
     const newTop1 = nextCols.machine1.jobs[0]?.id || null;
     const newTop2 = nextCols.machine2.jobs[0]?.id || null;
 
@@ -1704,24 +1732,23 @@ const onDragEnd = async (result) => {
     const manualState = {
       machine1: nextCols.machine1.jobs.map(j => j.id),
       machine2: nextCols.machine2.jobs.map(j => j.id),
-      placeholders
+      placeholders: placeholdersRef.current
     };
     try {
-      manualStateSaveInFlight.current = true;                         // begin guard
+      manualStateSaveInFlight.current = true;
       await axios.post(API_ROOT + '/manualState', manualState);
-      manualStateWriteGuardUntil.current = Date.now() + 1500;         // ignore GETs for 1.5s
-      console.log("[manual-state] wrote (same-col) → write-guard 1500ms");
+      extendManualStateGuard(MANUAL_STATE_GUARD_MS);
     } catch (err) {
       console.error('❌ manualState save failed (same-col reorder)', err);
     } finally {
-      manualStateSaveInFlight.current = false;                        // end guard
+      manualStateSaveInFlight.current = false;
     }
     setManualReorder(true);
     return;
   }
 
   // 3) Cross-column move: build the destination jobs array
-  const dstJobs = Array.from(columns[dstCol].jobs);
+  const dstJobs = Array.from(cur[dstCol].jobs);
   const movedJobs = chainJobs.map(job => ({
     ...job,
     machineId: dstCol === 'queue' ? 'queue' : dstCol,
@@ -1749,9 +1776,9 @@ const onDragEnd = async (result) => {
 
   // 5) Assemble and reschedule all columns
   const nextCols = {
-    ...columns,
-    [srcCol]: { ...columns[srcCol], jobs: newSrcJobs },
-    [dstCol]: { ...columns[dstCol], jobs: dstJobs }
+    ...cur,
+    [srcCol]: { ...cur[srcCol], jobs: newSrcJobs },
+    [dstCol]: { ...cur[dstCol], jobs: dstJobs }
   };
 
   const machineKeyLabels = {
@@ -1790,25 +1817,23 @@ const onDragEnd = async (result) => {
   // Always keep queue sorted by your rule
   nextCols.queue.jobs = sortQueue(nextCols.queue.jobs);
 
-  // update state
   setColumns(nextCols);
-  // console.log('⏹ onDragEnd end (cross-col), new columns:', nextCols);
+  columnsRef.current = nextCols;
 
   // 6) Persist the shared manualState to backend **including placeholders**
   const manualState = {
     machine1: nextCols.machine1.jobs.map(j => j.id),
     machine2: nextCols.machine2.jobs.map(j => j.id),
-    placeholders
+    placeholders: placeholdersRef.current
   };
   try {
-    manualStateSaveInFlight.current = true;                         // begin guard
+    manualStateSaveInFlight.current = true;
     await axios.post(API_ROOT + '/manualState', manualState);
-    manualStateWriteGuardUntil.current = Date.now() + 1500;         // ignore GETs for 1.5s
-    console.log("[manual-state] wrote (cross-col) → write-guard 1500ms");
+    extendManualStateGuard(MANUAL_STATE_GUARD_MS);
   } catch (err) {
     console.error('❌ manualState save failed (cross-col)', err);
   } finally {
-    manualStateSaveInFlight.current = false;                        // end guard
+    manualStateSaveInFlight.current = false;
   }
   // NEW: only set start time when moved into a machine column (preserves drop index)
   if (dstCol === 'machine1' || dstCol === 'machine2') {

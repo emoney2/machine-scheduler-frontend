@@ -4,6 +4,14 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
 import axios from 'axios';
 
+/** e.g. 18702 → "19K" (round up to the nearest 1,000 stitches) */
+function formatStitchCountK(job) {
+  const raw = Number(job?.stitch_count ?? job?.stitchCount ?? 0);
+  if (!Number.isFinite(raw) || raw <= 0) return null;
+  const k = Math.ceil(raw / 1000);
+  return `${k}K`;
+}
+
 export default function Section9(props) {
   const [status, setStatus] = useState('');
   const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
@@ -608,6 +616,20 @@ export default function Section9(props) {
         mStatus = 'green';
       }
       const allGreen = dStatus === 'green' && tStatus === 'green' && mStatus === 'green';
+      const stitchLabel = formatStitchCountK(job);
+      const stitchCountEl = stitchLabel ? (
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: '#000',
+            lineHeight: 1,
+            flexShrink: 0
+          }}
+        >
+          {stitchLabel}
+        </span>
+      ) : null;
       const letterStyle = (color) => {
         if (color === 'gray') {
           return {
@@ -626,18 +648,24 @@ export default function Section9(props) {
       };
       if (allGreen) {
         return (
-          <div title="Digitized, thread & material ready" style={{ width: 18, height: 18, borderRadius: '50%', background: '#b8e6b8', border: '1px solid #2e7d32', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style={{ display: 'block' }}>
-              <path d="M1 4 L4 7 L9 1" stroke="#1b5e20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+            <div title="Digitized, thread & material ready" style={{ width: 18, height: 18, borderRadius: '50%', background: '#b8e6b8', border: '1px solid #2e7d32', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="10" height="8" viewBox="0 0 10 8" fill="none" style={{ display: 'block' }}>
+                <path d="M1 4 L4 7 L9 1" stroke="#1b5e20" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+            {stitchCountEl}
           </div>
         );
       }
       return (
-        <div style={{ display: 'flex', gap: 2, flexShrink: 0 }} title="D=Digitized, T=Thread, M=Material">
-          <span style={letterStyle(dStatus)} title="Digitized">D</span>
-          <span style={letterStyle(tStatus)} title="Thread">T</span>
-          <span style={letterStyle(mStatus)} title="Material">M</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 2, flexShrink: 0 }} title="D=Digitized, T=Thread, M=Material">
+            <span style={letterStyle(dStatus)} title="Digitized">D</span>
+            <span style={letterStyle(tStatus)} title="Thread">T</span>
+            <span style={letterStyle(mStatus)} title="Material">M</span>
+          </div>
+          {stitchCountEl}
         </div>
       );
     })()}
