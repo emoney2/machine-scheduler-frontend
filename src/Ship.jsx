@@ -1526,6 +1526,85 @@ export default function Ship() {
     }
   };
 
+  const refreshJobsForCurrentCompany = async () => {
+    const company = companyInput.trim();
+    if (!company) return;
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/jobs-for-company?company=${encodeURIComponent(company)}`,
+        { credentials: "include" }
+      );
+      if (res.status === 401) {
+        setShowLoginModal(true);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) {
+        console.error("Fetch error:", data.error);
+        return;
+      }
+      const incompleteJobs = (data.jobs || []).filter((job) => {
+        const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
+        const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
+        return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
+      });
+      const updatedJobs = incompleteJobs.map((job) => {
+        const qty = Number(job.Quantity ?? job.quantity ?? 0);
+        return {
+          ...job,
+          shipQty: qty,
+          ShippedQty: qty,
+        };
+      });
+      setJobs(updatedJobs);
+      setSelected((prevSelected) =>
+        prevSelected.filter((id) =>
+          updatedJobs.some((j) => j.orderId.toString() === id)
+        )
+      );
+    } catch (err) {
+      console.error("Error refreshing jobs:", err);
+    }
+  };
+
+  const handleMarkAsShipped = async () => {
+    const shopifySelected = selected.filter((id) => {
+      const j = jobs.find((x) => String(x.orderId) === String(id));
+      return j && isShopifyJob(j);
+    });
+    if (shopifySelected.length === 0) {
+      alert("Select at least one Shopify order.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/mark-shipped`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          order_ids: shopifySelected,
+          shipped_quantities: Object.fromEntries(
+            jobs
+              .filter((j) => shopifySelected.includes(j.orderId.toString()))
+              .map((j) => [j.orderId, j.shipQty])
+          ),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      await refreshJobsForCurrentCompany();
+      setSelected([]);
+    } catch (err) {
+      console.error(err);
+      alert(err?.message || "Failed to mark as shipped.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleBillOnly = async () => {
     if (selected.length === 0) {
       alert("Select at least one job to ship.");
@@ -2647,10 +2726,32 @@ export default function Ship() {
             </button>
           )}
           {selectionIncludesShopify && (
-            <span style={{ fontSize: 13, color: "#1565c0", maxWidth: 420, lineHeight: 1.35 }}>
-              Shopify retail: no QuickBooks. UPS labels first — then we attach tracking in Shopify and open the admin order so you can use{" "}
-              <strong>Print → Print packing slip</strong>.
-            </span>
+            <>
+              <button
+                type="button"
+                onClick={handleMarkAsShipped}
+                disabled={isShippingOverlay || loading}
+                aria-label="Mark as Shipped: update shipped quantity on the production sheet only"
+                title="Mark as Shipped: update shipped quantity on the production sheet only"
+                style={{
+                  minHeight: 44,
+                  padding: "10px 18px",
+                  borderRadius: 10,
+                  border: "2px solid #1565c0",
+                  background: "linear-gradient(180deg, #fafafa 0%, #e3f2fd 100%)",
+                  color: "#0d47a1",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  cursor: (isShippingOverlay || loading) ? "not-allowed" : "pointer",
+                  opacity: (isShippingOverlay || loading) ? 0.55 : 1,
+                }}
+              >
+                Mark as Shipped
+              </button>
+              <span style={{ fontSize: 13, color: "#1565c0", maxWidth: 420, lineHeight: 1.35 }}>
+                Ship in Shopify admin, then use <strong>Mark as Shipped</strong> to update the sheet. Or use the UPS button here for labels through your UPS account.
+              </span>
+            </>
           )}
         </div>
       )}
