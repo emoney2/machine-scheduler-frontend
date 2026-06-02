@@ -44,7 +44,7 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle, repView
             <th style={thStyle}>Qty</th>
             <th style={thStyle}>Sales</th>
             <th style={thStyle}>Commission</th>
-            <th style={thStyle}>Customer paid</th>
+            <th style={thStyle}>{repView ? "Customer has paid" : "Customer paid"}</th>
             <th style={thStyle}>Rep paid</th>
             {repView ? <th style={thStyle}>Due date</th> : <th style={thStyle}>Stage</th>}
             {!repView ? <th style={thStyle}>Invoice #</th> : null}
@@ -109,8 +109,9 @@ function SummaryCards({ owed, unpaidCommission, orderCount, repView = false }) {
         <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase" }}>Owed now</div>
         <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{money(owed)}</div>
         {repView ? (
-          <div style={{ fontSize: "0.8rem", color: "#666" }}>
-            Customer has paid and Commission will be paid at the end of the month
+          <div style={{ fontSize: "0.8rem", color: "#666", lineHeight: 1.45 }}>
+            <div>Customer has paid</div>
+            <div>Commission will be paid at the end of the month</div>
           </div>
         ) : (
           <div style={{ fontSize: "0.8rem", color: "#666" }}>Customer paid (QBO) — pay rep</div>
