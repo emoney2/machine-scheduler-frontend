@@ -23,12 +23,11 @@ const tableWrap = { overflowX: "auto", border: "1px solid #ddd", borderRadius: 6
 const thStyle = { padding: 8, background: "#f5f5f5", textAlign: "left" };
 const tdStyle = { padding: 8 };
 
-function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle }) {
+function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle, repView = false }) {
   if (!rows?.length) {
     return (
       <p style={{ color: "#666", fontSize: "0.88rem", margin: "0.5rem 0" }}>
-        No unpaid rep orders. Orders come from Production Orders (Google Sheets) with REP set in
-        column AQ.
+        {repView ? "No orders to show." : "No unpaid rep orders. Orders come from Production Orders (Google Sheets) with REP set in column AQ."}
       </p>
     );
   }
@@ -47,8 +46,8 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle }) {
             <th style={thStyle}>Commission</th>
             <th style={thStyle}>Customer paid</th>
             <th style={thStyle}>Rep paid</th>
-            <th style={thStyle}>Stage</th>
-            <th style={thStyle}>Invoice #</th>
+            {repView ? <th style={thStyle}>Due date</th> : <th style={thStyle}>Stage</th>}
+            {!repView ? <th style={thStyle}>Invoice #</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -81,8 +80,12 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle }) {
                 <td style={tdStyle}>{money(r.commission ?? r.estimatedCommission ?? r["Commission $"])}</td>
                 <td style={tdStyle}>{cust}</td>
                 <td style={tdStyle}>{rp}</td>
-                <td style={tdStyle}>{r.stage || "—"}</td>
-                <td style={tdStyle}>{r.invoiceNum || r["Invoice #"] || "—"}</td>
+                {repView ? (
+                  <td style={tdStyle}>{r.dueDate || "—"}</td>
+                ) : (
+                  <td style={tdStyle}>{r.stage || "—"}</td>
+                )}
+                {!repView ? <td style={tdStyle}>{r.invoiceNum || r["Invoice #"] || "—"}</td> : null}
               </tr>
             );
           })}
@@ -92,7 +95,7 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle }) {
   );
 }
 
-function SummaryCards({ owed, unpaidCommission, orderCount }) {
+function SummaryCards({ owed, unpaidCommission, orderCount, repView = false }) {
   const card = {
     flex: "1 1 160px",
     padding: "0.75rem 1rem",
@@ -105,17 +108,27 @@ function SummaryCards({ owed, unpaidCommission, orderCount }) {
       <div style={card}>
         <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase" }}>Owed now</div>
         <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{money(owed)}</div>
-        <div style={{ fontSize: "0.8rem", color: "#666" }}>Customer paid (QBO) — pay rep</div>
+        {repView ? (
+          <div style={{ fontSize: "0.8rem", color: "#666" }}>
+            Customer has paid and Commission will be paid at the end of the month
+          </div>
+        ) : (
+          <div style={{ fontSize: "0.8rem", color: "#666" }}>Customer paid (QBO) — pay rep</div>
+        )}
       </div>
       <div style={card}>
         <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase" }}>Unpaid commission</div>
         <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{money(unpaidCommission)}</div>
-        <div style={{ fontSize: "0.8rem", color: "#666" }}>All sheet orders not paid to rep</div>
+        {!repView ? (
+          <div style={{ fontSize: "0.8rem", color: "#666" }}>All sheet orders not paid to rep</div>
+        ) : null}
       </div>
       <div style={card}>
         <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase" }}>Orders</div>
         <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{orderCount}</div>
-        <div style={{ fontSize: "0.8rem", color: "#666" }}>Production Orders with REP</div>
+        {!repView ? (
+          <div style={{ fontSize: "0.8rem", color: "#666" }}>Production Orders with REP</div>
+        ) : null}
       </div>
     </div>
   );
@@ -299,15 +312,15 @@ export default function SalesPortal() {
             Sign out
           </button>
         </div>
-        <p style={{ color: "#555", fontSize: "0.9rem" }}>
-          Your orders are every Production Orders row with your REP. Commission is 12% of price ×
-          qty. <strong>Customer paid</strong> comes from QuickBooks after the order ships and is
-          invoiced; when that shows Y, the company owes you that commission.
-        </p>
         {error ? <p style={{ color: "crimson", fontSize: "0.9rem" }}>{error}</p> : null}
-        <SummaryCards owed={owed} unpaidCommission={unpaidTotal} orderCount={orders.length} />
-        <h2 style={{ fontSize: "1.05rem", marginTop: "1rem" }}>Your orders (rep not paid yet)</h2>
-        <OrdersTable rows={orders} />
+        <SummaryCards
+          owed={owed}
+          unpaidCommission={unpaidTotal}
+          orderCount={orders.length}
+          repView
+        />
+        <h2 style={{ fontSize: "1.05rem", marginTop: "1rem" }}>Your orders</h2>
+        <OrdersTable rows={orders} repView />
       </div>
     );
   }
