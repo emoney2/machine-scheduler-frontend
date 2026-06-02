@@ -16,7 +16,6 @@ export default function SalesPortal() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [repRows, setRepRows] = useState([]);
-  const [adminRows, setAdminRows] = useState([]);
   const [summaryByRep, setSummaryByRep] = useState({});
   const [selectedInvoices, setSelectedInvoices] = useState(() => new Set());
   const [syncMsg, setSyncMsg] = useState("");
@@ -54,7 +53,6 @@ export default function SalesPortal() {
           const { data } = await axios.get(`${API_ROOT}/sales/admin/ledger`, {
             withCredentials: true,
           });
-          setAdminRows(data.rows || []);
           setSummaryByRep(data.summaryByRep || {});
         } catch (e) {
           setError(e.response?.data?.error || "Failed to load admin ledger");
@@ -87,7 +85,6 @@ export default function SalesPortal() {
         const { data } = await axios.get(`${API_ROOT}/sales/admin/ledger`, {
           withCredentials: true,
         });
-        setAdminRows(data.rows || []);
         setSummaryByRep(data.summaryByRep || {});
       }
     } catch (err) {
@@ -99,7 +96,6 @@ export default function SalesPortal() {
     await axios.post(`${API_ROOT}/sales/logout`, {}, { withCredentials: true });
     setSession(null);
     setRepRows([]);
-    setAdminRows([]);
     setSummaryByRep({});
     setSelectedInvoices(new Set());
   };
@@ -113,6 +109,37 @@ export default function SalesPortal() {
       else n.add(k);
       return n;
     });
+  };
+
+  const repSections = Object.entries(summaryByRep).sort(([a], [b]) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+
+  const renderAdminRow = (r, i) => {
+    const id = String(r["Invoice QBO Id"] || "").trim();
+    const cust = String(r["Customer paid"] || "").toUpperCase();
+    const rp = String(r["Rep paid"] || "").toUpperCase();
+    const canSelect = cust === "Y" && rp !== "Y";
+    return (
+      <tr key={`${id}-${i}`} style={{ borderTop: "1px solid #eee" }}>
+        <td style={{ padding: 6, textAlign: "center" }}>
+          {canSelect ? (
+            <input
+              type="checkbox"
+              checked={selectedInvoices.has(id)}
+              onChange={() => toggleInvoice(id)}
+              aria-label={`Select invoice ${id}`}
+            />
+          ) : null}
+        </td>
+        <td style={{ padding: 6 }}>{r["Order #s"]}</td>
+        <td style={{ padding: 6 }}>{r["Invoice #"]}</td>
+        <td style={{ padding: 6 }}>{money(r["Product subtotal"])}</td>
+        <td style={{ padding: 6 }}>{money(r["Commission $"])}</td>
+        <td style={{ padding: 6 }}>{r["Customer paid"]}</td>
+        <td style={{ padding: 6 }}>{r["Rep paid"]}</td>
+      </tr>
+    );
   };
 
   const markRepPaid = async () => {
@@ -132,7 +159,6 @@ export default function SalesPortal() {
       const { data: d2 } = await axios.get(`${API_ROOT}/sales/admin/ledger`, {
         withCredentials: true,
       });
-      setAdminRows(d2.rows || []);
       setSummaryByRep(d2.summaryByRep || {});
     } catch (err) {
       alert(err.response?.data?.error || "Mark paid failed");
@@ -261,64 +287,66 @@ export default function SalesPortal() {
       {syncMsg ? <p style={{ fontSize: "0.85rem" }}>{syncMsg}</p> : null}
       <h2 style={{ fontSize: "1.05rem", marginTop: "1.25rem" }}>Outstanding by rep</h2>
       <ul style={{ margin: "0.25rem 0 1rem", paddingLeft: "1.1rem" }}>
-        {Object.keys(summaryByRep).length === 0 ? (
-          <li style={{ color: "#666" }}>No data</li>
+        {repSections.length === 0 ? (
+          <li style={{ color: "#666" }}>No rep commission rows</li>
         ) : (
-          Object.entries(summaryByRep).map(([rep, v]) => (
+          repSections.map(([rep, v]) => (
             <li key={rep}>
               <strong>{rep}</strong>: {money(v.commission || 0)} owed
             </li>
           ))
         )}
       </ul>
-      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <button type="button" onClick={markRepPaid} style={{ padding: "0.4rem 0.9rem" }}>
           Mark selected rep-paid
         </button>
       </div>
-      <div style={{ overflowX: "auto", border: "1px solid #ddd", borderRadius: 6 }}>
-        <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.82rem" }}>
-          <thead>
-            <tr style={{ background: "#f5f5f5", textAlign: "left" }}>
-              <th style={{ padding: 6 }} />
-              <th style={{ padding: 6 }}>Rep</th>
-              <th style={{ padding: 6 }}>Order #s</th>
-              <th style={{ padding: 6 }}>Invoice #</th>
-              <th style={{ padding: 6 }}>Commission</th>
-              <th style={{ padding: 6 }}>Cust paid</th>
-              <th style={{ padding: 6 }}>Rep paid</th>
-            </tr>
-          </thead>
-          <tbody>
-            {adminRows.map((r, i) => {
-              const id = String(r["Invoice QBO Id"] || "").trim();
-              const cust = String(r["Customer paid"] || "").toUpperCase();
-              const rp = String(r["Rep paid"] || "").toUpperCase();
-              const canSelect = cust === "Y" && rp !== "Y";
-              return (
-                <tr key={`${id}-${i}`} style={{ borderTop: "1px solid #eee" }}>
-                  <td style={{ padding: 6, textAlign: "center" }}>
-                    {canSelect ? (
-                      <input
-                        type="checkbox"
-                        checked={selectedInvoices.has(id)}
-                        onChange={() => toggleInvoice(id)}
-                        aria-label={`Select invoice ${id}`}
-                      />
-                    ) : null}
-                  </td>
-                  <td style={{ padding: 6 }}>{r.Rep}</td>
-                  <td style={{ padding: 6 }}>{r["Order #s"]}</td>
-                  <td style={{ padding: 6 }}>{r["Invoice #"]}</td>
-                  <td style={{ padding: 6 }}>{money(r["Commission $"])}</td>
-                  <td style={{ padding: 6 }}>{r["Customer paid"]}</td>
-                  <td style={{ padding: 6 }}>{r["Rep paid"]}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {repSections.length === 0 ? (
+        <p style={{ color: "#666" }}>No rep orders in the commission ledger.</p>
+      ) : (
+        repSections.map(([rep, v]) => {
+          const rows = v.rows || [];
+          return (
+            <section key={rep} style={{ marginBottom: "1.75rem" }}>
+              <h3 style={{ fontSize: "1rem", margin: "0 0 0.5rem" }}>
+                {rep}
+                <span style={{ fontWeight: 400, color: "#555", fontSize: "0.88rem" }}>
+                  {" "}
+                  — {rows.length} invoice{rows.length === 1 ? "" : "s"}
+                  {(v.commission || 0) > 0 ? ` · ${money(v.commission)} owed` : ""}
+                </span>
+              </h3>
+              <div style={{ overflowX: "auto", border: "1px solid #ddd", borderRadius: 6 }}>
+                <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.82rem" }}>
+                  <thead>
+                    <tr style={{ background: "#f5f5f5", textAlign: "left" }}>
+                      <th style={{ padding: 6 }} />
+                      <th style={{ padding: 6 }}>Order #s</th>
+                      <th style={{ padding: 6 }}>Invoice #</th>
+                      <th style={{ padding: 6 }}>Product subtotal</th>
+                      <th style={{ padding: 6 }}>Commission</th>
+                      <th style={{ padding: 6 }}>Cust paid</th>
+                      <th style={{ padding: 6 }}>Rep paid</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: 10, color: "#666" }}>
+                          No rows
+                        </td>
+                      </tr>
+                    ) : (
+                      rows.map((r, i) => renderAdminRow(r, i))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          );
+        })
+      )}
     </div>
   );
 }
