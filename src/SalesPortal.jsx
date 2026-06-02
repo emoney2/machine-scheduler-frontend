@@ -131,6 +131,7 @@ export default function SalesPortal() {
   const [owed, setOwed] = useState(0);
   const [unpaidTotal, setUnpaidTotal] = useState(0);
   const [summaryByRep, setSummaryByRep] = useState({});
+  const [meta, setMeta] = useState(null);
   const [selectedInvoices, setSelectedInvoices] = useState(() => new Set());
 
   const ordersFromPayload = (data) => data.orders || data.pipelineOrders || data.commissionRows || data.rows || [];
@@ -140,11 +141,13 @@ export default function SalesPortal() {
     setOrders(list);
     setOwed(data.owed ?? 0);
     setUnpaidTotal(data.unpaidCommission ?? data.pipelineCommission ?? 0);
+    setMeta(data.meta || null);
   };
 
   const applyAdminPayload = (data) => {
     setSummaryByRep(data.summaryByRep || {});
     setOrders(ordersFromPayload(data));
+    setMeta(data.meta || null);
   };
 
   const refreshSession = useCallback(async () => {
@@ -208,6 +211,7 @@ export default function SalesPortal() {
     setOwed(0);
     setUnpaidTotal(0);
     setSummaryByRep({});
+    setMeta(null);
     setSelectedInvoices(new Set());
   };
 
@@ -337,10 +341,27 @@ export default function SalesPortal() {
         </button>
       </div>
       {repSections.length === 0 ? (
-        <p style={{ color: "#666" }}>
-          No rep orders with outstanding rep payment. Set <strong>REP</strong> on Production Orders
-          (column AQ) for each sales order.
-        </p>
+        <div style={{ color: "#666" }}>
+          <p>
+            No rep orders with outstanding rep payment. Each row needs a name under the{" "}
+            <strong>Sales Rep</strong> column on Production Orders (column AQ).
+          </p>
+          {meta ? (
+            <p style={{ fontSize: "0.82rem", marginTop: 8 }}>
+              Debug: reading <code>{meta.sheetRange}</code> — {meta.productionRowCount} production
+              row(s), {meta.rowsWithRep} with Sales Rep filled
+              {meta.repColumn ? (
+                <>
+                  , column &quot;{meta.repColumn}&quot;
+                  {meta.repColumnIndex != null ? ` (index ${meta.repColumnIndex})` : ""}
+                </>
+              ) : (
+                <> — Sales Rep column not found in header row</>
+              )}
+              .
+            </p>
+          ) : null}
+        </div>
       ) : (
         repSections.map(([rep, v]) => {
           const repOrders = v.orders || v.pipelineOrders || v.commissionRows || v.rows || [];
