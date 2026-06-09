@@ -784,15 +784,15 @@ export default function Section9(props) {
                                       <span
                                         style={{
                                           flexShrink: 0,
-                                          display: 'inline-block',
-                                          width: 20,
-                                          height: 20,
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          width: 28,
+                                          height: 28,
                                           borderRadius: '50%',
                                           background: '#000',
                                           color: base,
-                                          lineHeight: '20px',
-                                          textAlign: 'center',
-                                          fontSize: isPh ? 13 : 11,
+                                          fontSize: isPh ? 13 : 10,
                                           fontWeight: 'bold',
                                           marginRight: 4
                                         }}
