@@ -300,6 +300,53 @@ export default function OrderSubmission() {
     previewUrl: ""
   });
 
+  const [useOrderShipAddress, setUseOrderShipAddress] = useState(false);
+  const [showOrderShipAddressModal, setShowOrderShipAddressModal] = useState(false);
+  const [orderShipAddressForm, setOrderShipAddressForm] = useState({
+    companyName: "",
+    contactName: "",
+    phone: "",
+    street1: "",
+    street2: "",
+    city: "",
+    state: "",
+    zip: "",
+  });
+
+  const normalizeOrderShipAddress = (raw = {}) => {
+    const toStateAbbr = (v = "") => String(v || "").trim().toUpperCase().slice(0, 2);
+    const toZip5 = (v = "") => {
+      const m = String(v || "").match(/(\d{5})/);
+      return m ? m[1] : "";
+    };
+    return {
+      companyName: String(raw.companyName || "").trim(),
+      contactName: String(raw.contactName || "").trim(),
+      phone: String(raw.phone || "").trim(),
+      street1: String(raw.street1 || "").trim(),
+      street2: String(raw.street2 || "").trim(),
+      city: String(raw.city || "").trim(),
+      state: toStateAbbr(raw.state),
+      zip: toZip5(raw.zip),
+    };
+  };
+
+  const validateOrderShipAddress = (raw = {}) => {
+    const a = normalizeOrderShipAddress(raw);
+    if (!a.street1 || !a.city || a.state.length !== 2 || a.zip.length !== 5) {
+      return {
+        ok: false,
+        message: "Please enter a valid shipping address (street, city, 2-letter state, 5-digit ZIP).",
+      };
+    }
+    return { ok: true, value: a };
+  };
+
+  const handleOrderShipAddressInputChange = (e) => {
+    const { name, value } = e.target;
+    setOrderShipAddressForm((prev) => ({ ...prev, [name]: value }));
+  };
+
   const handleReorderChange = (e) => {
     const { name, value } = e.target;
     setReorderData(d => ({ ...d, [name]: value }));
@@ -904,6 +951,17 @@ const submitForm = async () => {
     alert("Please select one or more production files.");
     return;
   }
+  if (useOrderShipAddress) {
+    const checked = validateOrderShipAddress(orderShipAddressForm);
+    if (!checked.ok) {
+      setIsSubmittingOverlay(false);
+      window._isSubmittingOrder = false;
+      setShowOrderShipAddressModal(true);
+      alert(checked.message);
+      return;
+    }
+  }
+
   const fd = new FormData();
   Object.entries(form).forEach(([key, value]) => {
     if (key === "materials") {
@@ -939,6 +997,19 @@ const submitForm = async () => {
 
   // 🖨️ Print column: use checkbox (orderHasPrint) so you can submit YES before file is ready
   fd.append("print", orderHasPrint ? "YES" : "NO");
+
+  if (useOrderShipAddress) {
+    const addr = validateOrderShipAddress(orderShipAddressForm).value;
+    fd.append("useOrderShipAddress", "1");
+    fd.append("orderShipCompany", addr.companyName);
+    fd.append("orderShipContact", addr.contactName);
+    fd.append("orderShipPhone", addr.phone);
+    fd.append("orderShipStreet1", addr.street1);
+    fd.append("orderShipStreet2", addr.street2);
+    fd.append("orderShipCity", addr.city);
+    fd.append("orderShipState", addr.state);
+    fd.append("orderShipZip", addr.zip);
+  }
 
   // 🖨️ Append printFiles
   if (printFiles.length > 0) {
@@ -2760,6 +2831,42 @@ const handleSaveNewCompany = async () => {
           <legend>Additional Info</legend>
           <div style={{ display: "grid", gap: "0.5rem" }}>
             <div>
+              <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={useOrderShipAddress}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setUseOrderShipAddress(checked);
+                    if (checked) {
+                      setShowOrderShipAddressModal(true);
+                    } else {
+                      setOrderShipAddressForm({
+                        companyName: "",
+                        contactName: "",
+                        phone: "",
+                        street1: "",
+                        street2: "",
+                        city: "",
+                        state: "",
+                        zip: "",
+                      });
+                    }
+                  }}
+                />
+                Ship to a different address for this order
+              </label>
+              {useOrderShipAddress && (
+                <button
+                  type="button"
+                  onClick={() => setShowOrderShipAddressModal(true)}
+                  style={{ marginTop: "0.35rem", padding: "0.35rem 0.75rem" }}
+                >
+                  Edit order shipping address
+                </button>
+              )}
+            </div>
+            <div>
               <label>
                 Notes<br />
                 <textarea
@@ -2929,6 +3036,85 @@ const handleSaveNewCompany = async () => {
         {materialNames.map((m) => <option key={m} value={m} />)}
       </datalist>
       {/* ─────────────────────────────────────────────────────────────────── */}
+
+      {showOrderShipAddressModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 10004,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "12px",
+            boxSizing: "border-box",
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="order-ship-address-title"
+        >
+          <div
+            style={{
+              background: "#fafafa",
+              borderRadius: 14,
+              width: "min(620px, 100%)",
+              maxHeight: "min(92vh, 740px)",
+              padding: "14px 16px 12px",
+              boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
+              border: "1px solid #e0e0e0",
+              overflow: "auto",
+            }}
+          >
+            <h3 id="order-ship-address-title" style={{ margin: "0 0 6px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
+              Order shipping address
+            </h3>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#546e7a" }}>
+              Saved on this order only. When you ship this order later, this address will be used instead of the company default.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <input name="companyName" value={orderShipAddressForm.companyName} onChange={handleOrderShipAddressInputChange} placeholder="Company Name (optional)" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="contactName" value={orderShipAddressForm.contactName} onChange={handleOrderShipAddressInputChange} placeholder="Contact Name (optional)" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="phone" value={orderShipAddressForm.phone} onChange={handleOrderShipAddressInputChange} placeholder="Phone (optional)" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <div />
+              <input name="street1" value={orderShipAddressForm.street1} onChange={handleOrderShipAddressInputChange} placeholder="Street Address 1 *" style={{ gridColumn: "1 / span 2", padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="street2" value={orderShipAddressForm.street2} onChange={handleOrderShipAddressInputChange} placeholder="Street Address 2" style={{ gridColumn: "1 / span 2", padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="city" value={orderShipAddressForm.city} onChange={handleOrderShipAddressInputChange} placeholder="City *" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+              <input name="state" value={orderShipAddressForm.state} onChange={handleOrderShipAddressInputChange} placeholder="State (2-letter) *" maxLength={2} style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5", textTransform: "uppercase" }} />
+              <input name="zip" value={orderShipAddressForm.zip} onChange={handleOrderShipAddressInputChange} placeholder="ZIP (5-digit) *" style={{ padding: "8px", borderRadius: 8, border: "1px solid #b0bec5" }} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOrderShipAddressModal(false);
+                  if (!validateOrderShipAddress(orderShipAddressForm).ok) {
+                    setUseOrderShipAddress(false);
+                  }
+                }}
+                style={{ minWidth: 88, minHeight: 44, padding: "0 14px", borderRadius: 8, border: "1px solid #90a4ae", background: "#fff", cursor: "pointer", fontWeight: 600 }}
+              >
+                {validateOrderShipAddress(orderShipAddressForm).ok ? "Done" : "Cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const checked = validateOrderShipAddress(orderShipAddressForm);
+                  if (!checked.ok) {
+                    alert(checked.message);
+                    return;
+                  }
+                  setOrderShipAddressForm(checked.value);
+                  setShowOrderShipAddressModal(false);
+                }}
+                style={{ minWidth: 88, minHeight: 44, padding: "0 14px", borderRadius: 8, border: "1px solid #0d47a1", background: "#1565c0", color: "#fff", cursor: "pointer", fontWeight: 600 }}
+              >
+                Save address
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>  
   </>      
 );               

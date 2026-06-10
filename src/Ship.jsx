@@ -787,6 +787,8 @@ export default function Ship() {
   });
   /** UPS wizard: whether this flow should create a QBO invoice (set when opening box modal). */
   const upsFlowCreateInvoiceRef = useRef(true);
+  /** When true, skip order-specific ship address and use Directory default. */
+  const forceDirectoryShipRef = useRef(false);
   const navigate = useNavigate();
 
   /** Live Shopify Admin payload while shipping a retail order (shipping_lines refresh at ship time). */
@@ -1734,10 +1736,17 @@ export default function Ship() {
       }
     });
 
-    // 1) Try one-time override first, then Production Orders row (may not have address)
+    const orderShipAddress =
+      !shipToOverride && !forceDirectoryShipRef.current
+        ? getOrderShipAddressFromJob(jobToShip)
+        : null;
+
+    // 1) One-time override, then order-specific address on file, then sheet row
     let recipient = shipToOverride
       ? toRecipientFromOneTimeAddress(normalizeOneTimeAddress(shipToOverride))
-      : buildRecipientFrom(jobToShip);
+      : orderShipAddress
+        ? toRecipientFromOneTimeAddress(orderShipAddress)
+        : buildRecipientFrom(jobToShip);
 
     // 2) If missing anything important, fetch from Directory by company name
     const needsDirectory = !recipient.Address.AddressLine1 ||
@@ -1747,7 +1756,7 @@ export default function Ship() {
       !recipient.Address.PostalCode ||
       recipient.Address.PostalCode.length !== 5;
 
-    if (needsDirectory && !shipToOverride) {
+    if (needsDirectory && !shipToOverride && !orderShipAddress) {
       const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       const companyName =
         get(jobToShip, "Company Name") ||
@@ -2122,6 +2131,53 @@ export default function Ship() {
     },
   });
 
+  /** Map normalized one-time / order address to backend ship_to_override shape. */
+  const toShipToOverrideApiPayload = (addr = {}) => {
+    const a = normalizeOneTimeAddress(addr);
+    if (!a.street1) return null;
+    return {
+      name: a.companyName || a.contactName || "Recipient",
+      attention_name: a.contactName || "",
+      phone: a.phone || "",
+      addr1: a.street1,
+      addr2: a.street2 || "",
+      city: a.city,
+      state: a.state,
+      zip: a.zip,
+      country: a.country || "US",
+    };
+  };
+
+  const getOrderShipAddressFromJob = (job = {}) => {
+    const street1 = String(job["Order Ship Street 1"] || "").trim();
+    if (!street1) return null;
+    return normalizeOneTimeAddress({
+      companyName: job["Order Ship Company"] || "",
+      contactName: job["Order Ship Contact"] || "",
+      phone: job["Order Ship Phone"] || "",
+      street1,
+      street2: job["Order Ship Street 2"] || "",
+      city: job["Order Ship City"] || "",
+      state: job["Order Ship State"] || "",
+      zip: job["Order Ship ZIP"] || "",
+    });
+  };
+
+  const getStoredShipAddressForSelection = () => {
+    const selectedJobs = jobs.filter((j) => selected.includes(j.orderId.toString()));
+    const addresses = selectedJobs
+      .map(getOrderShipAddressFromJob)
+      .filter(Boolean);
+    if (addresses.length === 0) return null;
+    const key = (a) =>
+      [a.street1, a.street2, a.city, a.state, a.zip].join("|").toLowerCase();
+    const firstKey = key(addresses[0]);
+    if (addresses.some((a) => key(a) !== firstKey)) {
+      return { conflict: true, value: null };
+    }
+    return { conflict: false, value: addresses[0] };
+  };
+
   const beginRatesFlowWithAddressChoice = () => {
     const flat = buildShipmentPackages(boxCounts, customBoxes);
     if (flat.length === 0) {
@@ -2131,20 +2187,35 @@ export default function Ship() {
     setShowAddressChoiceModal(true);
   };
 
-  const proceedToRatesWithAddress = async (overrideAddress = null) => {
+  const proceedToRatesWithAddress = async (overrideAddress = null, useOrderAddress = false) => {
     const flat = buildShipmentPackages(boxCounts, customBoxes);
     if (flat.length === 0) {
       alert("Add at least one box.");
       return;
     }
-    setOneTimeShipAddress(overrideAddress || null);
+    let effectiveOverride = overrideAddress || null;
+    if (overrideAddress) {
+      forceDirectoryShipRef.current = false;
+    } else if (useOrderAddress) {
+      forceDirectoryShipRef.current = false;
+      const stored = getStoredShipAddressForSelection();
+      if (stored?.conflict) {
+        alert("Selected orders have different shipping addresses on file. Ship them separately or enter a one-time address.");
+        return;
+      }
+      effectiveOverride = stored?.value || null;
+    } else {
+      forceDirectoryShipRef.current = true;
+      effectiveOverride = null;
+    }
+    setOneTimeShipAddress(effectiveOverride || null);
     setShowAddressChoiceModal(false);
     setShowOneTimeAddressModal(false);
     setShowRateModal(true);
     setRatesLoading(true);
     setShippingOptions([]);
     try {
-      await fetchRates(flat, overrideAddress || null);
+      await fetchRates(flat, effectiveOverride || null);
     } finally {
       setRatesLoading(false);
     }
@@ -2180,6 +2251,7 @@ export default function Ship() {
       }
     }
     upsFlowCreateInvoiceRef.current = Boolean(createInvoice);
+    forceDirectoryShipRef.current = false;
     setBoxCounts(initialBoxCounts());
     setCustomBoxes([]);
     setShowCustomBoxModal(false);
@@ -2218,7 +2290,16 @@ export default function Ship() {
     const skipInv = selectionIncludesShopify
       ? true
       : !upsFlowCreateInvoiceRef.current;
-    const shipToOverride = oneTimeShipAddress ? { ...oneTimeShipAddress } : null;
+    let shipToOverride = oneTimeShipAddress ? { ...oneTimeShipAddress } : null;
+    if (!shipToOverride && !forceDirectoryShipRef.current) {
+      const stored = getStoredShipAddressForSelection();
+      if (stored?.conflict) {
+        alert("Selected orders have different shipping addresses on file. Ship them separately or enter a one-time address.");
+        return;
+      }
+      shipToOverride = stored?.value || null;
+    }
+    const shipToApi = shipToOverride ? toShipToOverrideApiPayload(shipToOverride) : null;
     const isManualRate =
       SKIP_UPS ||
       !opt ||
@@ -2242,7 +2323,7 @@ export default function Ship() {
         ups_purchased_rate: 0,
         skip_invoice: skipInv,
         qboEnv: "production",
-        ...(shipToOverride ? { ship_to_override: shipToOverride } : {}),
+        ...(shipToApi ? { ship_to_override: shipToApi } : {}),
       });
       return;
     }
@@ -2264,9 +2345,12 @@ export default function Ship() {
       skip_ups: false,
       skip_invoice: skipInv,
       qboEnv: "production",
-      ...(shipToOverride ? { ship_to_override: shipToOverride } : {}),
+      ...(shipToApi ? { ship_to_override: shipToApi } : {}),
     });
   };
+
+  const storedShipForModal = getStoredShipAddressForSelection();
+  const hasOrderShipOnFile = Boolean(storedShipForModal?.value);
 
   const earliestDueSelected = getEarliestDueDate(selected, jobs);
   const hardSoftSummarySelected = hardSoftSummaryForSelection(selected, jobs);
@@ -3151,12 +3235,14 @@ export default function Ship() {
             }}
           >
             <h3 id="ship-address-choice-title" style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
-              Ship to a different address?
+              {hasOrderShipOnFile ? "Choose shipping address" : "Ship to a different address?"}
             </h3>
             <p style={{ margin: "0 0 14px", fontSize: 14, color: "#37474f", lineHeight: 1.4 }}>
-              Use your default address from Directory, or enter a one-time shipping address for this shipment only.
+              {hasOrderShipOnFile
+                ? "This order has a shipping address on file. Use that address, the company default from Directory, or enter a one-time address."
+                : "Use your default address from Directory, or enter a one-time shipping address for this shipment only."}
             </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               <button
                 type="button"
                 onClick={() => {
@@ -3167,12 +3253,26 @@ export default function Ship() {
               >
                 Cancel
               </button>
+              {hasOrderShipOnFile && (
+                <button
+                  type="button"
+                  onClick={() => proceedToRatesWithAddress(null, true)}
+                  style={{
+                    ...shipModalFooterBtn,
+                    background: "#2e7d32",
+                    color: "#fff",
+                    borderColor: "#1b5e20",
+                  }}
+                >
+                  Use order address
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => proceedToRatesWithAddress(null)}
+                onClick={() => proceedToRatesWithAddress(null, false)}
                 style={shipModalFooterBtn}
               >
-                No, use default
+                {hasOrderShipOnFile ? "Use company default" : "No, use default"}
               </button>
               <button
                 type="button"
