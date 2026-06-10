@@ -2148,7 +2148,7 @@ export default function Ship() {
     };
   };
 
-  const getOrderShipAddressFromJob = (job = {}) => {
+  const orderShipAddressFromJobRow = (job = {}) => {
     const street1 = String(job["Order Ship Street 1"] || "").trim();
     if (!street1) return null;
     return normalizeOneTimeAddress({
@@ -2161,6 +2161,20 @@ export default function Ship() {
       state: job["Order Ship State"] || "",
       zip: job["Order Ship ZIP"] || "",
     });
+  };
+
+  const isBackProductJob = (job = {}) =>
+    String(job.Product || job.product || "").toLowerCase().includes("back");
+
+  const getOrderShipAddressFromJob = (job = {}) => {
+    const direct = orderShipAddressFromJobRow(job);
+    if (direct) return direct;
+    if (!isBackProductJob(job)) return null;
+    const orderId = Number(job.orderId);
+    if (!Number.isFinite(orderId) || orderId <= 1) return null;
+    const frontJob = jobs.find((j) => Number(j.orderId) === orderId - 1);
+    if (!frontJob) return null;
+    return orderShipAddressFromJobRow(frontJob);
   };
 
   const getStoredShipAddressForSelection = () => {
