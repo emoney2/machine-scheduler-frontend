@@ -278,14 +278,25 @@ export default function DigitizingList() {
 
   // Filter + sort (+optional partition like Fur List)
   const cards = useMemo(() => {
-    // 1) Only show Stage === Ordered (case-insensitive).
-    // 1) Only show jobs with NO Stitch Count
+    // 1) Exclude COMPLETE orders (Stage or Status)
     let base = (orders || []).filter(o => {
+      const status = String(o["Status"] || "").trim().toUpperCase();
+      const stage = String(o["Stage"] || "").trim().toUpperCase();
+      return (
+        status !== "COMPLETE" &&
+        status !== "COMPLETED" &&
+        stage !== "COMPLETE" &&
+        stage !== "COMPLETED"
+      );
+    });
+
+    // 2) Only show jobs with NO Stitch Count
+    base = base.filter(o => {
       const stitch = String(o["Stitch Count"] || "").trim();
       return stitch === "";
     });
 
-    // 2) Exclude Printed Towels
+    // 3) Exclude Printed Towels
     base = base.filter(o => {
       const product = String(o["Product"] || "").toLowerCase();
       return !product.includes("printed towel");
@@ -293,7 +304,7 @@ export default function DigitizingList() {
 
 
 
-    // 3) Sort: samples (qty 1) at top, then by Due Date (oldest first), then Order #
+    // 4) Sort: samples (qty 1) at top, then by Due Date (oldest first), then Order #
     const isSample = (o) => Number(o["Quantity"]) === 1;
     base.sort((a, b) => {
       const aSample = isSample(a);
@@ -411,7 +422,7 @@ export default function DigitizingList() {
       {/* Content */}
       {cards.length === 0 ? (
         <div style={{ padding: "24px 8px", color: "#777" }}>
-          No digitizing items (Stage = Ordered) to show.
+          No digitizing items to show.
         </div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
