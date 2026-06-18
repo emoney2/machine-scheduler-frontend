@@ -1716,6 +1716,11 @@ export default function Ship() {
       return US_STATE_NAME_TO_ABBR[s.toLowerCase()] || s.toUpperCase();
     };
     const toZip5 = (v = "") => {
+      if (v == null || v === "") return "";
+      if (typeof v === "number" && Number.isFinite(v)) {
+        const digits = String(Math.trunc(v));
+        if (digits.length >= 5) return digits.slice(0, 5);
+      }
       const m = String(v).match(/(\d{5})/);
       return m ? m[1] : "";
     };
@@ -1748,6 +1753,17 @@ export default function Ship() {
         ? toRecipientFromOneTimeAddress(orderShipAddress)
         : buildRecipientFrom(jobToShip);
 
+    // If order-ship path is missing ZIP/state, re-read from the selected job row (sheet cols past AZ).
+    if (
+      (shipToOverride || orderShipAddress) &&
+      (!recipient.Address.PostalCode || recipient.Address.PostalCode.length !== 5)
+    ) {
+      const refreshed = getOrderShipAddressFromJob(jobToShip);
+      if (refreshed) {
+        recipient = toRecipientFromOneTimeAddress(refreshed);
+      }
+    }
+
     // 2) If missing anything important, fetch from Directory by company name
     const needsDirectory = !recipient.Address.AddressLine1 ||
       !recipient.Address.City ||
@@ -1756,14 +1772,14 @@ export default function Ship() {
       !recipient.Address.PostalCode ||
       recipient.Address.PostalCode.length !== 5;
 
-    if (needsDirectory && !shipToOverride && !orderShipAddress) {
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
-      const companyName =
-        get(jobToShip, "Company Name") ||
-        jobToShip.Company ||
-        jobToShip.Customer ||
-        "";
+    const companyName =
+      get(jobToShip, "Company Name") ||
+      jobToShip.Company ||
+      jobToShip.Customer ||
+      "";
 
+    if (needsDirectory && companyName) {
+      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
       try {
         const dirRes = await fetch(
           `${API_BASE}/api/directory-row?company=${encodeURIComponent(companyName)}`,
@@ -1771,7 +1787,32 @@ export default function Ship() {
         );
         if (dirRes.ok) {
           const dirRow = await dirRes.json();
-          recipient = buildRecipientFrom(dirRow);
+          const dirRecipient = buildRecipientFrom(dirRow);
+          if (!shipToOverride && !orderShipAddress) {
+            recipient = dirRecipient;
+          } else {
+            recipient = {
+              ...recipient,
+              Name: recipient.Name || dirRecipient.Name,
+              AttentionName: recipient.AttentionName || dirRecipient.AttentionName,
+              Phone: recipient.Phone || dirRecipient.Phone,
+              Address: {
+                ...recipient.Address,
+                AddressLine1: recipient.Address.AddressLine1 || dirRecipient.Address.AddressLine1,
+                AddressLine2: recipient.Address.AddressLine2 || dirRecipient.Address.AddressLine2,
+                City: recipient.Address.City || dirRecipient.Address.City,
+                StateProvinceCode:
+                  recipient.Address.StateProvinceCode?.length === 2
+                    ? recipient.Address.StateProvinceCode
+                    : dirRecipient.Address.StateProvinceCode,
+                PostalCode:
+                  recipient.Address.PostalCode?.length === 5
+                    ? recipient.Address.PostalCode
+                    : dirRecipient.Address.PostalCode,
+                CountryCode: recipient.Address.CountryCode || dirRecipient.Address.CountryCode,
+              },
+            };
+          }
         } else {
           console.warn("Directory fetch failed:", await dirRes.text());
         }
@@ -2084,13 +2125,31 @@ export default function Ship() {
     setCustomBoxes((prev) => prev.filter((c) => c.id !== id));
   };
 
+  const readJobField = (job = {}, ...names) => {
+    for (const name of names) {
+      const direct = job?.[name];
+      if (direct != null && String(direct).trim() !== "") return direct;
+    }
+    const wanted = new Set(names.map((n) => String(n).trim().toLowerCase()));
+    for (const [key, value] of Object.entries(job || {})) {
+      if (value == null || String(value).trim() === "") continue;
+      if (wanted.has(String(key).trim().toLowerCase())) return value;
+    }
+    return "";
+  };
+
   const normalizeOneTimeAddress = (raw = {}) => {
     const toStateAbbr = (v = "") => {
       const s = String(v || "").trim().toUpperCase();
       return s.slice(0, 2);
     };
     const toZip5 = (v = "") => {
-      const m = String(v || "").match(/(\d{5})/);
+      if (v == null || v === "") return "";
+      if (typeof v === "number" && Number.isFinite(v)) {
+        const digits = String(Math.trunc(v));
+        if (digits.length >= 5) return digits.slice(0, 5);
+      }
+      const m = String(v).match(/(\d{5})/);
       return m ? m[1] : "";
     };
     return {
@@ -2149,17 +2208,17 @@ export default function Ship() {
   };
 
   const orderShipAddressFromJobRow = (job = {}) => {
-    const street1 = String(job["Order Ship Street 1"] || "").trim();
+    const street1 = String(readJobField(job, "Order Ship Street 1", "Order Ship Street1") || "").trim();
     if (!street1) return null;
     return normalizeOneTimeAddress({
-      companyName: job["Order Ship Company"] || "",
-      contactName: job["Order Ship Contact"] || "",
-      phone: job["Order Ship Phone"] || "",
+      companyName: readJobField(job, "Order Ship Company"),
+      contactName: readJobField(job, "Order Ship Contact"),
+      phone: readJobField(job, "Order Ship Phone"),
       street1,
-      street2: job["Order Ship Street 2"] || "",
-      city: job["Order Ship City"] || "",
-      state: job["Order Ship State"] || "",
-      zip: job["Order Ship ZIP"] || "",
+      street2: readJobField(job, "Order Ship Street 2", "Order Ship Street2"),
+      city: readJobField(job, "Order Ship City"),
+      state: readJobField(job, "Order Ship State"),
+      zip: readJobField(job, "Order Ship ZIP", "Order Ship Zip", "Order Ship Zip Code"),
     });
   };
 
