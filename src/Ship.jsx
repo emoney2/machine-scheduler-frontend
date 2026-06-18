@@ -2166,13 +2166,18 @@ export default function Ship() {
   const isBackProductJob = (job = {}) =>
     String(job.Product || job.product || "").toLowerCase().includes("back");
 
+  const jobsByOrderId = useMemo(
+    () => new Map(jobs.map((j) => [String(j.orderId), j])),
+    [jobs]
+  );
+
   const getOrderShipAddressFromJob = (job = {}) => {
     const direct = orderShipAddressFromJobRow(job);
     if (direct) return direct;
     if (!isBackProductJob(job)) return null;
     const orderId = Number(job.orderId);
     if (!Number.isFinite(orderId) || orderId <= 1) return null;
-    const frontJob = jobs.find((j) => Number(j.orderId) === orderId - 1);
+    const frontJob = jobsByOrderId.get(String(orderId - 1));
     if (!frontJob) return null;
     return orderShipAddressFromJobRow(frontJob);
   };
@@ -2180,7 +2185,7 @@ export default function Ship() {
   const getStoredShipAddressForSelection = () => {
     const selectedJobs = jobs.filter((j) => selected.includes(j.orderId.toString()));
     const addresses = selectedJobs
-      .map(getOrderShipAddressFromJob)
+      .map((job) => getOrderShipAddressFromJob(job))
       .filter(Boolean);
     if (addresses.length === 0) return null;
     const key = (a) =>
@@ -2196,6 +2201,11 @@ export default function Ship() {
     const flat = buildShipmentPackages(boxCounts, customBoxes);
     if (flat.length === 0) {
       alert("Add at least one box.");
+      return;
+    }
+    const stored = getStoredShipAddressForSelection();
+    if (stored?.conflict) {
+      alert("Selected orders have different shipping addresses on file. Ship them separately or enter a one-time address.");
       return;
     }
     setShowAddressChoiceModal(true);
@@ -3262,11 +3272,11 @@ export default function Ship() {
             }}
           >
             <h3 id="ship-address-choice-title" style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
-              {hasOrderShipOnFile ? "Secondary shipping address" : "Ship to a different address?"}
+              {hasOrderShipOnFile ? "Choose shipping address" : "Ship to a different address?"}
             </h3>
             <p style={{ margin: "0 0 14px", fontSize: 14, color: "#37474f", lineHeight: 1.4 }}>
               {hasOrderShipOnFile
-                ? "There is a secondary shipping address on this order. Would you like to continue with this address?"
+                ? "This order has a specific shipping address on file. Use that address, enter a different one, or use the company default from Directory."
                 : "Use your default address from Directory, or enter a one-time shipping address for this shipment only."}
             </p>
             {hasOrderShipOnFile && storedShipForModal?.value && (
@@ -3274,14 +3284,17 @@ export default function Ship() {
                 style={{
                   margin: "0 0 14px",
                   padding: "10px 12px",
-                  background: "#fff",
-                  border: "1px solid #cfd8dc",
+                  background: "#e8f5e9",
+                  border: "1px solid #a5d6a7",
                   borderRadius: 8,
                   fontSize: 13,
                   color: "#263238",
                   lineHeight: 1.45,
                 }}
               >
+                <div style={{ fontWeight: 700, marginBottom: 4, color: "#1b5e20" }}>
+                  Order shipping address
+                </div>
                 {formatShipAddressLines(storedShipForModal.value).map((line) => (
                   <div key={line}>{line}</div>
                 ))}
@@ -3298,53 +3311,41 @@ export default function Ship() {
               >
                 Cancel
               </button>
-              {hasOrderShipOnFile ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => proceedToRatesWithAddress(null, false)}
-                    style={shipModalFooterBtn}
-                  >
-                    No, use default
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => proceedToRatesWithAddress(null, true)}
-                    style={{
-                      ...shipModalFooterBtn,
-                      background: "#2e7d32",
-                      color: "#fff",
-                      borderColor: "#1b5e20",
-                    }}
-                  >
-                    Yes
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => proceedToRatesWithAddress(null, false)}
-                    style={shipModalFooterBtn}
-                  >
-                    No, use default
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddressChoiceModal(false);
-                      setShowOneTimeAddressModal(true);
-                    }}
-                    style={{
-                      ...shipModalFooterBtn,
-                      background: "#1565c0",
-                      color: "#fff",
-                      borderColor: "#0d47a1",
-                    }}
-                  >
-                    Yes, different address
-                  </button>
-                </>
+              <button
+                type="button"
+                onClick={() => proceedToRatesWithAddress(null, false)}
+                style={shipModalFooterBtn}
+              >
+                Use company default
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddressChoiceModal(false);
+                  setShowOneTimeAddressModal(true);
+                }}
+                style={{
+                  ...shipModalFooterBtn,
+                  background: "#1565c0",
+                  color: "#fff",
+                  borderColor: "#0d47a1",
+                }}
+              >
+                Enter different address
+              </button>
+              {hasOrderShipOnFile && (
+                <button
+                  type="button"
+                  onClick={() => proceedToRatesWithAddress(null, true)}
+                  style={{
+                    ...shipModalFooterBtn,
+                    background: "#2e7d32",
+                    color: "#fff",
+                    borderColor: "#1b5e20",
+                  }}
+                >
+                  Use order address
+                </button>
               )}
             </div>
           </div>
