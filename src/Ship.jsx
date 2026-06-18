@@ -2171,30 +2171,60 @@ export default function Ship() {
     [jobs]
   );
 
-  const getOrderShipAddressFromJob = (job = {}) => {
-    const direct = orderShipAddressFromJobRow(job);
-    if (direct) return direct;
-    if (!isBackProductJob(job)) return null;
+  const getPairedFrontJob = (job = {}) => {
     const orderId = Number(job.orderId);
     if (!Number.isFinite(orderId) || orderId <= 1) return null;
-    const frontJob = jobsByOrderId.get(String(orderId - 1));
-    if (!frontJob) return null;
-    return orderShipAddressFromJobRow(frontJob);
+    return jobsByOrderId.get(String(orderId - 1)) || null;
+  };
+
+  const shipAddressCompareKey = (addr = {}) => {
+    const a = normalizeOneTimeAddress(addr);
+    const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    return [norm(a.street1), norm(a.street2), norm(a.city), norm(a.state), norm(a.zip)].join("|");
+  };
+
+  const getOrderShipAddressFromJob = (job = {}) => {
+    // Back rows often share the front order's ship address; prefer the paired front row.
+    if (isBackProductJob(job)) {
+      const frontJob = getPairedFrontJob(job);
+      const frontAddr = frontJob ? orderShipAddressFromJobRow(frontJob) : null;
+      if (frontAddr) return frontAddr;
+    }
+    return orderShipAddressFromJobRow(job);
   };
 
   const getStoredShipAddressForSelection = () => {
     const selectedJobs = jobs.filter((j) => selected.includes(j.orderId.toString()));
-    const addresses = selectedJobs
-      .map((job) => getOrderShipAddressFromJob(job))
-      .filter(Boolean);
-    if (addresses.length === 0) return null;
-    const key = (a) =>
-      [a.street1, a.street2, a.city, a.state, a.zip].join("|").toLowerCase();
-    const firstKey = key(addresses[0]);
-    if (addresses.some((a) => key(a) !== firstKey)) {
-      return { conflict: true, value: null };
+    const labeled = selectedJobs
+      .map((job) => ({
+        job,
+        address: getOrderShipAddressFromJob(job),
+      }))
+      .filter((x) => x.address);
+
+    if (labeled.length === 0) return null;
+
+    const unique = [];
+    for (const item of labeled) {
+      const key = shipAddressCompareKey(item.address);
+      if (!unique.some((u) => shipAddressCompareKey(u.address) === key)) {
+        unique.push(item);
+      }
     }
-    return { conflict: false, value: addresses[0] };
+
+    if (unique.length === 1) {
+      return { conflict: false, value: unique[0].address, options: null };
+    }
+
+    return {
+      conflict: true,
+      value: null,
+      options: unique.map(({ job, address }) => ({
+        orderId: String(job.orderId),
+        product: String(job.Product || job.product || "").trim(),
+        address,
+      })),
+    };
   };
 
   const beginRatesFlowWithAddressChoice = () => {
@@ -2203,15 +2233,14 @@ export default function Ship() {
       alert("Add at least one box.");
       return;
     }
-    const stored = getStoredShipAddressForSelection();
-    if (stored?.conflict) {
-      alert("Selected orders have different shipping addresses on file. Ship them separately or enter a one-time address.");
-      return;
-    }
     setShowAddressChoiceModal(true);
   };
 
-  const proceedToRatesWithAddress = async (overrideAddress = null, useOrderAddress = false) => {
+  const proceedToRatesWithAddress = async (
+    overrideAddress = null,
+    useOrderAddress = false,
+    orderAddressOverride = null
+  ) => {
     const flat = buildShipmentPackages(boxCounts, customBoxes);
     if (flat.length === 0) {
       alert("Add at least one box.");
@@ -2223,11 +2252,7 @@ export default function Ship() {
     } else if (useOrderAddress) {
       forceDirectoryShipRef.current = false;
       const stored = getStoredShipAddressForSelection();
-      if (stored?.conflict) {
-        alert("Selected orders have different shipping addresses on file. Ship them separately or enter a one-time address.");
-        return;
-      }
-      effectiveOverride = stored?.value || null;
+      effectiveOverride = orderAddressOverride || stored?.value || null;
     } else {
       forceDirectoryShipRef.current = true;
       effectiveOverride = null;
@@ -2317,10 +2342,6 @@ export default function Ship() {
     let shipToOverride = oneTimeShipAddress ? { ...oneTimeShipAddress } : null;
     if (!shipToOverride && !forceDirectoryShipRef.current) {
       const stored = getStoredShipAddressForSelection();
-      if (stored?.conflict) {
-        alert("Selected orders have different shipping addresses on file. Ship them separately or enter a one-time address.");
-        return;
-      }
       shipToOverride = stored?.value || null;
     }
     const shipToApi = shipToOverride ? toShipToOverrideApiPayload(shipToOverride) : null;
@@ -2374,7 +2395,11 @@ export default function Ship() {
   };
 
   const storedShipForModal = getStoredShipAddressForSelection();
-  const hasOrderShipOnFile = Boolean(storedShipForModal?.value);
+  const shipAddressConflictOptions = storedShipForModal?.options || null;
+  const hasShipAddressConflict = Boolean(shipAddressConflictOptions?.length);
+  const hasOrderShipOnFile = Boolean(
+    storedShipForModal?.value || shipAddressConflictOptions?.length
+  );
 
   const formatShipAddressLines = (addr = {}) => {
     const lines = [];
@@ -3265,7 +3290,7 @@ export default function Ship() {
             style={{
               background: "#fafafa",
               borderRadius: 14,
-              width: "min(520px, 100%)",
+              width: hasShipAddressConflict ? "min(640px, 100%)" : "min(520px, 100%)",
               padding: "16px",
               boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
               border: "1px solid #e0e0e0",
@@ -3275,11 +3300,50 @@ export default function Ship() {
               {hasOrderShipOnFile ? "Choose shipping address" : "Ship to a different address?"}
             </h3>
             <p style={{ margin: "0 0 14px", fontSize: 14, color: "#37474f", lineHeight: 1.4 }}>
-              {hasOrderShipOnFile
-                ? "This order has a specific shipping address on file. Use that address, enter a different one, or use the company default from Directory."
-                : "Use your default address from Directory, or enter a one-time shipping address for this shipment only."}
+              {hasShipAddressConflict
+                ? "Selected orders have different shipping addresses on file. Choose which address to use, enter a different one, or use the company default from Directory."
+                : hasOrderShipOnFile
+                  ? "This order has a specific shipping address on file. Use that address, enter a different one, or use the company default from Directory."
+                  : "Use your default address from Directory, or enter a one-time shipping address for this shipment only."}
             </p>
-            {hasOrderShipOnFile && storedShipForModal?.value && (
+            {hasShipAddressConflict && shipAddressConflictOptions.map((option) => (
+              <div
+                key={`${option.orderId}-${shipAddressCompareKey(option.address)}`}
+                style={{
+                  margin: "0 0 10px",
+                  padding: "10px 12px",
+                  background: "#fff",
+                  border: "1px solid #cfd8dc",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  color: "#263238",
+                  lineHeight: 1.45,
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 4, color: "#1a237e" }}>
+                  Order #{option.orderId}
+                  {option.product ? ` — ${option.product}` : ""}
+                </div>
+                {formatShipAddressLines(option.address).map((line) => (
+                  <div key={`${option.orderId}-${line}`}>{line}</div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => proceedToRatesWithAddress(null, true, option.address)}
+                    style={{
+                      ...shipModalFooterBtn,
+                      background: "#2e7d32",
+                      color: "#fff",
+                      borderColor: "#1b5e20",
+                    }}
+                  >
+                    Use this address
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!hasShipAddressConflict && hasOrderShipOnFile && storedShipForModal?.value && (
               <div
                 style={{
                   margin: "0 0 14px",
@@ -3333,7 +3397,7 @@ export default function Ship() {
               >
                 Enter different address
               </button>
-              {hasOrderShipOnFile && (
+              {hasOrderShipOnFile && !hasShipAddressConflict && (
                 <button
                   type="button"
                   onClick={() => proceedToRatesWithAddress(null, true)}
