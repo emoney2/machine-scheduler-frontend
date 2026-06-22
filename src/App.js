@@ -21,6 +21,7 @@ import OrderSubmission from './OrderSubmission';
 import { subWorkDays, fmtMMDD } from './helpers';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import ReorderPage from "./ReorderPage";
+import OrderConfirmationPage from "./OrderConfirmationPage";
 import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
@@ -1401,7 +1402,7 @@ const fetchManualStateCore = async (previousCols) => {
   useEffect(() => {
     // Disable polling on Scan and Reorder pages for speed and to prevent memory leaks
     const path = window.location.pathname.toLowerCase();
-    if (path.includes("/scan") || path.includes("/reorder")) {
+    if (path.includes("/scan") || path.includes("/reorder") || path.includes("/order-confirmation")) {
       console.log("[Polling] disabled on", path);
       return;
     }
@@ -2014,6 +2015,7 @@ useEffect(() => {
           {/* 🔒 Hidden page — only reachable when Ship passes selected jobs via location.state */}
           <Route path="/box-select" element={<BoxSelectGuard />} />
           <Route path="/reorder" element={<ReorderPage />} />
+          <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
           <Route path="/order" element={<OrderSubmission />} />
           <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
           <Route path="/shipment-complete" element={<ShipmentComplete />} />

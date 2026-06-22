@@ -2527,7 +2527,22 @@ const handleSaveNewCompany = async () => {
         )}
 
 
-        <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem" }}>
+        <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem", display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+          <button
+            type="button"
+            onClick={() => navigate("/order-confirmation")}
+            style={{
+              padding: "0.25rem 0.5rem",
+              fontSize: "0.8rem",
+              background: "#16a34a",
+              color: "#fff",
+              border: "none",
+              borderRadius: "3px",
+              cursor: "pointer",
+            }}
+          >
+            Create Order Confirmation
+          </button>
           <button
             type="button"
             onClick={() => navigate("/reorder")}
