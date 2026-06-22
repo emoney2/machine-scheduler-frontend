@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -10,11 +10,16 @@ function formatMoney(value) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function orderIdStr(job) {
+  return String(job.orderId ?? job["Order #"] ?? "").trim();
+}
+
 export default function OrderConfirmationPage() {
   const [companyList, setCompanyList] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
   const [selectedCompany, setSelectedCompany] = useState("");
   const [jobs, setJobs] = useState([]);
+  const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingCustomersText, setLoadingCustomersText] = useState("Loading customers…");
@@ -78,6 +83,7 @@ export default function OrderConfirmationPage() {
 
     setLoading(true);
     setSelectedCompany(value);
+    setSelected([]);
     try {
       const res = await axios.get(
         `${API_ROOT}/outstanding-orders-for-company?company=${encodeURIComponent(value)}`,
@@ -101,15 +107,41 @@ export default function OrderConfirmationPage() {
     loadOutstandingJobs(companyInput);
   };
 
+  const toggleSelect = (orderId) => {
+    const idStr = String(orderId).trim();
+    setSelected((prev) =>
+      prev.includes(idStr) ? prev.filter((id) => id !== idStr) : [...prev, idStr]
+    );
+  };
+
+  const handleSelectAll = () => {
+    setSelected(jobs.map((job) => orderIdStr(job)).filter(Boolean));
+  };
+
+  const handleClearSelection = () => {
+    setSelected([]);
+  };
+
+  const selectedJobs = useMemo(
+    () => jobs.filter((job) => selected.includes(orderIdStr(job))),
+    [jobs, selected]
+  );
+
+  const grandTotal = selectedJobs.reduce((sum, job) => sum + Number(job.LineTotal || 0), 0);
+
   const handleDownloadPdf = async () => {
     if (!selectedCompany) {
       alert("Select a customer first.");
       return;
     }
+    if (selected.length === 0) {
+      alert("Select at least one job for the order confirmation.");
+      return;
+    }
     setPdfLoading(true);
     try {
       const res = await axios.get(
-        `${API_ROOT}/order-confirmation-pdf?company=${encodeURIComponent(selectedCompany)}`,
+        `${API_ROOT}/order-confirmation-pdf?company=${encodeURIComponent(selectedCompany)}&order_ids=${encodeURIComponent(selected.join(","))}`,
         { responseType: "blob" }
       );
       const blob = new Blob([res.data], { type: "application/pdf" });
@@ -128,8 +160,6 @@ export default function OrderConfirmationPage() {
       setPdfLoading(false);
     }
   };
-
-  const grandTotal = jobs.reduce((sum, job) => sum + Number(job.LineTotal || 0), 0);
 
   return (
     <div style={{ padding: "2rem", maxWidth: 1100, margin: "0 auto" }}>
@@ -151,7 +181,7 @@ export default function OrderConfirmationPage() {
       </div>
 
       <p style={{ color: "#4b5563", marginTop: 0 }}>
-        Select a customer to view all outstanding jobs (stage is not Complete). Back jobs are excluded.
+        Select a customer, then click the jobs you want on the order confirmation. Back jobs are excluded.
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: "1rem" }}>
@@ -230,111 +260,180 @@ export default function OrderConfirmationPage() {
 
       {loading && <p>Loading outstanding orders…</p>}
 
-      {selectedCompany && !loading && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+      {selectedCompany && !loading && jobs.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
           <div>
             <strong>{selectedCompany}</strong>
             <span style={{ color: "#6b7280", marginLeft: 8 }}>
-              {jobs.length} outstanding job{jobs.length === 1 ? "" : "s"}
+              {selected.length} of {jobs.length} selected
             </span>
           </div>
-          <button
-            type="button"
-            onClick={handleDownloadPdf}
-            disabled={pdfLoading}
-            style={{
-              padding: "0.5rem 1rem",
-              background: "#16a34a",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              cursor: pdfLoading ? "not-allowed" : "pointer",
-              opacity: pdfLoading ? 0.7 : 1,
-              fontWeight: 600,
-            }}
-          >
-            {pdfLoading ? "Generating PDF…" : "Download PDF"}
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              style={{
+                padding: "0.4rem 0.75rem",
+                borderRadius: 6,
+                border: "1px solid #64748b",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              onClick={handleClearSelection}
+              disabled={selected.length === 0}
+              style={{
+                padding: "0.4rem 0.75rem",
+                borderRadius: 6,
+                border: "1px solid #64748b",
+                background: "#fff",
+                cursor: selected.length === 0 ? "not-allowed" : "pointer",
+                opacity: selected.length === 0 ? 0.6 : 1,
+              }}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={pdfLoading || selected.length === 0}
+              style={{
+                padding: "0.5rem 1rem",
+                background: "#16a34a",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                cursor: pdfLoading || selected.length === 0 ? "not-allowed" : "pointer",
+                opacity: pdfLoading || selected.length === 0 ? 0.7 : 1,
+                fontWeight: 600,
+              }}
+            >
+              {pdfLoading ? "Generating PDF…" : "Download PDF"}
+            </button>
+          </div>
         </div>
       )}
 
+      {selectedCompany && !loading && jobs.length > 0 && (
+        <p style={{ color: "#6b7280", fontSize: "0.85rem", marginTop: 0, marginBottom: 12 }}>
+          Click a job to select or deselect it for the confirmation.
+        </p>
+      )}
+
       <div style={{ marginTop: "0.5rem" }}>
-        {jobs.map((job, idx) => (
-          <div
-            key={`${job.orderId || job["Order #"]}-${idx}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              border: "1px solid #d1d5db",
-              padding: "0.85rem",
-              borderRadius: 10,
-              marginBottom: "0.85rem",
-              gap: "1rem",
-              background: "#fff",
-            }}
-          >
+        {jobs.map((job, idx) => {
+          const id = orderIdStr(job);
+          const isSelected = selected.includes(id);
+          return (
             <div
+              key={`${id}-${idx}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => toggleSelect(id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleSelect(id);
+                }
+              }}
               style={{
-                width: 72,
-                height: 72,
-                flexShrink: 0,
-                borderRadius: 8,
-                overflow: "hidden",
-                border: "1px solid #e5e7eb",
-                background: "#f9fafb",
+                display: "flex",
+                alignItems: "center",
+                border: isSelected ? "2px solid #16a34a" : "1px solid #d1d5db",
+                padding: "0.85rem",
+                borderRadius: 10,
+                marginBottom: "0.85rem",
+                gap: "1rem",
+                background: isSelected ? "#4CAF50" : "#fff",
+                color: isSelected ? "#fff" : "#000",
+                cursor: "pointer",
               }}
             >
-              {job.image ? (
-                <img
-                  src={job.image}
-                  alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    display: "grid",
-                    placeItems: "center",
-                    fontSize: 11,
-                    color: "#9ca3af",
-                  }}
-                >
-                  No preview
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  flexShrink: 0,
+                  borderRadius: "50%",
+                  border: isSelected ? "2px solid #fff" : "2px solid #9ca3af",
+                  background: isSelected ? "#fff" : "transparent",
+                  display: "grid",
+                  placeItems: "center",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: isSelected ? "#16a34a" : "transparent",
+                }}
+                aria-hidden="true"
+              >
+                ✓
+              </div>
+              <div
+                style={{
+                  width: 72,
+                  height: 72,
+                  flexShrink: 0,
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  border: isSelected ? "1px solid rgba(255,255,255,0.35)" : "1px solid #e5e7eb",
+                  background: isSelected ? "rgba(255,255,255,0.15)" : "#f9fafb",
+                }}
+              >
+                {job.image ? (
+                  <img
+                    src={job.image}
+                    alt=""
+                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "grid",
+                      placeItems: "center",
+                      fontSize: 11,
+                      color: isSelected ? "rgba(255,255,255,0.8)" : "#9ca3af",
+                    }}
+                  >
+                    No preview
+                  </div>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: 4 }}>
+                  {job.Design || "(No Design)"}
                 </div>
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: 4 }}>
-                {job.Design || "(No Design)"}
+                <div style={{ marginBottom: 4, opacity: isSelected ? 0.95 : 1 }}>
+                  {job.Product || "?"}
+                </div>
+                <div style={{ fontSize: "0.85rem", opacity: isSelected ? 0.9 : 1, color: isSelected ? "inherit" : "#6b7280" }}>
+                  Order #{job["Order #"] || "?"} | Stage: {job.Stage || "—"}
+                  {job["Due Date"] ? ` | Due: ${job["Due Date"]}` : ""}
+                </div>
               </div>
-              <div style={{ color: "#374151", marginBottom: 4 }}>
-                {job.Product || "?"}
+              <div style={{ textAlign: "right", minWidth: 120 }}>
+                <div style={{ fontSize: "0.85rem", opacity: 0.85 }}>Qty</div>
+                <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{job.Quantity ?? "?"}</div>
               </div>
-              <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>
-                Order #{job["Order #"] || "?"} | Stage: {job.Stage || "—"}
-                {job["Due Date"] ? ` | Due: ${job["Due Date"]}` : ""}
-              </div>
-            </div>
-            <div style={{ textAlign: "right", minWidth: 120 }}>
-              <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>Qty</div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{job.Quantity ?? "?"}</div>
-            </div>
-            <div style={{ textAlign: "right", minWidth: 120 }}>
-              <div style={{ fontSize: "0.85rem", color: "#6b7280" }}>Price</div>
-              <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{formatMoney(job.Price)}</div>
-              <div style={{ fontSize: "0.8rem", color: "#6b7280", marginTop: 2 }}>
-                Total {formatMoney(job.LineTotal)}
+              <div style={{ textAlign: "right", minWidth: 120 }}>
+                <div style={{ fontSize: "0.85rem", opacity: 0.85 }}>Price</div>
+                <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{formatMoney(job.Price)}</div>
+                <div style={{ fontSize: "0.8rem", opacity: 0.85, marginTop: 2 }}>
+                  Total {formatMoney(job.LineTotal)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {selectedCompany && !loading && jobs.length > 0 && (
+      {selectedCompany && !loading && selectedJobs.length > 0 && (
         <div style={{ textAlign: "right", fontWeight: 700, fontSize: "1.1rem", marginTop: 8 }}>
-          Grand Total: {formatMoney(grandTotal)}
+          Selected Total: {formatMoney(grandTotal)}
         </div>
       )}
 
