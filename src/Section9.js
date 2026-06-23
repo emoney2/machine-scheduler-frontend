@@ -53,7 +53,9 @@ export default function Section9(props) {
   const safeColumns = columns ?? {
     queue: { title: 'Queue', jobs: [] },
     machine1: { title: 'Machine 1', headCount: 1, jobs: [] },
-    machine2: { title: 'Machine 2', headCount: 6, jobs: [] }
+    machine2: { title: 'Machine 2', headCount: 6, jobs: [] },
+    machine3: { title: 'Machine 3', headCount: 6, jobs: [] },
+    machine4: { title: 'Machine 4', headCount: 6, jobs: [] },
   };
 
   // Fetch thread inventory: prefer status API; fallback to raw /threadInventory and derive red/yellow/green
@@ -344,7 +346,7 @@ export default function Section9(props) {
          }}
        >
         <div style={{ display: 'flex', gap: 16, marginTop: 16, overflowX: 'auto' }}>
-          {['queue', 'machine1', 'machine2'].map(colId => {
+          {['queue', 'machine1', 'machine2', 'machine3', 'machine4'].map(colId => {
             const col = safeColumns[colId] || {};
             const rawJobs = Array.isArray(col.jobs) ? col.jobs : [];
             const jobs = rawJobs
@@ -380,7 +382,7 @@ export default function Section9(props) {
                       position: 'relative',
                       border: '1px solid #ccc',
                       borderRadius: 4,
-                      width: colId === 'queue' ? 300 : 380,
+                      width: colId === 'queue' ? 260 : 300,
                       minHeight: 400,
                       padding: 12,
                       background: '#fafafa'

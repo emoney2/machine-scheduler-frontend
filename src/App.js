@@ -253,6 +253,24 @@ const BUBBLE_START  = '#e0f7fa';
 const BUBBLE_END    = '#ffe0b2';
 const BUBBLE_DELIV  = '#c8e6c9';
 
+const SCHEDULER_MACHINE_KEYS = ['machine1', 'machine2', 'machine3', 'machine4'];
+const SCHEDULER_MACHINE_LABELS = {
+  machine1: 'Machine 1 (1)',
+  machine2: 'Machine 2 (6)',
+  machine3: 'Machine 3 (6)',
+  machine4: 'Machine 4 (6)',
+};
+
+function buildSchedulerColumnsTemplate() {
+  return {
+    queue: { title: 'Queue', jobs: [] },
+    machine1: { title: 'Machine 1', headCount: 1, jobs: [] },
+    machine2: { title: 'Machine 2', headCount: 6, jobs: [] },
+    machine3: { title: 'Machine 3', headCount: 6, jobs: [] },
+    machine4: { title: 'Machine 4', headCount: 6, jobs: [] },
+  };
+}
+
 export default function App() {
   // Derive backend origin (no /api) for login redirects
   const BACKEND_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
@@ -315,6 +333,8 @@ export default function App() {
   // Track last‐seen top job on each machine
   const prevMachine1Top = useRef({ id: null, ts: 0 });
   const prevMachine2Top = useRef({ id: null, ts: 0 });
+  const prevMachine3Top = useRef({ id: null, ts: 0 });
+  const prevMachine4Top = useRef({ id: null, ts: 0 });
 
   // (Legacy; safe if referenced elsewhere)
   const bumpedJobs = useRef(new Set());
@@ -346,6 +366,8 @@ export default function App() {
 
   const prevM1Top = useRef(null);
   const prevM2Top = useRef(null);
+  const prevM3Top = useRef(null);
+  const prevM4Top = useRef(null);
 
   // Send a new start time when needed
   // >>> REPLACE your entire bumpJobStartTime with this <<<
@@ -354,7 +376,7 @@ export default function App() {
   const bumpJobStartTime = async (jobId) => {
     try {
       const findJobById = () => {
-        for (const key of ["machine1", "machine2", "queue"]) {
+        for (const key of [...SCHEDULER_MACHINE_KEYS, 'queue']) {
           const hit = (columns?.[key]?.jobs || []).find((j) => j.id === jobId);
           if (hit) return hit;
         }
@@ -418,22 +440,7 @@ export default function App() {
   }, [placeholders]);
 
   // ─── Core columns state, with fixed headCount baked into the title ───────────
-  const [columns, setColumns] = useState({
-    queue: {
-      title: 'Queue',
-      jobs: []
-    },
-    machine1: {
-      title: 'Machine 1',  // <-- headCount = 1
-      headCount: 1,             // <-- fixed
-      jobs: []
-    },
-    machine2: {
-      title: 'Machine 2',  // <-- headCount = 6
-      headCount: 6,             // <-- fixed
-      jobs: []
-    },
-  });
+  const [columns, setColumns] = useState(buildSchedulerColumnsTemplate);
   useEffect(() => {
     columnsRef.current = columns;
   }, [columns]);
@@ -457,8 +464,12 @@ export default function App() {
         queue: columns.queue.jobs || [],
         machine1: columns.machine1.jobs || [],
         machine2: columns.machine2.jobs || [],
+        machine3: columns.machine3.jobs || [],
+        machine4: columns.machine4.jobs || [],
         machine1_headCount: columns.machine1.headCount || 1,
-        machine2_headCount: columns.machine2.headCount || 6
+        machine2_headCount: columns.machine2.headCount || 6,
+        machine3_headCount: columns.machine3.headCount || 6,
+        machine4_headCount: columns.machine4.headCount || 6,
       };
       
       const res = await axios.post(API_ROOT + '/autoFillMachines', payload, {
@@ -472,12 +483,17 @@ export default function App() {
             ...prev,
             queue: { ...prev.queue, jobs: res.data.queue || [] },
             machine1: { ...prev.machine1, jobs: res.data.machine1 || [] },
-            machine2: { ...prev.machine2, jobs: res.data.machine2 || [] }
+            machine2: { ...prev.machine2, jobs: res.data.machine2 || [] },
+            machine3: { ...prev.machine3, jobs: res.data.machine3 || [] },
+            machine4: { ...prev.machine4, jobs: res.data.machine4 || [] },
           };
-          
-          // Re-schedule machine jobs to update timing
-          next.machine1.jobs = scheduleMachineJobs(next.machine1.jobs, 'Machine 1 (1)');
-          next.machine2.jobs = scheduleMachineJobs(next.machine2.jobs, 'Machine 2 (6)');
+
+          SCHEDULER_MACHINE_KEYS.forEach((key) => {
+            next[key].jobs = scheduleMachineJobs(
+              next[key].jobs,
+              SCHEDULER_MACHINE_LABELS[key]
+            );
+          });
           
           return next;
         });
@@ -486,6 +502,8 @@ export default function App() {
         const manualState = {
           machine1: res.data.machine1.map(j => j.id),
           machine2: res.data.machine2.map(j => j.id),
+          machine3: (res.data.machine3 || []).map(j => j.id),
+          machine4: (res.data.machine4 || []).map(j => j.id),
           placeholders: placeholders
         };
         
@@ -1067,6 +1085,8 @@ const kickMetaWorker = () => {
           queue:    { ...prev.queue,    jobs: [...prev.queue.jobs]    },
           machine1: { ...prev.machine1, jobs: [...prev.machine1.jobs] },
           machine2: { ...prev.machine2, jobs: [...prev.machine2.jobs] },
+          machine3: { ...prev.machine3, jobs: [...prev.machine3.jobs] },
+          machine4: { ...prev.machine4, jobs: [...prev.machine4.jobs] },
         };
         const upgrade = (job) => {
           if (!job?.imageFileId) return;
@@ -1076,8 +1096,7 @@ const kickMetaWorker = () => {
           if (newUrl && newUrl !== job.artworkUrl) job.artworkUrl = newUrl;
         };
         next.queue.jobs.forEach(upgrade);
-        next.machine1.jobs.forEach(upgrade);
-        next.machine2.jobs.forEach(upgrade);
+        SCHEDULER_MACHINE_KEYS.forEach((key) => next[key].jobs.forEach(upgrade));
         return next;
       });
     }
@@ -1202,24 +1221,22 @@ const fetchOrdersEmbroLinksCore = async () => {
       queue:    { ...liveCols.queue,    jobs: [] },
       machine1: { ...liveCols.machine1, jobs: [] },
       machine2: { ...liveCols.machine2, jobs: [] },
+      machine3: { ...(liveCols.machine3 || { title: 'Machine 3', headCount: 6 }), jobs: [] },
+      machine4: { ...(liveCols.machine4 || { title: 'Machine 4', headCount: 6 }), jobs: [] },
     };
 
-    // 7) Preserve any manual placements
-    liveCols.machine1.jobs.forEach(job => {
-      if (jobById[job.id]) jobById[job.id].machineId = 'machine1';
-    });
-    liveCols.machine2.jobs.forEach(job => {
-      if (jobById[job.id]) jobById[job.id].machineId = 'machine2';
+    SCHEDULER_MACHINE_KEYS.forEach((key) => {
+      liveCols[key].jobs.forEach(job => {
+        if (jobById[job.id]) jobById[job.id].machineId = key;
+      });
     });
 
     // 8) Distribute jobs into newCols
     Object.values(jobById).forEach(job => {
-      if (job.machineId === 'machine1') {
-        job.machineId = 'Machine 1 (1)';
-        newCols['machine1'].jobs.push(job);
-      } else if (job.machineId === 'machine2') {
-        job.machineId = 'Machine 2 (6)'
-        newCols['machine2'].jobs.push(job);
+      if (SCHEDULER_MACHINE_KEYS.includes(job.machineId)) {
+        const key = job.machineId;
+        job.machineId = SCHEDULER_MACHINE_LABELS[key];
+        newCols[key].jobs.push(job);
       } else {
         newCols.queue.jobs.push(job);
       }
@@ -1236,8 +1253,12 @@ const fetchOrdersEmbroLinksCore = async () => {
     });
 
     // 10) Re-run scheduleMachineJobs with machine labels so head counts are correct
-    newCols.machine1.jobs = scheduleMachineJobs(newCols.machine1.jobs, 'Machine 1 (1)');
-    newCols.machine2.jobs = scheduleMachineJobs(newCols.machine2.jobs, 'Machine 2 (6)');
+    SCHEDULER_MACHINE_KEYS.forEach((key) => {
+      newCols[key].jobs = scheduleMachineJobs(
+        newCols[key].jobs,
+        SCHEDULER_MACHINE_LABELS[key]
+      );
+    });
 
     // 11) Return the updated columns
     return newCols;
@@ -1285,22 +1306,21 @@ const fetchManualStateCore = async (previousCols) => {
     // 2) Overwrite local placeholders state
     setPlaceholders(msData.placeholders || []);
 
-    // 3) Extract machine1 & machine2 IDs
+    // 3) Extract machine column IDs
     const cols = Array.isArray(msData.machineColumns)
       ? msData.machineColumns
-      : [[], []];
+      : [[], [], [], []];
 
     const machine1Ids = cols[0] || [];
     const machine2Ids = cols[1] || [];
-
+    const machine3Ids = cols[2] || [];
+    const machine4Ids = cols[3] || [];
 
     // 4) Build a unified pool of all active, non-placeholder jobs
     const pool = [
       ...previousCols.queue.jobs,
-      ...previousCols.machine1.jobs,
-      ...previousCols.machine2.jobs
+      ...SCHEDULER_MACHINE_KEYS.flatMap((key) => previousCols[key].jobs),
     ];
-
 
     const byId = new Map(pool.map(j => [j.id, { ...j, machineId: 'queue' }]));
 
@@ -1309,6 +1329,8 @@ const fetchManualStateCore = async (previousCols) => {
       queue:    { ...previousCols.queue,    jobs: [] },
       machine1: { ...previousCols.machine1, jobs: [] },
       machine2: { ...previousCols.machine2, jobs: [] },
+      machine3: { ...(previousCols.machine3 || { title: 'Machine 3', headCount: 6 }), jobs: [] },
+      machine4: { ...(previousCols.machine4 || { title: 'Machine 4', headCount: 6 }), jobs: [] },
     };
 
     // Seed queue with all jobs initially (will be pulled out as we place them)
@@ -1326,14 +1348,16 @@ const fetchManualStateCore = async (previousCols) => {
 
     // 6) Place machine1 ids in exact saved order
     machine1Ids.forEach(id => pullToMachine(id, 'machine1'));
-    // 7) Place machine2 ids in exact saved order
     machine2Ids.forEach(id => pullToMachine(id, 'machine2'));
+    machine3Ids.forEach(id => pullToMachine(id, 'machine3'));
+    machine4Ids.forEach(id => pullToMachine(id, 'machine4'));
 
     // 7.5) Any placeholders that are not explicitly on a machine stay in queue
     (msData.placeholders || []).forEach(ph => {
-      const onM1 = machine1Ids.includes(ph.id);
-      const onM2 = machine2Ids.includes(ph.id);
-      if (!onM1 && !onM2 && !mergedCols.queue.jobs.some(j => j.id === ph.id)) {
+      const onMachine = [machine1Ids, machine2Ids, machine3Ids, machine4Ids].some((ids) =>
+        ids.includes(ph.id)
+      );
+      if (!onMachine && !mergedCols.queue.jobs.some(j => j.id === ph.id)) {
         mergedCols.queue.jobs.push(ph);
       }
     });
@@ -1346,8 +1370,12 @@ const fetchManualStateCore = async (previousCols) => {
     });
 
     // 8) Re-run scheduling on machines (timing only; order stays as placed)
-    mergedCols.machine1.jobs = scheduleMachineJobs(mergedCols.machine1.jobs, 'Machine 1 (1)');
-    mergedCols.machine2.jobs = scheduleMachineJobs(mergedCols.machine2.jobs, 'Machine 2 (6)');
+    SCHEDULER_MACHINE_KEYS.forEach((key) => {
+      mergedCols[key].jobs = scheduleMachineJobs(
+        mergedCols[key].jobs,
+        SCHEDULER_MACHINE_LABELS[key]
+      );
+    });
 
     return mergedCols;
 
@@ -1485,7 +1513,9 @@ useEffect(() => {
 
   maybeStamp(columns?.machine1?.jobs?.[0], prevM1Top);
   maybeStamp(columns?.machine2?.jobs?.[0], prevM2Top);
-}, [isScheduler, columns?.machine1?.jobs, columns?.machine2?.jobs]);
+  maybeStamp(columns?.machine3?.jobs?.[0], prevM3Top);
+  maybeStamp(columns?.machine4?.jobs?.[0], prevM4Top);
+}, [isScheduler, columns?.machine1?.jobs, columns?.machine2?.jobs, columns?.machine3?.jobs, columns?.machine4?.jobs]);
 
 
 // === Section 6: Placeholder Management ===
@@ -1527,8 +1557,10 @@ const submitPlaceholder = async (e) => {
 
   // 1) persist full manual state
   const manualState = {
-    machine1:     columns.machine1.jobs.map(j => j.id),
-    machine2:     columns.machine2.jobs.map(j => j.id),
+    machine1: columns.machine1.jobs.map(j => j.id),
+    machine2: columns.machine2.jobs.map(j => j.id),
+    machine3: columns.machine3.jobs.map(j => j.id),
+    machine4: columns.machine4.jobs.map(j => j.id),
     placeholders: updated
   };
   try {
@@ -1557,6 +1589,8 @@ const removePlaceholder = async (id) => {
   const manualState = {
     machine1:     columns.machine1.jobs.map(j => j.id),
     machine2:     columns.machine2.jobs.map(j => j.id),
+    machine3:     columns.machine3.jobs.map(j => j.id),
+    machine4:     columns.machine4.jobs.map(j => j.id),
     placeholders: cleaned
   };
   try {
@@ -1703,7 +1737,7 @@ const onDragEnd = async (result) => {
       ? sortQueue(newSrcJobs)
       : scheduleMachineJobs(
           newSrcJobs,
-          srcCol === 'machine1' ? 'Machine 1 (1)' : 'Machine 2 (6)'
+          SCHEDULER_MACHINE_LABELS[srcCol] || 'Machine 2 (6)'
         );
 
     // 🔒 Preserve the manual order you just set
@@ -1722,17 +1756,27 @@ const onDragEnd = async (result) => {
 
     const oldTop1 = cur.machine1.jobs[0]?.id || null;
     const oldTop2 = cur.machine2.jobs[0]?.id || null;
+    const oldTop3 = cur.machine3.jobs[0]?.id || null;
+    const oldTop4 = cur.machine4.jobs[0]?.id || null;
     const newTop1 = nextCols.machine1.jobs[0]?.id || null;
     const newTop2 = nextCols.machine2.jobs[0]?.id || null;
+    const newTop3 = nextCols.machine3.jobs[0]?.id || null;
+    const newTop4 = nextCols.machine4.jobs[0]?.id || null;
 
     updatePrevTopRef(prevMachine1Top, oldTop1, newTop1);
     updatePrevTopRef(prevMachine2Top, oldTop2, newTop2);
+    updatePrevTopRef(prevMachine3Top, oldTop3, newTop3);
+    updatePrevTopRef(prevMachine4Top, oldTop4, newTop4);
     prevMachine1Top.current = newTop1;
     prevMachine2Top.current = newTop2;
+    prevMachine3Top.current = newTop3;
+    prevMachine4Top.current = newTop4;
 
     const manualState = {
       machine1: nextCols.machine1.jobs.map(j => j.id),
       machine2: nextCols.machine2.jobs.map(j => j.id),
+      machine3: nextCols.machine3.jobs.map(j => j.id),
+      machine4: nextCols.machine4.jobs.map(j => j.id),
       placeholders: placeholdersRef.current
     };
     try {
@@ -1782,17 +1826,14 @@ const onDragEnd = async (result) => {
     [dstCol]: { ...cur[dstCol], jobs: dstJobs }
   };
 
-  const machineKeyLabels = {
-    machine1: 'Machine 1 (1)',
-    machine2: 'Machine 2 (6)'
-  };
+  const machineKeyLabels = { ...SCHEDULER_MACHINE_LABELS };
 
-  // Safe even if the old "top watcher" effect is removed
   prevMachine1Top.current = nextCols.machine1.jobs[0]?.id || null;
   prevMachine2Top.current = nextCols.machine2.jobs[0]?.id || null;
+  prevMachine3Top.current = nextCols.machine3.jobs[0]?.id || null;
+  prevMachine4Top.current = nextCols.machine4.jobs[0]?.id || null;
 
-  // Compute times (or any scheduling metadata)
-  ['machine1', 'machine2'].forEach(machine => {
+  SCHEDULER_MACHINE_KEYS.forEach(machine => {
     nextCols[machine].jobs = scheduleMachineJobs(
       nextCols[machine].jobs,
       machineKeyLabels[machine]
@@ -1825,6 +1866,8 @@ const onDragEnd = async (result) => {
   const manualState = {
     machine1: nextCols.machine1.jobs.map(j => j.id),
     machine2: nextCols.machine2.jobs.map(j => j.id),
+    machine3: nextCols.machine3.jobs.map(j => j.id),
+    machine4: nextCols.machine4.jobs.map(j => j.id),
     placeholders: placeholdersRef.current
   };
   try {
@@ -1837,7 +1880,7 @@ const onDragEnd = async (result) => {
     manualStateSaveInFlight.current = false;
   }
   // NEW: only set start time when moved into a machine column (preserves drop index)
-  if (dstCol === 'machine1' || dstCol === 'machine2') {
+  if (SCHEDULER_MACHINE_KEYS.includes(dstCol)) {
     const head = movedJobs?.[0];
     if (head && !head.embroidery_start) {
       Promise.resolve().then(() => maybeSetStartTimeOnAssign(head));
