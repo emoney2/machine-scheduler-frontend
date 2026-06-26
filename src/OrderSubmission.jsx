@@ -446,6 +446,17 @@ export default function OrderSubmission() {
       !materialsInv.map(v => v.toLowerCase())
                .includes(form.furColor.trim().toLowerCase())
     );
+  // Fur color is not needed for yardage book holders, scorecard holders,
+  // or any needlepoint product.
+  const furNotNeeded = (() => {
+    const p = form.product.trim().toLowerCase();
+    return (
+      p.includes("needlepoint") ||
+      p.includes("yardage") ||
+      p.includes("scorecard")
+    );
+  })();
+
   const formRef = useRef(null); // for automatic resubmit
 
   const handleNewProductChange = (e) => {
@@ -2828,12 +2839,12 @@ const handleSaveNewCompany = async () => {
                   ref={furColorRef}
                   id="furColor"
                   type="text"
-                  placeholder="Fur Color*"
+                  placeholder={`Fur Color${furNotNeeded ? "" : "*"}`}
                   value={form.furColor}
                   onChange={handleFurColorInput}
                   list="os-material-list"
                   autoComplete="off"
-                  required
+                  required={!furNotNeeded}
                   style={{ padding:"0.5rem", border:"1px solid #ccc", borderRadius:"4px" }}
                 />
               </div>
