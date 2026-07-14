@@ -28,6 +28,42 @@ function recordShipmentHistoryEntry(shipData, orderIds, jobs, companyHint) {
   });
 }
 
+/** Parse Quantity / Shipped cell values from the production sheet. */
+function parseQtyNumber(raw, fallback = 0) {
+  if (raw == null || raw === "") return fallback;
+  if (raw === true) return 1;
+  if (raw === false) return 0;
+  const n = Number(raw);
+  if (Number.isFinite(n)) return Math.max(0, n);
+  const s = String(raw).trim().toUpperCase();
+  if (["YES", "Y", "TRUE", "DONE", "SHIPPED"].includes(s)) return 1;
+  return fallback;
+}
+
+/** Units still to ship for a job row (Quantity − Shipped). */
+function remainingToShip(job) {
+  if (!job) return 0;
+  if (job.remainingToShip != null && job.remainingToShip !== "") {
+    const r = Number(job.remainingToShip);
+    if (Number.isFinite(r)) return Math.max(0, r);
+  }
+  const qty = parseQtyNumber(job.Quantity ?? job.quantity, 0);
+  const shipped = parseQtyNumber(job.Shipped ?? job.shipped, 0);
+  return Math.max(0, qty - shipped);
+}
+
+/** Keep open / partially shipped jobs on the Ship tab. */
+function isOpenForShip(job) {
+  const left = remainingToShip(job);
+  if (left > 0) return true;
+  // No shipped progress yet and Stage not complete → still open
+  const shipped = parseQtyNumber(job?.Shipped ?? job?.shipped, 0);
+  if (shipped > 0) return false;
+  const stage = String(job?.["Stage"] ?? job?.stage ?? "").trim().toUpperCase();
+  const status = String(job?.["Status"] ?? job?.status ?? "").trim().toUpperCase();
+  return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
+}
+
 /** Shopify retail rows (sheet + Company Name). */
 function getShopifyOrderId(job) {
   const v = job?.["Shopify Order ID"] ?? job?.["Shopify ID"];
@@ -820,18 +856,14 @@ export default function Ship() {
         const data = await res.json();
 
         if (res.ok) {
-          const incompleteJobs = (data.jobs || []).filter((job) => {
-            const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
-            const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
-            return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
-          });
+          const incompleteJobs = (data.jobs || []).filter(isOpenForShip);
 
           const updatedJobs = incompleteJobs.map((job) => {
-            const qty = Number(job.Quantity ?? job.quantity ?? 0);
+            const left = remainingToShip(job) || parseQtyNumber(job.Quantity ?? job.quantity, 0);
             return {
               ...job,
-              shipQty: qty,
-              ShippedQty: qty,
+              shipQty: left,
+              ShippedQty: left,
             };
           });
 
@@ -914,21 +946,20 @@ export default function Ship() {
 
         .then(data => {
           if (data.jobs) {
-            // Filter out COMPLETE jobs
-            const incompleteJobs = data.jobs.filter((job) => {
-              const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
-              const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
-              return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
-            });
+            // Keep open + partially shipped jobs (hide only when fully shipped)
+            const incompleteJobs = data.jobs.filter(isOpenForShip);
 
             setJobs(prev => {
               const prevMap = Object.fromEntries(prev.map(j => [j.orderId, j]));
               return incompleteJobs.map(newJob => {
                 const existing = prevMap[newJob.orderId];
+                const left =
+                  remainingToShip(newJob) ||
+                  parseQtyNumber(newJob.Quantity ?? newJob.quantity, 0);
                 return {
                   ...newJob,
-                  shipQty: existing?.shipQty ?? newJob.quantity,
-                  ShippedQty: existing?.shipQty ?? newJob.quantity,
+                  shipQty: existing?.shipQty ?? left,
+                  ShippedQty: existing?.shipQty ?? left,
                 };
               });
             });
@@ -1129,16 +1160,13 @@ export default function Ship() {
 
       const data = await res.json();
       if (res.ok) {
-        // Filter out COMPLETE jobs
-        const incompleteJobs = data.jobs.filter((job) => {
-          const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
-          const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
-          return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
-        });
+        // Keep open + partially shipped jobs (hide only when fully shipped)
+        const incompleteJobs = data.jobs.filter(isOpenForShip);
 
-        const jobsWithQty = incompleteJobs.map(job => {
-          const qty = Number(job.Quantity ?? 0);
-          return { ...job, shipQty: qty, ShippedQty: qty };
+        const jobsWithQty = incompleteJobs.map((job) => {
+          const left =
+            remainingToShip(job) || parseQtyNumber(job.Quantity ?? job.quantity, 0);
+          return { ...job, shipQty: left, ShippedQty: left };
         });
         setJobs(jobsWithQty);
         setSelected(prev =>
@@ -1545,17 +1573,14 @@ export default function Ship() {
         console.error("Fetch error:", data.error);
         return;
       }
-      const incompleteJobs = (data.jobs || []).filter((job) => {
-        const stage = String(job["Stage"] ?? job.stage ?? "").trim().toUpperCase();
-        const status = String(job["Status"] ?? job.status ?? "").trim().toUpperCase();
-        return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
-      });
+      const incompleteJobs = (data.jobs || []).filter(isOpenForShip);
       const updatedJobs = incompleteJobs.map((job) => {
-        const qty = Number(job.Quantity ?? job.quantity ?? 0);
+        const left =
+          remainingToShip(job) || parseQtyNumber(job.Quantity ?? job.quantity, 0);
         return {
           ...job,
-          shipQty: qty,
-          ShippedQty: qty,
+          shipQty: left,
+          ShippedQty: left,
         };
       });
       setJobs(updatedJobs);
@@ -2626,6 +2651,9 @@ export default function Ship() {
               const oid = row.orderId || row["Order #"] || "";
               const dueStyle = queueCardDueStyle(row["Due Date"]);
               const stageLabel = String(row["Stage"] || "").trim() || "—";
+              const qtyTotal = parseQtyNumber(row.Quantity ?? row.quantity, 0);
+              const left = remainingToShip(row);
+              const shippedAlready = Math.max(0, qtyTotal - left);
               const onCardActivate = () => openCompanyInShip(company);
               return (
                 <div
@@ -2714,6 +2742,21 @@ export default function Ship() {
                           {stageLabel}
                         </span>
                       </div>
+                      {shippedAlready > 0 && left > 0 && (
+                        <div
+                          style={{
+                            marginTop: 6,
+                            fontSize: "0.78rem",
+                            fontWeight: 700,
+                            color: "#b45309",
+                          }}
+                        >
+                          {left} left to ship
+                          <span style={{ fontWeight: 500, color: "#92400e" }}>
+                            {` (${shippedAlready} of ${qtyTotal} shipped)`}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div
@@ -2770,7 +2813,7 @@ export default function Ship() {
           <div style={{ width: 60, textAlign: "center" }}>#</div>
           <div style={{ width: 80, textAlign: "center" }}>Date</div>
           <div style={{ width: 200, textAlign: "center" }}>Design</div>
-          <div style={{ width: 70, textAlign: "center" }}>Qty</div>
+          <div style={{ width: 100, textAlign: "center" }}>Ship qty</div>
           <div style={{ width: 120, textAlign: "center" }}>Product</div>
           <div style={{ width: 120, textAlign: "center" }}>Stage</div>
           <div style={{ width: 80, textAlign: "center" }}>Price</div>
@@ -2778,7 +2821,12 @@ export default function Ship() {
         </div>
       )}
 
-      {jobs.map((job) => (
+      {jobs.map((job) => {
+        const left = remainingToShip(job);
+        const qtyTotal = parseQtyNumber(job.Quantity ?? job.quantity, 0);
+        const shippedAlready = Math.max(0, qtyTotal - left);
+        const selectedRow = selected.includes(job.orderId.toString());
+        return (
         <div
           key={job.orderId}
           ref={el => { if (el) jobRefs.current[job.orderId] = el; }}
@@ -2790,8 +2838,8 @@ export default function Ship() {
             padding: "0.5rem 1rem",
             marginBottom: "0.3rem",
             borderRadius: "6px",
-            backgroundColor: selected.includes(job.orderId.toString()) ? "#4CAF50" : "#fff",
-            color: selected.includes(job.orderId.toString()) ? "#fff" : "#000",
+            backgroundColor: selectedRow ? "#4CAF50" : "#fff",
+            color: selectedRow ? "#fff" : "#000",
             cursor: "pointer"
           }}
         >
@@ -2799,11 +2847,12 @@ export default function Ship() {
           <div style={{ width: 60, textAlign: "center" }}>{job.orderId}</div>
           <div style={{ width: 80, textAlign: "center" }}>{formatDateMMDD(job["Date"])}</div>
           <div style={{ width: 200, textAlign: "center" }}>{job["Design"]}</div>
-          <div style={{ width: 70, textAlign: "center" }}>
+          <div style={{ width: 100, textAlign: "center" }}>
             <input
               type="number"
-              value={job.shipQty ?? job["Quantity"] ?? 0}
+              value={job.shipQty ?? left ?? job["Quantity"] ?? 0}
               min="1"
+              max={left > 0 ? left : undefined}
               style={{ width: "50px" }}
               onClick={(e) => e.stopPropagation()}
               onChange={(e) => {
@@ -2815,6 +2864,18 @@ export default function Ship() {
                 );
               }}
             />
+            {shippedAlready > 0 && left > 0 && (
+              <div
+                style={{
+                  fontSize: "0.7rem",
+                  marginTop: 2,
+                  fontWeight: 700,
+                  color: selectedRow ? "#fff7d6" : "#b45309",
+                }}
+              >
+                {left} left
+              </div>
+            )}
           </div>
           <div style={{ width: 120, textAlign: "center" }}>{job["Product"]}</div>
           <div style={{ width: 120, textAlign: "center" }}>{job["Stage"]}</div>
@@ -2826,7 +2887,8 @@ export default function Ship() {
             </div>
           </div>
         </div>
-      ))}
+        );
+      })}
 
       {selected.length > 0 && (
         <div style={{ marginTop: "2rem", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
