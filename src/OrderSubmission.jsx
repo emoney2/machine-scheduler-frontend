@@ -166,6 +166,7 @@ export default function OrderSubmission() {
     loadLastAcceptedCustomerJob()
   );
   const [lastJobThumbFailed, setLastJobThumbFailed] = useState(false);
+  const [reorderingLastJob, setReorderingLastJob] = useState(false);
 
   useEffect(() => {
     setLastJobThumbFailed(false);
@@ -350,6 +351,46 @@ export default function OrderSubmission() {
   const handleReorderChange = (e) => {
     const { name, value } = e.target;
     setReorderData(d => ({ ...d, [name]: value }));
+  };
+
+  /** Same as picking a job on /reorder: load full job, then prefill this form. */
+  const handleReorderLastJob = async () => {
+    const orderNumber = String(lastAcceptedCustomerJob?.orderNumber || "").trim();
+    const company = String(lastAcceptedCustomerJob?.company || "").trim();
+    if (!orderNumber || reorderingLastJob) return;
+
+    setReorderingLastJob(true);
+    try {
+      let job = null;
+
+      if (company) {
+        const { data } = await axios.get(
+          `${API_ROOT}/jobs-for-company?company=${encodeURIComponent(company)}`
+        );
+        const jobs = data?.jobs || [];
+        job =
+          jobs.find(
+            (j) => String(j["Order #"] || j.orderId || "").trim() === orderNumber
+          ) || null;
+      }
+
+      if (!job) {
+        const { data } = await axios.get(
+          `${API_ROOT}/orders/${encodeURIComponent(orderNumber)}`
+        );
+        if (data?.error) {
+          throw new Error(data.error);
+        }
+        job = data;
+      }
+
+      navigate("/order", { state: { reorderJob: job } });
+    } catch (err) {
+      console.error("❌ Failed to load last job for reorder:", err);
+      alert("Failed to load that order for reorder.");
+    } finally {
+      setReorderingLastJob(false);
+    }
   };
 
 
@@ -1611,6 +1652,25 @@ const handleSaveNewCompany = async () => {
                 return Number.isFinite(ms) ? new Date(ms).toLocaleString() : "";
               })()}
             </span>
+            <button
+              type="button"
+              onClick={handleReorderLastJob}
+              disabled={reorderingLastJob}
+              style={{
+                flexShrink: 0,
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                background: reorderingLastJob ? "#93c5fd" : "#007bff",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                cursor: reorderingLastJob ? "wait" : "pointer",
+              }}
+              title="Prefill the form from this job (same as Reorder Previous Job)"
+            >
+              {reorderingLastJob ? "Loading…" : "Reorder"}
+            </button>
           </>
         ) : (
           <span style={{ color: "#9ca3af", fontSize: 11 }}>
