@@ -780,11 +780,47 @@ const WEEKLY_SALES_GOAL = 375;
 const DAILY_SALES_GOAL = 75;
 const WORK_DAYS_PER_WEEK = 5;
 
-function computeWeeklySalesGoalStats(soldThisWeek) {
+/** Glass-fill colors for Sold This Week — rises like water, red → green only. */
+function weeklySalesFillColor(sold, minGoal, stretchGoal) {
+  if (!(stretchGoal > 0)) return "#e5e7eb";
+  const min = Number.isFinite(minGoal) && minGoal > 0 ? minGoal : stretchGoal * 0.4;
+  if (sold <= 0) return "transparent";
+  if (sold < min * 0.33) return "#fca5a5"; // behind — soft red
+  if (sold < min * 0.66) return "#fdba74"; // warming — orange
+  if (sold < min) return "#fde047"; // approaching min — yellow
+  if (sold < min + (stretchGoal - min) * 0.5) return "#86efac"; // min met — light green
+  if (sold < stretchGoal) return "#4ade80"; // chasing 75/day — green
+  return "#22c55e"; // stretch goal met — strong green
+}
+
+function computeWeeklySalesGoalStats(soldThisWeek, soldPerDayAvg) {
   const sold = Number(soldThisWeek);
   if (!Number.isFinite(sold)) return null;
-  const remaining = Math.max(0, WEEKLY_SALES_GOAL - sold);
-  return { remaining };
+  const stretchGoal = WEEKLY_SALES_GOAL;
+  const avg = Number(soldPerDayAvg);
+  const minGoal =
+    Number.isFinite(avg) && avg > 0
+      ? Math.round(avg * WORK_DAYS_PER_WEEK * 100) / 100
+      : null;
+  const fillPct = Math.min(100, Math.max(0, (sold / stretchGoal) * 100));
+  const remainingToStretch = Math.max(0, stretchGoal - sold);
+  const remainingToMin =
+    minGoal != null ? Math.max(0, minGoal - sold) : null;
+  const metMin = minGoal != null && sold >= minGoal;
+  const metStretch = sold >= stretchGoal;
+  const fillColor = weeklySalesFillColor(sold, minGoal, stretchGoal);
+  return {
+    sold,
+    minGoal,
+    stretchGoal,
+    fillPct,
+    fillColor,
+    remainingToStretch,
+    remainingToMin,
+    metMin,
+    metStretch,
+    avg,
+  };
 }
 const metricBoxEmbroidery = {
   ...metricBox,
@@ -1747,38 +1783,117 @@ function col(width, center = false) {
               </div>
 
               {/* Headcovers sold this calendar week (Mon–Sun ET, through today); excludes lines with "back" in Product */}
-              <div style={metricBox}>
-                <div style={metricLabel} title="Sold This Week">
-                  Sold This Week
-                </div>
-                <div style={metricValue}>
-                  {metrics?.headcovers_sold_this_week != null
-                    ? Number.isInteger(metrics.headcovers_sold_this_week)
-                      ? String(metrics.headcovers_sold_this_week)
-                      : metrics.headcovers_sold_this_week.toFixed(2)
-                    : "—"}
-                </div>
-                {(() => {
-                  const goalStats = computeWeeklySalesGoalStats(
-                    metrics?.headcovers_sold_this_week
-                  );
-                  if (!goalStats) return null;
-                  const { remaining } = goalStats;
-                  return (
-                    <>
-                      <div style={metricSubtext}>
-                        Goal: {WEEKLY_SALES_GOAL} ({DAILY_SALES_GOAL}/day ×{" "}
-                        {WORK_DAYS_PER_WEEK} days)
+              {(() => {
+                const goalStats = computeWeeklySalesGoalStats(
+                  metrics?.headcovers_sold_this_week,
+                  metrics?.headcovers_sold_per_day
+                );
+                const fillPct = goalStats?.fillPct ?? 0;
+                const fillColor = goalStats?.fillColor ?? "transparent";
+                return (
+                  <div
+                    style={{
+                      ...metricBox,
+                      position: "relative",
+                      overflow: "hidden",
+                      background: "#f8fafc",
+                    }}
+                  >
+                    {/* Glass fill — rises from the bottom like water */}
+                    <div
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: `${fillPct}%`,
+                        background: `linear-gradient(
+                          180deg,
+                          rgba(255,255,255,0.35) 0%,
+                          ${fillColor} 18%,
+                          ${fillColor} 100%
+                        )`,
+                        transition:
+                          "height 0.6s ease, background 0.45s ease",
+                        pointerEvents: "none",
+                        zIndex: 0,
+                      }}
+                    />
+                    {/* Soft wave sheen at the water line */}
+                    {fillPct > 1 && fillPct < 100 ? (
+                      <div
+                        aria-hidden
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: `calc(${fillPct}% - 2px)`,
+                          height: 4,
+                          background:
+                            "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)",
+                          pointerEvents: "none",
+                          zIndex: 0,
+                          transition: "bottom 0.6s ease",
+                        }}
+                      />
+                    ) : null}
+                    <div
+                      style={{
+                        position: "relative",
+                        zIndex: 1,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        width: "100%",
+                      }}
+                    >
+                      <div style={metricLabel} title="Sold This Week">
+                        Sold This Week
                       </div>
-                      <div style={metricSubtext}>
-                        {remaining > 0
-                          ? `${remaining} more to reach ${WEEKLY_SALES_GOAL}`
-                          : `Goal reached (${WEEKLY_SALES_GOAL})`}
+                      <div style={metricValue}>
+                        {metrics?.headcovers_sold_this_week != null
+                          ? Number.isInteger(metrics.headcovers_sold_this_week)
+                            ? String(metrics.headcovers_sold_this_week)
+                            : metrics.headcovers_sold_this_week.toFixed(2)
+                          : "—"}
                       </div>
-                    </>
-                  );
-                })()}
-              </div>
+                      {goalStats ? (
+                        <>
+                          <div style={metricSubtext}>
+                            {goalStats.minGoal != null
+                              ? `Min: ${goalStats.minGoal} (avg × ${WORK_DAYS_PER_WEEK})`
+                              : `Min: avg × ${WORK_DAYS_PER_WEEK}`}
+                          </div>
+                          <div style={metricSubtext}>
+                            Goal: {goalStats.stretchGoal} ({DAILY_SALES_GOAL}
+                            /day × {WORK_DAYS_PER_WEEK})
+                          </div>
+                          <div
+                            style={{
+                              ...metricSubtext,
+                              color: goalStats.metStretch
+                                ? "#15803d"
+                                : goalStats.metMin
+                                  ? "#166534"
+                                  : "#64748b",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {goalStats.metStretch
+                              ? `Stretch goal met (${goalStats.stretchGoal})`
+                              : goalStats.metMin
+                                ? `${goalStats.remainingToStretch} more to hit ${DAILY_SALES_GOAL}/day pace`
+                                : goalStats.remainingToMin != null
+                                  ? `${goalStats.remainingToMin} more to clear min (avg × ${WORK_DAYS_PER_WEEK})`
+                                  : `${goalStats.remainingToStretch} more to reach ${goalStats.stretchGoal}`}
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Goal */}
               <div style={metricBox}>
