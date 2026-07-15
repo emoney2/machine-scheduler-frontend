@@ -793,19 +793,26 @@ function weeklySalesFillColor(sold, minGoal, stretchGoal) {
   return "#22c55e"; // stretch goal met — strong green
 }
 
+function round1(n) {
+  return Math.round(Number(n) * 10) / 10;
+}
+
+function format1(n) {
+  if (!Number.isFinite(n)) return "—";
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
 function computeWeeklySalesGoalStats(soldThisWeek, soldPerDayAvg) {
   const sold = Number(soldThisWeek);
   if (!Number.isFinite(sold)) return null;
   const stretchGoal = WEEKLY_SALES_GOAL;
   const avg = Number(soldPerDayAvg);
   const minGoal =
-    Number.isFinite(avg) && avg > 0
-      ? Math.round(avg * WORK_DAYS_PER_WEEK * 100) / 100
-      : null;
+    Number.isFinite(avg) && avg > 0 ? round1(avg * WORK_DAYS_PER_WEEK) : null;
   const fillPct = Math.min(100, Math.max(0, (sold / stretchGoal) * 100));
-  const remainingToStretch = Math.max(0, stretchGoal - sold);
+  const remainingToStretch = round1(Math.max(0, stretchGoal - sold));
   const remainingToMin =
-    minGoal != null ? Math.max(0, minGoal - sold) : null;
+    minGoal != null ? round1(Math.max(0, minGoal - sold)) : null;
   const metMin = minGoal != null && sold >= minGoal;
   const metStretch = sold >= stretchGoal;
   const fillColor = weeklySalesFillColor(sold, minGoal, stretchGoal);
@@ -1862,7 +1869,7 @@ function col(width, center = false) {
                         <>
                           <div style={metricSubtext}>
                             {goalStats.minGoal != null
-                              ? `Min: ${goalStats.minGoal} (avg × ${WORK_DAYS_PER_WEEK})`
+                              ? `Min: ${format1(goalStats.minGoal)} (avg × ${WORK_DAYS_PER_WEEK})`
                               : `Min: avg × ${WORK_DAYS_PER_WEEK}`}
                           </div>
                           <div style={metricSubtext}>
@@ -1883,10 +1890,10 @@ function col(width, center = false) {
                             {goalStats.metStretch
                               ? `Stretch goal met (${goalStats.stretchGoal})`
                               : goalStats.metMin
-                                ? `${goalStats.remainingToStretch} more to hit ${DAILY_SALES_GOAL}/day pace`
+                                ? `${format1(goalStats.remainingToStretch)} more to hit ${DAILY_SALES_GOAL}/day pace`
                                 : goalStats.remainingToMin != null
-                                  ? `${goalStats.remainingToMin} more to clear min (avg × ${WORK_DAYS_PER_WEEK})`
-                                  : `${goalStats.remainingToStretch} more to reach ${goalStats.stretchGoal}`}
+                                  ? `${format1(goalStats.remainingToMin)} more to clear min (avg × ${WORK_DAYS_PER_WEEK})`
+                                  : `${format1(goalStats.remainingToStretch)} more to reach ${goalStats.stretchGoal}`}
                           </div>
                         </>
                       ) : null}
