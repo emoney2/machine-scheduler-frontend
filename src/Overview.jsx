@@ -4,6 +4,123 @@ import axios from "axios";
 import { socket } from "./socketClient";
 import { supabase } from "./supabaseClient";
 
+const GOAL_CONFETTI_COLORS = [
+  "#22c55e",
+  "#4ade80",
+  "#fbbf24",
+  "#f97316",
+  "#38bdf8",
+  "#a78bfa",
+  "#f472b6",
+  "#ef4444",
+];
+
+function makeGoalConfettiPieces(burstId) {
+  const count = 42;
+  const pieces = [];
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45;
+    const dist = 36 + Math.random() * 72;
+    pieces.push({
+      id: `${burstId}-${i}`,
+      color: GOAL_CONFETTI_COLORS[i % GOAL_CONFETTI_COLORS.length],
+      dx: Math.cos(angle) * dist,
+      dy: Math.sin(angle) * dist - 10 - Math.random() * 28,
+      rot: (Math.random() - 0.5) * 720,
+      delay: Math.random() * 0.22,
+      duration: 1.15 + Math.random() * 0.85,
+      w: 4 + Math.random() * 5,
+      h: 6 + Math.random() * 8,
+      round: Math.random() > 0.55,
+    });
+  }
+  return pieces;
+}
+
+/** Little confetti/fireworks burst around the Sold This Week box when stretch goal is met. */
+function GoalMetConfetti({ active }) {
+  const [pieces, setPieces] = React.useState([]);
+  const burstIdRef = React.useRef(0);
+  const clearTimerRef = React.useRef(null);
+
+  const fire = React.useCallback(() => {
+    burstIdRef.current += 1;
+    const burstId = burstIdRef.current;
+    setPieces(makeGoalConfettiPieces(burstId));
+    if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+    clearTimerRef.current = window.setTimeout(() => {
+      setPieces((prev) =>
+        prev[0]?.id?.startsWith(`${burstId}-`) ? [] : prev
+      );
+      clearTimerRef.current = null;
+    }, 2400);
+  }, []);
+
+  React.useEffect(() => {
+    if (!active) {
+      setPieces([]);
+      return undefined;
+    }
+    fire();
+    const interval = window.setInterval(fire, 12000);
+    return () => {
+      window.clearInterval(interval);
+      if (clearTimerRef.current) window.clearTimeout(clearTimerRef.current);
+    };
+  }, [active, fire]);
+
+  if (!active && pieces.length === 0) return null;
+
+  return (
+    <>
+      <style>{`
+        @keyframes overview-goal-confetti-burst {
+          0% {
+            transform: translate(-50%, -50%) scale(0.35) rotate(0deg);
+            opacity: 1;
+          }
+          70% { opacity: 1; }
+          100% {
+            transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy)))
+              scale(1) rotate(var(--rot));
+            opacity: 0;
+          }
+        }
+      `}</style>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          overflow: "visible",
+          pointerEvents: "none",
+          zIndex: 3,
+        }}
+      >
+        {pieces.map((p) => (
+          <span
+            key={p.id}
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "45%",
+              width: p.w,
+              height: p.h,
+              background: p.color,
+              borderRadius: p.round ? "50%" : 2,
+              ["--dx"]: `${p.dx}px`,
+              ["--dy"]: `${p.dy}px`,
+              ["--rot"]: `${p.rot}deg`,
+              animation: `overview-goal-confetti-burst ${p.duration}s cubic-bezier(0.15, 0.75, 0.25, 1) ${p.delay}s both`,
+              boxShadow: "0 0 0 1px rgba(255,255,255,0.25)",
+            }}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default function Overview() {
   const [metrics, setMetrics] = useState(null);
   const [metricsUpdatedAt, setMetricsUpdatedAt] = useState(null);
@@ -731,7 +848,6 @@ function LastUpdatedBadge({ at }) {
   );
 }
 
-
 // ——— Styles (added) ——————————————————————————————————————————————
 const header = { fontSize: 14, fontWeight: 700, marginBottom: 8 };
 const subtleUpdatedStyle = { fontSize: 12, color: "#9CA3AF", fontStyle: "italic" };
@@ -1231,10 +1347,13 @@ function col(width, center = false) {
       if (typeof rf === "function") await rf({ bypassDebounce: true });
     } catch (err) {
       const body = err?.response?.data;
-      const msg =
+      let msg =
         (body && (body.error || body.message)) ||
         err?.message ||
         String(err);
+      if (body?.detail && msg && !String(msg).includes(String(body.detail))) {
+        msg = `${msg} (${body.detail})`;
+      }
       setMaterialsRebuildErr(msg);
     } finally {
       setRebuildingMaterials(false);
@@ -1720,6 +1839,12 @@ function col(width, center = false) {
         {/* LEFT COLUMN: Performance Metrics, Materials, Kanban */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {/* Performance Metrics (Headcovers / Day + Goal) */}
+          {(() => {
+            const stretchMet = !!computeWeeklySalesGoalStats(
+              metrics?.headcovers_sold_this_week,
+              metrics?.headcovers_sold_per_day
+            )?.metStretch;
+            return (
           <div
             style={{
               background: "#fff",
@@ -1727,7 +1852,8 @@ function col(width, center = false) {
               borderRadius: 10,
               boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
               padding: 12,
-              overflow: "hidden",
+              // Allow confetti to spill around the Sold This Week box when goal is met
+              overflow: stretchMet ? "visible" : "hidden",
               position: "relative", // for overlay
             }}
           >
@@ -1797,54 +1923,63 @@ function col(width, center = false) {
                 );
                 const fillPct = goalStats?.fillPct ?? 0;
                 const fillColor = goalStats?.fillColor ?? "transparent";
+                const metStretch = !!goalStats?.metStretch;
                 return (
                   <div
                     style={{
                       ...metricBox,
                       position: "relative",
-                      overflow: "hidden",
+                      overflow: "visible",
                       background: "#f8fafc",
                     }}
                   >
-                    {/* Glass fill — rises from the bottom like water */}
+                    <GoalMetConfetti active={metStretch} />
+                    {/* Clip layer so the water fill stays inside the box */}
                     <div
                       aria-hidden
                       style={{
                         position: "absolute",
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        height: `${fillPct}%`,
-                        background: `linear-gradient(
-                          180deg,
-                          rgba(255,255,255,0.35) 0%,
-                          ${fillColor} 18%,
-                          ${fillColor} 100%
-                        )`,
-                        transition:
-                          "height 0.6s ease, background 0.45s ease",
+                        inset: 0,
+                        overflow: "hidden",
+                        borderRadius: 10,
                         pointerEvents: "none",
                         zIndex: 0,
                       }}
-                    />
-                    {/* Soft wave sheen at the water line */}
-                    {fillPct > 1 && fillPct < 100 ? (
+                    >
+                      {/* Glass fill — rises from the bottom like water */}
                       <div
-                        aria-hidden
                         style={{
                           position: "absolute",
                           left: 0,
                           right: 0,
-                          bottom: `calc(${fillPct}% - 2px)`,
-                          height: 4,
-                          background:
-                            "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)",
-                          pointerEvents: "none",
-                          zIndex: 0,
-                          transition: "bottom 0.6s ease",
+                          bottom: 0,
+                          height: `${fillPct}%`,
+                          background: `linear-gradient(
+                            180deg,
+                            rgba(255,255,255,0.35) 0%,
+                            ${fillColor} 18%,
+                            ${fillColor} 100%
+                          )`,
+                          transition:
+                            "height 0.6s ease, background 0.45s ease",
                         }}
                       />
-                    ) : null}
+                      {/* Soft wave sheen at the water line */}
+                      {fillPct > 1 && fillPct < 100 ? (
+                        <div
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            right: 0,
+                            bottom: `calc(${fillPct}% - 2px)`,
+                            height: 4,
+                            background:
+                              "linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent)",
+                            transition: "bottom 0.6s ease",
+                          }}
+                        />
+                      ) : null}
+                    </div>
                     <div
                       style={{
                         position: "relative",
@@ -1953,6 +2088,8 @@ function col(width, center = false) {
 
               </div>  {/* <-- closes the grid */}
           </div>
+            );
+          })()}
 
           {/* Materials To Order */}
           <div
