@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
-const DAYS_WINDOW = 7;
+const DAYS_WINDOW = 14;
 
 function parseDate(s) {
   if (s === null || s === undefined || s === "") return null;
@@ -228,7 +228,31 @@ export default function SewingPriority() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const ctrlRef = useRef(null);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    const syncFs = () => {
+      const el = rootRef.current;
+      setIsFullscreen(!!(document.fullscreenElement && el && document.fullscreenElement === el));
+    };
+    document.addEventListener("fullscreenchange", syncFs);
+    return () => document.removeEventListener("fullscreenchange", syncFs);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      const el = rootRef.current;
+      if (el?.requestFullscreen) await el.requestFullscreen();
+    } catch (e) {
+      console.warn("Fullscreen failed:", e);
+    }
+  };
 
   useEffect(() => {
     let alive = true;
@@ -301,7 +325,18 @@ export default function SewingPriority() {
   }, []);
 
   return (
-    <div style={{ padding: "6px 8px 8px", maxWidth: 1600, margin: "0 auto" }}>
+    <div
+      ref={rootRef}
+      style={{
+        padding: "6px 8px 8px",
+        maxWidth: isFullscreen ? "none" : 1600,
+        margin: "0 auto",
+        background: "#fff",
+        minHeight: isFullscreen ? "100vh" : undefined,
+        boxSizing: "border-box",
+        overflow: isFullscreen ? "auto" : undefined,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -341,12 +376,33 @@ export default function SewingPriority() {
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
           <span style={{ opacity: 0.7 }}>✓</span> Sewn
         </span>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>
-          {lastUpdated
-            ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-            : loading
-              ? "Loading…"
-              : ""}
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 11, color: "#9ca3af" }}>
+            {lastUpdated
+              ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+              : loading
+                ? "Loading…"
+                : ""}
+          </span>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+            style={{
+              padding: "2px 10px",
+              fontSize: 12,
+              fontWeight: 700,
+              lineHeight: 1.3,
+              border: "1px solid #d1d5db",
+              borderRadius: 6,
+              background: isFullscreen ? "#111827" : "#fff",
+              color: isFullscreen ? "#fff" : "#111827",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          </button>
         </span>
       </div>
 
