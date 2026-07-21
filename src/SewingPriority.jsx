@@ -424,7 +424,8 @@ export default function SewingPriority() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-          gap: 10,
+          columnGap: 10,
+          rowGap: 0,
           opacity: loading && jobs.length ? 0.7 : 1,
         }}
       >
@@ -441,7 +442,16 @@ export default function SewingPriority() {
           return (
             <div
               key={`${order}|${product}|${design}|${idx}`}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                height: "100%",
+                paddingTop: 8,
+                paddingBottom: 10,
+                borderBottom: "1px solid #d1d5db",
+                boxSizing: "border-box",
+              }}
             >
               {customer ? (
                 <div
