@@ -1,8 +1,18 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
-const DAYS_WINDOW = 14;
+/** Tile board horizon. */
+const BOARD_DAYS_WINDOW = 14;
+/** Catch-up tracker looks farther so later spikes show up in planning. */
+const CATCH_UP_DAYS_WINDOW = 30;
+
+/** Mon–Fri sewing capacity. */
+const WORKDAY_PCS = 48;
+const WORK_START_H = 8; // 8:00
+const WORK_END_H = 16; // 16:00
+const HOURS_PER_WORKDAY = WORK_END_H - WORK_START_H;
+const PCS_PER_HOUR = WORKDAY_PCS / HOURS_PER_WORKDAY;
 
 function parseDate(s) {
   if (s === null || s === undefined || s === "") return null;
@@ -75,6 +85,129 @@ function outlineByShipDate(shipDate) {
   if (d < 0) return "#e74c3c";
   if (d === 0) return "#f1c40f";
   return "#2ecc71";
+}
+
+function startOfLocalDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function isWeekday(d) {
+  const day = d.getDay();
+  return day >= 1 && day <= 5;
+}
+
+/** Hours of sewing still available today (0 on weekends / after 4pm). */
+function remainingWorkHoursToday(now = new Date()) {
+  if (!isWeekday(now)) return 0;
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), WORK_START_H, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), WORK_END_H, 0, 0, 0);
+  if (now >= end) return 0;
+  if (now <= start) return HOURS_PER_WORKDAY;
+  return (end.getTime() - now.getTime()) / 3600000;
+}
+
+function remainingCapacityToday(now = new Date()) {
+  return remainingWorkHoursToday(now) * PCS_PER_HOUR;
+}
+
+/** Capacity from now through end of ship date (Mon–Fri only, partial today). */
+function capacityThroughShipDate(shipDate, now = new Date()) {
+  const ship = parseDate(shipDate);
+  if (!ship) return 0;
+  const shipDay = startOfLocalDay(ship);
+  const today = startOfLocalDay(now);
+
+  if (shipDay.getTime() < today.getTime()) {
+    return remainingCapacityToday(now);
+  }
+  if (shipDay.getTime() === today.getTime()) {
+    return remainingCapacityToday(now);
+  }
+
+  let cap = remainingCapacityToday(now);
+  const cursor = new Date(today);
+  cursor.setDate(cursor.getDate() + 1);
+  while (cursor.getTime() <= shipDay.getTime()) {
+    if (isWeekday(cursor)) cap += WORKDAY_PCS;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return cap;
+}
+
+/** Workdays from today through ship date (today counts only if hours remain). */
+function workdaysThroughShipDate(shipDate, now = new Date()) {
+  const ship = parseDate(shipDate);
+  if (!ship) return 0;
+  const shipDay = startOfLocalDay(ship);
+  const today = startOfLocalDay(now);
+
+  if (shipDay.getTime() < today.getTime()) {
+    return remainingWorkHoursToday(now) > 0 ? 1 : 0;
+  }
+
+  let n = 0;
+  const cursor = new Date(today);
+  while (cursor.getTime() <= shipDay.getTime()) {
+    if (isWeekday(cursor)) {
+      if (cursor.getTime() === today.getTime()) {
+        if (remainingWorkHoursToday(now) > 0) n += 1;
+      } else {
+        n += 1;
+      }
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return n;
+}
+
+function jobQty(job) {
+  const raw = job?.["Quantity"] ?? job?.["Qty"];
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Running catch-up: walk jobs by ship date; max(cum demand − capacity through that date).
+ * Sewing-complete jobs are excluded (already off the sewing load).
+ */
+function computeCatchUpTracker(jobs, now = new Date()) {
+  const hoursLeft = remainingWorkHoursToday(now);
+  const pcsLeftToday = Math.max(0, Math.round(remainingCapacityToday(now)));
+
+  let cumDemand = 0;
+  let maxDeficit = 0;
+  let bottleneckShip = null;
+
+  for (const job of jobs || []) {
+    if (job?.sewingSummaryComplete) continue;
+    const ship = job["Ship Date"] ?? job["Ship"] ?? null;
+    if (parseDate(ship) == null) continue;
+    const qty = jobQty(job);
+    if (qty <= 0) continue;
+
+    cumDemand += qty;
+    const cap = capacityThroughShipDate(ship, now);
+    const deficit = cumDemand - cap;
+    if (deficit > maxDeficit + 1e-9) {
+      maxDeficit = deficit;
+      bottleneckShip = ship;
+    }
+  }
+
+  const extraPcs = maxDeficit > 1e-9 ? Math.ceil(maxDeficit - 1e-9) : 0;
+  const overWorkdays = bottleneckShip ? workdaysThroughShipDate(bottleneckShip, now) : 0;
+  const perDay =
+    extraPcs > 0 ? (overWorkdays > 0 ? Math.ceil(extraPcs / overWorkdays) : extraPcs) : 0;
+
+  return {
+    extraPcs,
+    overWorkdays,
+    perDay,
+    hoursLeft,
+    pcsLeftToday,
+    bottleneckShip,
+    openPcs: cumDemand,
+  };
 }
 
 function extractFileIdFromFormulaOrUrl(input) {
@@ -227,8 +360,8 @@ export default function SewingPriority() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const ctrlRef = useRef(null);
   const rootRef = useRef(null);
 
@@ -240,6 +373,21 @@ export default function SewingPriority() {
     document.addEventListener("fullscreenchange", syncFs);
     return () => document.removeEventListener("fullscreenchange", syncFs);
   }, []);
+
+  // Live workday clock (hours left today / catch-up math).
+  useEffect(() => {
+    const tick = () => setNow(new Date());
+    tick();
+    const id = window.setInterval(tick, 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // Tracker uses full loaded set (30d); tiles use the nearer board window (14d).
+  const boardJobs = useMemo(
+    () => (jobs || []).filter((j) => isJobInTimeWindow(j, BOARD_DAYS_WINDOW)),
+    [jobs]
+  );
+  const catchUp = useMemo(() => computeCatchUpTracker(jobs, now), [jobs, now]);
 
   const toggleFullscreen = async () => {
     try {
@@ -280,7 +428,8 @@ export default function SewingPriority() {
         const filtered = [];
         for (const j of raw) {
           if (isStageCompleted(j)) continue;
-          if (!isJobInTimeWindow(j, DAYS_WINDOW)) continue;
+          // Load far enough for catch-up; board filters to BOARD_DAYS_WINDOW when rendering.
+          if (!isJobInTimeWindow(j, CATCH_UP_DAYS_WINDOW)) continue;
           const k = [
             String(j["Order #"] ?? "").trim(),
             String(j["Product"] ?? "").trim(),
@@ -303,7 +452,6 @@ export default function SewingPriority() {
         });
 
         setJobs(filtered);
-        setLastUpdated(new Date());
       } catch (e) {
         if (!alive || axios.isCancel(e)) return;
         console.error("Sewing Priority load failed:", e);
@@ -341,17 +489,15 @@ export default function SewingPriority() {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 10,
+          gap: 12,
           flexWrap: "nowrap",
           marginBottom: 8,
-          fontSize: 12,
-          color: "#4b5563",
           whiteSpace: "nowrap",
           overflowX: "auto",
           minHeight: 22,
+          lineHeight: 1,
         }}
       >
-        <span style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>Sewing Priority</span>
         <span
           style={{
             fontWeight: 900,
@@ -359,40 +505,34 @@ export default function SewingPriority() {
             color: "#111827",
             letterSpacing: "0.02em",
             lineHeight: 1,
+            flexShrink: 0,
           }}
         >
           {(() => {
-            const d = new Date();
+            const d = now;
             const weekday = d.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
             return `${weekday} ${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
           })()}
         </span>
-        <span style={{ color: "#9ca3af" }}>·</span>
-        <span style={{ color: "#6b7280" }}>{DAYS_WINDOW}d</span>
-        <span style={{ color: "#9ca3af" }}>·</span>
-        <Legend color="#2ecc71" label="On time" />
-        <Legend color="#f1c40f" label="Ship today" />
-        <Legend color="#e74c3c" label="Catch up" />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <span style={{ opacity: 0.7 }}>✓</span> Sewn
-        </span>
-        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 11, color: "#9ca3af" }}>
-            {lastUpdated
-              ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-              : loading
-                ? "Loading…"
-                : ""}
-          </span>
+        <span
+          style={{
+            marginLeft: "auto",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 10,
+            minWidth: 0,
+          }}
+        >
+          <CatchUpStatus catchUp={catchUp} />
           <button
             type="button"
             onClick={toggleFullscreen}
             title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
             style={{
-              padding: "2px 10px",
-              fontSize: 12,
+              padding: "2px 8px",
+              fontSize: 11,
               fontWeight: 700,
-              lineHeight: 1.3,
+              lineHeight: 1,
               border: "1px solid #d1d5db",
               borderRadius: 6,
               background: isFullscreen ? "#111827" : "#fff",
@@ -401,7 +541,7 @@ export default function SewingPriority() {
               flexShrink: 0,
             }}
           >
-            {isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            {isFullscreen ? "Exit" : "Full"}
           </button>
         </span>
       </div>
@@ -412,12 +552,14 @@ export default function SewingPriority() {
         </div>
       )}
 
-      {loading && !jobs.length && (
+      {loading && !boardJobs.length && (
         <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>Loading jobs…</div>
       )}
 
-      {!loading && !jobs.length && !error && (
-        <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>No jobs in the next {DAYS_WINDOW} days.</div>
+      {!loading && !boardJobs.length && !error && (
+        <div style={{ padding: 40, textAlign: "center", color: "#6b7280" }}>
+          No jobs in the next {BOARD_DAYS_WINDOW} days.
+        </div>
       )}
 
       <div
@@ -426,10 +568,10 @@ export default function SewingPriority() {
           gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
           columnGap: 10,
           rowGap: 0,
-          opacity: loading && jobs.length ? 0.7 : 1,
+          opacity: loading && boardJobs.length ? 0.7 : 1,
         }}
       >
-        {jobs.map((job, idx) => {
+        {boardJobs.map((job, idx) => {
           const order = String(job["Order #"] ?? "").trim() || "—";
           const customer = String(job["Company Name"] ?? job["Company"] ?? job["Customer"] ?? "").trim();
           const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
@@ -587,20 +729,61 @@ export default function SewingPriority() {
   );
 }
 
-function Legend({ color, label }) {
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+function fmtHoursLeft(h) {
+  if (h <= 0) return "0h";
+  if (h >= HOURS_PER_WORKDAY - 1e-6) return `${HOURS_PER_WORKDAY}h`;
+  const rounded = Math.round(h * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded}h` : `${rounded.toFixed(1)}h`;
+}
+
+const CATCH_UP_POSITIVE = [
+  "Caught up — nice work!",
+  "On track — keep crushing it!",
+  "All clear — you're ahead of the stack!",
+  "Caught up — great pace!",
+];
+
+function CatchUpStatus({ catchUp }) {
+  const behind = (catchUp?.extraPcs || 0) > 0;
+  const hoursLeft = catchUp?.hoursLeft ?? 0;
+  const pcsLeftToday = catchUp?.pcsLeftToday ?? 0;
+  const hoursBit =
+    hoursLeft > 0 ? `${fmtHoursLeft(hoursLeft)} left (${pcsLeftToday} pcs)` : "day done";
+
+  const title = `Assumes ${WORKDAY_PCS}/day Mon–Fri ${WORK_START_H}:00–${WORK_END_H}:00. Catch-up looks ${CATCH_UP_DAYS_WINDOW} days out (board shows ${BOARD_DAYS_WINDOW}). Sewing-complete excluded.`;
+
+  if (behind) {
+    const days = catchUp.overWorkdays || "—";
+    const dayWord = catchUp.overWorkdays === 1 ? "day" : "days";
+    return (
       <span
+        title={title}
         style={{
-          width: 10,
-          height: 10,
-          borderRadius: 2,
-          border: `2.5px solid ${color}`,
-          boxSizing: "border-box",
-          display: "inline-block",
+          fontWeight: 900,
+          fontSize: 18,
+          lineHeight: 1,
+          color: "#dc2626",
+          letterSpacing: "0.01em",
         }}
-      />
-      {label}
+      >
+        Need +{catchUp.extraPcs} over {days} {dayWord} (~{catchUp.perDay}/day) · {hoursBit}
+      </span>
+    );
+  }
+
+  const note = CATCH_UP_POSITIVE[(catchUp?.openPcs || 0) % CATCH_UP_POSITIVE.length];
+  return (
+    <span
+      title={title}
+      style={{
+        fontWeight: 900,
+        fontSize: 18,
+        lineHeight: 1,
+        color: "#16a34a",
+        letterSpacing: "0.01em",
+      }}
+    >
+      {note} · {hoursBit}
     </span>
   );
 }
