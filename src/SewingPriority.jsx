@@ -212,9 +212,9 @@ function TileOverlayText({ children, color = "#111827", style = {}, title }) {
         color,
         padding: "4px 6px",
         pointerEvents: "none",
-        WebkitTextStroke: "3px #fff",
+        WebkitTextStroke: "5px #fff",
         paintOrder: "stroke fill",
-        textShadow: "0 0 4px #fff, 0 1px 2px rgba(255,255,255,0.9)",
+        textShadow: "0 0 6px #fff, 0 0 3px #fff, 0 1px 2px rgba(255,255,255,0.95)",
         ...style,
       }}
     >
@@ -317,6 +317,21 @@ export default function SewingPriority() {
         }}
       >
         <span style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>Sewing Priority</span>
+        <span
+          style={{
+            fontWeight: 900,
+            fontSize: 18,
+            color: "#111827",
+            letterSpacing: "0.02em",
+            lineHeight: 1,
+          }}
+        >
+          {(() => {
+            const d = new Date();
+            const weekday = d.toLocaleDateString("en-US", { weekday: "long" }).toUpperCase();
+            return `${weekday} ${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+          })()}
+        </span>
         <span style={{ color: "#9ca3af" }}>·</span>
         <span style={{ color: "#6b7280" }}>{DAYS_WINDOW}d</span>
         <span style={{ color: "#9ca3af" }}>·</span>
