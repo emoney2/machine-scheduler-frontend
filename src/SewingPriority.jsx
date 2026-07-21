@@ -275,7 +275,7 @@ export default function SewingPriority() {
   }, []);
 
   return (
-    <div style={{ padding: 16, maxWidth: 1400, margin: "0 auto" }}>
+    <div style={{ padding: "16px 8px", maxWidth: 1600, margin: "0 auto" }}>
       <div
         style={{
           display: "flex",
@@ -339,7 +339,7 @@ export default function SewingPriority() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-          gap: 20,
+          gap: 10,
           opacity: loading && jobs.length ? 0.7 : 1,
         }}
       >
@@ -378,7 +378,6 @@ export default function SewingPriority() {
                     textAlign: "center",
                     lineHeight: 1.2,
                     marginTop: 2,
-                    marginBottom: 6,
                     maxWidth: "100%",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -388,6 +387,27 @@ export default function SewingPriority() {
                   title={customer}
                 >
                   {customer}
+                </div>
+              ) : null}
+              {product ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "#111827",
+                    textAlign: "center",
+                    lineHeight: 1.2,
+                    marginTop: customer ? 2 : 2,
+                    marginBottom: 6,
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    padding: "0 2px",
+                  }}
+                  title={product}
+                >
+                  {product}
                 </div>
               ) : (
                 <div style={{ marginBottom: 6 }} />
