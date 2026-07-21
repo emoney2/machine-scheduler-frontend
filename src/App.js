@@ -1923,9 +1923,11 @@ useEffect(() => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: 8,
+          padding: '2px 4px',
           backgroundColor: '#fafafa',
-          borderBottom: '1px solid #ccc'
+          borderBottom: '1px solid #ccc',
+          minHeight: 28,
+          overflowX: 'auto',
         }}
       >
         {[
@@ -1947,20 +1949,18 @@ useEffect(() => {
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
             display: 'inline-block',
-            padding: '0.5rem 1rem',
-            // Wide enough for longest single word (e.g. "Departments"); wrap only at spaces
-            maxWidth: '10.5rem',
+            padding: '0.15rem 0.55rem',
             textAlign: 'center',
             verticalAlign: 'middle',
-            lineHeight: 1.2,
-            whiteSpace: 'normal',
-            wordBreak: 'normal',
-            overflowWrap: 'normal',
+            lineHeight: 1.15,
+            whiteSpace: 'nowrap',
+            fontSize: 12,
             textDecoration: 'none',
             color: '#333',
             fontWeight: isActive ? '600' : '400',
-            borderBottom: isActive ? '2px solid #333' : 'none',
-            boxSizing: 'border-box'
+            borderBottom: isActive ? '2px solid #333' : '2px solid transparent',
+            boxSizing: 'border-box',
+            flexShrink: 0,
           })}>
             {label}
           </NavLink>
@@ -1976,12 +1976,16 @@ useEffect(() => {
           }}
           style={{
             marginLeft: 'auto',
-            padding: '0.5rem 1rem',
+            padding: '0.15rem 0.55rem',
             border: '1px solid transparent',
             background: 'transparent',
             cursor: 'pointer',
             color: '#333',
-            fontWeight: '400'
+            fontWeight: '400',
+            fontSize: 12,
+            lineHeight: 1.15,
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
           }}
         >
           Logout

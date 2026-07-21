@@ -275,49 +275,37 @@ export default function SewingPriority() {
   }, []);
 
   return (
-    <div style={{ padding: "16px 8px", maxWidth: 1600, margin: "0 auto" }}>
+    <div style={{ padding: "6px 8px 8px", maxWidth: 1600, margin: "0 auto" }}>
       <div
         style={{
           display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          marginBottom: 16,
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "nowrap",
+          marginBottom: 8,
+          fontSize: 12,
+          color: "#4b5563",
+          whiteSpace: "nowrap",
+          overflowX: "auto",
+          minHeight: 22,
         }}
       >
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: "#111827" }}>
-            Sewing Priority
-          </h2>
-          <div style={{ marginTop: 4, fontSize: 13, color: "#6b7280" }}>
-            Ship in next {DAYS_WINDOW} days · green on time · yellow ships today · red catch up
-          </div>
-        </div>
-        <div style={{ fontSize: 12, color: "#9ca3af" }}>
+        <span style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>Sewing Priority</span>
+        <span style={{ color: "#9ca3af" }}>·</span>
+        <span style={{ color: "#6b7280" }}>{DAYS_WINDOW}d</span>
+        <span style={{ color: "#9ca3af" }}>·</span>
+        <Legend color="#2ecc71" label="On time" />
+        <Legend color="#f1c40f" label="Ship today" />
+        <Legend color="#e74c3c" label="Catch up" />
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ opacity: 0.7 }}>✓</span> Sewn
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "#9ca3af" }}>
           {lastUpdated
             ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
             : loading
               ? "Loading…"
               : ""}
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          flexWrap: "wrap",
-          marginBottom: 16,
-          fontSize: 12,
-          color: "#4b5563",
-        }}
-      >
-        <Legend color="#2ecc71" label="On time" />
-        <Legend color="#f1c40f" label="Ship today" />
-        <Legend color="#e74c3c" label="Catch up" />
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <span style={{ opacity: 0.7 }}>✓</span> Sewing done (stays for shipping)
         </span>
       </div>
 
@@ -493,13 +481,13 @@ export default function SewingPriority() {
 
 function Legend({ color, label }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
       <span
         style={{
-          width: 14,
-          height: 14,
-          borderRadius: 3,
-          border: `5px solid ${color}`,
+          width: 10,
+          height: 10,
+          borderRadius: 2,
+          border: `2.5px solid ${color}`,
           boxSizing: "border-box",
           display: "inline-block",
         }}
