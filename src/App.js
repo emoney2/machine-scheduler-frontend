@@ -35,7 +35,7 @@ import KanbanOpen from "./KanbanOpen";
 import KanbanGo from "./KanbanGo";
 import KanbanScanPublic from "./KanbanScanPublic";
 import KanbanPrint from "./KanbanPrint";
-import ProductionOrders from './ProductionOrders';
+import SewingPriority from './SewingPriority';
 import QueueTab from './QueueTab';
 import SalesPortal from "./SalesPortal";
 
@@ -1931,7 +1931,6 @@ useEffect(() => {
         {[
          { to: "/Overview",          label: "Overview" },
          { to: "/",                  label: "Scheduler" },
-         { to: "/production-orders", label: "Production Orders" },
          { to: "/submit",            label: "Order Submission" },
          { to: "/inventory",         label: "Inventory" },
          { to: "/inventory-ordered", label: "Inventory Ordered" },
@@ -1943,7 +1942,8 @@ useEffect(() => {
          { to: "/material-log",      label: "Material Log" },
          { to: "/departments",       label: "Departments" },
          { to: "/kanban/queue",      label: "Kanban Queue" },
-         { to: "/sales",             label: "Sales" }
+         { to: "/sales",             label: "Sales" },
+         { to: "/sewing-priority",   label: "Sewing Priority" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => ({
             display: 'inline-block',
@@ -2029,7 +2029,8 @@ useEffect(() => {
         />
           <Route path="/overview" element={<Overview />} />
           <Route path="/submit" element={<OrderSubmission />} />
-          <Route path="/production-orders" element={<ProductionOrders />} />
+          <Route path="/sewing-priority" element={<SewingPriority />} />
+          <Route path="/production-orders" element={<SewingPriority />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/inventory-ordered" element={<InventoryOrdered />} />
           <Route path="/digitizing" element={<DigitizingList />} />
