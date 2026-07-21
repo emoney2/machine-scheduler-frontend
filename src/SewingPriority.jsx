@@ -164,7 +164,7 @@ function getJobThumbUrl(job) {
 function SewingDoneOverlay() {
   return (
     <div
-      title="Sewing complete — ready for shipping"
+      title="Sewing complete (Sewing Summary Top ≥ order quantity)"
       aria-label="Sewing complete"
       style={{
         position: "absolute",
