@@ -438,6 +438,11 @@ export default function SewingPriority() {
           const thumb = getJobThumbUrl(job);
           const product = String(job["Product"] ?? "").trim();
           const design = String(job["Design"] ?? "").trim();
+          const qtyRaw = job["Quantity"] ?? job["Qty"] ?? null;
+          const qtyLabel =
+            qtyRaw === null || qtyRaw === undefined || qtyRaw === ""
+              ? ""
+              : String(Math.round(Number(qtyRaw)) || qtyRaw).trim();
 
           return (
             <div
@@ -552,11 +557,27 @@ export default function SewingPriority() {
                 </TileOverlayText>
                 <TileOverlayText
                   color={outline}
-                  style={{ bottom: 2, fontSize: 14 }}
+                  style={{ bottom: 2, left: 0, right: "40%", fontSize: 14, textAlign: "left" }}
                   title={shipDate ? `Ship: ${String(shipDate)}` : "No ship date"}
                 >
                   {fmtMMDD(shipDate)}
                 </TileOverlayText>
+                {qtyLabel ? (
+                  <TileOverlayText
+                    color="#111827"
+                    style={{
+                      bottom: 2,
+                      left: "auto",
+                      right: 0,
+                      fontSize: 14,
+                      textAlign: "right",
+                      padding: "4px 6px",
+                    }}
+                    title={`Qty: ${qtyLabel}`}
+                  >
+                    {qtyLabel}
+                  </TileOverlayText>
+                ) : null}
               </div>
             </div>
           );
