@@ -363,6 +363,8 @@ export default function App() {
   // Which route are we on? (Scheduler is at "/")
   const location = useLocation();
   const isScheduler = location.pathname === "/";
+  const path = (location.pathname || "/").toLowerCase();
+  const isCompactNav = isScheduler || path === "/sewing-priority" || path.startsWith("/sewing-priority/");
 
   const prevM1Top = useRef(null);
   const prevM2Top = useRef(null);
@@ -1923,11 +1925,11 @@ useEffect(() => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: '2px 4px',
+          padding: isCompactNav ? '2px 4px' : 8,
           backgroundColor: '#fafafa',
           borderBottom: '1px solid #ccc',
-          minHeight: 28,
-          overflowX: 'auto',
+          minHeight: isCompactNav ? 28 : undefined,
+          overflowX: isCompactNav ? 'auto' : undefined,
         }}
       >
         {[
@@ -1947,21 +1949,40 @@ useEffect(() => {
          { to: "/sales",             label: "Sales" },
          { to: "/sewing-priority",   label: "Sewing Priority" }
         ].map(({ to, label }) => (
-          <NavLink key={to} to={to} style={({ isActive }) => ({
-            display: 'inline-block',
-            padding: '0.15rem 0.55rem',
-            textAlign: 'center',
-            verticalAlign: 'middle',
-            lineHeight: 1.15,
-            whiteSpace: 'nowrap',
-            fontSize: 12,
-            textDecoration: 'none',
-            color: '#333',
-            fontWeight: isActive ? '600' : '400',
-            borderBottom: isActive ? '2px solid #333' : '2px solid transparent',
-            boxSizing: 'border-box',
-            flexShrink: 0,
-          })}>
+          <NavLink key={to} to={to} style={({ isActive }) => (
+            isCompactNav
+              ? {
+                  display: 'inline-block',
+                  padding: '0.15rem 0.55rem',
+                  textAlign: 'center',
+                  verticalAlign: 'middle',
+                  lineHeight: 1.15,
+                  whiteSpace: 'nowrap',
+                  fontSize: 12,
+                  textDecoration: 'none',
+                  color: '#333',
+                  fontWeight: isActive ? '600' : '400',
+                  borderBottom: isActive ? '2px solid #333' : '2px solid transparent',
+                  boxSizing: 'border-box',
+                  flexShrink: 0,
+                }
+              : {
+                  display: 'inline-block',
+                  padding: '0.5rem 1rem',
+                  maxWidth: '10.5rem',
+                  textAlign: 'center',
+                  verticalAlign: 'middle',
+                  lineHeight: 1.2,
+                  whiteSpace: 'normal',
+                  wordBreak: 'normal',
+                  overflowWrap: 'normal',
+                  textDecoration: 'none',
+                  color: '#333',
+                  fontWeight: isActive ? '600' : '400',
+                  borderBottom: isActive ? '2px solid #333' : 'none',
+                  boxSizing: 'border-box',
+                }
+          )}>
             {label}
           </NavLink>
         ))}
@@ -1974,19 +1995,31 @@ useEffect(() => {
             const base = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
             window.location.href = `${base}/logout`;
           }}
-          style={{
-            marginLeft: 'auto',
-            padding: '0.15rem 0.55rem',
-            border: '1px solid transparent',
-            background: 'transparent',
-            cursor: 'pointer',
-            color: '#333',
-            fontWeight: '400',
-            fontSize: 12,
-            lineHeight: 1.15,
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
+          style={
+            isCompactNav
+              ? {
+                  marginLeft: 'auto',
+                  padding: '0.15rem 0.55rem',
+                  border: '1px solid transparent',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: '#333',
+                  fontWeight: '400',
+                  fontSize: 12,
+                  lineHeight: 1.15,
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }
+              : {
+                  marginLeft: 'auto',
+                  padding: '0.5rem 1rem',
+                  border: '1px solid transparent',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  color: '#333',
+                  fontWeight: '400',
+                }
+          }
         >
           Logout
         </button>

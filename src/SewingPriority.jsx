@@ -197,6 +197,32 @@ function SewingDoneOverlay() {
   );
 }
 
+function TileOverlayText({ children, color = "#111827", style = {}, title }) {
+  return (
+    <div
+      title={title}
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        zIndex: 3,
+        textAlign: "center",
+        fontWeight: 800,
+        lineHeight: 1.15,
+        color,
+        padding: "4px 6px",
+        pointerEvents: "none",
+        WebkitTextStroke: "3px #fff",
+        paintOrder: "stroke fill",
+        textShadow: "0 0 4px #fff, 0 1px 2px rgba(255,255,255,0.9)",
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function SewingPriority() {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -346,18 +372,6 @@ export default function SewingPriority() {
               key={`${order}|${product}|${design}|${idx}`}
               style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
             >
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 16,
-                  color: "#111827",
-                  textAlign: "center",
-                  lineHeight: 1.2,
-                }}
-                title={order}
-              >
-                {order}
-              </div>
               {customer ? (
                 <div
                   style={{
@@ -365,7 +379,6 @@ export default function SewingPriority() {
                     color: "#4b5563",
                     textAlign: "center",
                     lineHeight: 1.2,
-                    marginTop: 2,
                     maxWidth: "100%",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -385,8 +398,8 @@ export default function SewingPriority() {
                     color: "#111827",
                     textAlign: "center",
                     lineHeight: 1.2,
-                    marginTop: customer ? 2 : 2,
-                    marginBottom: 6,
+                    marginTop: customer ? 2 : 0,
+                    marginBottom: 4,
                     maxWidth: "100%",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -398,78 +411,71 @@ export default function SewingPriority() {
                   {product}
                 </div>
               ) : (
-                <div style={{ marginBottom: 6 }} />
+                <div style={{ marginBottom: 4 }} />
               )}
 
-              {/* Tile + ship date stay visually paired */}
-              <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div
-                  style={{
-                    position: "relative",
-                    width: "100%",
-                    aspectRatio: "1 / 1",
-                    borderRadius: 10,
-                    border: `5px solid ${outline}`,
-                    background: "#f9fafb",
-                    overflow: "hidden",
-                    boxSizing: "border-box",
-                  }}
-                  title={
-                    sewingDone
-                      ? `${order} — sewing done · ship ${fmtMMDD(shipDate)}`
-                      : `${order} · ship ${fmtMMDD(shipDate)}${product ? ` · ${product}` : ""}`
-                  }
-                >
-                  {thumb ? (
-                    <img
-                      src={thumb}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        display: "block",
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        padding: 8,
-                        textAlign: "center",
-                        fontSize: 12,
-                        color: "#9ca3af",
-                      }}
-                    >
-                      {design || product || "No image"}
-                    </div>
-                  )}
-                  {sewingDone && <SewingDoneOverlay />}
-                </div>
-
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: outline,
-                    textAlign: "center",
-                    marginTop: 3,
-                    lineHeight: 1.1,
-                  }}
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  aspectRatio: "1 / 1",
+                  borderRadius: 10,
+                  border: `5px solid ${outline}`,
+                  background: "#f9fafb",
+                  overflow: "hidden",
+                  boxSizing: "border-box",
+                }}
+                title={
+                  sewingDone
+                    ? `${order} — sewing done · ship ${fmtMMDD(shipDate)}`
+                    : `${order} · ship ${fmtMMDD(shipDate)}${product ? ` · ${product}` : ""}`
+                }
+              >
+                {thumb ? (
+                  <img
+                    src={thumb}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      display: "block",
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 8,
+                      textAlign: "center",
+                      fontSize: 12,
+                      color: "#9ca3af",
+                    }}
+                  >
+                    {design || product || "No image"}
+                  </div>
+                )}
+                {sewingDone && <SewingDoneOverlay />}
+                <TileOverlayText style={{ top: 2, fontSize: 16 }} title={order}>
+                  {order}
+                </TileOverlayText>
+                <TileOverlayText
+                  color={outline}
+                  style={{ bottom: 2, fontSize: 14 }}
                   title={shipDate ? `Ship: ${String(shipDate)}` : "No ship date"}
                 >
                   {fmtMMDD(shipDate)}
-                </div>
+                </TileOverlayText>
               </div>
             </div>
           );
