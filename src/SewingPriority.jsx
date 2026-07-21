@@ -345,6 +345,7 @@ export default function SewingPriority() {
       >
         {jobs.map((job, idx) => {
           const order = String(job["Order #"] ?? "").trim() || "—";
+          const customer = String(job["Company Name"] ?? job["Company"] ?? job["Customer"] ?? "").trim();
           const shipDate = job["Ship Date"] ?? job["Ship"] ?? null;
           const outline = outlineByShipDate(shipDate);
           const sewingDone = !!job.sewingSummaryComplete;
@@ -355,7 +356,7 @@ export default function SewingPriority() {
           return (
             <div
               key={`${order}|${product}|${design}|${idx}`}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+              style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
             >
               <div
                 style={{
@@ -369,71 +370,98 @@ export default function SewingPriority() {
               >
                 {order}
               </div>
+              {customer ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#4b5563",
+                    textAlign: "center",
+                    lineHeight: 1.2,
+                    marginTop: 2,
+                    marginBottom: 6,
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    padding: "0 2px",
+                  }}
+                  title={customer}
+                >
+                  {customer}
+                </div>
+              ) : (
+                <div style={{ marginBottom: 6 }} />
+              )}
 
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  aspectRatio: "1 / 1",
-                  borderRadius: 10,
-                  border: `3px solid ${outline}`,
-                  background: "#f9fafb",
-                  overflow: "hidden",
-                  boxSizing: "border-box",
-                }}
-                title={
-                  sewingDone
-                    ? `${order} — sewing done · ship ${fmtMMDD(shipDate)}`
-                    : `${order} · ship ${fmtMMDD(shipDate)}${product ? ` · ${product}` : ""}`
-                }
-              >
-                {thumb ? (
-                  <img
-                    src={thumb}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      display: "block",
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 8,
-                      textAlign: "center",
-                      fontSize: 12,
-                      color: "#9ca3af",
-                    }}
-                  >
-                    {design || product || "No image"}
-                  </div>
-                )}
-                {sewingDone && <SewingDoneOverlay />}
-              </div>
+              {/* Tile + ship date stay visually paired */}
+              <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div
+                  style={{
+                    position: "relative",
+                    width: "100%",
+                    aspectRatio: "1 / 1",
+                    borderRadius: 10,
+                    border: `5px solid ${outline}`,
+                    background: "#f9fafb",
+                    overflow: "hidden",
+                    boxSizing: "border-box",
+                  }}
+                  title={
+                    sewingDone
+                      ? `${order} — sewing done · ship ${fmtMMDD(shipDate)}`
+                      : `${order} · ship ${fmtMMDD(shipDate)}${product ? ` · ${product}` : ""}`
+                  }
+                >
+                  {thumb ? (
+                    <img
+                      src={thumb}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 8,
+                        textAlign: "center",
+                        fontSize: 12,
+                        color: "#9ca3af",
+                      }}
+                    >
+                      {design || product || "No image"}
+                    </div>
+                  )}
+                  {sewingDone && <SewingDoneOverlay />}
+                </div>
 
-              <div
-                style={{
-                  fontWeight: 700,
-                  fontSize: 14,
-                  color: outline,
-                  textAlign: "center",
-                }}
-                title={shipDate ? `Ship: ${String(shipDate)}` : "No ship date"}
-              >
-                {fmtMMDD(shipDate)}
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: outline,
+                    textAlign: "center",
+                    marginTop: 3,
+                    lineHeight: 1.1,
+                  }}
+                  title={shipDate ? `Ship: ${String(shipDate)}` : "No ship date"}
+                >
+                  {fmtMMDD(shipDate)}
+                </div>
               </div>
             </div>
           );
@@ -451,7 +479,7 @@ function Legend({ color, label }) {
           width: 14,
           height: 14,
           borderRadius: 3,
-          border: `3px solid ${color}`,
+          border: `5px solid ${color}`,
           boxSizing: "border-box",
           display: "inline-block",
         }}
