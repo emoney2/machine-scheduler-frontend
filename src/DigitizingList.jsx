@@ -296,10 +296,12 @@ export default function DigitizingList() {
       return stitch === "";
     });
 
-    // 3) Exclude Printed Towels
+    // 3) Exclude Printed Towels and Belts
     base = base.filter(o => {
       const product = String(o["Product"] || "").toLowerCase();
-      return !product.includes("printed towel");
+      if (product.includes("printed towel")) return false;
+      if (/\bbelts?\b/.test(product)) return false;
+      return true;
     });
 
 
