@@ -531,6 +531,23 @@ export default function SewingPriority() {
         </span>
         <span
           style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 12,
+            color: "#4b5563",
+            flexShrink: 0,
+          }}
+        >
+          <Legend color="#2ecc71" label="On time" />
+          <Legend color="#f1c40f" label="Ship today" />
+          <Legend color="#e74c3c" label="Catch up" />
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ opacity: 0.7 }}>✓</span> Sewn
+          </span>
+        </span>
+        <span
+          style={{
             marginLeft: "auto",
             display: "inline-flex",
             alignItems: "center",
@@ -741,6 +758,24 @@ export default function SewingPriority() {
         })}
       </div>
     </div>
+  );
+}
+
+function Legend({ color, label }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <span
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: 2,
+          border: `2.5px solid ${color}`,
+          boxSizing: "border-box",
+          display: "inline-block",
+        }}
+      />
+      {label}
+    </span>
   );
 }
 
