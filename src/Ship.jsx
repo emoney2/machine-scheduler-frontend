@@ -894,7 +894,7 @@ export default function Ship() {
   }, []);
   // === End useEffect 1 ===
 
-  // Embroidery / Sewing queue for cards under the search bar
+  // Open jobs queue (all products/stages) for cards under the search bar
   useEffect(() => {
     let cancelled = false;
 
@@ -2632,12 +2632,12 @@ export default function Ship() {
 
       <div style={{ marginBottom: "1.75rem" }}>
         <div style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: "0.5rem", color: "#374151" }}>
-          In production (Embroidery / Sewing)
+          Open jobs (all products)
         </div>
         {productionQueueLoading && productionQueue.length === 0 ? (
           <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>Loading queue…</div>
         ) : productionQueue.length === 0 ? (
-          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>No open jobs in Embroidery or Sewing.</div>
+          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>No open jobs to ship.</div>
         ) : (
           <div
             style={{
