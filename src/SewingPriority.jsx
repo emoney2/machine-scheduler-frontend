@@ -212,7 +212,11 @@ function computeCatchUpTracker(jobs, now = new Date()) {
   const extraPcs = maxDeficit > 1e-9 ? Math.ceil(maxDeficit - 1e-9) : 0;
   const overWorkdays = bottleneckShip ? workdaysThroughShipDate(bottleneckShip, now) : 0;
   const perDay =
-    extraPcs > 0 ? (overWorkdays > 0 ? Math.ceil(extraPcs / overWorkdays) : extraPcs) : 0;
+    extraPcs > 0
+      ? overWorkdays > 0
+        ? Math.round((extraPcs / overWorkdays) * 10) / 10
+        : extraPcs
+      : 0;
 
   return {
     extraPcs,
@@ -816,7 +820,7 @@ function CatchUpStatus({ catchUp }) {
           letterSpacing: "0.01em",
         }}
       >
-        Need +{catchUp.extraPcs} over {days} {dayWord} (~{catchUp.perDay}/day) · {hoursBit}
+        Need +{catchUp.extraPcs} over {days} {dayWord} (~{Number(catchUp.perDay).toFixed(1)}/day) · {hoursBit}
       </span>
     );
   }
