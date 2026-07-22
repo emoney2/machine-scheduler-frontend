@@ -167,8 +167,22 @@ function jobQty(job) {
 }
 
 /**
+ * Still shown on the board, but not counted in catch-up capacity math.
+ * Back panels / towels / belts are not part of the 48/day sewing load.
+ */
+function excludeFromCatchUpLoad(job) {
+  const product = String(job?.["Product"] ?? "").toLowerCase();
+  if (!product) return false;
+  if (/\bback\b/.test(product)) return true;
+  if (/\btowels?\b/.test(product)) return true;
+  if (/\bbelts?\b/.test(product)) return true;
+  return false;
+}
+
+/**
  * Running catch-up: walk jobs by ship date; max(cum demand − capacity through that date).
- * Sewing-complete jobs are excluded (already off the sewing load).
+ * Sewing-complete, Back, towel, and belt jobs are excluded from the load
+ * (they still appear on the tile board).
  */
 function computeCatchUpTracker(jobs, now = new Date()) {
   const hoursLeft = remainingWorkHoursToday(now);
@@ -180,6 +194,7 @@ function computeCatchUpTracker(jobs, now = new Date()) {
 
   for (const job of jobs || []) {
     if (job?.sewingSummaryComplete) continue;
+    if (excludeFromCatchUpLoad(job)) continue;
     const ship = job["Ship Date"] ?? job["Ship"] ?? null;
     if (parseDate(ship) == null) continue;
     const qty = jobQty(job);
@@ -750,7 +765,7 @@ function CatchUpStatus({ catchUp }) {
   const hoursBit =
     hoursLeft > 0 ? `${fmtHoursLeft(hoursLeft)} left (${pcsLeftToday} pcs)` : "day done";
 
-  const title = `Assumes ${WORKDAY_PCS}/day Mon–Fri ${WORK_START_H}:00–${WORK_END_H}:00. Catch-up looks ${CATCH_UP_DAYS_WINDOW} days out (board shows ${BOARD_DAYS_WINDOW}). Sewing-complete excluded.`;
+  const title = `Assumes ${WORKDAY_PCS}/day Mon–Fri ${WORK_START_H}:00–${WORK_END_H}:00. Catch-up looks ${CATCH_UP_DAYS_WINDOW} days out (board shows ${BOARD_DAYS_WINDOW}). Excludes sewing-complete, Back, towels, and belts.`;
 
   if (behind) {
     const days = catchUp.overWorkdays || "—";
