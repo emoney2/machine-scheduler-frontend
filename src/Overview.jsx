@@ -2112,7 +2112,7 @@ function col(width, center = false) {
                 type="button"
                 onClick={() => recalculateMaterialsToOrder()}
                 disabled={rebuildingMaterials || loadingMaterials}
-                title="Runs the sheet script that rebuilds Overview columns M and N, then refreshes this list"
+                title="Manual only — lists also rebuild nightly ~midnight. Does not rewrite Material Log."
                 style={{
                   marginLeft: "auto",
                   padding: "6px 12px",
@@ -2125,7 +2125,7 @@ function col(width, center = false) {
                   cursor: rebuildingMaterials || loadingMaterials ? "not-allowed" : "pointer",
                 }}
               >
-                {rebuildingMaterials ? "Recalculating…" : "Recalculate lists"}
+                {rebuildingMaterials ? "Recalculating…" : "Recalculate lists (manual)"}
               </button>
             </div>
             {materialsRebuildErr ? (
@@ -2182,7 +2182,7 @@ function col(width, center = false) {
                   Order now
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-                  Grouped by vendor · earliest open job due within 60 days
+                  Stock covers near-term jobs first · shortfall for Due ≤ 60 days
                 </div>
                 {!materials.length ? (
                   <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing in this column.</div>
@@ -2352,7 +2352,7 @@ function col(width, center = false) {
                   Plan ahead
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-                  Same shortage rules · earliest open job due in more than 60 days (bulk-buy reference)
+                  Leftover stock after near-term · shortfall for Due in 60+ days
                 </div>
                 {!materialsFuture.length ? (
                   <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing deferred to this column.</div>
