@@ -1567,6 +1567,36 @@ const handleSaveNewCompany = async () => {
     }
   }, [reorderJob]);
 
+  // Prefill from Design Portal (or any deep link): /order?company=&product=&quantity=&designName=
+  useEffect(() => {
+    if (reorderJob) return;
+    const params = new URLSearchParams(location.search || "");
+    const company = (params.get("company") || "").trim();
+    const product = (params.get("product") || "").trim();
+    const quantity = (params.get("quantity") || "").trim();
+    const designName = (
+      params.get("designName") ||
+      params.get("design") ||
+      ""
+    ).trim();
+    const notes = (params.get("notes") || "").trim();
+    const material = (params.get("material") || "").trim();
+    if (!company && !product && !quantity && !designName && !notes && !material) {
+      return;
+    }
+    setForm((prev) => ({
+      ...prev,
+      ...(company ? { company } : {}),
+      ...(product ? { product } : {}),
+      ...(quantity ? { quantity } : {}),
+      ...(designName ? { designName } : {}),
+      ...(notes ? { notes } : {}),
+      ...(material
+        ? { materials: [material, "", "", "", ""] }
+        : {}),
+    }));
+  }, [location.search, reorderJob]);
+
   useEffect(() => {
     if (hasStartedLoadingFiles && !prodFilesLoading && !printFilesLoading) {
       setTimeout(() => {
