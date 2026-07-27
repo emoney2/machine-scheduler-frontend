@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import "react-image-crop/dist/ReactCrop.css";
-import ReactCrop from "react-image-crop";
+import ReactCrop, { centerCrop, makeAspectCrop } from "react-image-crop";
 
 const BACKEND = "https://machine-scheduler-backend.onrender.com";
 
@@ -76,13 +76,6 @@ function getLocationStyles(locKey) {
   return { bg, text };
 }
 
-function formatPricePreview(raw) {
-  const s = String(raw || "").trim();
-  if (!s) return "—";
-  const n = Number(s.replace(/[^0-9.-]/g, ""));
-  return Number.isNaN(n) ? s : `$${n.toFixed(2)}`;
-}
-
 export default function KanbanWizard() {
   const editId = useMemo(() => {
     try {
@@ -119,12 +112,35 @@ export default function KanbanWizard() {
   const [saving, setSaving] = useState(false);
   const [cropSrc, setCropSrc] = useState(null);
   const [cropModalOpen, setCropModalOpen] = useState(false);
-  const [crop, setCrop] = useState({ unit: "%", width: 80, x: 10, y: 10 });
+  const [crop, setCrop] = useState({ unit: "%", width: 90, x: 5, y: 5 });
   const [completedCrop, setCompletedCrop] = useState(null);
+  const [cropZoom, setCropZoom] = useState(1);
+  const [photoFit, setPhotoFit] = useState("contain"); // contain | cover
+  const [locationMenuOpen, setLocationMenuOpen] = useState(false);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const cropImageRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
   const [fieldErrors, setFieldErrors] = useState({});
-  const [showCamera, setShowCamera] = useState(false);
+
+  function openCropEditor(src) {
+    if (!src) return;
+    setCropSrc(src);
+    setCropZoom(1);
+    setCrop({ unit: "%", width: 90, x: 5, y: 5 });
+    setCompletedCrop(null);
+    setCropModalOpen(true);
+  }
+
+  function onCropImageLoad(e) {
+    const { naturalWidth: width, naturalHeight: height } = e.currentTarget;
+    const next = centerCrop(
+      makeAspectCrop({ unit: "%", width: 92 }, 1, width, height),
+      width,
+      height
+    );
+    setCrop(next);
+    setCompletedCrop(null);
+  }
 
   useEffect(() => {
     if (!editId) return;
@@ -190,23 +206,39 @@ export default function KanbanWizard() {
   }
 
   function applyCrop() {
-    if (!completedCrop || !cropImageRef.current) return;
+    if (!cropImageRef.current) return;
 
     const img = cropImageRef.current;
+    const pixelCrop = completedCrop?.width
+      ? completedCrop
+      : (() => {
+          // Fallback: convert % crop to displayed pixels
+          const w = img.width;
+          const h = img.height;
+          return {
+            x: ((crop.x || 0) / 100) * w,
+            y: ((crop.y || 0) / 100) * h,
+            width: ((crop.width || 100) / 100) * w,
+            height: ((crop.height || crop.width || 100) / 100) * h,
+          };
+        })();
+
+    if (!pixelCrop?.width || !pixelCrop?.height) return;
+
     const canvas = document.createElement("canvas");
     const scaleX = img.naturalWidth / img.width;
     const scaleY = img.naturalHeight / img.height;
 
-    canvas.width = completedCrop.width * scaleX;
-    canvas.height = completedCrop.height * scaleY;
+    canvas.width = Math.max(1, Math.round(pixelCrop.width * scaleX));
+    canvas.height = Math.max(1, Math.round(pixelCrop.height * scaleY));
 
     const ctx = canvas.getContext("2d");
     ctx.drawImage(
       img,
-      completedCrop.x * scaleX,
-      completedCrop.y * scaleY,
-      completedCrop.width * scaleX,
-      completedCrop.height * scaleY,
+      pixelCrop.x * scaleX,
+      pixelCrop.y * scaleY,
+      pixelCrop.width * scaleX,
+      pixelCrop.height * scaleY,
       0,
       0,
       canvas.width,
@@ -225,9 +257,8 @@ export default function KanbanWizard() {
     reader.onload = () => {
       const data = String(reader.result || "");
       setPhotoUrl(data);
-      setCropSrc(data);
-      setCropModalOpen(true);
       clearFieldError("photoUrl");
+      openCropEditor(data);
     };
     reader.readAsDataURL(file);
   }
@@ -433,23 +464,18 @@ export default function KanbanWizard() {
                 KANBAN CARD
               </div>
 
-              {/* Location banner = select */}
+              {/* Location banner — custom menu so options stay readable */}
               <div style={{ position: "relative" }}>
-                <select
-                  value={location}
-                  onChange={(e) => {
-                    setLocation(e.target.value);
-                    clearFieldError("location");
-                  }}
+                <button
+                  type="button"
+                  onClick={() => setLocationMenuOpen((v) => !v)}
                   aria-label="Location"
+                  aria-expanded={locationMenuOpen}
                   style={{
                     width: "100%",
-                    appearance: "none",
-                    WebkitAppearance: "none",
                     background: locBg,
                     color: locText,
                     textAlign: "center",
-                    textAlignLast: "center",
                     fontWeight: 900,
                     fontSize: "clamp(16px, 3.8vw, 24px)",
                     padding: "10px 28px",
@@ -461,27 +487,79 @@ export default function KanbanWizard() {
                     outline: "none",
                   }}
                 >
-                  {LOCATIONS.map((o) => (
-                    <option key={o} value={o} style={{ color: "#111827" }}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    right: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: locText,
-                    opacity: 0.85,
-                    pointerEvents: "none",
-                    fontSize: 12,
-                  }}
-                >
-                  ▼
-                </span>
+                  {location || "Location"}
+                  <span
+                    aria-hidden
+                    style={{
+                      marginLeft: 10,
+                      fontSize: 12,
+                      opacity: 0.85,
+                    }}
+                  >
+                    ▼
+                  </span>
+                </button>
+                {locationMenuOpen ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: 0,
+                      right: 0,
+                      top: "calc(100% + 4px)",
+                      zIndex: 40,
+                      background: "#ffffff",
+                      color: "#111827",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 10,
+                      boxShadow: "0 12px 28px rgba(0,0,0,0.18)",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {LOCATIONS.map((o) => {
+                      const styles = getLocationStyles(o);
+                      const active = o === location;
+                      return (
+                        <button
+                          key={o}
+                          type="button"
+                          onClick={() => {
+                            setLocation(o);
+                            clearFieldError("location");
+                            setLocationMenuOpen(false);
+                          }}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 8,
+                            width: "100%",
+                            padding: "12px 14px",
+                            border: "none",
+                            borderBottom: "1px solid #f3f4f6",
+                            background: active ? "#f3f4f6" : "#ffffff",
+                            color: "#111827",
+                            fontWeight: active ? 900 : 700,
+                            fontSize: 16,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span
+                            aria-hidden
+                            style={{
+                              width: 12,
+                              height: 12,
+                              borderRadius: 999,
+                              background: styles.bg,
+                              border: "1px solid #d1d5db",
+                              flexShrink: 0,
+                            }}
+                          />
+                          {o}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
               </div>
 
               <div
@@ -503,23 +581,17 @@ export default function KanbanWizard() {
                     minHeight: 0,
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    title="Click to add or change photo"
+                  <div
                     style={{
+                      position: "relative",
                       width: "100%",
                       aspectRatio: "1 / 1",
-                      padding: 0,
                       border: fieldErrors.photoUrl
                         ? "2px solid #ef4444"
                         : "1px solid #e5e7eb",
                       borderRadius: 12,
                       overflow: "hidden",
-                      background: "#f9fafb",
-                      cursor: "pointer",
-                      display: "grid",
-                      placeItems: "center",
+                      background: "#f3f4f6",
                     }}
                   >
                     {photoUrl ? (
@@ -529,12 +601,18 @@ export default function KanbanWizard() {
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "cover",
+                          objectFit: photoFit,
+                          objectPosition: "center",
+                          display: "block",
                         }}
                       />
                     ) : (
                       <div
                         style={{
+                          width: "100%",
+                          height: "100%",
+                          display: "grid",
+                          placeItems: "center",
                           color: "#9ca3af",
                           fontSize: 12,
                           fontWeight: 700,
@@ -542,15 +620,72 @@ export default function KanbanWizard() {
                           textAlign: "center",
                         }}
                       >
-                        Tap to add photo
+                        Add a photo
                       </div>
                     )}
-                  </button>
+
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: 6,
+                        right: 6,
+                        bottom: 6,
+                        display: "flex",
+                        gap: 4,
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        title="Take photo with camera"
+                        onClick={() => setCameraModalOpen(true)}
+                        style={photoChipBtn}
+                      >
+                        Camera
+                      </button>
+                      <button
+                        type="button"
+                        title="Upload image"
+                        onClick={() => fileInputRef.current?.click()}
+                        style={photoChipBtn}
+                      >
+                        Upload
+                      </button>
+                      {photoUrl ? (
+                        <button
+                          type="button"
+                          title="Crop / resize image"
+                          onClick={() => openCropEditor(photoUrl)}
+                          style={photoChipBtn}
+                        >
+                          Resize
+                        </button>
+                      ) : null}
+                      {photoUrl ? (
+                        <button
+                          type="button"
+                          title={
+                            photoFit === "contain"
+                              ? "Fill frame (may crop edges)"
+                              : "Fit whole image in frame"
+                          }
+                          onClick={() =>
+                            setPhotoFit((f) =>
+                              f === "contain" ? "cover" : "contain"
+                            )
+                          }
+                          style={photoChipBtn}
+                        >
+                          {photoFit === "contain" ? "Fit" : "Fill"}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     hidden
                     onChange={(e) => {
                       openCropFromFile(e.target.files?.[0]);
@@ -561,13 +696,14 @@ export default function KanbanWizard() {
                   <div
                     style={{
                       display: "grid",
-                      rowGap: 8,
+                      rowGap: 6,
                       textAlign: "center",
                       justifyItems: "stretch",
                       minWidth: 0,
+                      alignContent: "center",
                     }}
                   >
-                    <CardInput
+                    <CardText
                       value={itemName}
                       onChange={(v) => {
                         setItemName(v);
@@ -575,10 +711,11 @@ export default function KanbanWizard() {
                       }}
                       placeholder="Item name"
                       error={!!fieldErrors.itemName}
+                      rows={2}
                       style={{
                         fontWeight: 900,
-                        fontSize: "clamp(16px, 3.2vw, 28px)",
-                        lineHeight: 1.1,
+                        fontSize: "clamp(15px, 3vw, 24px)",
+                        lineHeight: 1.15,
                         textAlign: "center",
                       }}
                     />
@@ -589,7 +726,8 @@ export default function KanbanWizard() {
                         gap: 6,
                         alignItems: "baseline",
                         justifyContent: "center",
-                        fontSize: "clamp(14px, 2.6vw, 20px)",
+                        fontSize: "clamp(14px, 2.6vw, 18px)",
+                        flexWrap: "wrap",
                       }}
                     >
                       <span style={{ opacity: 0.85 }}>Price:</span>
@@ -610,50 +748,47 @@ export default function KanbanWizard() {
                         }}
                       />
                     </div>
-                    <div
-                      style={{
-                        fontSize: "clamp(11px, 2vw, 14px)",
-                        lineHeight: 1.35,
-                        opacity: 0.55,
-                      }}
-                    >
-                      {formatPricePreview(costPerPkg)}
-                    </div>
 
                     <div
                       style={{
-                        fontSize: "clamp(11px, 2.2vw, 14px)",
-                        lineHeight: 1.3,
+                        fontSize: "clamp(11px, 2.1vw, 13px)",
+                        lineHeight: 1.35,
                         textAlign: "left",
+                        minWidth: 0,
                       }}
                     >
+                      <div style={{ opacity: 0.8, marginBottom: 2 }}>
+                        Vendor:
+                      </div>
+                      <CardText
+                        value={supplier}
+                        onChange={(v) => {
+                          setSupplier(v);
+                          clearFieldError("supplier");
+                        }}
+                        placeholder="Vendor name"
+                        error={!!fieldErrors.supplier}
+                        rows={2}
+                        style={{
+                          fontWeight: 600,
+                          textAlign: "left",
+                          fontSize: "inherit",
+                        }}
+                      />
+                      <div style={{ opacity: 0.8, marginTop: 6 }}>
+                        Contact:
+                      </div>
                       <div
                         style={{
-                          display: "flex",
-                          gap: 4,
-                          alignItems: "center",
-                          marginBottom: 4,
+                          fontWeight: 600,
+                          color: "#111827",
+                          wordBreak: "break-word",
+                          overflowWrap: "anywhere",
+                          whiteSpace: "pre-wrap",
+                          lineHeight: 1.3,
                         }}
                       >
-                        <span style={{ opacity: 0.8, flexShrink: 0 }}>
-                          Vendor:
-                        </span>
-                        <CardInput
-                          value={supplier}
-                          onChange={(v) => {
-                            setSupplier(v);
-                            clearFieldError("supplier");
-                          }}
-                          placeholder="Vendor"
-                          error={!!fieldErrors.supplier}
-                          style={{ fontWeight: 600, flex: 1, minWidth: 0 }}
-                        />
-                      </div>
-                      <div style={{ opacity: 0.8 }}>
-                        Contact:{" "}
-                        <span style={{ fontWeight: 600, color: "#111827" }}>
-                          {contactDisplay}
-                        </span>
+                        {contactDisplay}
                       </div>
                     </div>
                   </div>
@@ -890,7 +1025,8 @@ export default function KanbanWizard() {
                   </div>
                 ) : (
                   <div style={{ color: "#6b7280", fontSize: 13 }}>
-                    Tap the photo on the card, or use camera / URL below.
+                    Use Camera / Upload / Resize on the card photo. Drag the crop
+                    box larger to zoom out; use Fit to show the whole image.
                   </div>
                 )}
 
@@ -898,34 +1034,27 @@ export default function KanbanWizard() {
                   <button
                     type="button"
                     style={btnSecondary}
-                    onClick={() => setShowCamera((v) => !v)}
+                    onClick={() => setCameraModalOpen(true)}
                   >
-                    {showCamera ? "Hide camera" : "Use camera"}
+                    Open camera
+                  </button>
+                  <button
+                    type="button"
+                    style={btnSecondary}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    Upload image
                   </button>
                   {photoUrl ? (
                     <button
                       type="button"
                       style={btnSecondary}
-                      onClick={() => {
-                        setCropSrc(photoUrl);
-                        setCropModalOpen(true);
-                      }}
+                      onClick={() => openCropEditor(photoUrl)}
                     >
-                      Crop photo
+                      Crop / resize
                     </button>
                   ) : null}
                 </div>
-
-                {showCamera ? (
-                  <CameraCapture
-                    onCapture={(img) => {
-                      setPhotoUrl(img);
-                      setCropSrc(img);
-                      setCropModalOpen(true);
-                      clearFieldError("photoUrl");
-                    }}
-                  />
-                ) : null}
 
                 <input
                   value={photoUrl.startsWith("data:") ? "" : photoUrl}
@@ -997,6 +1126,18 @@ export default function KanbanWizard() {
         </div>
       )}
 
+      {cameraModalOpen ? (
+        <CameraCaptureModal
+          onCapture={(img) => {
+            setPhotoUrl(img);
+            clearFieldError("photoUrl");
+            setCameraModalOpen(false);
+            openCropEditor(img);
+          }}
+          onClose={() => setCameraModalOpen(false)}
+        />
+      ) : null}
+
       {cropModalOpen && cropSrc && (
         <div
           style={{
@@ -1014,31 +1155,85 @@ export default function KanbanWizard() {
               background: "white",
               padding: 20,
               borderRadius: 12,
-              maxWidth: "90vw",
-              maxHeight: "90vh",
+              maxWidth: "min(920px, 96vw)",
+              maxHeight: "92vh",
               overflow: "auto",
+              width: "100%",
             }}
           >
-            <ReactCrop
-              crop={crop}
-              onChange={(c) => setCrop(c)}
-              onComplete={(c) => setCompletedCrop(c)}
+            <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>
+              Crop / resize photo
+            </div>
+            <div style={{ color: "#6b7280", fontSize: 13, marginBottom: 12 }}>
+              Drag the corners to include more of the image (zoom out). Use the
+              slider if the picture is still too big on screen.
+            </div>
+
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 12,
+                fontSize: 13,
+                fontWeight: 600,
+              }}
             >
-              <img
-                ref={cropImageRef}
-                src={cropSrc}
-                alt=""
-                style={{ maxWidth: "100%" }}
+              View size
+              <input
+                type="range"
+                min={0.45}
+                max={1.4}
+                step={0.05}
+                value={cropZoom}
+                onChange={(e) => setCropZoom(Number(e.target.value))}
+                style={{ flex: 1 }}
               />
-            </ReactCrop>
+              <span style={{ width: 40, textAlign: "right" }}>
+                {Math.round(cropZoom * 100)}%
+              </span>
+            </label>
+
+            <div
+              style={{
+                maxHeight: "58vh",
+                overflow: "auto",
+                background: "#111827",
+                borderRadius: 8,
+                padding: 12,
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.round(cropZoom * 100)}%`,
+                  margin: "0 auto",
+                  minWidth: 180,
+                }}
+              >
+                <ReactCrop
+                  crop={crop}
+                  aspect={1}
+                  onChange={(c) => setCrop(c)}
+                  onComplete={(c) => setCompletedCrop(c)}
+                >
+                  <img
+                    ref={cropImageRef}
+                    src={cropSrc}
+                    alt=""
+                    onLoad={onCropImageLoad}
+                    style={{ width: "100%", display: "block" }}
+                  />
+                </ReactCrop>
+              </div>
+            </div>
 
             <div
               style={{
                 marginTop: 12,
-                textAlign: "right",
                 display: "flex",
                 gap: 10,
                 justifyContent: "flex-end",
+                flexWrap: "wrap",
               }}
             >
               <button
@@ -1049,7 +1244,7 @@ export default function KanbanWizard() {
                 Cancel
               </button>
               <button type="button" onClick={applyCrop} style={btnPrimary}>
-                Apply Crop
+                Apply crop
               </button>
             </div>
           </div>
@@ -1074,6 +1269,48 @@ function CardInput({ value, onChange, placeholder, error, style }) {
         width: "100%",
         boxSizing: "border-box",
         minWidth: 0,
+        ...style,
+      }}
+      onFocus={(e) => {
+        e.target.style.background = "#fff";
+        e.target.style.border = error
+          ? "1px solid #fca5a5"
+          : "1px solid #d1d5db";
+      }}
+      onBlur={(e) => {
+        e.target.style.background = error
+          ? "#fef2f2"
+          : "rgba(243,244,246,0.55)";
+        e.target.style.border = error
+          ? "1px solid #fca5a5"
+          : "1px solid transparent";
+      }}
+    />
+  );
+}
+
+function CardText({ value, onChange, placeholder, error, style, rows = 2 }) {
+  return (
+    <textarea
+      value={value}
+      rows={rows}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      style={{
+        border: error ? "1px solid #fca5a5" : "1px solid transparent",
+        borderRadius: 6,
+        padding: "4px 6px",
+        outline: "none",
+        background: error ? "#fef2f2" : "rgba(243,244,246,0.55)",
+        width: "100%",
+        boxSizing: "border-box",
+        minWidth: 0,
+        resize: "vertical",
+        overflowWrap: "anywhere",
+        wordBreak: "break-word",
+        whiteSpace: "pre-wrap",
+        lineHeight: 1.25,
+        fontFamily: "inherit",
         ...style,
       }}
       onFocus={(e) => {
@@ -1138,29 +1375,57 @@ function QrPlaceholder({ label, hint }) {
   );
 }
 
-function CameraCapture({ onCapture }) {
+function CameraCaptureModal({ onCapture, onClose }) {
   const videoRef = React.useRef(null);
-  const [stream, setStream] = React.useState(null);
+  const streamRef = React.useRef(null);
+  const [error, setError] = React.useState("");
+  const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
-    return () => {
-      if (stream) stream.getTracks().forEach((t) => t.stop());
-    };
-  }, [stream]);
+    let cancelled = false;
 
-  async function startCamera() {
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: true });
-      videoRef.current.srcObject = s;
-      setStream(s);
-    } catch (e) {
-      alert("Camera error: " + e.message);
-    }
-  }
+    (async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error(
+            "Camera is not available in this browser. Use Upload instead."
+          );
+        }
+        const s = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+        if (cancelled) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = s;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = s;
+          video.muted = true;
+          await video.play();
+          setReady(true);
+        }
+      } catch (e) {
+        if (!cancelled) setError(String(e?.message || e));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    };
+  }, []);
 
   function takePhoto() {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !video.videoWidth) return;
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -1170,20 +1435,66 @@ function CameraCapture({ onCapture }) {
   }
 
   return (
-    <div style={{ marginTop: 4 }}>
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        style={{ width: "100%", maxWidth: 320, borderRadius: 8 }}
-      />
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <button type="button" onClick={startCamera} style={btnSecondary}>
-          Start Camera
-        </button>
-        <button type="button" onClick={takePhoto} style={btnSecondary}>
-          Take Photo
-        </button>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        display: "grid",
+        placeItems: "center",
+        zIndex: 10000,
+        padding: 20,
+      }}
+    >
+      <div
+        style={{
+          background: "white",
+          padding: 20,
+          borderRadius: 12,
+          maxWidth: 560,
+          width: "100%",
+        }}
+      >
+        <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 10 }}>
+          Camera
+        </div>
+        {error ? (
+          <div style={{ color: "#b91c1c", marginBottom: 12 }}>{error}</div>
+        ) : null}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          style={{
+            width: "100%",
+            borderRadius: 8,
+            background: "#111827",
+            minHeight: 220,
+            objectFit: "cover",
+          }}
+        />
+        <div
+          style={{
+            marginTop: 12,
+            display: "flex",
+            gap: 10,
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+          }}
+        >
+          <button type="button" onClick={onClose} style={btnSecondary}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={takePhoto}
+            style={btnPrimary}
+            disabled={!ready || !!error}
+          >
+            Take photo
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -1227,6 +1538,18 @@ const choiceBtn = {
   fontWeight: 800,
   fontSize: 16,
   cursor: "pointer",
+};
+
+const photoChipBtn = {
+  border: "none",
+  borderRadius: 999,
+  padding: "5px 8px",
+  fontSize: 11,
+  fontWeight: 800,
+  background: "rgba(17,24,39,0.82)",
+  color: "#fff",
+  cursor: "pointer",
+  lineHeight: 1.1,
 };
 
 const inp = {

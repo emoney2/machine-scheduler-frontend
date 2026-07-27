@@ -287,7 +287,8 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                                         width: "100%",
                                                         height: "auto",
                                                         aspectRatio: "1 / 1",
-                                                        objectFit: "cover",
+                                                        objectFit: "contain",
+                                                        background: "#f3f4f6",
                                                         borderRadius: 12,
                                                         border: "1px solid #e5e7eb",
                                                 }}
@@ -322,8 +323,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                           <div
                             style={{
                               fontWeight: 900,
-                              fontSize: "clamp(28px, 3.4vw, 42px)",
-                              lineHeight: 1.1,
+                              fontSize: "clamp(22px, 3vw, 36px)",
+                              lineHeight: 1.15,
+                              overflowWrap: "anywhere",
+                              wordBreak: "break-word",
+                              maxWidth: "100%",
                             }}
                           >
                             {String(item.itemName || "—")}
@@ -353,7 +357,10 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                           <div
                             style={{
                               fontSize: "clamp(12px, 1.6vw, 16px)",
-                              lineHeight: 1.3,
+                              lineHeight: 1.35,
+                              maxWidth: "100%",
+                              overflowWrap: "anywhere",
+                              wordBreak: "break-word",
                             }}
                           >
                             <div>
