@@ -272,9 +272,7 @@ export default function KanbanWizard() {
     }
     if (!String(supplier).trim()) errs.supplier = "Vendor is required.";
     if (!String(itemName).trim()) errs.itemName = "Item name is required.";
-    if (!String(dept).trim()) errs.dept = "Dept is required.";
     if (!String(location).trim()) errs.location = "Location is required.";
-    if (!String(packageSize).trim()) errs.packageSize = "Package size is required.";
     if (!String(costPerPkg).trim()) errs.costPerPkg = "Price is required.";
     if (!String(photoUrl).trim()) errs.photoUrl = "Photo is required.";
     if (!String(binQtyUnits).trim()) errs.binQtyUnits = "Bin qty is required.";
@@ -860,41 +858,6 @@ export default function KanbanWizard() {
                   />
                 </div>
 
-                {/* Dept / package / category on card */}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr 1fr",
-                    gap: 8,
-                    fontSize: 12,
-                  }}
-                >
-                  <LabeledCardField
-                    label="Dept"
-                    value={dept}
-                    onChange={(v) => {
-                      setDept(v);
-                      clearFieldError("dept");
-                    }}
-                    error={!!fieldErrors.dept}
-                  />
-                  <LabeledCardField
-                    label="Package"
-                    value={packageSize}
-                    onChange={(v) => {
-                      setPackageSize(v);
-                      clearFieldError("packageSize");
-                    }}
-                    error={!!fieldErrors.packageSize}
-                  />
-                  <LabeledCardField
-                    label="Category"
-                    value={category}
-                    onChange={setCategory}
-                    placeholder="optional"
-                  />
-                </div>
-
                 {/* BOTTOM: QR placeholders */}
                 <div
                   style={{
@@ -1155,31 +1118,6 @@ function MiniStat({ label, value, onChange, error }) {
         }}
       />
     </div>
-  );
-}
-
-function LabeledCardField({
-  label,
-  value,
-  onChange,
-  error,
-  placeholder,
-}) {
-  return (
-    <label style={{ display: "grid", gap: 3, minWidth: 0 }}>
-      <span style={{ opacity: 0.8, fontWeight: 700 }}>{label}</span>
-      <CardInput
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder || "—"}
-        error={!!error}
-        style={{
-          fontWeight: 700,
-          fontSize: 13,
-          textAlign: "center",
-        }}
-      />
-    </label>
   );
 }
 
