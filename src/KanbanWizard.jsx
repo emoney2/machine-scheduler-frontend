@@ -298,7 +298,7 @@ export default function KanbanWizard() {
       dept,
       category,
       location,
-      packageSize,
+      packageSize: packageSize || "—",
       binQtyUnits,
       caseMultiple,
       reorderQtyBasis,
