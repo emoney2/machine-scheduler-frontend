@@ -1317,7 +1317,8 @@ const handleSaveNewCompany = async () => {
     try {
       await axios.post(
         `${API_ROOT}/materials`,
-        newMaterialData
+        newMaterialData,
+        { withCredentials: true }
       );
       alert("Material successfully added");
 
@@ -1338,8 +1339,16 @@ const handleSaveNewCompany = async () => {
       // 3) Close modal & clear errors
       setIsNewMaterialModalOpen(false);
       setNewMaterialErrors({});
-    } catch {
-      setNewMaterialErrors({ general: "Failed to save material. Try again." });
+    } catch (err) {
+      const apiMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message;
+      setNewMaterialErrors({
+        general: apiMsg
+          ? `Failed to save material: ${apiMsg}`
+          : "Failed to save material. Try again.",
+      });
     } finally {
       setIsSubmittingOverlay(false);
     }
