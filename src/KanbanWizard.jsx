@@ -339,12 +339,6 @@ export default function KanbanWizard() {
   }
 
   const { bg: locBg, text: locText } = getLocationStyles(location);
-  const contactDisplay =
-    orderMethod === "Email"
-      ? orderEmail || "—"
-      : url
-        ? "See Product Link QR"
-        : "—";
 
   if (loadingEdit) {
     return <div style={{ padding: 24 }}>Loading kanban…</div>;
@@ -416,40 +410,63 @@ export default function KanbanWizard() {
 
       {phase === "card" && (
         <>
-          <p style={{ color: "#6b7280", marginTop: 8, marginBottom: 0 }}>
-            Fill out the card below — it matches what you’ll print.
+          <div
+            style={{
+              marginTop: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setPhase("method")}
+              style={{
+                ...btnSecondary,
+                padding: "6px 10px",
+                fontSize: 13,
+              }}
+            >
+              {orderMethod === "Online" ? "Order Online" : "Manual"} · change
+            </button>
             {editingId ? (
-              <span style={{ marginLeft: 8, fontFamily: "ui-monospace, monospace" }}>
+              <span
+                style={{
+                  fontFamily: "ui-monospace, monospace",
+                  fontSize: 13,
+                  color: "#6b7280",
+                }}
+              >
                 {editingId}
               </span>
             ) : null}
-          </p>
+          </div>
 
           <div
             style={{
               marginTop: 16,
-              display: "grid",
-              gridTemplateColumns: "minmax(280px, 420px) minmax(260px, 1fr)",
-              gap: 28,
-              alignItems: "start",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 16,
             }}
-            className="wizardLayout"
           >
-            {/* LIVE CARD — mirrors KanbanCardPreview front */}
+            {/* LIVE CARD — all fields live on the card */}
             <div
               style={{
                 position: "relative",
                 width: "100%",
-                aspectRatio: "2 / 3",
+                maxWidth: 440,
                 boxSizing: "border-box",
                 background: "white",
                 borderRadius: 14,
                 border: "0.9pt solid #9ca3af",
-                padding: "12px 12px 16px",
+                padding: "12px 12px 14px",
                 display: "grid",
-                gridTemplateRows: "auto auto 1fr",
-                gap: 8,
-                overflow: "hidden",
+                gridTemplateRows: "auto auto auto",
+                gap: 10,
+                overflow: "visible",
                 boxShadow: "0 10px 28px rgba(17,24,39,0.08)",
               }}
             >
@@ -464,7 +481,7 @@ export default function KanbanWizard() {
                 KANBAN CARD
               </div>
 
-              {/* Location banner — custom menu so options stay readable */}
+              {/* Location banner */}
               <div style={{ position: "relative" }}>
                 <button
                   type="button"
@@ -565,20 +582,17 @@ export default function KanbanWizard() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateRows: "1fr 1fr 1fr",
-                  gap: 10,
-                  minHeight: 0,
+                  gap: 12,
                   fontSize: "clamp(13px, 2.8vw, 18px)",
                 }}
               >
-                {/* TOP: photo + name/price/vendor */}
+                {/* TOP: photo + name/price/vendor/contact */}
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1fr 1fr",
                     gap: 10,
-                    alignItems: "center",
-                    minHeight: 0,
+                    alignItems: "start",
                   }}
                 >
                   <div
@@ -638,7 +652,6 @@ export default function KanbanWizard() {
                     >
                       <button
                         type="button"
-                        title="Take photo with camera"
                         onClick={() => setCameraModalOpen(true)}
                         style={photoChipBtn}
                       >
@@ -646,7 +659,6 @@ export default function KanbanWizard() {
                       </button>
                       <button
                         type="button"
-                        title="Upload image"
                         onClick={() => fileInputRef.current?.click()}
                         style={photoChipBtn}
                       >
@@ -655,7 +667,6 @@ export default function KanbanWizard() {
                       {photoUrl ? (
                         <button
                           type="button"
-                          title="Crop / resize image"
                           onClick={() => openCropEditor(photoUrl)}
                           style={photoChipBtn}
                         >
@@ -665,11 +676,6 @@ export default function KanbanWizard() {
                       {photoUrl ? (
                         <button
                           type="button"
-                          title={
-                            photoFit === "contain"
-                              ? "Fill frame (may crop edges)"
-                              : "Fit whole image in frame"
-                          }
                           onClick={() =>
                             setPhotoFit((f) =>
                               f === "contain" ? "cover" : "contain"
@@ -700,7 +706,7 @@ export default function KanbanWizard() {
                       textAlign: "center",
                       justifyItems: "stretch",
                       minWidth: 0,
-                      alignContent: "center",
+                      alignContent: "start",
                     }}
                   >
                     <CardText
@@ -714,7 +720,7 @@ export default function KanbanWizard() {
                       rows={2}
                       style={{
                         fontWeight: 900,
-                        fontSize: "clamp(15px, 3vw, 24px)",
+                        fontSize: "clamp(15px, 3vw, 22px)",
                         lineHeight: 1.15,
                         textAlign: "center",
                       }}
@@ -726,7 +732,7 @@ export default function KanbanWizard() {
                         gap: 6,
                         alignItems: "baseline",
                         justifyContent: "center",
-                        fontSize: "clamp(14px, 2.6vw, 18px)",
+                        fontSize: "clamp(14px, 2.6vw, 17px)",
                         flexWrap: "wrap",
                       }}
                     >
@@ -744,7 +750,7 @@ export default function KanbanWizard() {
                           width: 88,
                           textAlign: "left",
                           fontFamily:
-                            'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                            'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
                         }}
                       />
                     </div>
@@ -776,103 +782,117 @@ export default function KanbanWizard() {
                         }}
                       />
                       <div style={{ opacity: 0.8, marginTop: 6 }}>
-                        Contact:
+                        {orderMethod === "Online"
+                          ? "Product URL:"
+                          : "Contact:"}
                       </div>
-                      <div
+                      <CardText
+                        value={
+                          orderMethod === "Online" ? url : orderEmail
+                        }
+                        onChange={(v) => {
+                          if (orderMethod === "Online") {
+                            setUrl(v);
+                            clearFieldError("url");
+                          } else {
+                            setOrderEmail(v);
+                            clearFieldError("orderEmail");
+                          }
+                        }}
+                        placeholder={
+                          orderMethod === "Online"
+                            ? "https://vendor.com/product"
+                            : "email or phone"
+                        }
+                        error={
+                          !!(
+                            orderMethod === "Online"
+                              ? fieldErrors.url
+                              : fieldErrors.orderEmail
+                          )
+                        }
+                        rows={2}
                         style={{
                           fontWeight: 600,
-                          color: "#111827",
-                          wordBreak: "break-word",
-                          overflowWrap: "anywhere",
-                          whiteSpace: "pre-wrap",
-                          lineHeight: 1.3,
+                          textAlign: "left",
+                          fontSize: "inherit",
                         }}
-                      >
-                        {contactDisplay}
-                      </div>
+                      />
                     </div>
                   </div>
                 </div>
 
-                {/* MIDDLE: bin + reorder */}
+                {/* MIDDLE: bin + reorder + lead time */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 12,
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: 8,
                     alignContent: "center",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "grid",
-                      alignContent: "center",
-                      justifyItems: "center",
-                      rowGap: 4,
-                      textAlign: "center",
+                  <MiniStat
+                    label="Bin Qty"
+                    value={binQtyUnits}
+                    onChange={(v) => {
+                      setBinQtyUnits(v);
+                      clearFieldError("binQtyUnits");
                     }}
-                  >
-                    <div
-                      style={{
-                        opacity: 0.8,
-                        fontSize: "clamp(13px, 2.4vw, 18px)",
-                      }}
-                    >
-                      Bin Qty (units):
-                    </div>
-                    <CardInput
-                      value={binQtyUnits}
-                      onChange={(v) => {
-                        setBinQtyUnits(v);
-                        clearFieldError("binQtyUnits");
-                      }}
-                      placeholder="—"
-                      error={!!fieldErrors.binQtyUnits}
-                      style={{
-                        fontWeight: 800,
-                        fontSize: "clamp(18px, 3.2vw, 26px)",
-                        textAlign: "center",
-                        width: "70%",
-                        fontFamily:
-                          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                      }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      display: "grid",
-                      alignContent: "center",
-                      justifyItems: "center",
-                      rowGap: 4,
-                      textAlign: "center",
+                    error={!!fieldErrors.binQtyUnits}
+                  />
+                  <MiniStat
+                    label="Reorder Qty"
+                    value={reorderQtyBasis}
+                    onChange={(v) => {
+                      setReorderQtyBasis(v);
+                      clearFieldError("reorderQtyBasis");
                     }}
-                  >
-                    <div
-                      style={{
-                        opacity: 0.8,
-                        fontSize: "clamp(13px, 2.4vw, 18px)",
-                      }}
-                    >
-                      Reorder Qty (basis):
-                    </div>
-                    <CardInput
-                      value={reorderQtyBasis}
-                      onChange={(v) => {
-                        setReorderQtyBasis(v);
-                        clearFieldError("reorderQtyBasis");
-                      }}
-                      placeholder="—"
-                      error={!!fieldErrors.reorderQtyBasis}
-                      style={{
-                        fontWeight: 800,
-                        fontSize: "clamp(18px, 3.2vw, 26px)",
-                        textAlign: "center",
-                        width: "70%",
-                        fontFamily:
-                          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                      }}
-                    />
-                  </div>
+                    error={!!fieldErrors.reorderQtyBasis}
+                  />
+                  <MiniStat
+                    label="Lead (days)"
+                    value={leadTimeDays}
+                    onChange={(v) => {
+                      setLeadTimeDays(v);
+                      clearFieldError("leadTimeDays");
+                    }}
+                    error={!!fieldErrors.leadTimeDays}
+                  />
+                </div>
+
+                {/* Dept / package / category on card */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: 8,
+                    fontSize: 12,
+                  }}
+                >
+                  <LabeledCardField
+                    label="Dept"
+                    value={dept}
+                    onChange={(v) => {
+                      setDept(v);
+                      clearFieldError("dept");
+                    }}
+                    error={!!fieldErrors.dept}
+                  />
+                  <LabeledCardField
+                    label="Package"
+                    value={packageSize}
+                    onChange={(v) => {
+                      setPackageSize(v);
+                      clearFieldError("packageSize");
+                    }}
+                    error={!!fieldErrors.packageSize}
+                  />
+                  <LabeledCardField
+                    label="Category"
+                    value={category}
+                    onChange={setCategory}
+                    placeholder="optional"
+                  />
                 </div>
 
                 {/* BOTTOM: QR placeholders */}
@@ -882,7 +902,6 @@ export default function KanbanWizard() {
                     gridTemplateColumns: "1fr 1fr 1fr",
                     alignItems: "start",
                     gap: 6,
-                    padding: "4px 4px 0",
                   }}
                 >
                   <QrPlaceholder
@@ -891,10 +910,10 @@ export default function KanbanWizard() {
                       orderMethod === "Online"
                         ? url
                           ? "Ready after save"
-                          : "Needs URL →"
+                          : "Add URL above"
                         : orderEmail
                           ? "Ready after save"
-                          : "Needs contact →"
+                          : "Add contact above"
                     }
                   />
                   <QrPlaceholder label="Reorder Request QR" hint="After save" />
@@ -915,197 +934,44 @@ export default function KanbanWizard() {
               />
             </div>
 
-            {/* OFF-CARD DETAILS */}
-            <div style={{ display: "grid", gap: 14, alignContent: "start" }}>
-              <div
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                justifyContent: "center",
+              }}
+            >
+              <button type="button" onClick={save} style={btnPrimary}>
+                {editingId ? "Save changes" : "Save Kanban"}
+              </button>
+              <a
+                href="/kanban/queue"
                 style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 16,
-                  display: "grid",
-                  gap: 12,
-                  background: "#fafafa",
+                  ...btnSecondary,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  textDecoration: "none",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 8,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>
-                    Ordering &amp; details
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPhase("method")}
-                    style={{
-                      ...btnSecondary,
-                      padding: "6px 10px",
-                      fontSize: 13,
-                    }}
-                  >
-                    {orderMethod === "Online" ? "Online" : "Manual"} · change
-                  </button>
-                </div>
-
-                {orderMethod === "Online" ? (
-                  <Field
-                    label="Product URL (required — Product Link QR)"
-                    value={url}
-                    setValue={setUrl}
-                    placeholder="https://vendor.com/product"
-                    error={fieldErrors.url}
-                    onEdit={() => clearFieldError("url")}
-                  />
-                ) : (
-                  <Field
-                    label="Contact info (email or phone — shown on card)"
-                    value={orderEmail}
-                    setValue={setOrderEmail}
-                    placeholder="purchasing@vendor.com or 555-123-4567"
-                    error={fieldErrors.orderEmail}
-                    onEdit={() => clearFieldError("orderEmail")}
-                  />
-                )}
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 10,
-                  }}
-                >
-                  <Field
-                    label="Dept (required)"
-                    value={dept}
-                    setValue={setDept}
-                    error={fieldErrors.dept}
-                    onEdit={() => clearFieldError("dept")}
-                  />
-                  <Field
-                    label="Package Size (required)"
-                    value={packageSize}
-                    setValue={setPackageSize}
-                    error={fieldErrors.packageSize}
-                    onEdit={() => clearFieldError("packageSize")}
-                  />
-                  <Field
-                    label="Lead Time (days) — required"
-                    value={leadTimeDays}
-                    setValue={setLeadTimeDays}
-                    mono
-                    error={fieldErrors.leadTimeDays}
-                    onEdit={() => clearFieldError("leadTimeDays")}
-                  />
-                  <Field
-                    label="Category (optional)"
-                    value={category}
-                    setValue={setCategory}
-                  />
-                </div>
-              </div>
-
-              <div
-                style={{
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 16,
-                  display: "grid",
-                  gap: 10,
-                }}
-              >
-                <div style={{ fontWeight: 800, fontSize: 15 }}>Photo tools</div>
-                {fieldErrors.photoUrl ? (
-                  <div style={{ color: "#b91c1c", fontSize: 13 }}>
-                    {fieldErrors.photoUrl}
-                  </div>
-                ) : (
-                  <div style={{ color: "#6b7280", fontSize: 13 }}>
-                    Use Camera / Upload / Resize on the card photo. Drag the crop
-                    box larger to zoom out; use Fit to show the whole image.
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    style={btnSecondary}
-                    onClick={() => setCameraModalOpen(true)}
-                  >
-                    Open camera
-                  </button>
-                  <button
-                    type="button"
-                    style={btnSecondary}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Upload image
-                  </button>
-                  {photoUrl ? (
-                    <button
-                      type="button"
-                      style={btnSecondary}
-                      onClick={() => openCropEditor(photoUrl)}
-                    >
-                      Crop / resize
-                    </button>
-                  ) : null}
-                </div>
-
-                <input
-                  value={photoUrl.startsWith("data:") ? "" : photoUrl}
-                  onChange={(e) => {
-                    setPhotoUrl(e.target.value);
-                    clearFieldError("photoUrl");
-                  }}
-                  placeholder="Or paste image URL…"
-                  style={inp}
-                />
-              </div>
-
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                <button type="button" onClick={save} style={btnPrimary}>
-                  {editingId ? "Save changes" : "Save Kanban"}
-                </button>
-                <a
-                  href="/kanban/queue"
-                  style={{
-                    ...btnSecondary,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    textDecoration: "none",
-                  }}
-                >
-                  Cancel
-                </a>
-              </div>
-
-              {Object.keys(fieldErrors).length > 0 ? (
-                <div
-                  style={{
-                    color: "#b91c1c",
-                    fontSize: 13,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  Missing:{" "}
-                  {Object.values(fieldErrors).join(" ")}
-                </div>
-              ) : null}
+                Cancel
+              </a>
             </div>
-          </div>
 
-          <style>{`
-            @media (max-width: 820px) {
-              .wizardLayout {
-                grid-template-columns: 1fr !important;
-              }
-            }
-          `}</style>
+            {Object.keys(fieldErrors).length > 0 ? (
+              <div
+                style={{
+                  color: "#b91c1c",
+                  fontSize: 13,
+                  lineHeight: 1.4,
+                  textAlign: "center",
+                  maxWidth: 440,
+                }}
+              >
+                {Object.values(fieldErrors).join(" ")}
+              </div>
+            ) : null}
+          </div>
         </>
       )}
 
@@ -1251,6 +1117,69 @@ export default function KanbanWizard() {
         </div>
       )}
     </div>
+  );
+}
+
+function MiniStat({ label, value, onChange, error }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        alignContent: "center",
+        justifyItems: "center",
+        rowGap: 4,
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          opacity: 0.8,
+          fontSize: "clamp(11px, 2.2vw, 14px)",
+          lineHeight: 1.2,
+        }}
+      >
+        {label}
+      </div>
+      <CardInput
+        value={value}
+        onChange={onChange}
+        placeholder="—"
+        error={!!error}
+        style={{
+          fontWeight: 800,
+          fontSize: "clamp(15px, 2.8vw, 22px)",
+          textAlign: "center",
+          width: "90%",
+          fontFamily:
+            "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+        }}
+      />
+    </div>
+  );
+}
+
+function LabeledCardField({
+  label,
+  value,
+  onChange,
+  error,
+  placeholder,
+}) {
+  return (
+    <label style={{ display: "grid", gap: 3, minWidth: 0 }}>
+      <span style={{ opacity: 0.8, fontWeight: 700 }}>{label}</span>
+      <CardInput
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder || "—"}
+        error={!!error}
+        style={{
+          fontWeight: 700,
+          fontSize: 13,
+          textAlign: "center",
+        }}
+      />
+    </label>
   );
 }
 
@@ -1500,35 +1429,6 @@ function CameraCaptureModal({ onCapture, onClose }) {
   );
 }
 
-function Field({ label, value, setValue, placeholder, mono, error, onEdit }) {
-  return (
-    <label style={{ display: "grid", gap: 6 }}>
-      <div style={{ fontWeight: 600, fontSize: 13 }}>{label}</div>
-      <input
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          onEdit?.();
-        }}
-        placeholder={placeholder}
-        style={{
-          ...inp,
-          fontFamily: mono
-            ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace'
-            : "inherit",
-          border: error ? "1px solid #fca5a5" : inp.border,
-          boxShadow: error ? "0 0 0 1px #fecaca" : undefined,
-        }}
-      />
-      {error ? (
-        <div style={{ color: "#b91c1c", fontSize: 13, lineHeight: 1.35 }}>
-          {error}
-        </div>
-      ) : null}
-    </label>
-  );
-}
-
 const choiceBtn = {
   padding: "18px 16px",
   borderRadius: 10,
@@ -1550,13 +1450,6 @@ const photoChipBtn = {
   color: "#fff",
   cursor: "pointer",
   lineHeight: 1.1,
-};
-
-const inp = {
-  border: "1px solid #e5e7eb",
-  borderRadius: 8,
-  padding: "8px 10px",
-  outline: "none",
 };
 
 const btnPrimary = {
