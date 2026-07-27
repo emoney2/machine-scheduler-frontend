@@ -291,33 +291,60 @@ export default function KanbanWizard() {
 
     const finalId = editingId || (await findNextKanbanId(dept, category, sku));
 
-    const payload = {
-      kanbanId: finalId,
-      itemName,
-      sku,
-      dept,
-      category,
-      location,
-      packageSize: packageSize || "—",
-      binQtyUnits,
-      caseMultiple,
-      reorderQtyBasis,
-      unitsBasis,
-      leadTimeDays,
-      orderMethod,
-      orderEmail: orderMethod === "Email" ? orderEmail : "",
-      orderUrl: orderMethod === "Online" ? url : "",
-      supplier,
-      supplierSku,
-      costPerPkg,
-      substitutes,
-      notes,
-      photoUrl,
-    };
-
     try {
       setSaving(true);
-      await new Promise((r) => setTimeout(r, 50));
+
+      // Camera/crop photos are data: URLs — upload to Drive first (Sheets 50k cell limit)
+      let finalPhotoUrl = photoUrl;
+      if (String(photoUrl || "").startsWith("data:")) {
+        const blob = await (await fetch(photoUrl)).blob();
+        const fd = new FormData();
+        fd.append("file", blob, `${finalId}.jpg`);
+        fd.append("kanbanId", finalId);
+        const up = await fetch(`${BACKEND}/api/kanban/upload-photo`, {
+          method: "POST",
+          credentials: "include",
+          body: fd,
+        });
+        if (!up.ok) {
+          const t = await up.text().catch(() => "");
+          throw new Error(`Photo upload failed (HTTP ${up.status}) ${t}`);
+        }
+        const uj = await up.json();
+        finalPhotoUrl = uj?.photoUrl || "";
+        if (finalPhotoUrl.startsWith("/")) {
+          finalPhotoUrl = `${BACKEND}${finalPhotoUrl}`;
+        }
+        if (!finalPhotoUrl) {
+          throw new Error("Photo upload did not return a URL.");
+        }
+        setPhotoUrl(finalPhotoUrl);
+      }
+
+      const payload = {
+        kanbanId: finalId,
+        itemName,
+        sku,
+        dept,
+        category,
+        location,
+        packageSize: packageSize || "—",
+        binQtyUnits,
+        caseMultiple,
+        reorderQtyBasis,
+        unitsBasis,
+        leadTimeDays,
+        orderMethod,
+        orderEmail: orderMethod === "Email" ? orderEmail : "",
+        orderUrl: orderMethod === "Online" ? url : "",
+        supplier,
+        supplierSku,
+        costPerPkg,
+        substitutes,
+        notes,
+        photoUrl: finalPhotoUrl,
+      };
+
       const r = await fetch(`${BACKEND}/api/kanban/upsert-item`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
