@@ -894,7 +894,7 @@ export default function Ship() {
   }, []);
   // === End useEffect 1 ===
 
-  // Open jobs queue (all products/stages) for cards under the search bar
+  // Embroidery / Sewing open jobs for cards under the search bar
   useEffect(() => {
     let cancelled = false;
 
@@ -910,7 +910,12 @@ export default function Ship() {
         }
         const data = await res.json().catch(() => ({}));
         if (!cancelled && res.ok && Array.isArray(data.jobs)) {
-          setProductionQueue(data.jobs);
+          // Defense in depth: only show embroidery / sewing cards
+          const embOrSew = data.jobs.filter((j) => {
+            const stage = String(j?.Stage ?? j?.stage ?? "").trim().toUpperCase();
+            return stage === "EMBROIDERY" || stage === "SEWING" || stage === "SEW";
+          });
+          setProductionQueue(embOrSew);
         }
       } catch (e) {
         console.error("ship-production-queue:", e);
@@ -2632,12 +2637,12 @@ export default function Ship() {
 
       <div style={{ marginBottom: "1.75rem" }}>
         <div style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: "0.5rem", color: "#374151" }}>
-          Open jobs (all products)
+          Embroidery / Sewing jobs
         </div>
         {productionQueueLoading && productionQueue.length === 0 ? (
           <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>Loading queue…</div>
         ) : productionQueue.length === 0 ? (
-          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>No open jobs to ship.</div>
+          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>No embroidery / sewing jobs ready to ship.</div>
         ) : (
           <div
             style={{
