@@ -207,6 +207,150 @@ function hasAnyBoxesSelected(counts, customBoxes) {
   return presetAny || (customBoxes && customBoxes.length > 0);
 }
 
+/** Normalize product name for packing history (strip Front/Full/Back). */
+function normalizePackProductName(name, design = "") {
+  const raw = String(name || "").replace(/[\s\u00a0]+/g, " ").trim();
+  if (!raw) return "";
+  if (/\bback\b/i.test(raw)) return "";
+  let result = raw.replace(/ Full/g, "").replace(/ Front/g, "").replace(/ Back/g, "").trim();
+  for (const suffix of ["Front", "Full", "Back"]) {
+    if (result.length > suffix.length && result.toLowerCase().endsWith(suffix.toLowerCase())) {
+      result = result.slice(0, -suffix.length).trim();
+      break;
+    }
+  }
+  const parts = raw.split(/[\s\-_/]+/).filter(Boolean);
+  while (parts.length > 1 && ["front", "full", "back"].includes(parts[parts.length - 1].toLowerCase())) {
+    parts.pop();
+  }
+  const splitResult = parts.join(" ").trim();
+  for (const candidate of [result, splitResult]) {
+    const c = String(candidate || "").trim();
+    if (!c) continue;
+    if (c.toLowerCase() === "drive" && (/driver/i.test(raw) || /driver/i.test(design || ""))) {
+      return "Driver";
+    }
+    return c;
+  }
+  return raw;
+}
+
+/** Pieces going out in this shipment (excludes embroidery backs). */
+function buildShipmentPieces(selectedJobs) {
+  const out = [];
+  for (const j of selectedJobs || []) {
+    const product = String(j.Product || j.product || "").trim();
+    const design = String(j.Design || j.design || "").trim();
+    const norm = normalizePackProductName(product, design);
+    if (!norm) continue;
+    const qty = Math.max(0, Math.floor(Number(j.shipQty ?? j.ShippedQty) || 0));
+    if (qty <= 0) continue;
+    out.push({
+      order_id: String(j.orderId || "").trim(),
+      product,
+      product_norm: norm,
+      design,
+      qty,
+    });
+  }
+  return out;
+}
+
+function formatSuggestionSummary(suggestion) {
+  if (!suggestion) return "";
+  const parts = [];
+  const counts = suggestion.box_counts || {};
+  SHIP_BOX_PRESETS.forEach((p) => {
+    const n = Math.floor(Number(counts[p.id]) || 0);
+    if (n > 0) parts.push(`${n}× ${p.L}×${p.W}×${p.H}`);
+  });
+  (suggestion.custom_boxes || []).forEach((c) => {
+    parts.push(`1× ${c.L}×${c.W}×${c.H} custom`);
+  });
+  return parts.join(", ") || "—";
+}
+
+/** Expand selected boxes into individual package slots for contents assignment. */
+function expandBoxSlots(counts, customBoxes) {
+  const slots = [];
+  SHIP_BOX_PRESETS.forEach((p) => {
+    const n = Math.max(0, Math.floor(Number(counts[p.id]) || 0));
+    for (let i = 0; i < n; i++) {
+      slots.push({
+        key: `${p.id}-${i}`,
+        label: `${p.L}×${p.W}×${p.H}`,
+        L: p.L,
+        W: p.W,
+        H: p.H,
+        weight: p.weight,
+        preset_id: p.id,
+      });
+    }
+  });
+  (customBoxes || []).forEach((c, i) => {
+    slots.push({
+      key: c.id || `custom-${i}`,
+      label: `${c.L}×${c.W}×${c.H}`,
+      L: c.L,
+      W: c.W,
+      H: c.H,
+      weight: c.weight,
+      preset_id: null,
+    });
+  });
+  return slots;
+}
+
+/**
+ * pieceAlloc: { [orderId]: number[] } qty per box slot index.
+ * Returns box_contents payload or null if incomplete / empty.
+ */
+function buildBoxContentsPayload(slots, pieces, pieceAlloc) {
+  if (!slots.length || !pieces.length) return null;
+  const contents = slots.map((slot, idx) => ({
+    box_index: idx,
+    label: slot.label,
+    L: slot.L,
+    W: slot.W,
+    H: slot.H,
+    weight: slot.weight,
+    pieces: [],
+  }));
+  let anyAssigned = false;
+  for (const piece of pieces) {
+    const alloc = pieceAlloc[piece.order_id] || [];
+    for (let i = 0; i < slots.length; i++) {
+      const q = Math.max(0, Math.floor(Number(alloc[i]) || 0));
+      if (q <= 0) continue;
+      anyAssigned = true;
+      contents[i].pieces.push({
+        order_id: piece.order_id,
+        product: piece.product,
+        product_norm: piece.product_norm,
+        design: piece.design,
+        qty: q,
+      });
+    }
+  }
+  if (!anyAssigned) {
+    // Single box → auto-assign all pieces
+    if (slots.length === 1) {
+      contents[0].pieces = pieces.map((p) => ({ ...p }));
+      return contents;
+    }
+    return null;
+  }
+  return contents;
+}
+
+function emptyAllocForPieces(pieces, slotCount) {
+  const o = {};
+  (pieces || []).forEach((p) => {
+    o[p.order_id] = Array.from({ length: slotCount }, () => 0);
+  });
+  return o;
+}
+
 function parseUpsRateNumber(rate) {
   if (rate == null || rate === "N/A") return 0;
   if (typeof rate === "number" && Number.isFinite(rate)) return rate;
@@ -810,6 +954,11 @@ export default function Ship() {
     H: "",
     weight: "",
   });
+  const [boxSuggestion, setBoxSuggestion] = useState(null);
+  const [boxSuggestionLoading, setBoxSuggestionLoading] = useState(false);
+  /** { [orderId]: number[] } qty of each piece assigned to each box slot */
+  const [pieceBoxAlloc, setPieceBoxAlloc] = useState({});
+  const [showPackContents, setShowPackContents] = useState(false);
   const [oneTimeShipAddress, setOneTimeShipAddress] = useState(null);
   const [oneTimeAddressForm, setOneTimeAddressForm] = useState({
     companyName: "",
@@ -835,6 +984,14 @@ export default function Ship() {
   const selectedJobsForShip = useMemo(
     () => jobs.filter((j) => selected.includes(j.orderId.toString())),
     [jobs, selected]
+  );
+  const shipmentPieces = useMemo(
+    () => buildShipmentPieces(selectedJobsForShip),
+    [selectedJobsForShip]
+  );
+  const boxSlots = useMemo(
+    () => expandBoxSlots(boxCounts, customBoxes),
+    [boxCounts, customBoxes]
   );
   const selectionIncludesShopify = useMemo(
     () => selectedJobsForShip.some(isShopifyJob),
@@ -2125,6 +2282,114 @@ export default function Ship() {
     setBoxCounts((c) => ({ ...c, [id]: v }));
   };
 
+  const applyBoxSuggestion = () => {
+    const sug = boxSuggestion;
+    if (!sug) return;
+    const next = initialBoxCounts();
+    const counts = sug.box_counts || {};
+    SHIP_BOX_PRESETS.forEach((p) => {
+      next[p.id] = Math.max(0, Math.floor(Number(counts[p.id]) || 0));
+    });
+    setBoxCounts(next);
+    const customs = (sug.custom_boxes || []).map((c, i) => ({
+      id: `suggested-custom-${Date.now()}-${i}`,
+      L: Number(c.L),
+      W: Number(c.W),
+      H: Number(c.H),
+      weight: Number(c.weight) || 1,
+    }));
+    setCustomBoxes(customs);
+    setShowPackContents(true);
+  };
+
+  const setPieceAllocQty = (orderId, boxIndex, rawVal) => {
+    const v = Math.max(0, Math.floor(Number(rawVal) || 0));
+    setPieceBoxAlloc((prev) => {
+      const slotsN = boxSlots.length;
+      const arr = Array.from({ length: slotsN }, (_, i) =>
+        i === boxIndex ? v : Math.max(0, Math.floor(Number((prev[orderId] || [])[i]) || 0))
+      );
+      return { ...prev, [orderId]: arr };
+    });
+  };
+
+  const autoFillPackEvenly = () => {
+    const slotsN = boxSlots.length;
+    if (slotsN <= 0) return;
+    const next = {};
+    shipmentPieces.forEach((piece) => {
+      const arr = Array.from({ length: slotsN }, () => 0);
+      let left = piece.qty;
+      let i = 0;
+      while (left > 0 && slotsN > 0) {
+        arr[i % slotsN] += 1;
+        left -= 1;
+        i += 1;
+      }
+      next[piece.order_id] = arr;
+    });
+    setPieceBoxAlloc(next);
+  };
+
+  const putAllPiecesInFirstBox = () => {
+    const slotsN = boxSlots.length;
+    if (slotsN <= 0) return;
+    const next = {};
+    shipmentPieces.forEach((piece) => {
+      const arr = Array.from({ length: slotsN }, () => 0);
+      arr[0] = piece.qty;
+      next[piece.order_id] = arr;
+    });
+    setPieceBoxAlloc(next);
+  };
+
+  const fetchBoxSuggestion = async (pieces) => {
+    setBoxSuggestionLoading(true);
+    setBoxSuggestion(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/suggest-boxes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ pieces: pieces || [] }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.suggestion) {
+        const sug = data.suggestion;
+        setBoxSuggestion(sug);
+        // Auto-fill when we have a strong history match so mixed orders are ready immediately
+        if (
+          sug.confidence === "high" &&
+          (Object.values(sug.box_counts || {}).some((n) => Number(n) > 0) ||
+            (sug.custom_boxes || []).length > 0)
+        ) {
+          const next = initialBoxCounts();
+          SHIP_BOX_PRESETS.forEach((p) => {
+            next[p.id] = Math.max(0, Math.floor(Number((sug.box_counts || {})[p.id]) || 0));
+          });
+          setBoxCounts(next);
+          setCustomBoxes(
+            (sug.custom_boxes || []).map((c, i) => ({
+              id: `suggested-custom-${Date.now()}-${i}`,
+              L: Number(c.L),
+              W: Number(c.W),
+              H: Number(c.H),
+              weight: Number(c.weight) || 1,
+            }))
+          );
+          setShowPackContents(true);
+        }
+      } else {
+        setBoxSuggestion(null);
+      }
+    } catch (e) {
+      console.warn("suggest-boxes failed:", e);
+      setBoxSuggestion(null);
+    } finally {
+      setBoxSuggestionLoading(false);
+    }
+  };
+
   const handleCustomBoxFormChange = (e) => {
     const { name, value } = e.target;
     setCustomBoxForm((prev) => ({ ...prev, [name]: value }));
@@ -2390,6 +2655,9 @@ export default function Ship() {
     setCustomBoxes([]);
     setShowCustomBoxModal(false);
     setCustomBoxForm({ L: "", W: "", H: "", weight: "" });
+    setBoxSuggestion(null);
+    setPieceBoxAlloc({});
+    setShowPackContents(false);
     setShippingOptions([]);
     setShowRateModal(false);
     setShowAddressChoiceModal(false);
@@ -2406,6 +2674,8 @@ export default function Ship() {
       zip: "",
     });
     setShowBoxModal(true);
+    const pieces = buildShipmentPieces(sj);
+    fetchBoxSuggestion(pieces);
   };
 
   const onContinueToRates = async () => {
@@ -2421,6 +2691,11 @@ export default function Ship() {
     const summary = summaryForShipmentApi(
       buildBoxesSummary(boxCounts, customBoxes)
     );
+    const pieces = buildShipmentPieces(
+      jobs.filter((j) => selected.includes(j.orderId.toString()))
+    );
+    const slots = expandBoxSlots(boxCounts, customBoxes);
+    const boxContents = buildBoxContentsPayload(slots, pieces, pieceBoxAlloc);
     const skipInv = selectionIncludesShopify
       ? true
       : !upsFlowCreateInvoiceRef.current;
@@ -2436,6 +2711,11 @@ export default function Ship() {
       opt.method === "Manual Shipping" ||
       opt.rate === "N/A" ||
       !opt.code;
+
+    const packingFields = {
+      pieces,
+      ...(boxContents ? { box_contents: boxContents } : {}),
+    };
 
     if (isManualRate) {
       await runShipmentCore({
@@ -2453,6 +2733,7 @@ export default function Ship() {
         ups_purchased_rate: 0,
         skip_invoice: skipInv,
         qboEnv: "production",
+        ...packingFields,
         ...(shipToApi ? { ship_to_override: shipToApi } : {}),
       });
       return;
@@ -2475,6 +2756,7 @@ export default function Ship() {
       skip_ups: false,
       skip_invoice: skipInv,
       qboEnv: "production",
+      ...packingFields,
       ...(shipToApi ? { ship_to_override: shipToApi } : {}),
     });
   };
@@ -3045,8 +3327,8 @@ export default function Ship() {
             style={{
               background: "#fafafa",
               borderRadius: 14,
-              width: "min(540px, 100%)",
-              maxHeight: "min(92vh, 640px)",
+              width: "min(620px, 100%)",
+              maxHeight: "min(92vh, 720px)",
               padding: "14px 16px 12px",
               boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
               display: "flex",
@@ -3065,6 +3347,80 @@ export default function Ship() {
                 <> · <strong>{hardSoftSummarySelected}</strong></>
               ) : null}
             </p>
+            {shipmentPieces.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  background: "#fff",
+                  border: "1px solid #e0e0e0",
+                  fontSize: 11,
+                  color: "#37474f",
+                  lineHeight: 1.35,
+                  maxHeight: 72,
+                  overflow: "auto",
+                }}
+              >
+                <div style={{ fontWeight: 700, marginBottom: 4, color: "#455a64" }}>
+                  Shipping {shipmentPieces.reduce((s, p) => s + p.qty, 0)} piece
+                  {shipmentPieces.reduce((s, p) => s + p.qty, 0) === 1 ? "" : "s"}
+                </div>
+                {shipmentPieces.map((p) => (
+                  <div key={p.order_id}>
+                    {p.qty}× {p.product_norm}
+                    {p.design ? ` — ${p.design}` : ""}
+                  </div>
+                ))}
+              </div>
+            )}
+            {(boxSuggestionLoading || boxSuggestion) && (
+              <div
+                style={{
+                  marginBottom: 10,
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1px solid #a5d6a7",
+                  background: "#e8f5e9",
+                  fontSize: 12,
+                  color: "#1b5e20",
+                  lineHeight: 1.4,
+                }}
+              >
+                {boxSuggestionLoading && <div>Looking up box suggestion from past shipments…</div>}
+                {!boxSuggestionLoading && boxSuggestion && (
+                  <>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                      Suggested
+                      {boxSuggestion.confidence && boxSuggestion.confidence !== "none"
+                        ? ` (${boxSuggestion.confidence})`
+                        : ""}
+                      : {formatSuggestionSummary(boxSuggestion)}
+                    </div>
+                    <div style={{ color: "#33691e", marginBottom: 8 }}>
+                      {boxSuggestion.reason || ""}
+                    </div>
+                    {((boxSuggestion.boxes_summary || []).length > 0 ||
+                      Object.values(boxSuggestion.box_counts || {}).some((n) => Number(n) > 0)) && (
+                      <button
+                        type="button"
+                        onClick={applyBoxSuggestion}
+                        style={{
+                          ...shipModalFooterBtn,
+                          background: "#2e7d32",
+                          color: "#fff",
+                          borderColor: "#1b5e20",
+                          fontSize: 12,
+                          minWidth: 120,
+                        }}
+                      >
+                        Apply suggestion
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
             {selectionIncludesShopify && (
               <div
                 style={{
@@ -3260,6 +3616,116 @@ export default function Ship() {
                 </div>
               )}
             </div>
+            {hasAnyBoxesSelected(boxCounts, customBoxes) && shipmentPieces.length > 0 && (
+              <div
+                style={{
+                  marginTop: 10,
+                  paddingTop: 8,
+                  borderTop: "1px solid #cfd8dc",
+                  flex: "1 1 auto",
+                  minHeight: 0,
+                  overflow: "auto",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowPackContents((v) => !v)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#455a64",
+                    marginBottom: 6,
+                  }}
+                >
+                  {showPackContents ? "▾" : "▸"} What goes in each box
+                  {boxSlots.length === 1 ? " (auto for 1 box)" : " (helps future suggestions)"}
+                </button>
+                {showPackContents && (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {boxSlots.length > 1 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={autoFillPackEvenly}
+                          style={{ ...shipModalFooterBtn, fontSize: 11, minWidth: 0, padding: "4px 8px" }}
+                        >
+                          Split evenly
+                        </button>
+                        <button
+                          type="button"
+                          onClick={putAllPiecesInFirstBox}
+                          style={{ ...shipModalFooterBtn, fontSize: 11, minWidth: 0, padding: "4px 8px" }}
+                        >
+                          All in box 1
+                        </button>
+                      </div>
+                    )}
+                    {shipmentPieces.map((piece) => {
+                      const alloc = pieceBoxAlloc[piece.order_id] || [];
+                      const assigned = alloc.reduce((s, n) => s + (Math.floor(Number(n) || 0)), 0);
+                      const left = piece.qty - assigned;
+                      return (
+                        <div
+                          key={piece.order_id}
+                          style={{
+                            padding: "8px 8px",
+                            borderRadius: 8,
+                            border: "1px solid #e0e0e0",
+                            background: "#fff",
+                            fontSize: 11,
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, color: "#37474f", marginBottom: 6 }}>
+                            {piece.product_norm}
+                            {piece.design ? ` — ${piece.design}` : ""}{" "}
+                            <span style={{ fontWeight: 500, color: left === 0 ? "#2e7d32" : "#ef6c00" }}>
+                              ({assigned}/{piece.qty}
+                              {left !== 0 ? ` · ${left} left` : ""})
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: `repeat(${Math.min(boxSlots.length, 4)}, minmax(0, 1fr))`,
+                              gap: 6,
+                            }}
+                          >
+                            {boxSlots.map((slot, idx) => (
+                              <label key={slot.key} style={{ display: "grid", gap: 2 }}>
+                                <span style={{ color: "#78909c", fontSize: 10 }}>
+                                  Box {idx + 1} ({slot.label})
+                                </span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={alloc[idx] ?? 0}
+                                  onChange={(e) =>
+                                    setPieceAllocQty(piece.order_id, idx, e.target.value)
+                                  }
+                                  style={{
+                                    width: "100%",
+                                    height: 28,
+                                    textAlign: "center",
+                                    borderRadius: 6,
+                                    border: "1px solid #90a4ae",
+                                    fontSize: 12,
+                                    boxSizing: "border-box",
+                                  }}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, flexShrink: 0 }}>
               <button type="button" onClick={() => setShowBoxModal(false)} style={shipModalFooterBtn}>Cancel</button>
               <button
