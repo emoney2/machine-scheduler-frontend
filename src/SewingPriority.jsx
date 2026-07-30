@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
-/** Tile board horizon. */
-const BOARD_DAYS_WINDOW = 14;
-/** Catch-up tracker looks farther so later spikes show up in planning. */
+/** Tile board horizon (~one month). */
+const BOARD_DAYS_WINDOW = 30;
+/** Catch-up tracker uses the same one-month window as the board. */
 const CATCH_UP_DAYS_WINDOW = 30;
 
 /** Mon–Fri sewing capacity. */
@@ -381,6 +381,7 @@ export default function SewingPriority() {
   const [error, setError] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [soldPerDay6w, setSoldPerDay6w] = useState(null);
   const ctrlRef = useRef(null);
   const rootRef = useRef(null);
 
@@ -401,7 +402,7 @@ export default function SewingPriority() {
     return () => window.clearInterval(id);
   }, []);
 
-  // Tracker uses full loaded set (30d); tiles use the nearer board window (14d).
+  // Board + catch-up both use the one-month loaded set.
   const boardJobs = useMemo(
     () => (jobs || []).filter((j) => isJobInTimeWindow(j, BOARD_DAYS_WINDOW)),
     [jobs]
@@ -435,11 +436,20 @@ export default function SewingPriority() {
 
       try {
         const url = `${ROOT}/overview?nocache=1`;
-        const res = await axios.get(url, {
-          withCredentials: true,
-          signal: ctrl.signal,
-          timeout: 45000,
-        });
+        const [res, metricsRes] = await Promise.all([
+          axios.get(url, {
+            withCredentials: true,
+            signal: ctrl.signal,
+            timeout: 45000,
+          }),
+          axios
+            .get(`${ROOT}/overview/metrics`, {
+              withCredentials: true,
+              signal: ctrl.signal,
+              timeout: 45000,
+            })
+            .catch(() => null),
+        ]);
         if (!alive) return;
 
         const raw = Array.isArray(res?.data?.upcoming) ? res.data.upcoming : [];
@@ -447,7 +457,7 @@ export default function SewingPriority() {
         const filtered = [];
         for (const j of raw) {
           if (isStageCompleted(j)) continue;
-          // Load far enough for catch-up; board filters to BOARD_DAYS_WINDOW when rendering.
+          // Load one-month horizon for board + catch-up.
           if (!isJobInTimeWindow(j, CATCH_UP_DAYS_WINDOW)) continue;
           const k = [
             String(j["Order #"] ?? "").trim(),
@@ -471,6 +481,10 @@ export default function SewingPriority() {
         });
 
         setJobs(filtered);
+        const avg6w = metricsRes?.data?.headcovers_sold_per_day_6w;
+        setSoldPerDay6w(
+          avg6w != null && Number.isFinite(Number(avg6w)) ? Number(avg6w) : null
+        );
       } catch (e) {
         if (!alive || axios.isCancel(e)) return;
         console.error("Sewing Priority load failed:", e);
@@ -559,6 +573,7 @@ export default function SewingPriority() {
             minWidth: 0,
           }}
         >
+          <SoldPerDayCircle value={soldPerDay6w} />
           <CatchUpStatus catchUp={catchUp} />
           <button
             type="button"
@@ -796,6 +811,37 @@ const CATCH_UP_POSITIVE = [
   "All clear — you're ahead of the stack!",
   "Caught up — great pace!",
 ];
+
+/** Avg pcs sold / business day over last 6 weeks (excludes back, towel, belt). */
+function SoldPerDayCircle({ value }) {
+  const label =
+    value != null && Number.isFinite(Number(value))
+      ? Number(value).toFixed(1)
+      : "—";
+  return (
+    <span
+      title="Avg pieces sold per day (last 6 weeks). Excludes products with back, towel, or belt in the name."
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: "50%",
+        border: "2px solid #111827",
+        background: "#fff",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 900,
+        fontSize: label.length > 4 ? 11 : 13,
+        lineHeight: 1,
+        color: "#111827",
+        flexShrink: 0,
+        boxSizing: "border-box",
+      }}
+    >
+      {label}
+    </span>
+  );
+}
 
 function CatchUpStatus({ catchUp }) {
   const behind = (catchUp?.extraPcs || 0) > 0;
