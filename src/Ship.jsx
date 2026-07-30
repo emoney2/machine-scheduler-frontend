@@ -910,12 +910,8 @@ export default function Ship() {
         }
         const data = await res.json().catch(() => ({}));
         if (!cancelled && res.ok && Array.isArray(data.jobs)) {
-          // Defense in depth: only show embroidery / sewing cards
-          const embOrSew = data.jobs.filter((j) => {
-            const stage = String(j?.Stage ?? j?.stage ?? "").trim().toUpperCase();
-            return stage === "EMBROIDERY" || stage === "SEWING" || stage === "SEW";
-          });
-          setProductionQueue(embOrSew);
+          // Backend already limits to embroidery / sewing / ship-ready (+ Embroidery List NEEDS WORK)
+          setProductionQueue(data.jobs);
         }
       } catch (e) {
         console.error("ship-production-queue:", e);
