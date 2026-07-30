@@ -1903,9 +1903,9 @@ function col(width, center = false) {
             >
 
 
-              {/* Products sold / day (current calendar year YTD; excludes product names containing "back") */}
+              {/* Products sold / day (YTD qty ÷ USPS business days: Mon–Fri minus USPS holidays; excludes "back") */}
               <div style={metricBox}>
-                <div style={metricLabel} title="Products Sold / Day">
+                <div style={metricLabel} title="Products Sold / Day (YTD ÷ USPS business days)">
                   Products Sold / Day
                 </div>
                 <div style={metricValue}>
