@@ -1283,8 +1283,28 @@ function col(width, center = false) {
     // ✅ Fire once on mount so we don’t sit on “Loading…” when there’s no cache
     loadFresh();
 
-    // slow safety poll (5 minutes)
+    // slow safety poll (5 minutes) — refresh displayed Overview data
     const id = setInterval(() => loadFresh(), 300000);
+
+    // Rebuild materials-to-order lists every 10 minutes (writes Overview M/N, then refresh)
+    const rebuildId = setInterval(() => {
+      if (!alive) return;
+      const rf = refreshOverviewRef.current;
+      // Fire-and-forget rebuild via the same path as the manual button
+      axios
+        .post(
+          `${ROOT}/overview/rebuild-materials`,
+          {},
+          { withCredentials: true, timeout: 270000, headers: { "Content-Type": "application/json" } }
+        )
+        .then(() => {
+          try { localStorage.removeItem(LS_OVERVIEW_KEY); } catch {}
+          if (alive && typeof rf === "function") rf({ bypassDebounce: true });
+        })
+        .catch((err) => {
+          console.warn("Auto materials rebuild (10 min) failed:", err?.message || err);
+        });
+    }, 10 * 60 * 1000);
 
     // refresh when backend emits updates (debounced 1s)
     const debounced = (() => {
@@ -1316,6 +1336,7 @@ function col(width, center = false) {
       refreshOverviewRef.current = null;
       try { overviewCtrlRef.current?.abort(); } catch {}
       clearInterval(id);
+      clearInterval(rebuildId);
       if (socket) {
         socket.off("ordersUpdated", debounced);
         socket.off("manualStateUpdated", debounced);
@@ -1800,15 +1821,16 @@ function col(width, center = false) {
         await axios.post(`${ROOT}/threadInventory`, threadPayload, { withCredentials: true });
       }
 
-      // Refresh materials after successful order
+      // Rebuild Overview M/N so ordered threads/materials drop off the needs-to-order list
       if (materialPayload.length || threadPayload.length) {
-        // Clear cache and trigger refresh
         try {
           localStorage.removeItem(LS_OVERVIEW_KEY);
-          // Trigger refresh via custom event that the useEffect listens to
+        } catch {}
+        try {
+          await recalculateMaterialsToOrder();
+        } catch (rebuildErr) {
+          console.warn("Post-order materials rebuild failed; refreshing cache only:", rebuildErr);
           window.dispatchEvent(new CustomEvent("materialsOrdered"));
-        } catch (e) {
-          console.warn("Failed to trigger materials refresh:", e);
         }
       }
 
@@ -2112,7 +2134,7 @@ function col(width, center = false) {
                 type="button"
                 onClick={() => recalculateMaterialsToOrder()}
                 disabled={rebuildingMaterials || loadingMaterials}
-                title="Manual only — lists also rebuild nightly ~midnight. Does not rewrite Material Log."
+                title="Rebuilds Overview lists now. Also auto-rebuilds every 10 minutes (and after you log an order)."
                 style={{
                   marginLeft: "auto",
                   padding: "6px 12px",
