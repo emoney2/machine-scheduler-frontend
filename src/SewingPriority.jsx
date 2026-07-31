@@ -349,6 +349,66 @@ function SewingDoneOverlay() {
   );
 }
 
+const WAITING_STORAGE_KEY = "sewingPriority.waiting";
+
+function loadWaitingKeys() {
+  try {
+    const raw = localStorage.getItem(WAITING_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveWaitingKeys(keys) {
+  try {
+    localStorage.setItem(WAITING_STORAGE_KEY, JSON.stringify([...keys]));
+  } catch {}
+}
+
+function jobWaitingKey(job) {
+  return [
+    String(job["Order #"] ?? "").trim(),
+    String(job["Product"] ?? "").trim(),
+    String(job["Design"] ?? "").trim(),
+  ].join("|");
+}
+
+function WaitingOverlay() {
+  return (
+    <div
+      title="Waiting — double-click to clear"
+      aria-label="Waiting"
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+        zIndex: 4,
+        background: "rgba(128, 0, 128, 0.45)",
+      }}
+    >
+      <span
+        style={{
+          fontWeight: 900,
+          fontSize: 22,
+          letterSpacing: "0.04em",
+          color: "#fff",
+          WebkitTextStroke: "4px #4a044e",
+          paintOrder: "stroke fill",
+          textShadow: "0 1px 4px rgba(0,0,0,0.45)",
+        }}
+      >
+        Waiting
+      </span>
+    </div>
+  );
+}
+
 function TileOverlayText({ children, color = "#111827", style = {}, title }) {
   return (
     <div
@@ -382,8 +442,19 @@ export default function SewingPriority() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [soldPerDay6w, setSoldPerDay6w] = useState(null);
+  const [waitingKeys, setWaitingKeys] = useState(() => loadWaitingKeys());
   const ctrlRef = useRef(null);
   const rootRef = useRef(null);
+
+  const toggleWaiting = (key) => {
+    setWaitingKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      saveWaitingKeys(next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     const syncFs = () => {
@@ -563,6 +634,18 @@ export default function SewingPriority() {
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <span style={{ opacity: 0.7 }}>✓</span> Sewn
           </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }} title="Double-click a tile to toggle">
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 2,
+                background: "rgba(128, 0, 128, 0.55)",
+                display: "inline-block",
+              }}
+            />
+            Waiting
+          </span>
         </span>
         <span
           style={{
@@ -636,6 +719,8 @@ export default function SewingPriority() {
             qtyRaw === null || qtyRaw === undefined || qtyRaw === ""
               ? ""
               : String(Math.round(Number(qtyRaw)) || qtyRaw).trim();
+          const waitKey = jobWaitingKey(job);
+          const isWaiting = waitingKeys.has(waitKey);
 
           return (
             <div
@@ -694,6 +779,10 @@ export default function SewingPriority() {
               )}
 
               <div
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  toggleWaiting(waitKey);
+                }}
                 style={{
                   position: "relative",
                   width: "100%",
@@ -703,11 +792,15 @@ export default function SewingPriority() {
                   background: "#f9fafb",
                   overflow: "hidden",
                   boxSizing: "border-box",
+                  cursor: "pointer",
+                  userSelect: "none",
                 }}
                 title={
-                  sewingDone
-                    ? `${order} — sewing done · ship ${fmtMMDD(shipDate)}`
-                    : `${order} · ship ${fmtMMDD(shipDate)}${product ? ` · ${product}` : ""}`
+                  isWaiting
+                    ? `${order} — Waiting · double-click to clear`
+                    : sewingDone
+                      ? `${order} — sewing done · ship ${fmtMMDD(shipDate)} · double-click for Waiting`
+                      : `${order} · ship ${fmtMMDD(shipDate)}${product ? ` · ${product}` : ""} · double-click for Waiting`
                 }
               >
                 {thumb ? (
@@ -745,6 +838,7 @@ export default function SewingPriority() {
                   </div>
                 )}
                 {sewingDone && <SewingDoneOverlay />}
+                {isWaiting && <WaitingOverlay />}
                 <TileOverlayText style={{ top: 2, fontSize: 16 }} title={order}>
                   {order}
                 </TileOverlayText>
