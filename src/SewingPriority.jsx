@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
+import { socket } from "./socketClient";
 
 const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 /** Tile board horizon (~one month). */
@@ -349,31 +350,16 @@ function SewingDoneOverlay() {
   );
 }
 
-const WAITING_STORAGE_KEY = "sewingPriority.waiting";
-
-function loadWaitingKeys() {
-  try {
-    const raw = localStorage.getItem(WAITING_STORAGE_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw);
-    return new Set(Array.isArray(arr) ? arr.map(String) : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveWaitingKeys(keys) {
-  try {
-    localStorage.setItem(WAITING_STORAGE_KEY, JSON.stringify([...keys]));
-  } catch {}
-}
-
 function jobWaitingKey(job) {
   return [
     String(job["Order #"] ?? "").trim(),
     String(job["Product"] ?? "").trim(),
     String(job["Design"] ?? "").trim(),
   ].join("|");
+}
+
+function keysToSet(keys) {
+  return new Set((Array.isArray(keys) ? keys : []).map((k) => String(k)));
 }
 
 function WaitingOverlay() {
@@ -442,18 +428,50 @@ export default function SewingPriority() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [soldPerDay6w, setSoldPerDay6w] = useState(null);
-  const [waitingKeys, setWaitingKeys] = useState(() => loadWaitingKeys());
+  const [waitingKeys, setWaitingKeys] = useState(() => new Set());
   const ctrlRef = useRef(null);
   const rootRef = useRef(null);
+  const waitingToggleInFlight = useRef(new Set());
 
-  const toggleWaiting = (key) => {
+  const applyWaitingKeys = (keys) => {
+    setWaitingKeys(keysToSet(keys));
+  };
+
+  const fetchWaitingKeys = async (signal) => {
+    const res = await axios.get(`${ROOT}/sewing-priority/waiting`, {
+      withCredentials: true,
+      signal,
+      timeout: 20000,
+    });
+    applyWaitingKeys(res?.data?.keys);
+  };
+
+  const toggleWaiting = async (key) => {
+    if (!key || waitingToggleInFlight.current.has(key)) return;
+    waitingToggleInFlight.current.add(key);
+    // Optimistic local update for snappy UI; server broadcast reconciles everyone.
     setWaitingKeys((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      saveWaitingKeys(next);
       return next;
     });
+    try {
+      const res = await axios.post(
+        `${ROOT}/sewing-priority/waiting/toggle`,
+        { key },
+        { withCredentials: true, timeout: 20000 }
+      );
+      if (Array.isArray(res?.data?.keys)) applyWaitingKeys(res.data.keys);
+    } catch (e) {
+      console.error("Waiting toggle failed:", e);
+      // Re-sync from server so we don't stay on a wrong optimistic state.
+      try {
+        await fetchWaitingKeys();
+      } catch {}
+    } finally {
+      waitingToggleInFlight.current.delete(key);
+    }
   };
 
   useEffect(() => {
@@ -463,6 +481,39 @@ export default function SewingPriority() {
     };
     document.addEventListener("fullscreenchange", syncFs);
     return () => document.removeEventListener("fullscreenchange", syncFs);
+  }, []);
+
+  // Shared Waiting flags — load + poll (socket covers live updates).
+  useEffect(() => {
+    let alive = true;
+    const ctrl = new AbortController();
+
+    const load = async () => {
+      try {
+        await fetchWaitingKeys(ctrl.signal);
+      } catch (e) {
+        if (!alive || axios.isCancel(e)) return;
+        console.warn("Sewing Priority waiting load failed:", e?.message || e);
+      }
+    };
+
+    load();
+    const interval = window.setInterval(load, 30000);
+
+    const onWaitingUpdated = (payload) => {
+      if (!alive) return;
+      if (Array.isArray(payload?.keys)) applyWaitingKeys(payload.keys);
+    };
+    if (socket) socket.on("sewingPriorityWaitingUpdated", onWaitingUpdated);
+
+    return () => {
+      alive = false;
+      window.clearInterval(interval);
+      try {
+        ctrl.abort();
+      } catch {}
+      if (socket) socket.off("sewingPriorityWaitingUpdated", onWaitingUpdated);
+    };
   }, []);
 
   // Live workday clock (hours left today / catch-up math).
