@@ -89,14 +89,8 @@ export default function Inventory() {
     });
   };
 
-  const handleThreadBlur = (idx) => (e) => {
-    const val = e.target.value.trim();
-    if (val && !threads.includes(val)) {
-      setNewItemData({ name: val, type: "Thread" });
-      setNewItemErrors({});
-      setIsNewItemModalOpen(true);
-    }
-  };
+  // New thread colors are handled on Submit (bulk modal). Do not open an empty modal on blur.
+  const handleThreadBlur = () => () => {};
 
   const handleMaterialInput = (idx) => (e) => {
     const raw = e.target.value;
@@ -196,16 +190,22 @@ const submitThreads = async () => {
     )
   ];
 
-  // ② If there are any, prepare the bulk modal and bail out
+  // ② If there are any, prepare the bulk modal (keep qty/action from the grid) and bail out
   if (unknowns.length) {
     setNewItemData({ name: "", type: "Thread" });
     setBulkNewItems(
-      unknowns.map(color => ({
-        name: color,
-        minInv: "",
-        reorder: "",
-        cost: ""
-      }))
+      unknowns.map(color => {
+        const row =
+          threadRows.find(r => String(r.value || "").trim() === color) || {};
+        return {
+          name: color,
+          minInv: "",
+          reorder: "",
+          cost: "",
+          quantity: String(row.quantity || "").trim(),
+          action: String(row.action || "Ordered").trim() || "Ordered"
+        };
+      })
     );
     setNewItemErrors({});
     setIsNewItemModalOpen(true);
@@ -229,16 +229,22 @@ const submitThreads = async () => {
   }
 
   try {
-    await axios.post(
+    const res = await axios.post(
       `${process.env.REACT_APP_API_ROOT}/threadInventory`,
       payload,
       { withCredentials: true }
     );
+    const added = res?.data?.added;
+    if (typeof added === "number" && added === 0) {
+      alert("Nothing was written to Thread Data. Check color, quantity, and try again.");
+      return;
+    }
     alert("Submitted!");
     setThreadRows(initRows());
   } catch (err) {
     console.error("❌ Submission failed", err);
-    alert("Submission failed");
+    const msg = err?.response?.data?.error || "Submission failed";
+    alert(msg);
   }
 };
 
@@ -393,20 +399,56 @@ const handleSaveBulkNewItems = async () => {
     }
 
     // --- THREAD BATCH ---
+    // 1) Register new colors on the master list
+    // 2) Log ALL filled grid rows (known + new) to Thread Data via /threadInventory
     if (newItemData.type === "Thread" && bulkNewItems.length) {
-      const payload = bulkNewItems.map(item => ({
-        materialName: item.name.trim(),
-        type:         "Thread",
-        quantity:     item.quantity || "1",
-        action:       item.action   || "Ordered",
-        minInv:       item.minInv,
-        reorder:      item.reorder,
-        cost:         item.cost
+      const masterPayload = bulkNewItems.map(item => ({
+        threadColor: String(item.name || "").trim(),
+        minInv:      String(item.minInv || "").trim(),
+        reorder:     String(item.reorder || "").trim(),
+        cost:        String(item.cost || "").trim()
       }));
 
-      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
-      console.log("Posting to:", url, payload);
-      await axios.post(url, payload);
+      await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/threads`,
+        masterPayload,
+        { withCredentials: true }
+      );
+
+      const logPayload = threadRows
+        .filter(r => String(r.value || "").trim() && String(r.quantity || "").trim())
+        .map(r => ({
+          value: String(r.value).trim(),
+          quantity: String(r.quantity).trim(),
+          action: String(r.action || "Ordered").trim() || "Ordered"
+        }));
+
+      // If a new color row somehow lost qty, fall back to bulk item values
+      if (!logPayload.length) {
+        for (const item of bulkNewItems) {
+          const qty = String(item.quantity || "").trim();
+          if (!item.name || !qty) continue;
+          logPayload.push({
+            value: String(item.name).trim(),
+            quantity: qty,
+            action: String(item.action || "Ordered").trim() || "Ordered"
+          });
+        }
+      }
+
+      if (!logPayload.length) {
+        throw new Error("No thread rows with quantity to log");
+      }
+
+      console.log("Posting threads to /threadInventory:", logPayload);
+      const res = await axios.post(
+        `${process.env.REACT_APP_API_ROOT}/threadInventory`,
+        logPayload,
+        { withCredentials: true }
+      );
+      if (typeof res?.data?.added === "number" && res.data.added === 0) {
+        throw new Error("Thread Data write returned 0 rows");
+      }
 
       setThreads(prev => [...prev, ...bulkNewItems.map(i => i.name)]);
       setBulkNewItems([]);
@@ -437,7 +479,11 @@ const handleSaveBulkNewItems = async () => {
     alert("Submitted!");
   } catch (err) {
     console.error(err);
-    setNewItemErrors({ general: "Failed to save. Try again." });
+    const msg =
+      err?.response?.data?.error ||
+      err?.message ||
+      "Failed to save. Try again.";
+    setNewItemErrors({ general: msg });
   }
 };
 
