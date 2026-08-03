@@ -843,7 +843,7 @@ export default function Ship() {
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
   const [companyInput, setCompanyInput] = useState("");
-  /** Embroidery / Sewing jobs for quick-pick cards (sorted on server). */
+  /** Outstanding jobs through next 6 weeks for quick-pick cards (sorted on server). */
   const [productionQueue, setProductionQueue] = useState([]);
   const [productionQueueLoading, setProductionQueueLoading] = useState(false);
   const [isPageOverlay, setIsPageOverlay] = useState(false);
@@ -963,7 +963,7 @@ export default function Ship() {
   }, []);
   // === End useEffect 1 ===
 
-  // Embroidery / Sewing open jobs for cards under the search bar
+  // Outstanding jobs (due through next 6 weeks) for cards under the search bar
   useEffect(() => {
     let cancelled = false;
 
@@ -979,7 +979,7 @@ export default function Ship() {
         }
         const data = await res.json().catch(() => ({}));
         if (!cancelled && res.ok && Array.isArray(data.jobs)) {
-          // Backend already limits to embroidery / sewing / ship-ready (+ Embroidery List NEEDS WORK)
+          // Backend returns outstanding jobs with due date through next 6 weeks
           setProductionQueue(data.jobs);
         }
       } catch (e) {
@@ -2756,12 +2756,12 @@ export default function Ship() {
 
       <div style={{ marginBottom: "1.75rem" }}>
         <div style={{ fontSize: "0.95rem", fontWeight: 700, marginBottom: "0.5rem", color: "#374151" }}>
-          Embroidery / Sewing jobs
+          Outstanding jobs (through next 6 weeks)
         </div>
         {productionQueueLoading && productionQueue.length === 0 ? (
           <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>Loading queue…</div>
         ) : productionQueue.length === 0 ? (
-          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>No embroidery / sewing jobs ready to ship.</div>
+          <div style={{ fontSize: "0.9rem", color: "#6b7280" }}>No outstanding jobs due in the next 6 weeks.</div>
         ) : (
           <div
             style={{
