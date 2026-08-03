@@ -170,13 +170,14 @@ function jobQty(job) {
 /**
  * Still shown on the board, but not counted in catch-up capacity math.
  * Back panels / towels / belts are not part of the 48/day sewing load.
+ * Uses substring match so names like "Backs", "DriverBack", "Golf Towel" are excluded.
  */
 function excludeFromCatchUpLoad(job) {
-  const product = String(job?.["Product"] ?? "").toLowerCase();
+  const product = String(job?.["Product"] ?? job?.product ?? "").toLowerCase();
   if (!product) return false;
-  if (/\bback\b/.test(product)) return true;
-  if (/\btowels?\b/.test(product)) return true;
-  if (/\bbelts?\b/.test(product)) return true;
+  if (product.includes("back")) return true;
+  if (product.includes("towel")) return true;
+  if (product.includes("belt")) return true;
   return false;
 }
 
