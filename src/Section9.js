@@ -1,8 +1,16 @@
 // File: frontend/src/Section9.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
 import axios from 'axios';
+import ThreadConflictPanel, { ThreadConflictStrip } from './ThreadConflictPanel';
+import {
+  detectThreadConflicts,
+  persistThreadConflicts,
+} from './utils/threadConflicts';
+
+const THREAD_CONFLICT_BORDER = '#ca8a04';
+const THREAD_CONFLICT_BG_TINT = 'rgba(250, 204, 21, 0.22)';
 
 /** e.g. 18702 → "19K" (round up to the nearest 1,000 stitches) */
 function formatStitchCountK(job) {
@@ -16,6 +24,9 @@ export default function Section9(props) {
   const [status, setStatus] = useState('');
   const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
   const [materialInventoryStatus, setMaterialInventoryStatus] = useState({});
+  const [conflictStripOpen, setConflictStripOpen] = useState(false);
+  const [conflictPanelIds, setConflictPanelIds] = useState(null); // null | string[] of conflict ids
+  const [selectedConflictId, setSelectedConflictId] = useState(null);
   const {
     columns,
     setColumns,
@@ -62,12 +73,14 @@ export default function Section9(props) {
   // Yellow = inventory negative but on-order (Inventory..) > 0
   useEffect(() => {
     const API_ROOT = (process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '');
-    const deriveStatus = (row) => {
+    const deriveDetail = (row) => {
       const inv = Number(row.inventory ?? row.Inventory ?? row.quantity ?? row.Quantity ?? 0);
       const onOrder = Number(row['Inventory..'] ?? row.onOrder ?? row.inventoryOnOrder ?? 0);
-      if (inv < 0 && onOrder > 0) return 'yellow';
-      if (inv < 0) return 'red';
-      return 'green';
+      let status = 'green';
+      if (inv > 0) status = 'green';
+      else if (onOrder > 0 && inv + onOrder > 0) status = 'yellow';
+      else status = 'red';
+      return { status, inventory: inv, onOrder };
     };
     const fetchThreadStatus = async () => {
       try {
@@ -86,8 +99,8 @@ export default function Section9(props) {
           const code = String(row.value ?? row.threadColor ?? row.Value ?? row.code ?? '').trim();
           if (!code) return;
           map[code] = typeof row === 'object' && (row.inventory !== undefined || row.quantity !== undefined || row.Inventory !== undefined)
-            ? deriveStatus(row)
-            : (row.status ?? 'green');
+            ? deriveDetail(row)
+            : { status: row.status ?? 'green', inventory: 0, onOrder: 0 };
         });
         setThreadInventoryStatus(map);
       } catch (_) {}
@@ -141,22 +154,51 @@ export default function Section9(props) {
     };
   }, []);
 
-  // Helper: get thread status (red | yellow | green). Supports API returning string or object with inventory/onOrder.
+  // Helper: get thread status (red | yellow | green). Supports API returning string or { status, inventory, onOrder }.
   const getThreadStatus = (threadCode) => {
     const raw = threadInventoryStatus[threadCode];
     if (raw === undefined || raw === null) return 'green';
     if (typeof raw === 'string') return raw;
     if (typeof raw === 'object' && raw !== null) {
-      const inv = raw.inventory ?? raw.quantity ?? raw.Inventory ?? 0;
-      const onOrder = raw.onOrder ?? raw.inventoryOnOrder ?? raw['Inventory..'] ?? 0;
-      const numInv = Number(inv);
-      const numOn = Number(onOrder);
-      if (numInv < 0 && numOn > 0) return 'yellow';
-      if (numInv < 0) return 'red';
-      return 'green';
+      if (raw.status === 'green' || raw.status === 'yellow' || raw.status === 'red') {
+        return raw.status;
+      }
+      const inv = Number(raw.inventory ?? raw.quantity ?? raw.Inventory ?? 0);
+      const onOrder = Number(raw.onOrder ?? raw.inventoryOnOrder ?? raw['Inventory..'] ?? 0);
+      if (inv > 0) return 'green';
+      if (onOrder > 0 && inv + onOrder > 0) return 'yellow';
+      return 'red';
     }
     return 'green';
   };
+
+  const conflictResult = useMemo(
+    () => detectThreadConflicts(safeColumns, threadInventoryStatus),
+    [safeColumns, threadInventoryStatus]
+  );
+
+  useEffect(() => {
+    persistThreadConflicts(conflictResult);
+  }, [conflictResult]);
+
+  const openConflictsForJob = (jobId) => {
+    const list = conflictResult.byJobId?.[String(jobId)] || [];
+    if (!list.length) return;
+    setConflictPanelIds(list.map((c) => c.id));
+    setSelectedConflictId(list[0].id);
+  };
+
+  const openConflictById = (conflictId) => {
+    setConflictPanelIds([conflictId]);
+    setSelectedConflictId(conflictId);
+    setConflictStripOpen(true);
+  };
+
+  const panelConflicts = useMemo(() => {
+    if (!conflictPanelIds?.length) return [];
+    const byId = new Map((conflictResult.conflicts || []).map((c) => [c.id, c]));
+    return conflictPanelIds.map((id) => byId.get(id)).filter(Boolean);
+  }, [conflictPanelIds, conflictResult]);
 
   // Helper: get material status (red = negative, yellow = on order, green = in stock). Unknown => green (no data = assume OK).
   const getMaterialStatus = (materialName) => {
@@ -201,6 +243,14 @@ export default function Section9(props) {
           {status}
         </span>
       </div>
+
+      <ThreadConflictStrip
+        summary={conflictResult.summary}
+        conflicts={conflictResult.conflicts}
+        expanded={conflictStripOpen}
+        onToggle={() => setConflictStripOpen((v) => !v)}
+        onOpenConflict={openConflictById}
+      />
 
       {/* Legend */}
       <div
@@ -285,6 +335,18 @@ export default function Section9(props) {
             }}
           />
           Late
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span
+            style={{
+              width: 12,
+              height: 12,
+              background: THREAD_CONFLICT_BG_TINT,
+              border: `2px solid ${THREAD_CONFLICT_BORDER}`,
+              borderRadius: 2
+            }}
+          />
+          Thread conflict
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <span style={{ fontSize: 14 }}>🔗</span> Link
@@ -457,6 +519,22 @@ export default function Section9(props) {
                               ? DARK_GREY
                               : DARK_PURPLE;
 
+                            const jobConflicts = conflictResult.byJobId?.[String(job.id)] || [];
+                            const hasThreadConflict = !isPh && jobConflicts.length > 0;
+                            const conflictColors = hasThreadConflict
+                              ? [...new Set(jobConflicts.map((c) => c.color))].join(', ')
+                              : '';
+                            const cardBorder = job.isLate
+                              ? 'red'
+                              : hasThreadConflict
+                              ? THREAD_CONFLICT_BORDER
+                              : bCol;
+                            const cardBackground = job.isLate
+                              ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
+                              : hasThreadConflict
+                              ? `linear-gradient(${THREAD_CONFLICT_BG_TINT}, ${THREAD_CONFLICT_BG_TINT}), ${base}`
+                              : base;
+
                             return (
                               <Draggable
                                 key={job.id.toString()}
@@ -481,12 +559,13 @@ export default function Section9(props) {
                                       paddingRight: rightPadding,
                                       paddingLeft: job.imageLink ? 6 + 56 + 8 : 6,
                                       margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
-                                      background: job.isLate
-                                        ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
-                                        : base,
-                                      border: `2px solid ${job.isLate ? 'red' : bCol}`,
+                                      background: cardBackground,
+                                      border: `2px solid ${cardBorder}`,
                                       borderRadius: 4,
                                       zIndex: 2,
+                                      boxShadow: hasThreadConflict && !job.isLate
+                                        ? '0 0 0 1px rgba(202, 138, 4, 0.35)'
+                                        : undefined,
                                       ...prov.draggableProps.style
                                     }}
 
@@ -675,6 +754,41 @@ export default function Section9(props) {
 ) : null}
 
 
+
+{/* Thread concurrency warning — click for competing jobs / cone math */}
+{hasThreadConflict && (
+  <button
+    type="button"
+    title={`Thread conflict: ${conflictColors}. Click for details.`}
+    onMouseDown={(e) => { e.stopPropagation(); }}
+    onClick={(e) => {
+      e.stopPropagation();
+      openConflictsForJob(job.id);
+    }}
+    style={{
+      position: 'absolute',
+      top: 4,
+      right: 24,
+      width: 18,
+      height: 18,
+      padding: 0,
+      background: '#facc15',
+      border: `1px solid ${THREAD_CONFLICT_BORDER}`,
+      borderRadius: 2,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: 11,
+      fontWeight: 800,
+      color: '#713f12',
+      zIndex: 8,
+      cursor: 'pointer',
+      lineHeight: 1,
+    }}
+  >
+    !
+  </button>
+)}
 
 {/* only show badge outside strip on real jobs */}
 {!isPh && (
@@ -945,12 +1059,19 @@ export default function Section9(props) {
                                             // Solid fill: red = missing, yellow = ordered, default = in stock (white)
                                             const isRed = threadStatus === 'red';
                                             const isYellow = threadStatus === 'yellow';
-                                            const backgroundColor = isRed ? '#c62828' : isYellow ? '#ffecb3' : '#fff';
-                                            const borderColor = isRed ? '#b71c1c' : isYellow ? '#f9a825' : '#e0e0e0';
+                                            const isConflictColor = hasThreadConflict && jobConflicts.some((c) => c.color === code);
+                                            const backgroundColor = isRed ? '#c62828' : isYellow ? '#ffecb3' : isConflictColor ? '#fef08a' : '#fff';
+                                            const borderColor = isRed ? '#b71c1c' : isYellow ? '#f9a825' : isConflictColor ? THREAD_CONFLICT_BORDER : '#e0e0e0';
                                             const textColor = isRed ? '#fff' : isYellow ? '#333' : '#111';
                                             return (
                                               <span
                                                 key={code}
+                                                title={isConflictColor ? `Schedule conflict on ${code} — click ! for details` : undefined}
+                                                onMouseDown={isConflictColor ? (e) => e.stopPropagation() : undefined}
+                                                onClick={isConflictColor ? (e) => {
+                                                  e.stopPropagation();
+                                                  openConflictsForJob(job.id);
+                                                } : undefined}
                                                 style={{
                                                   background:   backgroundColor,
                                                   color:       textColor,
@@ -962,7 +1083,9 @@ export default function Section9(props) {
                                                   overflow:    'visible',
                                                   textOverflow: 'clip',
                                                   whiteSpace:  'normal',
-                                                  width:       '100%'
+                                                  width:       '100%',
+                                                  cursor:      isConflictColor ? 'pointer' : undefined,
+                                                  fontWeight:  isConflictColor ? 700 : undefined,
                                                 }}
                                               >
                                                 {code}
@@ -987,6 +1110,18 @@ export default function Section9(props) {
           })}
         </div>
       </DragDropContext>
+
+      {panelConflicts.length > 0 && (
+        <ThreadConflictPanel
+          conflicts={panelConflicts}
+          selectedId={selectedConflictId}
+          onSelectConflict={setSelectedConflictId}
+          onClose={() => {
+            setConflictPanelIds(null);
+            setSelectedConflictId(null);
+          }}
+        />
+      )}
 
       {/* Modal for Add / Edit Placeholder */}
       {showModal && (

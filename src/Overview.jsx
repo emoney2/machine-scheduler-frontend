@@ -3,6 +3,11 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import axios from "axios";
 import { socket } from "./socketClient";
 import { supabase } from "./supabaseClient";
+import {
+  loadPersistedThreadConflicts,
+  formatConflictWindow,
+} from "./utils/threadConflicts";
+import ThreadConflictPanel from "./ThreadConflictPanel";
 
 const GOAL_CONFETTI_COLORS = [
   "#22c55e",
@@ -1089,6 +1094,44 @@ function col(width, center = false) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const markUpdated = React.useCallback(() => setLastUpdated(new Date()), []);
 
+  // Thread concurrency conflicts (computed on Scheduler, persisted to localStorage)
+  const [threadConflictSnapshot, setThreadConflictSnapshot] = useState(() =>
+    loadPersistedThreadConflicts()
+  );
+  const [overviewConflictId, setOverviewConflictId] = useState(null);
+
+  const refreshThreadConflicts = useCallback(() => {
+    setThreadConflictSnapshot(loadPersistedThreadConflicts());
+  }, []);
+
+  useEffect(() => {
+    refreshThreadConflicts();
+    const onFocus = () => refreshThreadConflicts();
+    const onStorage = (e) => {
+      if (!e.key || e.key === "threadScheduleConflicts.v1") refreshThreadConflicts();
+    };
+    const onCustom = () => refreshThreadConflicts();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("threadScheduleConflictsUpdated", onCustom);
+    const interval = window.setInterval(refreshThreadConflicts, 60000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("threadScheduleConflictsUpdated", onCustom);
+      window.clearInterval(interval);
+    };
+  }, [refreshThreadConflicts]);
+
+  const threadBuyNow = threadConflictSnapshot?.buyRecommendations || [];
+  const threadBuyOptional = threadConflictSnapshot?.optionalBuy || [];
+  const threadConflictCount = threadConflictSnapshot?.summary?.conflictCount || 0;
+  const overviewPanelConflicts = useMemo(() => {
+    if (!overviewConflictId || !threadConflictSnapshot?.conflicts) return [];
+    const c = threadConflictSnapshot.conflicts.find((x) => x.id === overviewConflictId);
+    return c ? [c] : [];
+  }, [overviewConflictId, threadConflictSnapshot]);
+
   // Load combined overview (upcoming + materials)
   useEffect(() => {
     let alive = true;
@@ -2112,6 +2155,153 @@ function col(width, center = false) {
           </div>
             );
           })()}
+
+          {/* Thread schedule conflicts — buy only when schedule can't absorb */}
+          <div
+            style={{
+              background: "#fff",
+              border: threadConflictCount ? "1px solid #facc15" : "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Thread Schedule Conflicts</span>
+              <span style={subtleUpdatedStyle}>
+                {threadConflictSnapshot?.persistedAt || threadConflictSnapshot?.computedAt
+                  ? `From Scheduler · ${formatClock(
+                      new Date(threadConflictSnapshot.persistedAt || threadConflictSnapshot.computedAt)
+                    )}`
+                  : "Open Scheduler to analyze"}
+              </span>
+              <button
+                type="button"
+                onClick={refreshThreadConflicts}
+                style={{
+                  marginLeft: "auto",
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  background: "#fff",
+                  color: "#111827",
+                  cursor: "pointer",
+                }}
+              >
+                Refresh
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+              Concurrent 6-head jobs need 6 cones per machine. Prefer reordering on the Scheduler;
+              buy recommendations appear only when due dates make that hard.
+            </div>
+
+            {!threadConflictCount ? (
+              <div style={{ fontSize: 13, color: "#6b7280" }}>
+                No overlapping thread-cone conflicts detected
+                {!threadConflictSnapshot ? " yet — visit the Scheduler once to compute." : "."}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#991b1b" }}>
+                    Recommended buy ({threadBuyNow.length})
+                  </div>
+                  {!threadBuyNow.length ? (
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                      No must-buy items — try reshuffling overlapping jobs first.
+                    </div>
+                  ) : (
+                    threadBuyNow.map((rec) => (
+                      <button
+                        key={`buy-${rec.color}-${rec.conesToBuy}`}
+                        type="button"
+                        onClick={() => {
+                          const match = (threadConflictSnapshot.conflicts || []).find(
+                            (c) => c.color === rec.color
+                          );
+                          if (match) setOverviewConflictId(match.id);
+                        }}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          border: "1px solid #fecaca",
+                          background: "#fef2f2",
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                          marginBottom: 8,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+                          {rec.label}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                          Need {rec.peakConesNeeded} · have {rec.availableCones} · short {rec.shortfall}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#991b1b", marginTop: 4 }}>
+                          {rec.reason}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#854d0e" }}>
+                    Reschedule first ({(threadConflictSnapshot.conflicts || []).filter((c) => !c.preferBuy).length})
+                  </div>
+                  {(threadConflictSnapshot.conflicts || [])
+                    .filter((c) => !c.preferBuy)
+                    .map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setOverviewConflictId(c.id)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          border: "1px solid #fde68a",
+                          background: "#fefce8",
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                          marginBottom: 8,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          {c.color} · optional {c.conesToBuy} cones
+                        </div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                          {formatConflictWindow(c.windowStart, c.windowEnd)} ·{" "}
+                          {(c.jobs || []).map((j) => `#${j.id}`).join(", ")}
+                        </div>
+                      </button>
+                    ))}
+                  {threadBuyOptional.length === 0 &&
+                    !(threadConflictSnapshot.conflicts || []).some((c) => !c.preferBuy) && (
+                      <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                        All open conflicts lean toward buying.
+                      </div>
+                    )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {overviewPanelConflicts.length > 0 && (
+            <ThreadConflictPanel
+              conflicts={overviewPanelConflicts}
+              selectedId={overviewConflictId}
+              onSelectConflict={setOverviewConflictId}
+              onClose={() => setOverviewConflictId(null)}
+            />
+          )}
 
           {/* Materials To Order */}
           <div
