@@ -2196,8 +2196,8 @@ function col(width, center = false) {
               </button>
             </div>
             <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
-              Same thread color on two or more machines, without enough cones to load them all.
-              Prefer keeping that color on one machine at a time; buy only when due dates make that hard.
+              Same thread color on two or more 6-head machines (Machine 1 ignored), without enough cones.
+              Prefer one machine at a time; buy recommendations are always in pods of 6.
             </div>
 
             {!threadConflictCount ? (

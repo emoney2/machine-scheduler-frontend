@@ -1,15 +1,17 @@
 /**
  * Thread-cone conflict detection for multi-head embroidery scheduling.
  *
- * Ignores schedule times. If the same color is assigned to jobs on two or more
- * machines, cones needed = sum of those machines' head counts (1 or 6).
+ * Ignores schedule times. Only 6-head machines (Machine 2–4) are considered —
+ * Machine 1 single cones are not tracked in inventory the same way.
+ * If the same color is on two or more 6-head machines, cones needed = 6 × machines.
  * Yellow conflict when on-hand cones cannot cover that.
+ * Buy recommendations always round up to pods of 6.
  */
 
-const MACHINE_KEYS = ['machine1', 'machine2', 'machine3', 'machine4'];
+/** Only multi-head machines — Machine 1 (1-head) is excluded */
+const MACHINE_KEYS = ['machine2', 'machine3', 'machine4'];
 
 const MACHINE_TITLES = {
-  machine1: 'Machine 1',
   machine2: 'Machine 2',
   machine3: 'Machine 3',
   machine4: 'Machine 4',
@@ -46,7 +48,9 @@ export function collectScheduledJobs(columns) {
   for (const machineKey of MACHINE_KEYS) {
     const col = columns[machineKey];
     if (!col) continue;
-    const headCount = Number(col.headCount) > 0 ? Number(col.headCount) : machineKey === 'machine1' ? 1 : 6;
+    const headCount = Number(col.headCount) > 0 ? Number(col.headCount) : 6;
+    // Single-head inventory is not tracked — skip anything under 6 heads
+    if (headCount < 6) continue;
     const machineTitle = col.title || MACHINE_TITLES[machineKey] || machineKey;
     const jobs = Array.isArray(col.jobs) ? col.jobs : [];
 
@@ -65,7 +69,7 @@ export function collectScheduledJobs(columns) {
         product: String(job.product || job.Product || ''),
         machineKey,
         machineTitle,
-        headCount,
+        headCount: 6, // always one full 6-cone set per 6-head machine
         colors,
         due_date: job.due_date ?? job['Due Date'] ?? '',
         due_type: String(job.due_type ?? job['Hard Date/Soft Date'] ?? ''),
@@ -177,7 +181,11 @@ export function detectThreadConflicts(columns, inventoryRaw) {
     if (peakCones <= avail) continue;
 
     const shortfall = peakCones - avail;
-    const conesToBuy = Math.ceil(shortfall / CONE_POD_SIZE) * CONE_POD_SIZE;
+    // Always buy in pods of 6 (never recommend 1–5 cones)
+    const conesToBuy = Math.max(
+      CONE_POD_SIZE,
+      Math.ceil(shortfall / CONE_POD_SIZE) * CONE_POD_SIZE
+    );
     const jobsList = jobsForColor.slice();
     const preferBuy = shouldPreferBuy(jobsList, machines.size);
     const suggestions = buildSuggestions({

@@ -50,8 +50,8 @@ export default function ThreadConflictPanel({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>{title}</div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-              The same thread color is on more than one machine, and you do not have enough cones
-              to load them all at once.
+              The same thread color is on more than one 6-head machine, and you do not have enough
+              cones to load them all at once. Machine 1 is ignored. Buys are in pods of 6.
             </div>
           </div>
           <button
@@ -274,7 +274,7 @@ export function ThreadConflictStrip({
           Thread {count === 1 ? 'conflict' : 'conflicts'}
         </span>
         <span style={{ color: '#854d0e', fontSize: 12 }}>
-          Same color on multiple machines · not enough cones
+          Same color on multiple 6-head machines · not enough cones
           {summary.buyCount ? ` · ${summary.buyCount} buy recommended` : ''}
         </span>
         <span style={{ marginLeft: 'auto', color: '#854d0e', fontSize: 12 }}>
