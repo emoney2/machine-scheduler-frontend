@@ -5,7 +5,7 @@ import { socket } from "./socketClient";
 import { supabase } from "./supabaseClient";
 import {
   loadPersistedThreadConflicts,
-  formatConflictWindow,
+  formatConflictMachines,
 } from "./utils/threadConflicts";
 import ThreadConflictPanel from "./ThreadConflictPanel";
 
@@ -2169,7 +2169,7 @@ function col(width, center = false) {
             }}
           >
             <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <span>Thread Schedule Conflicts</span>
+              <span>Thread Conflicts</span>
               <span style={subtleUpdatedStyle}>
                 {threadConflictSnapshot?.persistedAt || threadConflictSnapshot?.computedAt
                   ? `From Scheduler · ${formatClock(
@@ -2196,13 +2196,13 @@ function col(width, center = false) {
               </button>
             </div>
             <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
-              Concurrent 6-head jobs need 6 cones per machine. Prefer reordering on the Scheduler;
-              buy recommendations appear only when due dates make that hard.
+              Same thread color on two or more machines, without enough cones to load them all.
+              Prefer keeping that color on one machine at a time; buy only when due dates make that hard.
             </div>
 
             {!threadConflictCount ? (
               <div style={{ fontSize: 13, color: "#6b7280" }}>
-                No overlapping thread-cone conflicts detected
+                No multi-machine thread conflicts detected
                 {!threadConflictSnapshot ? " yet — visit the Scheduler once to compute." : "."}
               </div>
             ) : (
@@ -2213,7 +2213,7 @@ function col(width, center = false) {
                   </div>
                   {!threadBuyNow.length ? (
                     <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                      No must-buy items — try reshuffling overlapping jobs first.
+                      No must-buy items — keep shared colors on one machine at a time.
                     </div>
                   ) : (
                     threadBuyNow.map((rec) => (
@@ -2278,8 +2278,7 @@ function col(width, center = false) {
                           {c.color} · optional {c.conesToBuy} cones
                         </div>
                         <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                          {formatConflictWindow(c.windowStart, c.windowEnd)} ·{" "}
-                          {(c.jobs || []).map((j) => `#${j.id}`).join(", ")}
+                          {formatConflictMachines(c)}
                         </div>
                       </button>
                     ))}

@@ -1,9 +1,9 @@
 /**
- * Concurrent thread-cone conflict detection for multi-head embroidery scheduling.
+ * Thread-cone conflict detection for multi-head embroidery scheduling.
  *
- * Rule: a machine needs `headCount` cones of a color mounted to run that color.
- * Machine 1 (1 head) → 1 cone; Machines 2–4 (6 heads) → 6 cones each.
- * If overlapping jobs on different machines need the same color, cones add up.
+ * Ignores schedule times. If the same color is assigned to jobs on two or more
+ * machines, cones needed = sum of those machines' head counts (1 or 6).
+ * Yellow conflict when on-hand cones cannot cover that.
  */
 
 const MACHINE_KEYS = ['machine1', 'machine2', 'machine3', 'machine4'];
@@ -37,22 +37,7 @@ export function parseThreadCodes(raw) {
 }
 
 /**
- * @param {Record<string, any>} columns
- * @returns {Array<{
- *   id: string,
- *   company: string,
- *   design: string,
- *   product: string,
- *   machineKey: string,
- *   machineTitle: string,
- *   headCount: number,
- *   start: Date,
- *   end: Date,
- *   colors: string[],
- *   due_date: any,
- *   due_type: string,
- *   isLate: boolean,
- * }>}
+ * Jobs assigned to machine columns (not queue). Times are not used.
  */
 export function collectScheduledJobs(columns) {
   if (!columns || typeof columns !== 'object') return [];
@@ -67,13 +52,8 @@ export function collectScheduledJobs(columns) {
 
     for (const job of jobs) {
       if (!job || job.id == null) continue;
-      // Placeholders / empty thread lists cannot create cone conflicts
       const isPh = String(job.id).startsWith('ph-') || job.isPlaceholder;
       if (isPh) continue;
-
-      const start = toDate(job._rawStart || job.start_date || job.start);
-      const end = toDate(job._rawEnd || job.end);
-      if (!(start instanceof Date) || !(end instanceof Date) || !(end > start)) continue;
 
       const colors = parseThreadCodes(job.threadColors ?? job.Threads ?? '');
       if (!colors.length) continue;
@@ -86,8 +66,6 @@ export function collectScheduledJobs(columns) {
         machineKey,
         machineTitle,
         headCount,
-        start,
-        end,
         colors,
         due_date: job.due_date ?? job['Due Date'] ?? '',
         due_type: String(job.due_type ?? job['Hard Date/Soft Date'] ?? ''),
@@ -106,13 +84,8 @@ function toDate(v) {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function intervalsOverlap(aStart, aEnd, bStart, bEnd) {
-  return aStart < bEnd && bStart < aEnd;
-}
-
 /**
  * Normalize inventory map entries to { inventory, onOrder, status }.
- * Accepts legacy string statuses or detail objects.
  */
 export function normalizeInventoryMap(rawMap) {
   const map = {};
@@ -121,9 +94,12 @@ export function normalizeInventoryMap(rawMap) {
     const key = String(code).trim();
     if (!key) continue;
     if (typeof raw === 'string') {
-      map[key] = { status: raw, inventory: raw === 'green' ? 6 : 0, onOrder: raw === 'yellow' ? 6 : 0 };
-      // string-only maps have no cone counts — mark unknown
-      map[key].conesKnown = false;
+      map[key] = {
+        status: raw,
+        inventory: raw === 'green' ? 6 : 0,
+        onOrder: raw === 'yellow' ? 6 : 0,
+        conesKnown: false,
+      };
       continue;
     }
     if (raw && typeof raw === 'object') {
@@ -146,10 +122,6 @@ export function normalizeInventoryMap(rawMap) {
   return map;
 }
 
-/**
- * Available physical cones for loading machines now.
- * On-order cones are NOT counted (cannot mount what has not arrived).
- */
 export function availableCones(invEntry) {
   if (!invEntry) return 0;
   const n = Number(invEntry.inventory);
@@ -158,25 +130,7 @@ export function availableCones(invEntry) {
 }
 
 /**
- * Detect concurrent cone conflicts across scheduled machines.
- *
- * @param {Record<string, any>} columns - scheduler columns with scheduled jobs
- * @param {Record<string, any>} inventoryRaw - from /api/thread-inventory-status
- * @returns {{
- *   conflicts: Array<Conflict>,
- *   byJobId: Record<string, Conflict[]>,
- *   buyRecommendations: Array<BuyRec>,
- *   summary: { conflictCount: number, jobCount: number, buyCount: number }
- * }}
- *
- * Conflict shape:
- * {
- *   id, color, peakConesNeeded, availableCones, shortfall,
- *   conesToBuy, preferBuy, preferReschedule,
- *   windowStart, windowEnd,
- *   jobs: [...],
- *   suggestions: string[]
- * }
+ * Same color on 2+ machines + not enough cones → conflict.
  */
 export function detectThreadConflicts(columns, inventoryRaw) {
   const inventory = normalizeInventoryMap(inventoryRaw);
@@ -196,87 +150,40 @@ export function detectThreadConflicts(columns, inventoryRaw) {
   for (const [color, jobsForColor] of byColor) {
     if (jobsForColor.length < 2) continue;
 
-    // Sweep-line: peak concurrent cone demand for this color
-    const events = [];
+    /** @type {Map<string, { machineKey: string, machineTitle: string, headCount: number }>} */
+    const machines = new Map();
     for (const j of jobsForColor) {
-      events.push({ t: j.start.getTime(), delta: j.headCount, job: j, kind: 'start' });
-      events.push({ t: j.end.getTime(), delta: -j.headCount, job: j, kind: 'end' });
-    }
-    events.sort((a, b) => a.t - b.t || (a.kind === 'end' ? -1 : 1) - (b.kind === 'end' ? -1 : 1));
-
-    let activeCones = 0;
-    let peakCones = 0;
-    /** @type {Set<string>} */
-    let activeJobIds = new Set();
-    /** @type {typeof scheduled} */
-    let peakJobs = [];
-    let peakWindowStart = null;
-    let peakWindowEnd = null;
-
-    // Also track current active set for window bounds
-    /** @type {Map<string, typeof scheduled[0]>} */
-    const activeMap = new Map();
-
-    for (const ev of events) {
-      if (ev.kind === 'end') {
-        activeCones += ev.delta;
-        activeMap.delete(ev.job.id);
-        activeJobIds.delete(ev.job.id);
-        continue;
-      }
-      activeCones += ev.delta;
-      activeMap.set(ev.job.id, ev.job);
-      activeJobIds.add(ev.job.id);
-
-      if (activeCones > peakCones) {
-        peakCones = activeCones;
-        peakJobs = Array.from(activeMap.values());
-        peakWindowStart = ev.job.start;
-        // window end = earliest end among active
-        let minEnd = Infinity;
-        for (const aj of peakJobs) {
-          if (aj.end.getTime() < minEnd) minEnd = aj.end.getTime();
-        }
-        peakWindowEnd = new Date(minEnd);
+      if (!machines.has(j.machineKey)) {
+        machines.set(j.machineKey, {
+          machineKey: j.machineKey,
+          machineTitle: j.machineTitle,
+          headCount: j.headCount,
+        });
       }
     }
 
-    // Need at least two machines overlapping to be a concurrency issue
-    const distinctMachines = new Set(peakJobs.map((j) => j.machineKey));
-    if (peakCones <= 0 || distinctMachines.size < 2) continue;
+    if (machines.size < 2) continue;
+
+    const peakCones = Array.from(machines.values()).reduce((sum, m) => sum + m.headCount, 0);
 
     const invEntry = inventory[color];
-    const avail = invEntry?.conesKnown === false
-      ? // Legacy string status without counts: green ⇒ assume at least one machine (6), else 0
-        (invEntry?.status === 'green' ? 6 : 0)
-      : availableCones(invEntry);
+    const avail =
+      invEntry?.conesKnown === false
+        ? invEntry?.status === 'green'
+          ? 6
+          : 0
+        : availableCones(invEntry);
 
     if (peakCones <= avail) continue;
 
     const shortfall = peakCones - avail;
     const conesToBuy = Math.ceil(shortfall / CONE_POD_SIZE) * CONE_POD_SIZE;
-
-    // Competing jobs: all jobs for this color that overlap the peak window (or each other)
-    const competing = [];
-    const seen = new Set();
-    for (const j of jobsForColor) {
-      const overlapsPeak =
-        peakWindowStart &&
-        peakWindowEnd &&
-        intervalsOverlap(j.start, j.end, peakWindowStart, peakWindowEnd);
-      const inPeak = peakJobs.some((p) => p.id === j.id);
-      if (!overlapsPeak && !inPeak) continue;
-      if (seen.has(j.id)) continue;
-      seen.add(j.id);
-      competing.push(j);
-    }
-    // Fallback: use peak jobs
-    const jobsList = competing.length ? competing : peakJobs;
-
-    const preferBuy = shouldPreferBuy(jobsList, distinctMachines.size);
+    const jobsList = jobsForColor.slice();
+    const preferBuy = shouldPreferBuy(jobsList, machines.size);
     const suggestions = buildSuggestions({
       color,
       jobs: jobsList,
+      machines: Array.from(machines.values()),
       avail,
       peakCones,
       shortfall,
@@ -285,7 +192,7 @@ export function detectThreadConflicts(columns, inventoryRaw) {
     });
 
     conflicts.push({
-      id: `color-${color}-${peakWindowStart ? peakWindowStart.getTime() : 0}`,
+      id: `color-${color}`,
       color,
       peakConesNeeded: peakCones,
       availableCones: avail,
@@ -294,11 +201,10 @@ export function detectThreadConflicts(columns, inventoryRaw) {
       conesToBuy,
       preferBuy,
       preferReschedule: !preferBuy,
-      windowStart: peakWindowStart,
-      windowEnd: peakWindowEnd,
+      machineCount: machines.size,
       jobs: jobsList
         .slice()
-        .sort((a, b) => a.start - b.start)
+        .sort((a, b) => a.machineKey.localeCompare(b.machineKey) || a.id.localeCompare(b.id))
         .map((j) => ({
           id: j.id,
           company: j.company,
@@ -308,8 +214,6 @@ export function detectThreadConflicts(columns, inventoryRaw) {
           machineTitle: j.machineTitle,
           headCount: j.headCount,
           conesNeeded: j.headCount,
-          start: j.start.toISOString(),
-          end: j.end.toISOString(),
           due_date: j.due_date,
           due_type: j.due_type,
           isLate: j.isLate,
@@ -318,7 +222,6 @@ export function detectThreadConflicts(columns, inventoryRaw) {
     });
   }
 
-  // Sort: buy-first, then largest shortfall
   conflicts.sort((a, b) => {
     if (a.preferBuy !== b.preferBuy) return a.preferBuy ? -1 : 1;
     return b.shortfall - a.shortfall;
@@ -346,7 +249,6 @@ export function detectThreadConflicts(columns, inventoryRaw) {
       label: `${c.color} (Polyneon) - ${c.conesToBuy} Cones`,
     }));
 
-  // Also surface non-urgent shortfalls as "optional buy" for Overview
   const optionalBuy = conflicts
     .filter((c) => !c.preferBuy && c.conesToBuy > 0)
     .map((c) => ({
@@ -356,7 +258,7 @@ export function detectThreadConflicts(columns, inventoryRaw) {
       availableCones: c.availableCones,
       peakConesNeeded: c.peakConesNeeded,
       jobIds: c.jobs.map((j) => j.id),
-      reason: 'Schedule around this shortage if possible; buy only if reordering would hurt due dates.',
+      reason: 'Keep these jobs on different machines only if you buy more cones, or run them one machine at a time.',
       label: `${c.color} (Polyneon) - ${c.conesToBuy} Cones`,
       optional: true,
     }));
@@ -394,34 +296,27 @@ function buyReason(conflict) {
   if (late.length) {
     return `Late or at-risk jobs (${late.join(', ')}) share color ${conflict.color}; buying avoids further delay.`;
   }
-  if (conflict.jobs.length >= 3 || new Set(conflict.jobs.map((j) => j.machineKey)).size >= 3) {
-    return `Color ${conflict.color} peaks across ${new Set(conflict.jobs.map((j) => j.machineKey)).size} machines — hard to schedule around.`;
+  if (conflict.machineCount >= 3) {
+    return `Color ${conflict.color} is on ${conflict.machineCount} machines — hard to schedule around.`;
   }
-  return `Hard/near due dates make rescheduling around color ${conflict.color} difficult.`;
+  return `Hard/near due dates make keeping color ${conflict.color} on one machine at a time difficult.`;
 }
 
-function buildSuggestions({ color, jobs, avail, peakCones, shortfall, conesToBuy, preferBuy }) {
+function buildSuggestions({ color, jobs, machines, avail, peakCones, shortfall, conesToBuy, preferBuy }) {
   const suggestions = [];
-  const sorted = jobs.slice().sort((a, b) => a.start - b.start);
-  if (sorted.length >= 2) {
-    const a = sorted[0];
-    const b = sorted[1];
-    suggestions.push(
-      `Run sequentially: finish #${a.id} on ${a.machineTitle} before starting #${b.id} on ${b.machineTitle} (both need ${color}).`
-    );
-  }
-  if (sorted.length >= 2) {
-    suggestions.push(
-      `Reorder machine queues so jobs using ${color} do not overlap in time.`
-    );
-  }
-  // Machine move hint: if one job is on a 6-head and another could wait in queue
-  const sixHead = sorted.filter((j) => j.headCount >= 6);
-  if (sixHead.length >= 2) {
-    suggestions.push(
-      `Keep only one 6-head machine on ${color} at a time (need ${avail} on hand; peak asks for ${peakCones}).`
-    );
-  }
+  const machineNames = machines.map((m) => m.machineTitle).join(' and ');
+  const jobBits = jobs.map((j) => `#${j.id} (${j.machineTitle})`).join(', ');
+
+  suggestions.push(
+    `${color} is on ${machines.length} machines (${machineNames}): ${jobBits}.`
+  );
+  suggestions.push(
+    `Need ${peakCones} cones to load those machines at once; you have ${avail} on hand.`
+  );
+  suggestions.push(
+    `Run jobs with ${color} on one machine at a time, or move one job so they are not on different machines together.`
+  );
+
   if (conesToBuy > 0) {
     if (preferBuy) {
       suggestions.push(
@@ -429,7 +324,7 @@ function buildSuggestions({ color, jobs, avail, peakCones, shortfall, conesToBuy
       );
     } else {
       suggestions.push(
-        `Optional buy: ${conesToBuy} cones of ${color} if you cannot reshuffle without missing due dates.`
+        `Optional buy: ${conesToBuy} cones of ${color} if you want those machines to run ${color} at the same time.`
       );
     }
   }
@@ -442,7 +337,6 @@ export function persistThreadConflicts(result) {
   try {
     const payload = {
       ...result,
-      // Dates already ISO on jobs; keep serializable
       persistedAt: new Date().toISOString(),
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -464,16 +358,14 @@ export function loadPersistedThreadConflicts() {
   }
 }
 
-export function formatConflictWindow(isoStart, isoEnd) {
-  const fmt = (iso) => {
-    const d = toDate(iso);
-    if (!d) return '—';
-    return d.toLocaleString(undefined, {
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-  return `${fmt(isoStart)} → ${fmt(isoEnd)}`;
+/** @deprecated Times are no longer used; kept for older Overview snapshots. */
+export function formatConflictWindow() {
+  return '';
+}
+
+export function formatConflictMachines(conflict) {
+  if (!conflict?.jobs?.length) return '';
+  const machines = [...new Set(conflict.jobs.map((j) => j.machineTitle))];
+  const jobs = conflict.jobs.map((j) => `#${j.id}`).join(', ');
+  return `${machines.join(' + ')} · ${jobs}`;
 }

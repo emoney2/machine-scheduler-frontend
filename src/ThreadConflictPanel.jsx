@@ -1,12 +1,12 @@
 import React from 'react';
-import { formatConflictWindow } from './utils/threadConflicts';
+import { formatConflictMachines } from './utils/threadConflicts';
 
 /**
  * Detail panel / modal for one or more thread concurrency conflicts.
  */
 export default function ThreadConflictPanel({
   conflicts = [],
-  title = 'Thread schedule conflict',
+  title = 'Thread conflict',
   onClose,
   onSelectConflict,
   selectedId,
@@ -50,8 +50,8 @@ export default function ThreadConflictPanel({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 700, fontSize: 16, color: '#111827' }}>{title}</div>
             <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-              Overlapping jobs need more cones mounted than you have on hand.
-              Prefer reordering when due dates allow; buy only when stuck.
+              The same thread color is on more than one machine, and you do not have enough cones
+              to load them all at once.
             </div>
           </div>
           <button
@@ -126,7 +126,7 @@ function ConflictBody({ conflict }) {
           {badge.text}
         </span>
         <span style={{ fontSize: 12, color: '#6b7280' }}>
-          {formatConflictWindow(conflict.windowStart, conflict.windowEnd)}
+          {formatConflictMachines(conflict)}
         </span>
       </div>
 
@@ -139,7 +139,7 @@ function ConflictBody({ conflict }) {
         }}
       >
         <Stat label="On hand" value={`${conflict.availableCones} cones`} />
-        <Stat label="Peak needed" value={`${conflict.peakConesNeeded} cones`} />
+        <Stat label="Needed" value={`${conflict.peakConesNeeded} cones`} />
         <Stat label="Shortfall" value={`${conflict.shortfall} cones`} accent="#b45309" />
         <Stat
           label={conflict.preferBuy ? 'Buy' : 'Optional buy'}
@@ -150,11 +150,11 @@ function ConflictBody({ conflict }) {
 
       {conflict.onOrderCones > 0 && (
         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10 }}>
-          On order: {conflict.onOrderCones} cones (not counted for loading until received).
+          On order: {conflict.onOrderCones} cones (not counted until received).
         </div>
       )}
 
-      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Competing jobs</div>
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Jobs sharing this color</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
         {(conflict.jobs || []).map((j) => (
           <div
@@ -174,11 +174,13 @@ function ConflictBody({ conflict }) {
             <div style={{ color: '#4b5563', marginTop: 2 }}>
               {[j.company, j.design || j.product].filter(Boolean).join(' · ')}
             </div>
-            <div style={{ color: '#6b7280', marginTop: 2 }}>
-              {formatConflictWindow(j.start, j.end)}
-              {j.isLate ? ' · LATE' : ''}
-              {j.due_type ? ` · ${j.due_type}` : ''}
-            </div>
+            {(j.isLate || j.due_type) && (
+              <div style={{ color: '#6b7280', marginTop: 2 }}>
+                {j.isLate ? 'LATE' : ''}
+                {j.isLate && j.due_type ? ' · ' : ''}
+                {j.due_type || ''}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -269,13 +271,11 @@ export function ThreadConflictStrip({
           {count}
         </span>
         <span style={{ fontWeight: 700, color: '#713f12' }}>
-          Thread schedule {count === 1 ? 'conflict' : 'conflicts'}
+          Thread {count === 1 ? 'conflict' : 'conflicts'}
         </span>
         <span style={{ color: '#854d0e', fontSize: 12 }}>
-          {summary.jobCount} job{summary.jobCount === 1 ? '' : 's'} ·{' '}
-          {summary.buyCount
-            ? `${summary.buyCount} buy recommended`
-            : 'reschedule preferred'}
+          Same color on multiple machines · not enough cones
+          {summary.buyCount ? ` · ${summary.buyCount} buy recommended` : ''}
         </span>
         <span style={{ marginLeft: 'auto', color: '#854d0e', fontSize: 12 }}>
           {expanded ? 'Hide' : 'Show'}
@@ -305,13 +305,14 @@ export function ThreadConflictStrip({
             >
               <strong style={{ minWidth: 48 }}>{c.color}</strong>
               <span style={{ color: '#4b5563' }}>
-                need {c.peakConesNeeded} · have {c.availableCones} · short {c.shortfall}
+                {formatConflictMachines(c)} · need {c.peakConesNeeded} · have {c.availableCones}
               </span>
               <span
                 style={{
                   marginLeft: 'auto',
                   fontWeight: 700,
                   color: c.preferBuy ? '#991b1b' : '#854d0e',
+                  flexShrink: 0,
                 }}
               >
                 {c.preferBuy ? `Buy ${c.conesToBuy}` : 'Reschedule'}
