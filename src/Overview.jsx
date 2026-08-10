@@ -2180,11 +2180,12 @@ function col(width, center = false) {
             );
           })()}
 
-          {/* Thread schedule conflicts — buy only when schedule can't absorb */}
+          {/* Thread conflicts — only when Scheduler found multi-machine cone shortages */}
+          {threadConflictCount > 0 && (
           <div
             style={{
               background: "#fff",
-              border: threadConflictCount ? "1px solid #facc15" : "1px solid #e5e7eb",
+              border: "1px solid #facc15",
               borderRadius: 10,
               boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
               padding: 12,
@@ -2199,7 +2200,7 @@ function col(width, center = false) {
                   ? `From Scheduler · ${formatClock(
                       new Date(threadConflictSnapshot.persistedAt || threadConflictSnapshot.computedAt)
                     )}`
-                  : "Open Scheduler to analyze"}
+                  : "From Scheduler"}
               </span>
               <button
                 type="button"
@@ -2224,98 +2225,92 @@ function col(width, center = false) {
               Prefer one machine at a time; buy recommendations are always in pods of 6.
             </div>
 
-            {!threadConflictCount ? (
-              <div style={{ fontSize: 13, color: "#6b7280" }}>
-                No multi-machine thread conflicts detected
-                {!threadConflictSnapshot ? " yet — visit the Scheduler once to compute." : "."}
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 12 }}>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#991b1b" }}>
-                    Recommended buy ({threadBuyNow.length})
-                  </div>
-                  {!threadBuyNow.length ? (
-                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                      No must-buy items — keep shared colors on one machine at a time.
-                    </div>
-                  ) : (
-                    threadBuyNow.map((rec) => (
-                      <button
-                        key={`buy-${rec.color}-${rec.conesToBuy}`}
-                        type="button"
-                        onClick={() => {
-                          const match = (threadConflictSnapshot.conflicts || []).find(
-                            (c) => c.color === rec.color
-                          );
-                          if (match) setOverviewConflictId(match.id);
-                        }}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          textAlign: "left",
-                          border: "1px solid #fecaca",
-                          background: "#fef2f2",
-                          borderRadius: 8,
-                          padding: "8px 10px",
-                          marginBottom: 8,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
-                          {rec.label}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                          Need {rec.peakConesNeeded} · have {rec.availableCones} · short {rec.shortfall}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#991b1b", marginTop: 4 }}>
-                          {rec.reason}
-                        </div>
-                      </button>
-                    ))
-                  )}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 12 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#991b1b" }}>
+                  Recommended buy ({threadBuyNow.length})
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#854d0e" }}>
-                    Reschedule first ({(threadConflictSnapshot.conflicts || []).filter((c) => !c.preferBuy).length})
+                {!threadBuyNow.length ? (
+                  <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                    No must-buy items — keep shared colors on one machine at a time.
                   </div>
-                  {(threadConflictSnapshot.conflicts || [])
-                    .filter((c) => !c.preferBuy)
-                    .map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setOverviewConflictId(c.id)}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          textAlign: "left",
-                          border: "1px solid #fde68a",
-                          background: "#fefce8",
-                          borderRadius: 8,
-                          padding: "8px 10px",
-                          marginBottom: 8,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>
-                          {c.color} · optional {c.conesToBuy} cones
-                        </div>
-                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                          {formatConflictMachines(c)}
-                        </div>
-                      </button>
-                    ))}
-                  {threadBuyOptional.length === 0 &&
-                    !(threadConflictSnapshot.conflicts || []).some((c) => !c.preferBuy) && (
-                      <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                        All open conflicts lean toward buying.
+                ) : (
+                  threadBuyNow.map((rec) => (
+                    <button
+                      key={`buy-${rec.color}-${rec.conesToBuy}`}
+                      type="button"
+                      onClick={() => {
+                        const match = (threadConflictSnapshot.conflicts || []).find(
+                          (c) => c.color === rec.color
+                        );
+                        if (match) setOverviewConflictId(match.id);
+                      }}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        border: "1px solid #fecaca",
+                        background: "#fef2f2",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        marginBottom: 8,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
+                        {rec.label}
                       </div>
-                    )}
-                </div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                        Need {rec.peakConesNeeded} · have {rec.availableCones} · short {rec.shortfall}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#991b1b", marginTop: 4 }}>
+                        {rec.reason}
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
-            )}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#854d0e" }}>
+                  Reschedule first ({(threadConflictSnapshot.conflicts || []).filter((c) => !c.preferBuy).length})
+                </div>
+                {(threadConflictSnapshot.conflicts || [])
+                  .filter((c) => !c.preferBuy)
+                  .map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setOverviewConflictId(c.id)}
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "left",
+                        border: "1px solid #fde68a",
+                        background: "#fefce8",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        marginBottom: 8,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 13 }}>
+                        {c.color} · optional {c.conesToBuy} cones
+                      </div>
+                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                        {formatConflictMachines(c)}
+                      </div>
+                    </button>
+                  ))}
+                {threadBuyOptional.length === 0 &&
+                  !(threadConflictSnapshot.conflicts || []).some((c) => !c.preferBuy) && (
+                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
+                      All open conflicts lean toward buying.
+                    </div>
+                  )}
+              </div>
+            </div>
           </div>
+          )}
 
           {overviewPanelConflicts.length > 0 && (
             <ThreadConflictPanel
