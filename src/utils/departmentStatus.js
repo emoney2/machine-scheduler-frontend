@@ -5,7 +5,9 @@
  *
  * Capacities (Mon–Fri, US national holidays off):
  *   Sewing:     96 pcs/day (ship day may include sewing)
- *   Embroidery: 30,000 stitches/hr × 6 heads × 3 machines × 8 hr = 24 machine-hours/day
+ *   Embroidery: one job stays on one 6-head machine.
+ *     Job hours = (stitches/30000)×(qty/6); calendar days = ceil(jobHours/8).
+ *     Shop catch-up capacity = 3 machines × 8 hr = 24 machine-hours/day (different jobs in parallel).
  *   Print:      3 min/pc × 8 hr = 160 pcs/day
  *   Cut / Fur / Digitizing: no pcs/day yet → past-due vs on-time only
  */
@@ -200,7 +202,9 @@ export function computeDeadlines(job) {
   const sewingFinish = ship;
 
   const hours = embMachineHours(job);
-  const embDays = Math.max(1, Math.ceil(hours / EMB_MACHINE_HOURS_PER_DAY - 1e-9));
+  // One job → one machine (8 hr/day). Do NOT divide across 3 machines.
+  // Example: 100 pcs @ 30k stitches → 16.67 hr → 3 workdays, not 16.67/24 ≈ 1 day.
+  const embDays = Math.max(1, Math.ceil(hours / HOURS_PER_DAY - 1e-9));
   // Must be embroidered before sewing starts that morning
   const embFinishBy = subWorkDays(sewingStart, 1);
   const embStart = subWorkDays(embFinishBy, embDays - 1);
