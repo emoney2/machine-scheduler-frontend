@@ -3202,7 +3202,8 @@ function col(width, center = false) {
               </span>
             </div>
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-              Floater: work the highlighted department. Click a card for the next jobs to catch up.
+              Floater: work the highlighted department. Fur and Cut are tracked separately.
+              Click a card for the next jobs (with artwork) to catch up.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
               {DEPT_ORDER.map((deptId) => {
@@ -3319,10 +3320,17 @@ function col(width, center = false) {
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {deptDetail.nextJobs.map((j) => {
                       const late = (j.pastDueWorkdays || 0) > 0;
+                      const rawJob = j.job || {};
+                      const thumb = deriveThumb(
+                        rawJob.Preview || rawJob.Image || rawJob["Art Link"] || ""
+                      );
                       return (
                         <div
                           key={`${deptDetail.id}-${j.id}-${j.product}`}
                           style={{
+                            display: "flex",
+                            gap: 10,
+                            alignItems: "flex-start",
                             border: "1px solid #e5e7eb",
                             borderRadius: 8,
                             padding: "8px 10px",
@@ -3330,22 +3338,51 @@ function col(width, center = false) {
                             fontSize: 12,
                           }}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                            <strong>#{j.id}</strong>
-                            <span>
-                              Ship {j.shipLabel} · due by {j.deadlineLabel}
-                            </span>
+                          <div
+                            style={{
+                              width: 48,
+                              height: 48,
+                              borderRadius: 6,
+                              border: "1px solid #e5e7eb",
+                              background: "#fff",
+                              flexShrink: 0,
+                              overflow: "hidden",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            {thumb ? (
+                              <img
+                                src={thumb}
+                                alt=""
+                                width={48}
+                                height={48}
+                                loading="lazy"
+                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: 9, color: "#9ca3af" }}>No art</span>
+                            )}
                           </div>
-                          <div style={{ color: "#4b5563", marginTop: 2 }}>
-                            {[j.company, j.design || j.product].filter(Boolean).join(" · ")}
-                          </div>
-                          <div style={{ color: "#6b7280", marginTop: 2 }}>
-                            {j.qty} pcs
-                            {deptDetail.id === "embroidery"
-                              ? ` · ${Number(j.work).toFixed(1)} machine-hrs`
-                              : ""}
-                            {j.stage ? ` · ${j.stage}` : ""}
-                            {late ? " · PAST DUE for this step" : ""}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                              <strong>#{j.id}</strong>
+                              <span>
+                                Ship {j.shipLabel} · due by {j.deadlineLabel}
+                              </span>
+                            </div>
+                            <div style={{ color: "#4b5563", marginTop: 2 }}>
+                              {[j.company, j.design || j.product].filter(Boolean).join(" · ")}
+                            </div>
+                            <div style={{ color: "#6b7280", marginTop: 2 }}>
+                              {j.qty} pcs
+                              {deptDetail.id === "embroidery"
+                                ? ` · ${Number(j.work).toFixed(1)} machine-hrs`
+                                : ""}
+                              {j.stage ? ` · ${j.stage}` : ""}
+                              {late ? " · PAST DUE for this step" : ""}
+                            </div>
                           </div>
                         </div>
                       );

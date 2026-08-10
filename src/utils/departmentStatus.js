@@ -207,7 +207,13 @@ export function computeDeadlines(job) {
 
   const printJob = needsPrint(job);
   const printFinishBy = printJob ? subWorkDays(embStart, 1) : null;
-  const cutFurFinishBy = subWorkDays(printJob ? printFinishBy : embStart, 1);
+  // Fur and Cut run in parallel after digitizing, but have separate finish targets
+  // so each department can show its own past-due pressure.
+  // Cut: 1 workday before print (or embroidery if no print)
+  // Fur: 2 workdays before that same gate (slightly earlier buffer)
+  const nextGate = printJob ? printFinishBy : embStart;
+  const cutFinishBy = subWorkDays(nextGate, 1);
+  const furFinishBy = subWorkDays(nextGate, 2);
   const digitizingFinishBy = subWorkDays(embStart, DIGITIZE_LEAD_WORKDAYS);
 
   return {
@@ -222,7 +228,10 @@ export function computeDeadlines(job) {
     embFinishBy,
     printJob,
     printFinishBy,
-    cutFurFinishBy,
+    cutFinishBy,
+    furFinishBy,
+    /** @deprecated use cutFinishBy / furFinishBy */
+    cutFurFinishBy: cutFinishBy,
     digitizingFinishBy,
   };
 }
@@ -314,8 +323,9 @@ function deadlineFor(dept, deadlines) {
     case 'digitizing':
       return deadlines.digitizingFinishBy;
     case 'fur':
+      return deadlines.furFinishBy;
     case 'cut':
-      return deadlines.cutFurFinishBy;
+      return deadlines.cutFinishBy;
     case 'print':
       return deadlines.printFinishBy;
     case 'embroidery':
