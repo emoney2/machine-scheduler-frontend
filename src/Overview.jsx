@@ -8,6 +8,11 @@ import {
   formatConflictMachines,
 } from "./utils/threadConflicts";
 import ThreadConflictPanel from "./ThreadConflictPanel";
+import {
+  computeDepartmentStatus,
+  DEPT_ORDER,
+  DEPT_PLANNING_DAYS,
+} from "./utils/departmentStatus";
 
 const GOAL_CONFETTI_COLORS = [
   "#22c55e",
@@ -1045,6 +1050,8 @@ function col(width, center = false) {
 
 // ——— Component ——————————————————————————————————————————————
   const [upcoming, setUpcoming] = useState([]);
+  const [deptPlanningJobs, setDeptPlanningJobs] = useState([]);
+  const [deptDetailId, setDeptDetailId] = useState(null);
   const [loadingUpcoming, setLoadingUpcoming] = useState(true);
 
   // Materials (grouped by vendor)
@@ -1132,6 +1139,14 @@ function col(width, center = false) {
     return c ? [c] : [];
   }, [overviewConflictId, threadConflictSnapshot]);
 
+  const departmentStatus = useMemo(
+    () => computeDepartmentStatus(deptPlanningJobs),
+    [deptPlanningJobs]
+  );
+  const deptDetail = deptDetailId
+    ? departmentStatus.departments?.[deptDetailId]
+    : null;
+
   // Load combined overview (upcoming + materials)
   useEffect(() => {
     let alive = true;
@@ -1154,6 +1169,7 @@ function col(width, center = false) {
 
       // Show cached data immediately while fresh data loads in background
       setUpcoming(baseJobs);
+      setDeptPlanningJobs(baseJobs);
       // Ensure materials is always an array
       const materialsArray = Array.isArray(materials) ? materials : [];
       const materialsFutureArray = Array.isArray(materialsFuture) ? materialsFuture : [];
@@ -1240,23 +1256,31 @@ function col(width, center = false) {
         materialsFuture = data.materialsFuture || [];
         const rawUpcoming = data.upcoming || [];
         const daysWindowNum = parseInt(daysWindow, 10) || 7;
+        const dedupeJobs = (list) => {
+          const seen = new Set();
+          const out = [];
+          for (const j of list) {
+            const k = [
+              String(j["Order #"] ?? "").trim(),
+              String(j["Product"] ?? "").trim(),
+              String(j["Design"] ?? "").trim(),
+            ].join("|");
+            if (seen.has(k)) continue;
+            seen.add(k);
+            out.push(j);
+          }
+          return out;
+        };
         const sheetJobs = (rawUpcoming ?? []).filter(j => {
           if (isStageCompleted(j)) return false;
           return isJobInTimeWindow(j, daysWindowNum);
         });
-        // Dedupe line items: same Order # + Product + Design can appear twice if data ever overlaps
-        const seen = new Set();
-        upcoming = [];
-        for (const j of sheetJobs) {
-          const k = [
-            String(j["Order #"] ?? "").trim(),
-            String(j["Product"] ?? "").trim(),
-            String(j["Design"] ?? "").trim(),
-          ].join("|");
-          if (seen.has(k)) continue;
-          seen.add(k);
-          upcoming.push(j);
-        }
+        const planningJobs = (rawUpcoming ?? []).filter(j => {
+          if (isStageCompleted(j)) return false;
+          return isJobInTimeWindow(j, DEPT_PLANNING_DAYS);
+        });
+        upcoming = dedupeJobs(sheetJobs);
+        if (alive) setDeptPlanningJobs(dedupeJobs(planningJobs));
         console.log("📦 Overview data received:", {
           upcomingCount: upcoming?.length || 0,
           materialsCount: materials?.length || 0,
@@ -3156,7 +3180,7 @@ function col(width, center = false) {
 
         {/* RIGHT COLUMN: Department Status, then Upcoming Jobs */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-          {/* Department Status */}
+          {/* Department Status — backwards from ship date */}
           <div
             style={{
               background: "#fff",
@@ -3168,17 +3192,169 @@ function col(width, center = false) {
               minWidth: 0,
             }}
           >
-            <div style={header}>Department Status</div>
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Department Status</span>
+              <span style={subtleUpdatedStyle}>
+                Next {DEPT_PLANNING_DAYS} days · ship → back
+                {departmentStatus.focusId
+                  ? ` · focus: ${departmentStatus.departments[departmentStatus.focusId]?.label}`
+                  : " · on pace"}
+              </span>
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+              Floater: work the highlighted department. Click a card for the next jobs to catch up.
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
-              {["Digitizing", "Fur", "Cut", "Print", "Embroidery", "Sewing"].map((d, i) => (
-                <div key={i} style={{ border: "1px solid #eee", borderRadius: 10, padding: 10, minHeight: 72 }}>
-                  <div style={{ fontSize: 12, color: "#666" }}>{d}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700 }}>—</div>
-                  <div style={{ fontSize: 11, color: "#888" }}>calculating…</div>
-                </div>
-              ))}
+              {DEPT_ORDER.map((deptId) => {
+                const d = departmentStatus.departments[deptId];
+                if (!d) return null;
+                const isFocus = departmentStatus.focusId === deptId;
+                const behind = d.behind;
+                const border = isFocus
+                  ? "2px solid #ca8a04"
+                  : behind
+                  ? "1px solid #fca5a5"
+                  : "1px solid #eee";
+                const bg = isFocus
+                  ? "#fef9c3"
+                  : behind
+                  ? "#fef2f2"
+                  : "#fafafa";
+                const valueColor = behind ? "#991b1b" : isFocus ? "#854d0e" : "#111827";
+                return (
+                  <button
+                    key={deptId}
+                    type="button"
+                    onClick={() => setDeptDetailId(deptId)}
+                    style={{
+                      border,
+                      borderRadius: 10,
+                      padding: 10,
+                      minHeight: 84,
+                      background: bg,
+                      cursor: "pointer",
+                      textAlign: "left",
+                      boxShadow: isFocus ? "0 0 0 1px rgba(202,138,4,0.35)" : undefined,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: "#666", fontWeight: isFocus ? 700 : 500 }}>
+                      {d.label}
+                      {isFocus ? " · go here" : ""}
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: valueColor, lineHeight: 1.15 }}>
+                      {loadingUpcoming && !deptPlanningJobs.length ? "…" : d.headline}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#6b7280" }}>
+                      {loadingUpcoming && !deptPlanningJobs.length
+                        ? "loading…"
+                        : `${d.subline}${d.jobCount ? ` · ${d.jobCount} open` : ""}`}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
+
+          {deptDetail && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label={`${deptDetail.label} jobs`}
+              style={{
+                position: "fixed",
+                inset: 0,
+                background: "rgba(15, 23, 42, 0.45)",
+                zIndex: 10050,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+              }}
+              onClick={() => setDeptDetailId(null)}
+            >
+              <div
+                style={{
+                  width: "min(560px, 100%)",
+                  maxHeight: "85vh",
+                  overflow: "auto",
+                  background: "#fff",
+                  borderRadius: 10,
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 12px 40px rgba(0,0,0,0.18)",
+                  padding: 16,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, fontSize: 16 }}>{deptDetail.label}</div>
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                      {deptDetail.mode === "capacity"
+                        ? deptDetail.behind
+                          ? `${deptDetail.headline} behind · ${deptDetail.jobCount} jobs ready`
+                          : `${deptDetail.subline} · ${deptDetail.jobCount} jobs ready`
+                        : deptDetail.behind
+                        ? `${deptDetail.pastDueCount} past deadline · ${deptDetail.jobCount} ready`
+                        : `${deptDetail.jobCount} jobs on time / ready`}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeptDetailId(null)}
+                    style={{
+                      border: "1px solid #d1d5db",
+                      background: "#fff",
+                      borderRadius: 6,
+                      padding: "4px 10px",
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+                {!deptDetail.nextJobs?.length ? (
+                  <div style={{ fontSize: 13, color: "#6b7280" }}>Nothing waiting in this department.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {deptDetail.nextJobs.map((j) => {
+                      const late = (j.pastDueWorkdays || 0) > 0;
+                      return (
+                        <div
+                          key={`${deptDetail.id}-${j.id}-${j.product}`}
+                          style={{
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            background: late ? "#fff1f2" : "#fafafa",
+                            fontSize: 12,
+                          }}
+                        >
+                          <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                            <strong>#{j.id}</strong>
+                            <span>
+                              Ship {j.shipLabel} · due by {j.deadlineLabel}
+                            </span>
+                          </div>
+                          <div style={{ color: "#4b5563", marginTop: 2 }}>
+                            {[j.company, j.design || j.product].filter(Boolean).join(" · ")}
+                          </div>
+                          <div style={{ color: "#6b7280", marginTop: 2 }}>
+                            {j.qty} pcs
+                            {deptDetail.id === "embroidery"
+                              ? ` · ${Number(j.work).toFixed(1)} machine-hrs`
+                              : ""}
+                            {j.stage ? ` · ${j.stage}` : ""}
+                            {late ? " · PAST DUE for this step" : ""}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Upcoming Jobs */}
           <div
