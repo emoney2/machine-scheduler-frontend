@@ -3202,8 +3202,8 @@ function col(width, center = false) {
               </span>
             </div>
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-              Floater: work the highlighted department. Fur and Cut are tracked separately.
-              Click a card for the next jobs (with artwork) to catch up.
+              Floater: work the highlighted department. Sewing &amp; Embroidery include upcoming
+              ship dates even if the job is still upstream. Click a card for jobs (with artwork).
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
               {DEPT_ORDER.map((deptId) => {
@@ -3290,7 +3290,11 @@ function col(width, center = false) {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 800, fontSize: 16 }}>{deptDetail.label}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                      {deptDetail.mode === "capacity"
+                      {deptDetail.forecastsUpstream
+                        ? deptDetail.behind
+                          ? `${deptDetail.headline} behind · ${deptDetail.readyNow || 0} ready now · ${deptDetail.jobCount} must ship (incl. upstream)`
+                          : `${deptDetail.subline}`
+                        : deptDetail.mode === "capacity"
                         ? deptDetail.behind
                           ? `${deptDetail.headline} behind · ${deptDetail.jobCount} jobs ready`
                           : `${deptDetail.subline} · ${deptDetail.jobCount} jobs ready`

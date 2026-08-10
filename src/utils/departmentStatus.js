@@ -294,12 +294,35 @@ export function needsEmbroidery(job) {
   return true;
 }
 
+/** Ready to sew right now (already in sewing). */
 export function needsSewing(job) {
   if (isComplete(job)) return false;
   if (job?.sewingSummaryComplete) return false;
   if (excludeFromSewingLoad(job)) return false;
   const stage = getStage(job);
   return stage === 'SEWING' || stage === 'SEW';
+}
+
+/**
+ * Will need sewing before ship — includes jobs still in digitizing/fur/cut/print/embroidery.
+ * Used for sewing capacity catch-up so ship-today orders aren't invisible until they hit sewing.
+ */
+export function willNeedSewing(job) {
+  if (isComplete(job)) return false;
+  if (job?.sewingSummaryComplete) return false;
+  if (excludeFromSewingLoad(job)) return false;
+  return true;
+}
+
+/**
+ * Will need embroidery before sewing — includes upstream jobs not yet embroidered.
+ */
+export function willNeedEmbroidery(job) {
+  if (isComplete(job)) return false;
+  if (job?.sewingSummaryComplete) return false;
+  const stage = getStage(job);
+  if (stage === 'SEWING' || stage === 'SEW') return false;
+  return true;
 }
 
 function stillNeeds(dept, job) {
@@ -313,9 +336,11 @@ function stillNeeds(dept, job) {
     case 'print':
       return needsPrintDept(job);
     case 'embroidery':
-      return needsEmbroidery(job);
+      // Forecast: all jobs that still must be embroidered before ship
+      return willNeedEmbroidery(job);
     case 'sewing':
-      return needsSewing(job);
+      // Forecast: all jobs that still must be sewn before ship (not only Stage=SEWING)
+      return willNeedSewing(job);
     default:
       return false;
   }
@@ -526,15 +551,34 @@ export function computeDepartmentStatus(jobs, now = new Date()) {
       })
       .slice(0, 12);
 
+    let readyNow = 0;
+    if (dept === 'sewing') {
+      readyNow = rows.filter((r) => needsSewing(r.job)).length;
+    } else if (dept === 'embroidery') {
+      readyNow = rows.filter((r) => needsEmbroidery(r.job)).length;
+    }
+
+    if (dept === 'sewing' || dept === 'embroidery') {
+      if (jobCount === 0) {
+        subline = 'clear';
+      } else if (behind) {
+        subline = `behind · ${readyNow} ready / ${jobCount} to ship`;
+      } else {
+        subline = `on pace · ${readyNow} ready / ${jobCount} to ship`;
+      }
+    }
+
     departments[dept] = {
       id: dept,
       label: DEPT_LABELS[dept],
       ...result,
       jobCount,
+      readyNow,
       behind,
       headline,
       subline,
       nextJobs,
+      forecastsUpstream: dept === 'sewing' || dept === 'embroidery',
     };
   }
 
