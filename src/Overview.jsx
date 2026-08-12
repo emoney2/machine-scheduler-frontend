@@ -3491,6 +3491,22 @@ function col(width, center = false) {
                         ? "DUE SOON"
                         : "ON PACE";
                       const riskColor = late ? "#991b1b" : soon ? "#92400e" : "#166534";
+                      const dueShort =
+                        deptDetail.id === "digitizing"
+                          ? "Dig due"
+                          : deptDetail.id === "embroidery"
+                          ? "Emb due"
+                          : `${deptDetail.label} due`;
+                      const pastDays = Number(j.pastDueWorkdays) || 0;
+                      const throughDays = Number(j.daysThrough);
+                      const paceLabel =
+                        pastDays > 0
+                          ? `${pastDays}d late`
+                          : Number.isFinite(throughDays) && throughDays > 1
+                          ? `${throughDays}d early`
+                          : Number.isFinite(throughDays) && throughDays > 0
+                          ? "due today"
+                          : null;
                       return (
                         <div
                           key={`${deptDetail.id}-${j.id}-${j.product}`}
@@ -3538,7 +3554,18 @@ function col(width, center = false) {
                               <span style={{ fontWeight: 700, color: riskColor }}>{riskLabel}</span>
                             </div>
                             <div style={{ color: "#4b5563", marginTop: 2 }}>
-                              Ship {j.shipLabel} · need by {j.deadlineLabel}
+                              Ship {j.shipLabel} · {dueShort} {j.deadlineLabel}
+                              {paceLabel ? (
+                                <span
+                                  style={{
+                                    fontWeight: 700,
+                                    color: pastDays > 0 ? "#991b1b" : soon ? "#92400e" : "#166534",
+                                  }}
+                                >
+                                  {" "}
+                                  · {paceLabel}
+                                </span>
+                              ) : null}
                             </div>
                             <div style={{ color: "#4b5563", marginTop: 2 }}>
                               {[j.company, j.design || j.product].filter(Boolean).join(" · ")}
@@ -3551,9 +3578,6 @@ function col(width, center = false) {
                                 ? ` · ${Number(j.work).toFixed(1)} machine-hrs`
                                 : ""}
                               {j.stage ? ` · ${j.stage}` : ""}
-                              {late && (j.pastDueWorkdays || 0) > 0
-                                ? ` · ${j.pastDueWorkdays}d past step deadline`
-                                : ""}
                             </div>
                           </div>
                         </div>
