@@ -20,6 +20,9 @@
  *   Cut:        200 pcs/day (estimate)
  *   Fur:        200 pcs/day (estimate)
  *   Digitizing: 4 designs/day (estimate)
+ *
+ * Exclusions: towels and belts are never counted (not manufactured here).
+ * Backs are excluded from sewing load only (same as Sewing Priority).
  */
 
 export const DEPT_PLANNING_DAYS = 60;
@@ -189,11 +192,22 @@ function listStatus(job, key) {
   return String(job?.[key] ?? '').trim().toUpperCase();
 }
 
+/**
+ * Towels / belts are not manufactured here — exclude from every department
+ * capacity calculation (digitizing through sewing).
+ */
+export function excludeNonManufactured(job) {
+  const product = String(job?.Product ?? job?.product ?? '').toLowerCase();
+  if (!product) return false;
+  return product.includes('towel') || product.includes('belt');
+}
+
 /** Exclude backs/towels/belts from sewing pcs load (same as Sewing Priority). */
 export function excludeFromSewingLoad(job) {
   const product = String(job?.Product ?? job?.product ?? '').toLowerCase();
   if (!product) return false;
-  return product.includes('back') || product.includes('towel') || product.includes('belt');
+  if (excludeNonManufactured(job)) return true;
+  return product.includes('back');
 }
 
 export function embMachineHours(job) {
@@ -508,6 +522,7 @@ export function computeDepartmentStatus(jobs, now = new Date()) {
   const pool = [];
   for (const job of jobs || []) {
     if (isComplete(job)) continue;
+    if (excludeNonManufactured(job)) continue;
     const ship = parseJobDate(job['Ship Date'] ?? job.Ship ?? job['Due Date']);
     if (!ship) continue;
     // Include overdue + within planning horizon
