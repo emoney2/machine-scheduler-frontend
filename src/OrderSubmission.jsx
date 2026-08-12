@@ -160,6 +160,9 @@ export default function OrderSubmission() {
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [prodFilesLoading, setProdFilesLoading] = useState(false);
   const [printFilesLoading, setPrintFilesLoading] = useState(false);
+  const [suggestingMaterials, setSuggestingMaterials] = useState(false);
+  const [materialSuggestNote, setMaterialSuggestNote] = useState("");
+  const [materialSuggestErr, setMaterialSuggestErr] = useState("");
   const [overlayVisibleOnce, setOverlayVisibleOnce] = useState(false);
   const [hasStartedLoadingFiles, setHasStartedLoadingFiles] = useState(false);
   const [lastAcceptedCustomerJob, setLastAcceptedCustomerJob] = useState(() =>
@@ -879,6 +882,111 @@ const companyNames = companies.map((opt) => opt.value);
     });
   };
 
+  /** Optional: sample the same production artwork used for submit; prefill Material 1–5 + %. */
+  const suggestMaterialsFromArtwork = async () => {
+    setMaterialSuggestErr("");
+    setMaterialSuggestNote("");
+
+    const isImageName = (name) =>
+      /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(name || ""));
+    const isImageFile = (f) =>
+      !!f &&
+      (String(f.type || "").startsWith("image/") || isImageName(f.name));
+
+    // Same files attached for order submit — no separate upload
+    let imageFile = prodFiles.find(isImageFile) || null;
+
+    // Fallback: blob from the on-screen production preview (same attach)
+    if (!imageFile) {
+      const preview = prodPreviews.find(
+        (p) =>
+          p &&
+          (String(p.type || "").startsWith("image/") || isImageName(p.name)) &&
+          p.url
+      );
+      if (preview?.url) {
+        try {
+          const blob = await fetch(preview.url).then((r) => r.blob());
+          const ext = (preview.name || "artwork.png").split(".").pop() || "png";
+          imageFile = new File([blob], preview.name || `artwork.${ext}`, {
+            type: blob.type || preview.type || "image/png",
+          });
+        } catch (e) {
+          console.warn("Could not read production preview blob:", e);
+        }
+      }
+    }
+
+    if (!imageFile) {
+      setMaterialSuggestErr(
+        "Attach a PNG/JPG under Production Files first (the same file used to submit the order). PDF/EMB alone can’t be color-sampled yet."
+      );
+      return;
+    }
+
+    const alreadyFilled = form.materials.some((m) => String(m || "").trim());
+    if (alreadyFilled) {
+      const ok = window.confirm(
+        "Replace current Material 1–5 and % with artwork suggestions? You can still edit afterward."
+      );
+      if (!ok) return;
+    }
+
+    setSuggestingMaterials(true);
+    try {
+      const fd = new FormData();
+      fd.append("image", imageFile, imageFile.name || "artwork.png");
+      fd.append("maxMaterials", "5");
+      const res = await axios.post(`${API_ROOT}/suggest-materials`, fd, {
+        withCredentials: true,
+        timeout: 60000,
+      });
+      const data = res?.data || {};
+      const suggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+      if (!data.ok && data.error && !suggestions.length) {
+        setMaterialSuggestErr(String(data.error));
+        return;
+      }
+      if (!suggestions.length) {
+        setMaterialSuggestErr(
+          data.message ||
+            data.error ||
+            "No material matches found. Enter materials manually."
+        );
+        return;
+      }
+
+      setForm((prev) => {
+        const materials = ["", "", "", "", ""];
+        const materialPercents = ["", "", "", "", ""];
+        suggestions.slice(0, 5).forEach((s, i) => {
+          materials[i] = String(s.name || "").trim();
+          materialPercents[i] = String(s.percent ?? "");
+        });
+        return { ...prev, materials, materialPercents };
+      });
+
+      const conf = Number(data.confidence);
+      const confLabel =
+        Number.isFinite(conf) && conf > 0
+          ? ` · confidence ${Math.round(conf * 100)}%`
+          : "";
+      const summary = suggestions
+        .map((s) => `${s.name} ${s.percent}%`)
+        .join(", ");
+      setMaterialSuggestNote(
+        `From your production file (${imageFile.name}): ${summary}${confLabel}. Edit anything that looks wrong — submit still works the same.`
+      );
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error ||
+        err?.message ||
+        "Suggestion failed. Enter materials manually.";
+      setMaterialSuggestErr(String(msg));
+    } finally {
+      setSuggestingMaterials(false);
+    }
+  };
 
   const createPreviews = (files, urlsRef) =>
     files.map((f) => {
@@ -2828,6 +2936,69 @@ const handleSaveNewCompany = async () => {
 
           <div
             style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <button
+              type="button"
+              onClick={suggestMaterialsFromArtwork}
+              disabled={suggestingMaterials}
+              title="Optional: sample production artwork colors and match Material Inventory"
+              style={{
+                padding: "6px 12px",
+                fontSize: 13,
+                fontWeight: 600,
+                borderRadius: 8,
+                border: "1px solid #c7d2fe",
+                background: suggestingMaterials ? "#eef2ff" : "#fff",
+                color: "#312e81",
+                cursor: suggestingMaterials ? "wait" : "pointer",
+              }}
+            >
+              {suggestingMaterials ? "Suggesting…" : "Suggest from artwork"}
+            </button>
+            <span style={{ fontSize: 12, color: "#6b7280" }}>
+              Optional — uses the same Production Files image you attach for submit (PNG/JPG). No extra upload.
+            </span>
+          </div>
+          {materialSuggestNote ? (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#1e3a8a",
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
+                borderRadius: 8,
+                padding: "8px 10px",
+                marginBottom: 12,
+              }}
+            >
+              {materialSuggestNote}
+            </div>
+          ) : null}
+          {materialSuggestErr ? (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#92400e",
+                background: "#fffbeb",
+                border: "1px solid #fde68a",
+                borderRadius: 8,
+                padding: "8px 10px",
+                marginBottom: 12,
+              }}
+              role="alert"
+            >
+              {materialSuggestErr}
+            </div>
+          ) : null}
+
+          <div
+            style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr 1fr",
               gap: "1rem",
@@ -3077,6 +3248,33 @@ const handleSaveNewCompany = async () => {
                   )}
                 </div>
               ))}
+              {prodFiles.some(
+                (f) =>
+                  f &&
+                  (String(f.type || "").startsWith("image/") ||
+                    /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(f.name || "")))
+              ) && (
+                <button
+                  type="button"
+                  onClick={suggestMaterialsFromArtwork}
+                  disabled={suggestingMaterials}
+                  style={{
+                    marginTop: 6,
+                    padding: "4px 10px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    border: "1px solid #c7d2fe",
+                    background: "#fff",
+                    color: "#312e81",
+                    cursor: suggestingMaterials ? "wait" : "pointer",
+                  }}
+                >
+                  {suggestingMaterials
+                    ? "Suggesting materials…"
+                    : "Suggest materials from this production file"}
+                </button>
+              )}
             </div>
           </fieldset>
         </div>
