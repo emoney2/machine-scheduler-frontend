@@ -5,9 +5,7 @@ import { socket } from "./socketClient";
 import { supabase } from "./supabaseClient";
 import {
   loadPersistedThreadConflicts,
-  formatConflictMachines,
 } from "./utils/threadConflicts";
-import ThreadConflictPanel from "./ThreadConflictPanel";
 import {
   computeDepartmentStatus,
   DEPT_ORDER,
@@ -1123,7 +1121,6 @@ function col(width, center = false) {
   const [threadConflictSnapshot, setThreadConflictSnapshot] = useState(() =>
     loadPersistedThreadConflicts()
   );
-  const [overviewConflictId, setOverviewConflictId] = useState(null);
 
   const refreshThreadConflicts = useCallback(() => {
     setThreadConflictSnapshot(loadPersistedThreadConflicts());
@@ -1148,14 +1145,7 @@ function col(width, center = false) {
     };
   }, [refreshThreadConflicts]);
 
-  const threadBuyNow = threadConflictSnapshot?.buyRecommendations || [];
-  const threadBuyOptional = threadConflictSnapshot?.optionalBuy || [];
   const threadConflictCount = threadConflictSnapshot?.summary?.conflictCount || 0;
-  const overviewPanelConflicts = useMemo(() => {
-    if (!overviewConflictId || !threadConflictSnapshot?.conflicts) return [];
-    const c = threadConflictSnapshot.conflicts.find((x) => x.id === overviewConflictId);
-    return c ? [c] : [];
-  }, [overviewConflictId, threadConflictSnapshot]);
 
   const departmentStatus = useMemo(
     () => computeDepartmentStatus(deptPlanningJobs),
@@ -2206,7 +2196,7 @@ function col(width, center = false) {
             );
           })()}
 
-          {/* Thread conflicts — only when Scheduler found multi-machine cone shortages */}
+          {/* Thread conflicts — visual carts: jobs + machines + shared color */}
           {threadConflictCount > 0 && (
           <div
             style={{
@@ -2246,105 +2236,238 @@ function col(width, center = false) {
                 Refresh
               </button>
             </div>
-            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
-              Same thread color on two or more 6-head machines (Machine 1 ignored), without enough cones.
-              Prefer one machine at a time; buy recommendations are always in pods of 6.
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
+              Same color on 2+ six-head machines without enough cones. Buy in pods of 6.
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 12 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#991b1b" }}>
-                  Recommended buy ({threadBuyNow.length})
-                </div>
-                {!threadBuyNow.length ? (
-                  <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                    No must-buy items — keep shared colors on one machine at a time.
-                  </div>
-                ) : (
-                  threadBuyNow.map((rec) => (
-                    <button
-                      key={`buy-${rec.color}-${rec.conesToBuy}`}
-                      type="button"
-                      onClick={() => {
-                        const match = (threadConflictSnapshot.conflicts || []).find(
-                          (c) => c.color === rec.color
-                        );
-                        if (match) setOverviewConflictId(match.id);
-                      }}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {(threadConflictSnapshot.conflicts || []).map((c) => {
+                const swatch = colorFromName(c.color);
+                const jobs = Array.isArray(c.jobs) ? c.jobs : [];
+                // One representative job per machine column
+                const byMachine = [];
+                const seenMach = new Set();
+                for (const j of jobs) {
+                  const mk = j.machineKey || j.machineTitle || j.id;
+                  if (seenMach.has(mk)) continue;
+                  seenMach.add(mk);
+                  byMachine.push(j);
+                }
+                const artFallback = (id) => {
+                  const row = (deptPlanningJobs || []).find(
+                    (u) => String(u["Order #"] || "").trim() === String(id || "").trim()
+                  );
+                  return row
+                    ? row.Preview || row.Image || row["Art Link"] || ""
+                    : "";
+                };
+                const thumbFor = (j) => {
+                  if (j.artworkUrl && /^https?:\/\//i.test(j.artworkUrl)) return j.artworkUrl;
+                  if (j.imageFileId) return proxyThumb(j.imageFileId, "w160");
+                  const link = j.imageLink || artFallback(j.id);
+                  const fromDrive = deriveThumb(link);
+                  if (fromDrive) return fromDrive;
+                  const id = parseDriveId(link);
+                  return id ? proxyThumb(id, "w160") : "";
+                };
+
+                return (
+                  <div
+                    key={c.id}
+                    style={{
+                      border: c.preferBuy ? "1px solid #fecaca" : "1px solid #fde68a",
+                      background: c.preferBuy ? "#fffbfb" : "#fffef5",
+                      borderRadius: 12,
+                      padding: 12,
+                    }}
+                  >
+                    {/* Top: conflicting thread + buy badge */}
+                    <div
                       style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        border: "1px solid #fecaca",
-                        background: "#fef2f2",
-                        borderRadius: 8,
-                        padding: "8px 10px",
-                        marginBottom: 8,
-                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        marginBottom: 10,
                       }}
                     >
-                      <div style={{ fontWeight: 700, fontSize: 13, color: "#111827" }}>
-                        {rec.label}
+                      <div
+                        title={`${c.color} (Polyneon)`}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 8,
+                          border: "1px solid #d1d5db",
+                          background: swatch,
+                          flexShrink: 0,
+                          boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+                        }}
+                      />
+                      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: "#111827" }}>
+                          {c.color}{" "}
+                          <span style={{ fontWeight: 600, color: "#6b7280", fontSize: 12 }}>
+                            Polyneon
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "#6b7280" }}>
+                          Need {c.peakConesNeeded} · have {c.availableCones}
+                          {c.shortfall > 0 ? ` · short ${c.shortfall}` : ""}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                        Need {rec.peakConesNeeded} · have {rec.availableCones} · short {rec.shortfall}
+                      <div
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          padding: "6px 10px",
+                          borderRadius: 999,
+                          background: c.preferBuy ? "#fee2e2" : "#fef3c7",
+                          color: c.preferBuy ? "#991b1b" : "#92400e",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {c.preferBuy ? `Buy ${c.conesToBuy}` : "Reschedule"}
                       </div>
-                      <div style={{ fontSize: 11, color: "#991b1b", marginTop: 4 }}>
-                        {rec.reason}
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#854d0e" }}>
-                  Reschedule first ({(threadConflictSnapshot.conflicts || []).filter((c) => !c.preferBuy).length})
-                </div>
-                {(threadConflictSnapshot.conflicts || [])
-                  .filter((c) => !c.preferBuy)
-                  .map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setOverviewConflictId(c.id)}
-                      style={{
-                        display: "block",
-                        width: "100%",
-                        textAlign: "left",
-                        border: "1px solid #fde68a",
-                        background: "#fefce8",
-                        borderRadius: 8,
-                        padding: "8px 10px",
-                        marginBottom: 8,
-                        cursor: "pointer",
-                      }}
-                    >
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>
-                        {c.color} · optional {c.conesToBuy} cones
-                      </div>
-                      <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                        {formatConflictMachines(c)}
-                      </div>
-                    </button>
-                  ))}
-                {threadBuyOptional.length === 0 &&
-                  !(threadConflictSnapshot.conflicts || []).some((c) => !c.preferBuy) && (
-                    <div style={{ fontSize: 12, color: "#9ca3af" }}>
-                      All open conflicts lean toward buying.
                     </div>
-                  )}
-              </div>
+
+                    {/* Machine / job visual row */}
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: `repeat(${Math.max(byMachine.length, 1)}, minmax(0, 1fr))`,
+                        gap: 10,
+                        alignItems: "stretch",
+                      }}
+                    >
+                      {byMachine.map((j) => {
+                        const thumb = thumbFor(j);
+                        return (
+                            <div
+                              key={`${c.id}-${j.machineKey}-${j.id}`}
+                              style={{
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 10,
+                                background: "#fff",
+                                padding: 8,
+                                minWidth: 0,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: "#374151",
+                                  marginBottom: 6,
+                                  letterSpacing: 0.2,
+                                }}
+                              >
+                                {j.machineTitle || j.machineKey}
+                              </div>
+                              <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                                <div
+                                  style={{
+                                    width: 56,
+                                    height: 56,
+                                    borderRadius: 8,
+                                    border: "1px solid #e5e7eb",
+                                    background: "#f9fafb",
+                                    flexShrink: 0,
+                                    overflow: "hidden",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  {thumb ? (
+                                    <img
+                                      src={thumb}
+                                      alt=""
+                                      width={56}
+                                      height={56}
+                                      loading="lazy"
+                                      style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        objectFit: "cover",
+                                        display: "block",
+                                      }}
+                                    />
+                                  ) : (
+                                    <span style={{ fontSize: 9, color: "#9ca3af" }}>No art</span>
+                                  )}
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <div style={{ fontWeight: 800, fontSize: 13 }}>#{j.id}</div>
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: "#4b5563",
+                                      marginTop: 2,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                    title={j.company}
+                                  >
+                                    {j.company || "—"}
+                                  </div>
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: "#6b7280",
+                                      marginTop: 1,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                    title={j.design || j.product}
+                                  >
+                                    {j.design || j.product || "—"}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 4 }}>
+                                    {j.conesNeeded || 6} cones
+                                    {j.isLate ? " · LATE" : ""}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Shared conflict color callout between jobs */}
+                    <div
+                      style={{
+                        marginTop: 10,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        fontSize: 12,
+                        color: "#374151",
+                      }}
+                    >
+                      <span style={{ color: "#6b7280" }}>Conflicting thread</span>
+                      <span
+                        style={{
+                          width: 14,
+                          height: 14,
+                          borderRadius: 3,
+                          background: swatch,
+                          border: "1px solid #d1d5db",
+                          display: "inline-block",
+                        }}
+                      />
+                      <strong>{c.color}</strong>
+                      <span style={{ color: "#9ca3af" }}>
+                        on {byMachine.map((j) => j.machineTitle).join(" + ")}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-          )}
-
-          {overviewPanelConflicts.length > 0 && (
-            <ThreadConflictPanel
-              conflicts={overviewPanelConflicts}
-              selectedId={overviewConflictId}
-              onSelectConflict={setOverviewConflictId}
-              onClose={() => setOverviewConflictId(null)}
-            />
           )}
 
           {/* Materials To Order */}

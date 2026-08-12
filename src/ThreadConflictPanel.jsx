@@ -154,35 +154,76 @@ function ConflictBody({ conflict }) {
         </div>
       )}
 
-      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Jobs sharing this color</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
-        {(conflict.jobs || []).map((j) => (
-          <div
-            key={`${conflict.color}-${j.id}-${j.machineKey}`}
-            style={{
-              border: '1px solid #e5e7eb',
-              borderRadius: 8,
-              padding: '8px 10px',
-              fontSize: 12,
-              background: j.isLate ? '#fff1f2' : '#fafafa',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-              <strong>#{j.id}</strong>
-              <span style={{ color: '#374151' }}>{j.machineTitle} · {j.conesNeeded} cones</span>
-            </div>
-            <div style={{ color: '#4b5563', marginTop: 2 }}>
-              {[j.company, j.design || j.product].filter(Boolean).join(' · ')}
-            </div>
-            {(j.isLate || j.due_type) && (
-              <div style={{ color: '#6b7280', marginTop: 2 }}>
-                {j.isLate ? 'LATE' : ''}
-                {j.isLate && j.due_type ? ' · ' : ''}
-                {j.due_type || ''}
+      <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Jobs on each machine</div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        {(conflict.jobs || []).map((j) => {
+          const thumb =
+            (j.artworkUrl && /^https?:\/\//i.test(j.artworkUrl) && j.artworkUrl) ||
+            (j.imageFileId &&
+              `${(process.env.REACT_APP_API_ROOT || '').replace(/\/$/, '')}/drive/proxy/${j.imageFileId}?sz=w160`) ||
+            '';
+          return (
+            <div
+              key={`${conflict.color}-${j.id}-${j.machineKey}`}
+              style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: 8,
+                fontSize: 12,
+                background: j.isLate ? '#fff1f2' : '#fafafa',
+                display: 'flex',
+                gap: 8,
+              }}
+            >
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 6,
+                  border: '1px solid #e5e7eb',
+                  background: '#fff',
+                  flexShrink: 0,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {thumb ? (
+                  <img
+                    src={thumb}
+                    alt=""
+                    width={48}
+                    height={48}
+                    loading="lazy"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  />
+                ) : (
+                  <span style={{ fontSize: 9, color: '#9ca3af' }}>No art</span>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 800, color: '#374151' }}>{j.machineTitle}</div>
+                <div style={{ fontWeight: 700 }}>#{j.id}</div>
+                <div style={{ color: '#4b5563', marginTop: 2 }}>
+                  {[j.company, j.design || j.product].filter(Boolean).join(' · ')}
+                </div>
+                <div style={{ color: '#6b7280', marginTop: 2 }}>
+                  {j.conesNeeded} cones
+                  {j.isLate ? ' · LATE' : ''}
+                  {j.due_type ? ` · ${j.due_type}` : ''}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Suggestions</div>

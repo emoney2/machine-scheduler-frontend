@@ -74,6 +74,9 @@ export function collectScheduledJobs(columns) {
         due_date: job.due_date ?? job['Due Date'] ?? '',
         due_type: String(job.due_type ?? job['Hard Date/Soft Date'] ?? ''),
         isLate: !!job.isLate,
+        imageLink: String(job.imageLink || job.Image || job['Art Link'] || ''),
+        artworkUrl: String(job.artworkUrl || ''),
+        imageFileId: String(job.imageFileId || ''),
       });
     }
   }
@@ -225,6 +228,9 @@ export function detectThreadConflicts(columns, inventoryRaw) {
           due_date: j.due_date,
           due_type: j.due_type,
           isLate: j.isLate,
+          imageLink: j.imageLink || '',
+          artworkUrl: j.artworkUrl || '',
+          imageFileId: j.imageFileId || '',
         })),
       suggestions,
     });
