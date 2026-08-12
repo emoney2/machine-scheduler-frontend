@@ -1,18 +1,28 @@
 /**
- * Department Status — work backwards from Ship Date.
+ * Department Status — capacity schedule working backwards from Ship Date.
  *
  * Flow: Digitizing → (Fur ∥ Cut) → Print? → Embroidery → Sewing → Ship
+ *
+ * Model:
+ *   1) Per job, compute department finish-by dates by walking back from ship
+ *      (sewing 96 pcs/day, embroidery one-job-one-machine hours, etc.).
+ *   2) Shared shop capacity is reserved from the future toward today:
+ *      farthest deadlines claim days first, so a 1000-pc Sept 15 sew blocks
+ *      ~11 workdays ending on ship and those days cannot be used by other jobs.
+ *   3) Anything that cannot fit before today is "behind".
  *
  * Capacities (Mon–Fri, US national holidays off):
  *   Sewing:     96 pcs/day (ship day may include sewing)
  *   Embroidery: one job stays on one 6-head machine.
  *     Job hours = (stitches/30000)×(qty/6); calendar days = ceil(jobHours/8).
- *     Shop catch-up capacity = 3 machines × 8 hr = 24 machine-hours/day (different jobs in parallel).
+ *     Shop catch-up capacity = 3 machines × 8 hr = 24 machine-hours/day.
  *   Print:      3 min/pc × 8 hr = 160 pcs/day
- *   Cut / Fur / Digitizing: no pcs/day yet → past-due vs on-time only
+ *   Cut:        200 pcs/day (estimate)
+ *   Fur:        200 pcs/day (estimate)
+ *   Digitizing: 4 designs/day (estimate)
  */
 
-export const DEPT_PLANNING_DAYS = 30;
+export const DEPT_PLANNING_DAYS = 60;
 
 export const SEWING_PCS_PER_DAY = 96;
 export const EMB_STITCHES_PER_HOUR = 30000;
@@ -21,8 +31,13 @@ export const EMB_MACHINES = 3; // 6-head only; Machine 1 ignored
 export const HOURS_PER_DAY = 8;
 export const EMB_MACHINE_HOURS_PER_DAY = EMB_MACHINES * HOURS_PER_DAY; // 24
 export const PRINT_PCS_PER_DAY = Math.floor((HOURS_PER_DAY * 60) / 3); // 160
+export const CUT_PCS_PER_DAY = 200;
+export const FUR_PCS_PER_DAY = 200;
+export const DIGITIZE_DESIGNS_PER_DAY = 4;
 export const DEFAULT_STITCHES = 30000;
 export const DIGITIZE_LEAD_WORKDAYS = 3;
+/** Jobs due within this many workdays count as "coming up" in the detail list. */
+export const COMING_UP_WORKDAYS = 5;
 
 /** US federal holidays (observed) 2025–2027 — YYYY-MM-DD local */
 const US_HOLIDAYS = new Set([
@@ -203,18 +218,12 @@ export function computeDeadlines(job) {
 
   const hours = embMachineHours(job);
   // One job → one machine (8 hr/day). Do NOT divide across 3 machines.
-  // Example: 100 pcs @ 30k stitches → 16.67 hr → 3 workdays, not 16.67/24 ≈ 1 day.
   const embDays = Math.max(1, Math.ceil(hours / HOURS_PER_DAY - 1e-9));
-  // Must be embroidered before sewing starts that morning
   const embFinishBy = subWorkDays(sewingStart, 1);
   const embStart = subWorkDays(embFinishBy, embDays - 1);
 
   const printJob = needsPrint(job);
   const printFinishBy = printJob ? subWorkDays(embStart, 1) : null;
-  // Fur and Cut run in parallel after digitizing, but have separate finish targets
-  // so each department can show its own past-due pressure.
-  // Cut: 1 workday before print (or embroidery if no print)
-  // Fur: 2 workdays before that same gate (slightly earlier buffer)
   const nextGate = printJob ? printFinishBy : embStart;
   const cutFinishBy = subWorkDays(nextGate, 1);
   const furFinishBy = subWorkDays(nextGate, 2);
@@ -279,7 +288,6 @@ export function needsCut(job) {
 export function needsPrintDept(job) {
   if (isComplete(job) || !needsPrint(job)) return false;
   if (needsDigitizing(job)) return false;
-  // Print gated on fur AND cut
   if (!furComplete(job) || !cutComplete(job)) return false;
   return !printComplete(job);
 }
@@ -290,7 +298,6 @@ export function needsEmbroidery(job) {
   if (!printComplete(job)) return false;
   const stage = getStage(job);
   if (stage === 'SEWING' || stage === 'SEW') return false;
-  // Gates cleared and not yet in sewing → embroidery work remains
   return true;
 }
 
@@ -305,7 +312,6 @@ export function needsSewing(job) {
 
 /**
  * Will need sewing before ship — includes jobs still in digitizing/fur/cut/print/embroidery.
- * Used for sewing capacity catch-up so ship-today orders aren't invisible until they hit sewing.
  */
 export function willNeedSewing(job) {
   if (isComplete(job)) return false;
@@ -336,10 +342,8 @@ function stillNeeds(dept, job) {
     case 'print':
       return needsPrintDept(job);
     case 'embroidery':
-      // Forecast: all jobs that still must be embroidered before ship
       return willNeedEmbroidery(job);
     case 'sewing':
-      // Forecast: all jobs that still must be sewn before ship (not only Stage=SEWING)
       return willNeedSewing(job);
     default:
       return false;
@@ -371,52 +375,125 @@ function fmtMD(d) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
-function capacityCatchUp(items, dailyCapacity, now) {
-  let cum = 0;
-  let maxDeficit = 0;
+/**
+ * Reserve shared daily capacity from the future back to today.
+ * Farthest deadlines claim days first (a big Sept 15 sew blocks those days).
+ * Work that cannot fit on/after today becomes overflow → days behind.
+ */
+export function capacityScheduleBackward(items, dailyCapacity, now = new Date()) {
+  const today = startOfDay(now);
+  const sorted = [...(items || [])].sort((a, b) => {
+    const ta = a.deadline?.getTime?.() || 0;
+    const tb = b.deadline?.getTime?.() || 0;
+    if (tb !== ta) return tb - ta; // latest deadline first
+    return (b.work || 0) - (a.work || 0);
+  });
+
+  const capLeft = new Map(); // ymd -> remaining capacity that day
+  let totalOverflow = 0;
   let bottleneck = null;
   const enriched = [];
 
-  for (const item of items) {
-    cum += item.work;
-    const days = workdaysThrough(item.deadline, now);
-    const cap = days * dailyCapacity;
-    const deficit = cum - cap;
+  for (const item of sorted) {
+    let need = Math.max(0, Number(item.work) || 0);
+    let overflow = 0;
     const past = workdaysPastDue(item.deadline, now);
-    enriched.push({ ...item, cum, cap, deficit, pastDueWorkdays: past });
-    if (deficit > maxDeficit + 1e-9) {
-      maxDeficit = deficit;
-      bottleneck = item;
+
+    if (need <= 0 || !item.deadline) {
+      enriched.push({
+        ...item,
+        overflow: 0,
+        pastDueWorkdays: past,
+        scheduledOk: true,
+        risk: past > 0 ? 'late' : 'ok',
+      });
+      continue;
+    }
+
+    // Already past department deadline → entire load is late/overflow
+    if (past > 0) {
+      overflow = need;
+      need = 0;
+    } else {
+      const cursor = startOfDay(item.deadline);
+      let guard = 0;
+      while (need > 1e-9 && guard < 800) {
+        guard += 1;
+        if (!isWorkday(cursor)) {
+          cursor.setDate(cursor.getDate() - 1);
+          continue;
+        }
+        if (cursor.getTime() < today.getTime()) {
+          overflow += need;
+          need = 0;
+          break;
+        }
+        const key = ymd(cursor);
+        if (!capLeft.has(key)) capLeft.set(key, dailyCapacity);
+        const avail = capLeft.get(key);
+        const take = Math.min(avail, need);
+        capLeft.set(key, avail - take);
+        need -= take;
+        cursor.setDate(cursor.getDate() - 1);
+      }
+      if (need > 1e-9) {
+        overflow += need;
+        need = 0;
+      }
+    }
+
+    totalOverflow += overflow;
+    const daysThrough = workdaysThrough(item.deadline, now);
+    const row = {
+      ...item,
+      overflow,
+      pastDueWorkdays: past,
+      scheduledOk: overflow < 1e-9,
+      daysThrough,
+      risk:
+        past > 0 || overflow > 1e-9
+          ? 'late'
+          : daysThrough > 0 && daysThrough <= COMING_UP_WORKDAYS
+          ? 'soon'
+          : 'ok',
+    };
+    enriched.push(row);
+    if (overflow > 1e-9 && (!bottleneck || overflow > (bottleneck.overflow || 0))) {
+      bottleneck = row;
     }
   }
 
-  const daysBehind = dailyCapacity > 0 ? maxDeficit / dailyCapacity : 0;
+  const daysBehind = dailyCapacity > 0 ? totalOverflow / dailyCapacity : 0;
+  const lateCount = enriched.filter((r) => r.risk === 'late').length;
+  const soonCount = enriched.filter((r) => r.risk === 'soon').length;
+
   return {
-    maxDeficit,
+    mode: 'capacity',
+    maxDeficit: totalOverflow,
     daysBehind: Math.round(daysBehind * 10) / 10,
     bottleneck,
     items: enriched,
-    totalWork: cum,
+    totalWork: (items || []).reduce((s, i) => s + (Number(i.work) || 0), 0),
+    lateCount,
+    soonCount,
+    dailyCapacity,
   };
 }
 
-function pastDueSummary(items, now) {
-  let pastDueCount = 0;
-  let maxPast = 0;
-  const enriched = items.map((item) => {
-    const past = workdaysPastDue(item.deadline, now);
-    if (past > 0) {
-      pastDueCount += 1;
-      if (past > maxPast) maxPast = past;
-    }
-    return { ...item, pastDueWorkdays: past };
-  });
-  return {
-    pastDueCount,
-    daysBehind: maxPast, // max workdays late
-    items: enriched,
-    totalWork: items.length,
-  };
+function riskSort(a, b, now) {
+  const rank = { late: 0, soon: 1, ok: 2 };
+  const ra = rank[a.risk] ?? 2;
+  const rb = rank[b.risk] ?? 2;
+  if (ra !== rb) return ra - rb;
+  const pa = a.pastDueWorkdays ?? workdaysPastDue(a.deadline, now);
+  const pb = b.pastDueWorkdays ?? workdaysPastDue(b.deadline, now);
+  if (pa !== pb) return pb - pa;
+  const oa = a.overflow || 0;
+  const ob = b.overflow || 0;
+  if (Math.abs(ob - oa) > 1e-9) return ob - oa;
+  const dd = (a.deadline?.getTime?.() || 0) - (b.deadline?.getTime?.() || 0);
+  if (dd !== 0) return dd;
+  return String(a.id || '').localeCompare(String(b.id || ''));
 }
 
 /**
@@ -480,98 +557,79 @@ export function computeDepartmentStatus(jobs, now = new Date()) {
       });
     }
 
-    rows.sort((a, b) => {
-      const ds = a.ship - b.ship;
-      if (ds !== 0) return ds;
-      return a.id.localeCompare(b.id);
-    });
+    let dailyCapacity = null;
+    if (dept === 'sewing') dailyCapacity = SEWING_PCS_PER_DAY;
+    else if (dept === 'embroidery') dailyCapacity = EMB_MACHINE_HOURS_PER_DAY;
+    else if (dept === 'print') dailyCapacity = PRINT_PCS_PER_DAY;
+    else if (dept === 'cut') dailyCapacity = CUT_PCS_PER_DAY;
+    else if (dept === 'fur') dailyCapacity = FUR_PCS_PER_DAY;
+    else if (dept === 'digitizing') dailyCapacity = DIGITIZE_DESIGNS_PER_DAY;
 
-    let result;
-    if (dept === 'sewing') {
-      result = capacityCatchUp(rows, SEWING_PCS_PER_DAY, now);
-      result.mode = 'capacity';
-      result.unit = 'pcs';
-      result.dailyCapacity = SEWING_PCS_PER_DAY;
-    } else if (dept === 'embroidery') {
-      result = capacityCatchUp(rows, EMB_MACHINE_HOURS_PER_DAY, now);
-      result.mode = 'capacity';
-      result.unit = 'mch-hrs';
-      result.dailyCapacity = EMB_MACHINE_HOURS_PER_DAY;
-    } else if (dept === 'print') {
-      result = capacityCatchUp(rows, PRINT_PCS_PER_DAY, now);
-      result.mode = 'capacity';
-      result.unit = 'pcs';
-      result.dailyCapacity = PRINT_PCS_PER_DAY;
-    } else {
-      result = pastDueSummary(rows, now);
-      result.mode = 'deadline';
-      result.unit = dept === 'digitizing' ? 'designs' : 'pcs';
-      result.dailyCapacity = null;
-      // For display pressure: prefer past-due count; daysBehind = max lateness
-      result.maxDeficit = result.pastDueCount;
-    }
+    const result = capacityScheduleBackward(rows, dailyCapacity, now);
+    result.unit =
+      dept === 'digitizing' ? 'designs' : dept === 'embroidery' ? 'mch-hrs' : 'pcs';
+    result.dailyCapacity = dailyCapacity;
 
-    const behind =
-      (result.mode === 'capacity' && result.daysBehind > 0.05) ||
-      (result.mode === 'deadline' && (result.pastDueCount || 0) > 0);
+    const behind = result.daysBehind > 0.05;
     const jobCount = rows.length;
+    const lateCount = result.lateCount || 0;
+    const soonCount = result.soonCount || 0;
 
     let headline;
     let subline;
-    if (result.mode === 'capacity') {
-      if (result.daysBehind > 0.05) {
-        headline = `+${result.daysBehind}d`;
-        subline = 'behind';
-      } else if (jobCount === 0) {
-        headline = '—';
-        subline = 'clear';
-      } else {
-        headline = 'OK';
-        subline = 'on pace';
-      }
-    } else if ((result.pastDueCount || 0) > 0) {
-      headline = String(result.pastDueCount);
-      subline = 'past due';
-    } else if (jobCount === 0) {
+    if (jobCount === 0) {
       headline = '—';
       subline = 'clear';
+    } else if (behind) {
+      headline = `+${result.daysBehind}d`;
+      subline = lateCount ? `${lateCount} late` : 'behind';
+    } else if (soonCount > 0) {
+      headline = String(soonCount);
+      subline = 'due soon';
     } else {
-      headline = String(jobCount);
-      subline = 'on time';
+      headline = 'OK';
+      subline = 'on pace';
     }
 
-    const nextJobs = [...(result.items || rows)]
-      .sort((a, b) => {
-        const pa = a.pastDueWorkdays ?? workdaysPastDue(a.deadline, now);
-        const pb = b.pastDueWorkdays ?? workdaysPastDue(b.deadline, now);
-        if (pa !== pb) return pb - pa;
-        const dd = (a.deadline?.getTime?.() || 0) - (b.deadline?.getTime?.() || 0);
-        if (dd !== 0) return dd;
-        return a.ship - b.ship;
-      })
-      .slice(0, 12);
+    // Detail list: late + coming up only (not every open job)
+    const atRisk = [...(result.items || [])]
+      .filter((r) => r.risk === 'late' || r.risk === 'soon')
+      .sort((a, b) => riskSort(a, b, now));
+
+    // If nothing at risk, show the next few soonest deadlines so the modal isn't empty when OK
+    const nextJobs = (
+      atRisk.length
+        ? atRisk
+        : [...(result.items || [])].sort((a, b) => riskSort(a, b, now)).slice(0, 8)
+    ).slice(0, 20);
 
     let readyNow = 0;
     if (dept === 'sewing') {
       readyNow = rows.filter((r) => needsSewing(r.job)).length;
     } else if (dept === 'embroidery') {
       readyNow = rows.filter((r) => needsEmbroidery(r.job)).length;
+    } else if (dept === 'digitizing') {
+      readyNow = rows.length;
+    } else if (dept === 'fur') {
+      readyNow = rows.filter((r) => needsFur(r.job)).length;
+    } else if (dept === 'cut') {
+      readyNow = rows.filter((r) => needsCut(r.job)).length;
+    } else if (dept === 'print') {
+      readyNow = rows.filter((r) => needsPrintDept(r.job)).length;
     }
 
     if (dept === 'sewing' || dept === 'embroidery') {
-      if (jobCount === 0) {
-        subline = 'clear';
-      } else if (behind) {
-        subline = `behind · ${readyNow} ready / ${jobCount} to ship`;
-      } else {
-        subline = `on pace · ${readyNow} ready / ${jobCount} to ship`;
-      }
+      if (jobCount === 0) subline = 'clear';
+      else if (behind) subline = `behind · ${readyNow} ready now`;
+      else if (soonCount > 0) subline = `${soonCount} due soon · ${readyNow} ready`;
+      else subline = `on pace · ${readyNow} ready`;
     }
 
     departments[dept] = {
       id: dept,
       label: DEPT_LABELS[dept],
       ...result,
+      pastDueCount: lateCount,
       jobCount,
       readyNow,
       behind,
@@ -582,14 +640,12 @@ export function computeDepartmentStatus(jobs, now = new Date()) {
     };
   }
 
-  // Floater target = largest deficit
+  // Floater target = largest capacity deficit (days behind)
   let focusId = null;
   let bestScore = -Infinity;
   for (const dept of DEPT_ORDER) {
     const d = departments[dept];
-    let score = 0;
-    if (d.mode === 'capacity') score = d.daysBehind;
-    else score = d.pastDueCount > 0 ? d.daysBehind + d.pastDueCount * 0.1 : 0;
+    const score = d.daysBehind || 0;
     if (score > bestScore + 1e-9) {
       bestScore = score;
       focusId = score > 0.05 ? dept : focusId;

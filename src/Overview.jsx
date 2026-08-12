@@ -12,6 +12,7 @@ import {
   computeDepartmentStatus,
   DEPT_ORDER,
   DEPT_PLANNING_DAYS,
+  COMING_UP_WORKDAYS,
 } from "./utils/departmentStatus";
 
 const GOAL_CONFETTI_COLORS = [
@@ -3222,8 +3223,8 @@ function col(width, center = false) {
               </span>
             </div>
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-              Floater: work the highlighted department. Sewing &amp; Embroidery include upcoming
-              ship dates even if the job is still upstream. Click a card for jobs (with artwork).
+              Capacity from ship dates backward (sewing 96/day, emb machine-hours, etc.). Cards
+              show days behind or due soon — not open job counts. Click for late / coming-up jobs.
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
               {DEPT_ORDER.map((deptId) => {
@@ -3266,9 +3267,7 @@ function col(width, center = false) {
                       {loadingUpcoming && !deptPlanningJobs.length ? "…" : d.headline}
                     </div>
                     <div style={{ fontSize: 11, color: "#6b7280" }}>
-                      {loadingUpcoming && !deptPlanningJobs.length
-                        ? "loading…"
-                        : `${d.subline}${d.jobCount ? ` · ${d.jobCount} open` : ""}`}
+                      {loadingUpcoming && !deptPlanningJobs.length ? "loading…" : d.subline}
                     </div>
                   </button>
                 );
@@ -3310,17 +3309,28 @@ function col(width, center = false) {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 800, fontSize: 16 }}>{deptDetail.label}</div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                      {deptDetail.forecastsUpstream
-                        ? deptDetail.behind
-                          ? `${deptDetail.headline} behind · ${deptDetail.readyNow || 0} ready now · ${deptDetail.jobCount} must ship (incl. upstream)`
-                          : `${deptDetail.subline}`
-                        : deptDetail.mode === "capacity"
-                        ? deptDetail.behind
-                          ? `${deptDetail.headline} behind · ${deptDetail.jobCount} jobs ready`
-                          : `${deptDetail.subline} · ${deptDetail.jobCount} jobs ready`
+                      {deptDetail.jobCount === 0
+                        ? "Nothing in the planning window."
                         : deptDetail.behind
-                        ? `${deptDetail.pastDueCount} past deadline · ${deptDetail.jobCount} ready`
-                        : `${deptDetail.jobCount} jobs on time / ready`}
+                        ? `${deptDetail.headline} behind capacity${
+                            deptDetail.dailyCapacity
+                              ? ` · ${deptDetail.dailyCapacity} ${deptDetail.unit}/day`
+                              : ""
+                          }${
+                            deptDetail.readyNow
+                              ? ` · ${deptDetail.readyNow} ready now`
+                              : ""
+                          }`
+                        : (deptDetail.soonCount || 0) > 0
+                        ? `${deptDetail.soonCount} due within ${COMING_UP_WORKDAYS} workdays · on pace overall`
+                        : `On pace${
+                            deptDetail.dailyCapacity
+                              ? ` · ${deptDetail.dailyCapacity} ${deptDetail.unit}/day`
+                              : ""
+                          }`}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
+                      Showing late and coming-up jobs (not every open order).
                     </div>
                   </div>
                   <button
@@ -3339,15 +3349,25 @@ function col(width, center = false) {
                   </button>
                 </div>
                 {!deptDetail.nextJobs?.length ? (
-                  <div style={{ fontSize: 13, color: "#6b7280" }}>Nothing waiting in this department.</div>
+                  <div style={{ fontSize: 13, color: "#6b7280" }}>
+                    No late or coming-up jobs in this department.
+                  </div>
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {deptDetail.nextJobs.map((j) => {
-                      const late = (j.pastDueWorkdays || 0) > 0;
+                      const risk = j.risk || ((j.pastDueWorkdays || 0) > 0 ? "late" : "ok");
+                      const late = risk === "late";
+                      const soon = risk === "soon";
                       const rawJob = j.job || {};
                       const thumb = deriveThumb(
                         rawJob.Preview || rawJob.Image || rawJob["Art Link"] || ""
                       );
+                      const riskLabel = late
+                        ? "LATE"
+                        : soon
+                        ? "DUE SOON"
+                        : "ON PACE";
+                      const riskColor = late ? "#991b1b" : soon ? "#92400e" : "#166534";
                       return (
                         <div
                           key={`${deptDetail.id}-${j.id}-${j.product}`}
@@ -3358,7 +3378,7 @@ function col(width, center = false) {
                             border: "1px solid #e5e7eb",
                             borderRadius: 8,
                             padding: "8px 10px",
-                            background: late ? "#fff1f2" : "#fafafa",
+                            background: late ? "#fff1f2" : soon ? "#fffbeb" : "#fafafa",
                             fontSize: 12,
                           }}
                         >
@@ -3392,20 +3412,25 @@ function col(width, center = false) {
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                               <strong>#{j.id}</strong>
-                              <span>
-                                Ship {j.shipLabel} · due by {j.deadlineLabel}
-                              </span>
+                              <span style={{ fontWeight: 700, color: riskColor }}>{riskLabel}</span>
+                            </div>
+                            <div style={{ color: "#4b5563", marginTop: 2 }}>
+                              Ship {j.shipLabel} · need by {j.deadlineLabel}
                             </div>
                             <div style={{ color: "#4b5563", marginTop: 2 }}>
                               {[j.company, j.design || j.product].filter(Boolean).join(" · ")}
                             </div>
                             <div style={{ color: "#6b7280", marginTop: 2 }}>
-                              {j.qty} pcs
+                              {deptDetail.id === "digitizing"
+                                ? "1 design"
+                                : `${j.qty} pcs`}
                               {deptDetail.id === "embroidery"
                                 ? ` · ${Number(j.work).toFixed(1)} machine-hrs`
                                 : ""}
                               {j.stage ? ` · ${j.stage}` : ""}
-                              {late ? " · PAST DUE for this step" : ""}
+                              {late && (j.pastDueWorkdays || 0) > 0
+                                ? ` · ${j.pastDueWorkdays}d past step deadline`
+                                : ""}
                             </div>
                           </div>
                         </div>
