@@ -247,13 +247,30 @@ const LS_OVERVIEW_KEY = "jrco.overview.cache.v2";
 
 const LS_METRICS_KEY = "jrco.metrics.cache.v1";
 
-// Backend `/overview` keeps a 30s in-memory cache; bypass unless explicitly disabled.
+// Backend `/overview` keeps a 30s in-memory cache. Default: use it (avoids stacked
+// Sheet rebuilds that starve rebuild-materials / leave Materials To Order empty).
+// Set REACT_APP_OVERVIEW_BYPASS_SERVER_CACHE=1 to always force a fresh build.
 const OVERVIEW_BYPASS_SERVER_CACHE =
-  (process.env.REACT_APP_OVERVIEW_BYPASS_SERVER_CACHE || "1").trim() !== "0";
+  (process.env.REACT_APP_OVERVIEW_BYPASS_SERVER_CACHE || "0").trim() === "1";
 
 function withOverviewNoCache(url) {
-  if (!OVERVIEW_BYPASS_SERVER_CACHE) return url;
   return url.includes("?") ? `${url}&nocache=1` : `${url}?nocache=1`;
+}
+
+function isOverviewAbortError(err) {
+  if (!err) return false;
+  if (axios.isCancel?.(err)) return true;
+  const code = err.code || err.name || "";
+  const msg = String(err.message || "").toLowerCase();
+  return (
+    code === "ERR_CANCELED" ||
+    code === "CanceledError" ||
+    err.name === "CanceledError" ||
+    err.name === "AbortError" ||
+    msg.includes("canceled") ||
+    msg.includes("cancelled") ||
+    msg.includes("aborted")
+  );
 }
 
 // Simple Axios GET with per-attempt timeouts and exponential backoff
@@ -265,7 +282,7 @@ async function getWithRetry(axiosInstance, url, baseConfig = {}, attempts = [150
       return res;
     } catch (err) {
       lastErr = err;
-      if (axios.isCancel(err)) throw err;
+      if (axios.isCancel(err) || isOverviewAbortError(err)) throw err;
       const wait = 1000 * Math.pow(1.5, i);
       await new Promise(r => setTimeout(r, wait));
     }
@@ -1195,6 +1212,7 @@ function col(width, center = false) {
     // 2) Fetch fresh in background (stale-while-revalidate)
     async function loadFresh(opts = {}) {
       const bypassDebounce = !!(opts && opts.bypassDebounce);
+      const forceFresh = !!(opts && (opts.forceFresh || opts.bypassDebounce));
       // ⛔ Debounce: skip if last fetch < 5s ago (unless rebuilding / explicit refresh)
       const nowTs = Date.now();
       if (!bypassDebounce && nowTs - (lastFetchAtRef.current || 0) < 5000) return;
@@ -1229,10 +1247,14 @@ function col(width, center = false) {
 
         // Single source: GET /overview only (Production Orders via backend). Do not merge /combined —
         // that produced two stacked blocks (duplicate / mixed rows vs the overview payload).
-        const overviewUrl = withOverviewNoCache(`${ROOT}/overview`);
+        const overviewUrl =
+          forceFresh || OVERVIEW_BYPASS_SERVER_CACHE
+            ? withOverviewNoCache(`${ROOT}/overview`)
+            : `${ROOT}/overview`;
         console.log("[Overview upcoming] source=backend-overview (Production Orders tab only)", {
           overviewUrl,
           daysWindow,
+          forceFresh,
         });
         const overRes = await getWithRetry(
           axios,
@@ -1333,10 +1355,13 @@ function col(width, center = false) {
         );
         markUpdated();
       } catch (e) {
-        console.error("Overview loadFresh failed:", e);
-        // Ensure materials is set to empty array on error
-        setMaterials([]);
-        setMaterialsFuture([]);
+        // Abort/cancel is expected when a newer refresh starts — keep prior materials.
+        if (isOverviewAbortError(e)) {
+          console.warn("Overview loadFresh aborted (keeping prior materials)");
+        } else {
+          console.error("Overview loadFresh failed:", e);
+          // Stale-while-revalidate: do not wipe materials on transient errors.
+        }
       } finally {
         fetchLockRef.current = false;
         if (!alive) return;
@@ -1417,7 +1442,7 @@ function col(width, center = false) {
   const recalculateMaterialsToOrder = useCallback(async () => {
     setMaterialsRebuildErr(null);
     setRebuildingMaterials(true);
-    setLoadingMaterials(true);
+    // Keep existing lists visible; only spin the button (avoid full-panel "Loading…")
     try {
       await axios.post(
         `${ROOT}/overview/rebuild-materials`,
@@ -1432,7 +1457,7 @@ function col(width, center = false) {
         localStorage.removeItem(LS_OVERVIEW_KEY);
       } catch {}
       const rf = refreshOverviewRef.current;
-      if (typeof rf === "function") await rf({ bypassDebounce: true });
+      if (typeof rf === "function") await rf({ bypassDebounce: true, forceFresh: true });
     } catch (err) {
       const body = err?.response?.data;
       let msg =
