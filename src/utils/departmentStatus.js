@@ -511,6 +511,42 @@ function riskSort(a, b, now) {
 }
 
 /**
+ * Deadline-only risk (no shared capacity). Used for digitizing:
+ * LATE = past department due date; SOON = due within COMING_UP_WORKDAYS.
+ */
+export function deadlineRiskOnly(items, now = new Date()) {
+  const enriched = (items || []).map((item) => {
+    const past = workdaysPastDue(item.deadline, now);
+    const daysThrough = workdaysThrough(item.deadline, now);
+    return {
+      ...item,
+      overflow: 0,
+      pastDueWorkdays: past,
+      scheduledOk: past <= 0,
+      daysThrough,
+      risk:
+        past > 0
+          ? 'late'
+          : daysThrough > 0 && daysThrough <= COMING_UP_WORKDAYS
+          ? 'soon'
+          : 'ok',
+    };
+  });
+
+  return {
+    mode: 'deadline',
+    maxDeficit: 0,
+    daysBehind: 0,
+    bottleneck: null,
+    items: enriched,
+    totalWork: (items || []).reduce((s, i) => s + (Number(i.work) || 0), 0),
+    lateCount: enriched.filter((r) => r.risk === 'late').length,
+    soonCount: enriched.filter((r) => r.risk === 'soon').length,
+    dailyCapacity: null,
+  };
+}
+
+/**
  * @param {object[]} jobs - Production order rows (overview upcoming shape)
  * @param {Date} [now]
  */
@@ -578,23 +614,37 @@ export function computeDepartmentStatus(jobs, now = new Date()) {
     else if (dept === 'print') dailyCapacity = PRINT_PCS_PER_DAY;
     else if (dept === 'cut') dailyCapacity = CUT_PCS_PER_DAY;
     else if (dept === 'fur') dailyCapacity = FUR_PCS_PER_DAY;
-    else if (dept === 'digitizing') dailyCapacity = DIGITIZE_DESIGNS_PER_DAY;
+    // Digitizing: per-job dig due only (no shared 4/day capacity)
 
-    const result = capacityScheduleBackward(rows, dailyCapacity, now);
+    const deadlineOnly = dept === 'digitizing';
+    const result = deadlineOnly
+      ? deadlineRiskOnly(rows, now)
+      : capacityScheduleBackward(rows, dailyCapacity, now);
     result.unit =
       dept === 'digitizing' ? 'designs' : dept === 'embroidery' ? 'mch-hrs' : 'pcs';
     result.dailyCapacity = dailyCapacity;
 
-    const behind = result.daysBehind > 0.05;
     const jobCount = rows.length;
     const lateCount = result.lateCount || 0;
     const soonCount = result.soonCount || 0;
+    const behind = deadlineOnly ? lateCount > 0 : result.daysBehind > 0.05;
 
     let headline;
     let subline;
     if (jobCount === 0) {
       headline = '—';
       subline = 'clear';
+    } else if (deadlineOnly) {
+      if (lateCount > 0) {
+        headline = String(lateCount);
+        subline = 'past dig due';
+      } else if (soonCount > 0) {
+        headline = String(soonCount);
+        subline = 'due soon';
+      } else {
+        headline = 'OK';
+        subline = `${jobCount} open`;
+      }
     } else if (behind) {
       headline = `+${result.daysBehind}d`;
       subline = lateCount ? `${lateCount} late` : 'behind';
@@ -655,12 +705,13 @@ export function computeDepartmentStatus(jobs, now = new Date()) {
     };
   }
 
-  // Floater target = largest capacity deficit (days behind)
+  // Floater target: capacity days-behind, or digitizing calendar past-due count
   let focusId = null;
   let bestScore = -Infinity;
   for (const dept of DEPT_ORDER) {
     const d = departments[dept];
-    const score = d.daysBehind || 0;
+    const score =
+      d.mode === 'deadline' ? Number(d.lateCount) || 0 : Number(d.daysBehind) || 0;
     if (score > bestScore + 1e-9) {
       bestScore = score;
       focusId = score > 0.05 ? dept : focusId;

@@ -3434,6 +3434,16 @@ function col(width, center = false) {
                     <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
                       {deptDetail.jobCount === 0
                         ? "Nothing in the planning window."
+                        : deptDetail.mode === "deadline"
+                        ? (deptDetail.lateCount || 0) > 0
+                          ? `${deptDetail.lateCount} past dig due${
+                              (deptDetail.soonCount || 0) > 0
+                                ? ` · ${deptDetail.soonCount} due soon`
+                                : ""
+                            }`
+                          : (deptDetail.soonCount || 0) > 0
+                          ? `${deptDetail.soonCount} due within ${COMING_UP_WORKDAYS} workdays`
+                          : `${deptDetail.jobCount} open · none late`
                         : deptDetail.behind
                         ? `${deptDetail.headline} behind capacity${
                             deptDetail.dailyCapacity
@@ -3453,7 +3463,9 @@ function col(width, center = false) {
                           }`}
                     </div>
                     <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>
-                      Showing late and coming-up jobs (not every open order).
+                      {deptDetail.mode === "deadline"
+                        ? "Each card shows that job’s dig due date (from ship date). Late = past that date."
+                        : "Showing late and coming-up jobs (not every open order)."}
                     </div>
                   </div>
                   <button
@@ -3481,6 +3493,8 @@ function col(width, center = false) {
                       const risk = j.risk || ((j.pastDueWorkdays || 0) > 0 ? "late" : "ok");
                       const late = risk === "late";
                       const soon = risk === "soon";
+                      const pastDays = Number(j.pastDueWorkdays) || 0;
+                      const throughDays = Number(j.daysThrough);
                       const rawJob = j.job || {};
                       const thumb = deriveThumb(
                         rawJob.Preview || rawJob.Image || rawJob["Art Link"] || ""
@@ -3497,16 +3511,13 @@ function col(width, center = false) {
                           : deptDetail.id === "embroidery"
                           ? "Emb due"
                           : `${deptDetail.label} due`;
-                      const pastDays = Number(j.pastDueWorkdays) || 0;
-                      const throughDays = Number(j.daysThrough);
-                      const paceLabel =
-                        pastDays > 0
-                          ? `${pastDays}d late`
-                          : Number.isFinite(throughDays) && throughDays > 1
-                          ? `${throughDays}d early`
-                          : Number.isFinite(throughDays) && throughDays > 0
-                          ? "due today"
-                          : null;
+                      const paceLabel = late
+                        ? `${pastDays}d late`
+                        : Number.isFinite(throughDays) && throughDays > 1
+                        ? `${throughDays}d left`
+                        : Number.isFinite(throughDays) && throughDays > 0
+                        ? "due today"
+                        : null;
                       return (
                         <div
                           key={`${deptDetail.id}-${j.id}-${j.product}`}
@@ -3559,7 +3570,7 @@ function col(width, center = false) {
                                 <span
                                   style={{
                                     fontWeight: 700,
-                                    color: pastDays > 0 ? "#991b1b" : soon ? "#92400e" : "#166534",
+                                    color: late ? "#991b1b" : soon ? "#92400e" : "#166534",
                                   }}
                                 >
                                   {" "}
