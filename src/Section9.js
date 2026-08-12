@@ -146,7 +146,7 @@ export default function Section9(props) {
     let interval = null;
     const boot = setTimeout(() => {
       fetchMaterialStatus();
-      interval = setInterval(fetchMaterialStatus, 180000);
+      interval = setInterval(fetchMaterialStatus, 60000);
     }, 2800);
     return () => {
       clearTimeout(boot);
