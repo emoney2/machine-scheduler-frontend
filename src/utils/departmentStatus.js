@@ -19,7 +19,7 @@
  *   Print:      3 min/pc × 8 hr = 160 pcs/day
  *   Cut:        200 pcs/day (estimate)
  *   Fur:        200 pcs/day (estimate)
- *   Digitizing: 4 designs/day (estimate)
+ *   Digitizing: per-job dig due from ship (no shared capacity queue)
  *
  * Exclusions: towels and belts are never counted (not manufactured here).
  * Backs are excluded from sewing load only (same as Sewing Priority).
