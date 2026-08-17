@@ -5,6 +5,9 @@
  * Machine 1 single cones are not tracked in inventory the same way.
  * If the same color is on two or more 6-head machines, cones needed = 6 × machines.
  * Yellow conflict when on-hand cones cannot cover that.
+ * Sheet inventory is remaining length (feet / 16500), not physical cones.
+ * A 6-head machine pulls evenly from all 6 cones, so leftover length is spread
+ * across a multiple of 6 cones — not emptied one cone at a time.
  * Buy recommendations always round up to pods of 6, and skip colors already
  * covered by on-order cones.
  */
@@ -138,12 +141,14 @@ function detailFromRaw(raw) {
       status: raw,
       inventory: raw === 'green' ? 6 : 0,
       onOrder: raw === 'yellow' ? 6 : 0,
+      cones: raw === 'green' ? 6 : 0,
       conesKnown: false,
     };
   }
   if (raw && typeof raw === 'object') {
     const inventory = Number(raw.inventory ?? raw.Inventory ?? raw.quantity ?? 0);
     const onOrder = Number(raw.onOrder ?? raw.on_order ?? raw['On Order'] ?? 0);
+    const cones = Number(raw.cones ?? raw.physicalCones);
     let status = raw.status;
     if (!status) {
       if (inventory > 0) status = 'green';
@@ -154,6 +159,7 @@ function detailFromRaw(raw) {
       status,
       inventory: Number.isFinite(inventory) ? inventory : 0,
       onOrder: Number.isFinite(onOrder) ? onOrder : 0,
+      cones: Number.isFinite(cones) && cones > 0 ? Math.floor(cones) : 0,
       conesKnown: true,
     };
   }
@@ -180,6 +186,7 @@ export function normalizeInventoryMap(rawMap) {
         status: entry.inventory > 0 || prev.inventory > 0 ? 'green' : entry.status || prev.status,
         inventory: Math.max(prev.inventory || 0, entry.inventory || 0),
         onOrder: Math.max(prev.onOrder || 0, entry.onOrder || 0),
+        cones: Math.max(prev.cones || 0, entry.cones || 0),
         conesKnown: !!(prev.conesKnown || entry.conesKnown),
       };
     } else {
@@ -212,11 +219,24 @@ export function lookupInventoryEntry(rawMap, color) {
   return null;
 }
 
+/**
+ * Convert remaining cone-equivalents (total feet / 16500) into loadable cones.
+ * Usage comes off every cone in a 6-cone set equally, so 11.21 remaining still
+ * means 12 physical cones, not 11 full + one leftover.
+ */
+export function physicalConesFromRemaining(remaining) {
+  const n = Number(remaining);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.ceil(n / CONE_POD_SIZE - 1e-9) * CONE_POD_SIZE;
+}
+
 export function availableCones(invEntry) {
   if (!invEntry) return 0;
-  const n = Number(invEntry.inventory);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.floor(n));
+  const counted = Number(invEntry.cones);
+  if (Number.isFinite(counted) && counted > 0) {
+    return Math.max(0, Math.floor(counted));
+  }
+  return physicalConesFromRemaining(invEntry.inventory);
 }
 
 function onOrderCones(invEntry) {
