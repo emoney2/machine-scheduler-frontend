@@ -7,6 +7,7 @@ import ThreadConflictPanel, { ThreadConflictStrip } from './ThreadConflictPanel'
 import {
   detectThreadConflicts,
   persistThreadConflicts,
+  lookupInventoryEntry,
 } from './utils/threadConflicts';
 
 const THREAD_CONFLICT_BORDER = '#ca8a04';
@@ -23,6 +24,7 @@ function formatStitchCountK(job) {
 export default function Section9(props) {
   const [status, setStatus] = useState('');
   const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
+  const [threadInventoryReady, setThreadInventoryReady] = useState(false);
   const [materialInventoryStatus, setMaterialInventoryStatus] = useState({});
   const [conflictStripOpen, setConflictStripOpen] = useState(false);
   const [conflictPanelIds, setConflictPanelIds] = useState(null); // null | string[] of conflict ids
@@ -88,6 +90,7 @@ export default function Section9(props) {
         const data = res.data;
         if (data && typeof data === 'object' && !Array.isArray(data)) {
           setThreadInventoryStatus(data);
+          setThreadInventoryReady(true);
           return;
         }
       } catch (_) {}
@@ -103,15 +106,12 @@ export default function Section9(props) {
             : { status: row.status ?? 'green', inventory: 0, onOrder: 0 };
         });
         setThreadInventoryStatus(map);
+        setThreadInventoryReady(true);
       } catch (_) {}
     };
-    let interval = null;
-    const boot = setTimeout(() => {
-      fetchThreadStatus();
-      interval = setInterval(fetchThreadStatus, 180000);
-    }, 1400);
+    fetchThreadStatus();
+    const interval = setInterval(fetchThreadStatus, 180000);
     return () => {
-      clearTimeout(boot);
       if (interval) clearInterval(interval);
     };
   }, []);
@@ -156,7 +156,7 @@ export default function Section9(props) {
 
   // Helper: get thread status (red | yellow | green). Supports API returning string or { status, inventory, onOrder }.
   const getThreadStatus = (threadCode) => {
-    const raw = threadInventoryStatus[threadCode];
+    const raw = lookupInventoryEntry(threadInventoryStatus, threadCode);
     if (raw === undefined || raw === null) return 'green';
     if (typeof raw === 'string') return raw;
     if (typeof raw === 'object' && raw !== null) {
@@ -173,13 +173,14 @@ export default function Section9(props) {
   };
 
   const conflictResult = useMemo(
-    () => detectThreadConflicts(safeColumns, threadInventoryStatus),
-    [safeColumns, threadInventoryStatus]
+    () => detectThreadConflicts(safeColumns, threadInventoryReady ? threadInventoryStatus : null),
+    [safeColumns, threadInventoryStatus, threadInventoryReady]
   );
 
   useEffect(() => {
+    if (!threadInventoryReady) return;
     persistThreadConflicts(conflictResult);
-  }, [conflictResult]);
+  }, [conflictResult, threadInventoryReady]);
 
   const openConflictsForJob = (jobId) => {
     const list = conflictResult.byJobId?.[String(jobId)] || [];

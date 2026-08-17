@@ -5,6 +5,8 @@ import { socket } from "./socketClient";
 import { supabase } from "./supabaseClient";
 import {
   loadPersistedThreadConflicts,
+  persistThreadConflicts,
+  applyInventoryToConflicts,
 } from "./utils/threadConflicts";
 import {
   computeDepartmentStatus,
@@ -1122,17 +1124,38 @@ function col(width, center = false) {
     loadPersistedThreadConflicts()
   );
 
-  const refreshThreadConflicts = useCallback(() => {
+  const loadLocalThreadConflicts = useCallback(() => {
     setThreadConflictSnapshot(loadPersistedThreadConflicts());
+  }, []);
+
+  const refreshThreadConflicts = useCallback(async () => {
+    const snap = loadPersistedThreadConflicts();
+    if (!snap) {
+      setThreadConflictSnapshot(null);
+      return;
+    }
+    try {
+      const res = await axios.get(`${ROOT}/thread-inventory-status`, { withCredentials: true });
+      const data = res.data;
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const next = applyInventoryToConflicts(snap, data);
+        persistThreadConflicts(next);
+        setThreadConflictSnapshot(next);
+        return;
+      }
+    } catch (_) {
+      /* keep persisted snapshot if inventory fetch fails */
+    }
+    setThreadConflictSnapshot(snap);
   }, []);
 
   useEffect(() => {
     refreshThreadConflicts();
     const onFocus = () => refreshThreadConflicts();
     const onStorage = (e) => {
-      if (!e.key || e.key === "threadScheduleConflicts.v1") refreshThreadConflicts();
+      if (!e.key || e.key === "threadScheduleConflicts.v1") loadLocalThreadConflicts();
     };
-    const onCustom = () => refreshThreadConflicts();
+    const onCustom = () => loadLocalThreadConflicts();
     window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
     window.addEventListener("threadScheduleConflictsUpdated", onCustom);
@@ -1143,7 +1166,7 @@ function col(width, center = false) {
       window.removeEventListener("threadScheduleConflictsUpdated", onCustom);
       window.clearInterval(interval);
     };
-  }, [refreshThreadConflicts]);
+  }, [refreshThreadConflicts, loadLocalThreadConflicts]);
 
   const threadConflictCount = threadConflictSnapshot?.summary?.conflictCount || 0;
 

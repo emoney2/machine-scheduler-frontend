@@ -5,7 +5,8 @@
  * Machine 1 single cones are not tracked in inventory the same way.
  * If the same color is on two or more 6-head machines, cones needed = 6 × machines.
  * Yellow conflict when on-hand cones cannot cover that.
- * Buy recommendations always round up to pods of 6.
+ * Buy recommendations always round up to pods of 6, and skip colors already
+ * covered by on-order cones.
  */
 
 /** Only multi-head machines — Machine 1 (1-head) is excluded */
@@ -20,22 +21,62 @@ const MACHINE_TITLES = {
 /** Default Madeira pod size when recommending a purchase */
 export const CONE_POD_SIZE = 6;
 
+function emptyConflictResult(extra = {}) {
+  return {
+    conflicts: [],
+    byJobId: {},
+    buyRecommendations: [],
+    optionalBuy: [],
+    summary: {
+      conflictCount: 0,
+      jobCount: 0,
+      buyCount: 0,
+    },
+    computedAt: new Date().toISOString(),
+    ...extra,
+  };
+}
+
+/**
+ * Extract a 4-digit Madeira code from a sheet label or job token.
+ * Accepts "1800", "1800.00", "1800 Polyneon", etc.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+export function madeiraCode(raw) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  const m = s.match(/\b(\d{4})\b/);
+  if (m) return m[1];
+  const m2 = s.match(/^(\d{4})(?:\.0+)?$/);
+  return m2 ? m2[1] : '';
+}
+
 /**
  * @param {unknown} raw
  * @returns {string[]}
  */
 export function parseThreadCodes(raw) {
-  if (Array.isArray(raw)) {
-    return raw.map((c) => String(c).trim()).filter(Boolean);
-  }
   if (raw == null) return [];
-  const s = String(raw).trim();
-  if (!s) return [];
-  return s
-    .split(/[,;\s]+/)
-    .map((c) => c.trim())
-    .filter((c) => /^\d{4}$/.test(c) || c.length > 0)
-    .filter(Boolean);
+  const text = Array.isArray(raw)
+    ? raw.map((c) => String(c)).join(' ')
+    : String(raw);
+  if (!text.trim()) return [];
+  const found = [];
+  const seen = new Set();
+  const re = /\b(\d{4})\b/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    if (!seen.has(m[1])) {
+      seen.add(m[1]);
+      found.push(m[1]);
+    }
+  }
+  if (!found.length) {
+    const code = madeiraCode(text);
+    if (code) found.push(code);
+  }
+  return found;
 }
 
 /**
@@ -91,8 +132,37 @@ function toDate(v) {
   return isNaN(d.getTime()) ? null : d;
 }
 
+function detailFromRaw(raw) {
+  if (typeof raw === 'string') {
+    return {
+      status: raw,
+      inventory: raw === 'green' ? 6 : 0,
+      onOrder: raw === 'yellow' ? 6 : 0,
+      conesKnown: false,
+    };
+  }
+  if (raw && typeof raw === 'object') {
+    const inventory = Number(raw.inventory ?? raw.Inventory ?? raw.quantity ?? 0);
+    const onOrder = Number(raw.onOrder ?? raw.on_order ?? raw['On Order'] ?? 0);
+    let status = raw.status;
+    if (!status) {
+      if (inventory > 0) status = 'green';
+      else if (onOrder > 0 && inventory + onOrder > 0) status = 'yellow';
+      else status = 'red';
+    }
+    return {
+      status,
+      inventory: Number.isFinite(inventory) ? inventory : 0,
+      onOrder: Number.isFinite(onOrder) ? onOrder : 0,
+      conesKnown: true,
+    };
+  }
+  return null;
+}
+
 /**
  * Normalize inventory map entries to { inventory, onOrder, status }.
+ * Keys are indexed by 4-digit Madeira code so "1800 Polyneon" matches job "1800".
  */
 export function normalizeInventoryMap(rawMap) {
   const map = {};
@@ -100,33 +170,46 @@ export function normalizeInventoryMap(rawMap) {
   for (const [code, raw] of Object.entries(rawMap)) {
     const key = String(code).trim();
     if (!key) continue;
-    if (typeof raw === 'string') {
-      map[key] = {
-        status: raw,
-        inventory: raw === 'green' ? 6 : 0,
-        onOrder: raw === 'yellow' ? 6 : 0,
-        conesKnown: false,
+    const entry = detailFromRaw(raw);
+    if (!entry) continue;
+    const four = madeiraCode(key);
+    const indexKey = four || key;
+    const prev = map[indexKey];
+    if (prev) {
+      map[indexKey] = {
+        status: entry.inventory > 0 || prev.inventory > 0 ? 'green' : entry.status || prev.status,
+        inventory: Math.max(prev.inventory || 0, entry.inventory || 0),
+        onOrder: Math.max(prev.onOrder || 0, entry.onOrder || 0),
+        conesKnown: !!(prev.conesKnown || entry.conesKnown),
       };
-      continue;
+    } else {
+      map[indexKey] = entry;
     }
-    if (raw && typeof raw === 'object') {
-      const inventory = Number(raw.inventory ?? raw.Inventory ?? raw.quantity ?? 0);
-      const onOrder = Number(raw.onOrder ?? raw.on_order ?? raw['On Order'] ?? 0);
-      let status = raw.status;
-      if (!status) {
-        if (inventory > 0) status = 'green';
-        else if (onOrder > 0 && inventory + onOrder > 0) status = 'yellow';
-        else status = 'red';
-      }
-      map[key] = {
-        status,
-        inventory: Number.isFinite(inventory) ? inventory : 0,
-        onOrder: Number.isFinite(onOrder) ? onOrder : 0,
-        conesKnown: true,
-      };
+    if (key !== indexKey && !map[key]) {
+      map[key] = map[indexKey];
     }
   }
   return map;
+}
+
+/**
+ * Find an inventory row for a job thread code, even when sheet labels include
+ * a color name or trailing ".00".
+ */
+export function lookupInventoryEntry(rawMap, color) {
+  if (!rawMap || typeof rawMap !== 'object') return null;
+  if (color != null && rawMap[color] !== undefined && rawMap[color] !== null) {
+    return rawMap[color];
+  }
+  const code = madeiraCode(color);
+  if (code && rawMap[code] !== undefined && rawMap[code] !== null) {
+    return rawMap[code];
+  }
+  if (!code) return null;
+  for (const [k, v] of Object.entries(rawMap)) {
+    if (madeiraCode(k) === code) return v;
+  }
+  return null;
 }
 
 export function availableCones(invEntry) {
@@ -136,106 +219,106 @@ export function availableCones(invEntry) {
   return Math.max(0, Math.floor(n));
 }
 
-/**
- * Same color on 2+ machines + not enough cones → conflict.
- */
-export function detectThreadConflicts(columns, inventoryRaw) {
-  const inventory = normalizeInventoryMap(inventoryRaw);
-  const scheduled = collectScheduledJobs(columns);
+function onOrderCones(invEntry) {
+  if (!invEntry) return 0;
+  const n = Number(invEntry.onOrder);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.floor(n));
+}
 
-  /** @type {Map<string, typeof scheduled>} */
-  const byColor = new Map();
-  for (const job of scheduled) {
-    for (const color of job.colors) {
-      if (!byColor.has(color)) byColor.set(color, []);
-      byColor.get(color).push(job);
-    }
-  }
+function buyQtyFor(shortfallAfterOrders) {
+  if (shortfallAfterOrders <= 0) return 0;
+  return Math.max(
+    CONE_POD_SIZE,
+    Math.ceil(shortfallAfterOrders / CONE_POD_SIZE) * CONE_POD_SIZE
+  );
+}
 
-  const conflicts = [];
-
-  for (const [color, jobsForColor] of byColor) {
-    if (jobsForColor.length < 2) continue;
-
-    /** @type {Map<string, { machineKey: string, machineTitle: string, headCount: number }>} */
-    const machines = new Map();
-    for (const j of jobsForColor) {
-      if (!machines.has(j.machineKey)) {
-        machines.set(j.machineKey, {
-          machineKey: j.machineKey,
-          machineTitle: j.machineTitle,
-          headCount: j.headCount,
-        });
-      }
-    }
-
-    if (machines.size < 2) continue;
-
-    const peakCones = Array.from(machines.values()).reduce((sum, m) => sum + m.headCount, 0);
-
-    const invEntry = inventory[color];
-    const avail =
-      invEntry?.conesKnown === false
-        ? invEntry?.status === 'green'
-          ? 6
-          : 0
-        : availableCones(invEntry);
-
-    if (peakCones <= avail) continue;
-
-    const shortfall = peakCones - avail;
-    // Always buy in pods of 6 (never recommend 1–5 cones)
-    const conesToBuy = Math.max(
-      CONE_POD_SIZE,
-      Math.ceil(shortfall / CONE_POD_SIZE) * CONE_POD_SIZE
-    );
-    const jobsList = jobsForColor.slice();
-    const preferBuy = shouldPreferBuy(jobsList, machines.size);
-    const suggestions = buildSuggestions({
-      color,
-      jobs: jobsList,
-      machines: Array.from(machines.values()),
-      avail,
-      peakCones,
-      shortfall,
-      conesToBuy,
-      preferBuy,
-    });
-
-    conflicts.push({
-      id: `color-${color}`,
-      color,
-      peakConesNeeded: peakCones,
-      availableCones: avail,
-      onOrderCones: invEntry ? Math.max(0, Math.floor(Number(invEntry.onOrder) || 0)) : 0,
-      shortfall,
-      conesToBuy,
-      preferBuy,
-      preferReschedule: !preferBuy,
-      machineCount: machines.size,
-      jobs: jobsList
-        .slice()
-        .sort((a, b) => a.machineKey.localeCompare(b.machineKey) || a.id.localeCompare(b.id))
-        .map((j) => ({
-          id: j.id,
-          company: j.company,
-          design: j.design,
-          product: j.product,
-          machineKey: j.machineKey,
-          machineTitle: j.machineTitle,
-          headCount: j.headCount,
-          conesNeeded: j.headCount,
-          due_date: j.due_date,
-          due_type: j.due_type,
-          isLate: j.isLate,
-          imageLink: j.imageLink || '',
-          artworkUrl: j.artworkUrl || '',
-          imageFileId: j.imageFileId || '',
-        })),
-      suggestions,
+function machinesFromJobs(jobs) {
+  const machines = new Map();
+  for (const j of jobs) {
+    const key = j.machineKey || j.machineTitle;
+    if (!key || machines.has(key)) continue;
+    machines.set(key, {
+      machineKey: j.machineKey || key,
+      machineTitle: j.machineTitle || MACHINE_TITLES[j.machineKey] || key,
+      headCount: Number(j.headCount) > 0 ? Number(j.headCount) : 6,
     });
   }
+  return machines;
+}
 
+function mapConflictJob(j) {
+  return {
+    id: j.id,
+    company: j.company,
+    design: j.design,
+    product: j.product,
+    machineKey: j.machineKey,
+    machineTitle: j.machineTitle,
+    headCount: j.headCount,
+    conesNeeded: j.headCount || j.conesNeeded || 6,
+    due_date: j.due_date,
+    due_type: j.due_type,
+    isLate: j.isLate,
+    imageLink: j.imageLink || '',
+    artworkUrl: j.artworkUrl || '',
+    imageFileId: j.imageFileId || '',
+  };
+}
+
+function evaluateColorConflict({ color, jobs, invEntry }) {
+  const machines = machinesFromJobs(jobs);
+  if (machines.size < 2) return null;
+
+  const peakCones = Array.from(machines.values()).reduce((sum, m) => sum + m.headCount, 0);
+  const avail =
+    invEntry?.conesKnown === false
+      ? invEntry?.status === 'green'
+        ? 6
+        : 0
+      : availableCones(invEntry);
+  const onOrder = onOrderCones(invEntry);
+
+  if (peakCones <= avail) return null;
+
+  const shortfall = peakCones - avail;
+  const shortfallAfterOrders = Math.max(0, peakCones - avail - onOrder);
+  const conesToBuy = buyQtyFor(shortfallAfterOrders);
+  const jobsList = jobs.slice();
+  const preferBuy = conesToBuy > 0 && shouldPreferBuy(jobsList, machines.size);
+  const suggestions = buildSuggestions({
+    color,
+    jobs: jobsList,
+    machines: Array.from(machines.values()),
+    avail,
+    onOrder,
+    peakCones,
+    shortfall,
+    conesToBuy,
+    preferBuy,
+  });
+
+  return {
+    id: `color-${color}`,
+    color,
+    peakConesNeeded: peakCones,
+    availableCones: avail,
+    onOrderCones: onOrder,
+    shortfall,
+    conesToBuy,
+    preferBuy,
+    preferReschedule: !preferBuy,
+    machineCount: machines.size,
+    jobs: jobsList
+      .slice()
+      .sort((a, b) => String(a.machineKey || '').localeCompare(String(b.machineKey || '')) || String(a.id).localeCompare(String(b.id)))
+      .map(mapConflictJob),
+    suggestions,
+  };
+}
+
+function finalizeConflicts(conflicts) {
   conflicts.sort((a, b) => {
     if (a.preferBuy !== b.preferBuy) return a.preferBuy ? -1 : 1;
     return b.shortfall - a.shortfall;
@@ -291,6 +374,67 @@ export function detectThreadConflicts(columns, inventoryRaw) {
   };
 }
 
+/**
+ * Same color on 2+ machines + not enough cones → conflict.
+ * Pass `inventoryRaw = null` when inventory has not loaded yet so Overview
+ * is not overwritten with false "have 0" buy lists.
+ */
+export function detectThreadConflicts(columns, inventoryRaw) {
+  if (inventoryRaw == null) {
+    return emptyConflictResult({ inventoryReady: false });
+  }
+
+  const inventory = normalizeInventoryMap(inventoryRaw);
+  const scheduled = collectScheduledJobs(columns);
+
+  /** @type {Map<string, typeof scheduled>} */
+  const byColor = new Map();
+  for (const job of scheduled) {
+    for (const color of job.colors) {
+      if (!byColor.has(color)) byColor.set(color, []);
+      byColor.get(color).push(job);
+    }
+  }
+
+  const conflicts = [];
+
+  for (const [color, jobsForColor] of byColor) {
+    if (jobsForColor.length < 2) continue;
+    const invEntry = lookupInventoryEntry(inventory, color);
+    const conflict = evaluateColorConflict({
+      color,
+      jobs: jobsForColor,
+      invEntry,
+    });
+    if (conflict) conflicts.push(conflict);
+  }
+
+  return { ...finalizeConflicts(conflicts), inventoryReady: true };
+}
+
+/**
+ * Re-score a persisted Scheduler snapshot against live Thread Inventory.
+ * Used by Overview Refresh so "have 0" false positives drop without reopening Scheduler.
+ */
+export function applyInventoryToConflicts(result, inventoryRaw) {
+  if (!result || !Array.isArray(result.conflicts) || inventoryRaw == null) {
+    return result || emptyConflictResult();
+  }
+  const inventory = normalizeInventoryMap(inventoryRaw);
+  const conflicts = [];
+  for (const c of result.conflicts) {
+    const color = madeiraCode(c.color) || String(c.color || '').trim();
+    if (!color || !Array.isArray(c.jobs) || c.jobs.length < 2) continue;
+    const conflict = evaluateColorConflict({
+      color,
+      jobs: c.jobs,
+      invEntry: lookupInventoryEntry(inventory, color),
+    });
+    if (conflict) conflicts.push(conflict);
+  }
+  return { ...finalizeConflicts(conflicts), inventoryReady: true };
+}
+
 function shouldPreferBuy(jobs, machineCount) {
   if (machineCount >= 3) return true;
   const now = Date.now();
@@ -316,7 +460,7 @@ function buyReason(conflict) {
   return `Hard/near due dates make keeping color ${conflict.color} on one machine at a time difficult.`;
 }
 
-function buildSuggestions({ color, jobs, machines, avail, peakCones, shortfall, conesToBuy, preferBuy }) {
+function buildSuggestions({ color, jobs, machines, avail, onOrder, peakCones, shortfall, conesToBuy, preferBuy }) {
   const suggestions = [];
   const machineNames = machines.map((m) => m.machineTitle).join(' and ');
   const jobBits = jobs.map((j) => `#${j.id} (${j.machineTitle})`).join(', ');
@@ -327,6 +471,9 @@ function buildSuggestions({ color, jobs, machines, avail, peakCones, shortfall, 
   suggestions.push(
     `Need ${peakCones} cones to load those machines at once; you have ${avail} on hand.`
   );
+  if (onOrder > 0) {
+    suggestions.push(`${onOrder} cone${onOrder === 1 ? '' : 's'} already on order.`);
+  }
   suggestions.push(
     `Run jobs with ${color} on one machine at a time, or move one job so they are not on different machines together.`
   );
@@ -341,6 +488,10 @@ function buildSuggestions({ color, jobs, machines, avail, peakCones, shortfall, 
         `Optional buy: ${conesToBuy} cones of ${color} if you want those machines to run ${color} at the same time.`
       );
     }
+  } else if (onOrder > 0 && shortfall > 0) {
+    suggestions.push(
+      `Do not buy more — on-order cones cover the ${shortfall}-cone gap. Wait for the order or keep this color on one machine at a time.`
+    );
   }
   return suggestions;
 }
@@ -349,6 +500,7 @@ const STORAGE_KEY = 'threadScheduleConflicts.v1';
 
 export function persistThreadConflicts(result) {
   try {
+    if (result && result.inventoryReady === false) return;
     const payload = {
       ...result,
       persistedAt: new Date().toISOString(),
