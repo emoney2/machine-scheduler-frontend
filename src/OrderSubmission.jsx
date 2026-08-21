@@ -88,9 +88,23 @@ const blankNewMaterialData = (name = "") => ({
   color: "#000000",
 });
 
-function isUnknownInventoryName(name, materialsInv) {
+function prefillNewMaterialData(name, meta = {}) {
+  const m = meta[String(name || "").trim().toLowerCase()] || {};
+  return {
+    materialName: name || "",
+    unit: m.unit || "",
+    minInv: m.minInv || "",
+    reorder: m.reorder || "",
+    cost: m.cost || "",
+    vendor: m.vendor || "",
+    color: m.color || "#000000",
+  };
+}
+
+function isUnknownInventoryName(name, materialsInv, incompleteNames) {
   const n = String(name || "").trim();
   if (!n) return false;
+  if (incompleteNames && incompleteNames.has(n.toLowerCase())) return true;
   const known = new Set(
     (materialsInv || [])
       .map((v) => String(v || "").trim().toLowerCase())
@@ -99,9 +113,10 @@ function isUnknownInventoryName(name, materialsInv) {
   return !known.has(n.toLowerCase());
 }
 
-/** First material / back / fur value that is not yet on Material Inventory. */
-function findMissingMaterial(form, materialsInv) {
-  const unknown = (name) => isUnknownInventoryName(name, materialsInv);
+/** First material / back / fur value that is not yet a complete inventory row. */
+function findMissingMaterial(form, materialsInv, incompleteNames) {
+  const unknown = (name) =>
+    isUnknownInventoryName(name, materialsInv, incompleteNames);
   const mats = Array.isArray(form?.materials) ? form.materials : [];
   for (let i = 0; i < mats.length; i++) {
     if (unknown(mats[i])) {
@@ -273,6 +288,8 @@ export default function OrderSubmission() {
 
   // ─── MATERIALS inventory + refs ───────────────────────────────
   const [materialsInv, setMaterialsInv] = useState([]);
+  const [incompleteMaterials, setIncompleteMaterials] = useState(() => new Set());
+  const [materialInvMeta, setMaterialInvMeta] = useState({});
   // an array of refs for Material1–5
   const materialInputRefs = useRef([null, null, null, null, null]);
   // single ref for Back Material
@@ -517,17 +534,15 @@ export default function OrderSubmission() {
     .includes(form.product.trim().toLowerCase());
   const materialsInvalid =
     form.materials.filter(m => m.trim()).some(m =>
-      !materialsInv.map(v => v.toLowerCase()).includes(m.trim().toLowerCase())
+      isUnknownInventoryName(m, materialsInv, incompleteMaterials)
     )
     || (
       form.backMaterial.trim() &&
-      !materialsInv.map(v => v.toLowerCase())
-               .includes(form.backMaterial.trim().toLowerCase())
+      isUnknownInventoryName(form.backMaterial, materialsInv, incompleteMaterials)
     )
     || (
       form.furColor.trim() &&
-      !materialsInv.map(v => v.toLowerCase())
-               .includes(form.furColor.trim().toLowerCase())
+      isUnknownInventoryName(form.furColor, materialsInv, incompleteMaterials)
     );
   // Fur color is not needed for yardage book holders, scorecard holders,
   // or any needlepoint product.
@@ -771,11 +786,28 @@ useEffect(() => {
     timeout: 45000,
     validateStatus: s => s >= 200 && s < 400,
   };
-  axios.get(`${API_ROOT}/materials`, cfg)
+  axios.get(`${API_ROOT}/materials?details=1`, cfg)
     .then(res => {
-      const arr = Array.isArray(res.data) ? res.data : [];
-      console.log("[/materials] payload size:", arr.length);
-      setMaterialsInv(arr);
+      const raw = Array.isArray(res.data) ? res.data : [];
+      const names = [];
+      const incomplete = new Set();
+      const meta = {};
+      for (const row of raw) {
+        if (typeof row === "string") {
+          const n = row.trim();
+          if (n) names.push(n);
+          continue;
+        }
+        const n = String(row?.name || row?.materialName || "").trim();
+        if (!n) continue;
+        names.push(n);
+        meta[n.toLowerCase()] = row;
+        if (row.complete === false) incomplete.add(n.toLowerCase());
+      }
+      console.log("[/materials] payload size:", names.length, "incomplete:", incomplete.size);
+      setMaterialsInv(names);
+      setIncompleteMaterials(incomplete);
+      setMaterialInvMeta(meta);
     })
     .catch(err => {
       console.error("Failed to load materials:", err?.message || err);
@@ -907,10 +939,10 @@ const companyNames = companies.map((opt) => opt.value);
   const promptNewMaterialIfUnknown = (type, index, rawName) => {
     if (isNewMaterialModalOpen) return false;
     const name = String(rawName || "").trim();
-    if (!isUnknownInventoryName(name, materialsInv)) return false;
+    if (!isUnknownInventoryName(name, materialsInv, incompleteMaterials)) return false;
     setIsSubmittingOverlay(false);
     setModalMaterialField({ type, index });
-    setNewMaterialData(blankNewMaterialData(name));
+    setNewMaterialData(prefillNewMaterialData(name, materialInvMeta));
     setIsNewMaterialModalOpen(true);
     return true;
   };
@@ -1060,13 +1092,13 @@ const handleSubmit = async (e) => {
 
   // Unknown materials first — never cover the Add New Material modal
   // with the yellow "Submitting…" overlay (including reorders).
-  const missingMat = findMissingMaterial(form, materialsInv);
+  const missingMat = findMissingMaterial(form, materialsInv, incompleteMaterials);
   if (missingMat) {
     setModalMaterialField({
       type: missingMat.type,
       index: missingMat.index,
     });
-    setNewMaterialData(blankNewMaterialData(missingMat.name));
+    setNewMaterialData(prefillNewMaterialData(missingMat.name, materialInvMeta));
     setIsNewMaterialModalOpen(true);
     return;
   }
@@ -1465,8 +1497,20 @@ const handleSaveNewCompany = async () => {
       alert("Material successfully added");
 
       const savedName = newMaterialData.materialName;
-      const updatedInv = [...materialsInv, savedName];
+      const savedKey = savedName.trim().toLowerCase();
+      const updatedInv = materialsInv.some(
+        (m) => String(m || "").trim().toLowerCase() === savedKey
+      )
+        ? materialsInv
+        : [...materialsInv, savedName];
       setMaterialsInv(updatedInv);
+      const nextIncomplete = new Set(incompleteMaterials);
+      nextIncomplete.delete(savedKey);
+      setIncompleteMaterials(nextIncomplete);
+      setMaterialInvMeta((prev) => ({
+        ...prev,
+        [savedKey]: { ...newMaterialData, name: savedName, complete: true },
+      }));
 
       // 2) Update the form field that triggered it
       let nextForm = form;
@@ -1486,13 +1530,13 @@ const handleSaveNewCompany = async () => {
       setNewMaterialErrors({});
 
       // If another new material is still on the order, keep the modal open for it
-      const nextMissing = findMissingMaterial(nextForm, updatedInv);
+      const nextMissing = findMissingMaterial(nextForm, updatedInv, nextIncomplete);
       if (nextMissing) {
         setModalMaterialField({
           type: nextMissing.type,
           index: nextMissing.index,
         });
-        setNewMaterialData(blankNewMaterialData(nextMissing.name));
+        setNewMaterialData(prefillNewMaterialData(nextMissing.name, materialInvMeta));
         return;
       }
 
