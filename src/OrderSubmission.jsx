@@ -88,17 +88,20 @@ const blankNewMaterialData = (name = "") => ({
   color: "#000000",
 });
 
-/** First material / back / fur value that is not yet on Material Inventory. */
-function findMissingMaterial(form, materialsInv) {
+function isUnknownInventoryName(name, materialsInv) {
+  const n = String(name || "").trim();
+  if (!n) return false;
   const known = new Set(
     (materialsInv || [])
       .map((v) => String(v || "").trim().toLowerCase())
       .filter(Boolean)
   );
-  const unknown = (name) => {
-    const n = String(name || "").trim();
-    return Boolean(n) && !known.has(n.toLowerCase());
-  };
+  return !known.has(n.toLowerCase());
+}
+
+/** First material / back / fur value that is not yet on Material Inventory. */
+function findMissingMaterial(form, materialsInv) {
+  const unknown = (name) => isUnknownInventoryName(name, materialsInv);
   const mats = Array.isArray(form?.materials) ? form.materials : [];
   for (let i = 0; i < mats.length; i++) {
     if (unknown(mats[i])) {
@@ -901,6 +904,17 @@ const companyNames = companies.map((opt) => opt.value);
 
 
 
+  const promptNewMaterialIfUnknown = (type, index, rawName) => {
+    if (isNewMaterialModalOpen) return false;
+    const name = String(rawName || "").trim();
+    if (!isUnknownInventoryName(name, materialsInv)) return false;
+    setIsSubmittingOverlay(false);
+    setModalMaterialField({ type, index });
+    setNewMaterialData(blankNewMaterialData(name));
+    setIsNewMaterialModalOpen(true);
+    return true;
+  };
+
   const handleMaterialChange = (i, val) => {
     setForm((prev) => {
       const m = [...prev.materials];
@@ -1044,11 +1058,23 @@ const handleSubmit = async (e) => {
   console.log("🛎️ isReorder:", form.isReorder);
   e.preventDefault();
 
-  // Show overlay immediately when submit button is clicked
+  // Unknown materials first — never cover the Add New Material modal
+  // with the yellow "Submitting…" overlay (including reorders).
+  const missingMat = findMissingMaterial(form, materialsInv);
+  if (missingMat) {
+    setModalMaterialField({
+      type: missingMat.type,
+      index: missingMat.index,
+    });
+    setNewMaterialData(blankNewMaterialData(missingMat.name));
+    setIsNewMaterialModalOpen(true);
+    return;
+  }
+
+  // Show overlay only after the order is actually ready to send
   setIsSubmittingOverlay(true);
 
-  // Reorders skip company/product checks (copied from the original job),
-  // but new materials must still be added to Material Inventory.
+  // Reorders skip company/product checks (copied from the original job).
   if (!form.isReorder) {
     // 1) Company check
     const companyLower = form.company.trim().toLowerCase();
@@ -1083,18 +1109,6 @@ const handleSubmit = async (e) => {
       setNewProductData(p => ({ ...p, product: form.product }));
       return setIsNewProductModalOpen(true);
     }
-  }
-
-  // 3) Materials check — always, including reorders
-  const missingMat = findMissingMaterial(form, materialsInv);
-  if (missingMat) {
-    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
-    setModalMaterialField({
-      type: missingMat.type,
-      index: missingMat.index,
-    });
-    setNewMaterialData(blankNewMaterialData(missingMat.name));
-    return setIsNewMaterialModalOpen(true);
   }
 
   // ── New: ensure any non‑empty Material[i] has form.materialPercents[i] filled ──
@@ -2032,7 +2046,7 @@ const handleSaveNewCompany = async () => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1000,
+            zIndex: 10050,
           }}
         >
           <div
@@ -3050,6 +3064,7 @@ const handleSaveNewCompany = async () => {
                     placeholder={`Material ${i + 1}${i === 0 ? "*" : ""}`}
                     value={form.materials[i]}
                     onChange={handleMaterialInput(i)}
+                    onBlur={() => promptNewMaterialIfUnknown("materials", i, form.materials[i])}
                     list="os-material-list"
                     autoComplete="off"
                     required={i === 0}
@@ -3084,6 +3099,7 @@ const handleSaveNewCompany = async () => {
                     placeholder={`Material ${i + 1}`}
                     value={form.materials[i]}
                     onChange={handleMaterialInput(i)}
+                    onBlur={() => promptNewMaterialIfUnknown("materials", i, form.materials[i])}
                     list="os-material-list"
                     autoComplete="off"
                     style={{ flex: 1, padding: "0.5rem", border: "1px solid #ccc", borderRadius: "4px" }}
@@ -3115,6 +3131,7 @@ const handleSaveNewCompany = async () => {
                   placeholder={`Back Material${form.product.toLowerCase().includes("full") ? "*" : ""}`}
                   value={form.backMaterial}
                   onChange={handleBackMaterialInput}
+                  onBlur={() => promptNewMaterialIfUnknown("backMaterial", null, form.backMaterial)}
                   list="os-material-list"
                   autoComplete="off"
                   required={form.product.toLowerCase().includes("full")}
@@ -3148,6 +3165,7 @@ const handleSaveNewCompany = async () => {
                   placeholder={`Fur Color${furNotNeeded ? "" : "*"}`}
                   value={form.furColor}
                   onChange={handleFurColorInput}
+                  onBlur={() => promptNewMaterialIfUnknown("furColor", null, form.furColor)}
                   list="os-material-list"
                   autoComplete="off"
                   required={!furNotNeeded}
