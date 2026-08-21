@@ -78,6 +78,50 @@ function extractDriveIdFromAny(link) {
   return m ? m[1] : null;
 }
 
+const blankNewMaterialData = (name = "") => ({
+  materialName: name || "",
+  unit: "",
+  minInv: "",
+  reorder: "",
+  cost: "",
+  vendor: "",
+  color: "#000000",
+});
+
+/** First material / back / fur value that is not yet on Material Inventory. */
+function findMissingMaterial(form, materialsInv) {
+  const known = new Set(
+    (materialsInv || [])
+      .map((v) => String(v || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const unknown = (name) => {
+    const n = String(name || "").trim();
+    return Boolean(n) && !known.has(n.toLowerCase());
+  };
+  const mats = Array.isArray(form?.materials) ? form.materials : [];
+  for (let i = 0; i < mats.length; i++) {
+    if (unknown(mats[i])) {
+      return { type: "materials", index: i, name: String(mats[i]).trim() };
+    }
+  }
+  if (unknown(form?.backMaterial)) {
+    return {
+      type: "backMaterial",
+      index: null,
+      name: String(form.backMaterial).trim(),
+    };
+  }
+  if (unknown(form?.furColor)) {
+    return {
+      type: "furColor",
+      index: null,
+      name: String(form.furColor).trim(),
+    };
+  }
+  return null;
+}
+
 /**
  * Tiny JPEG for localStorage when API did not return primaryFileId (older backend).
  */
@@ -237,15 +281,7 @@ export default function OrderSubmission() {
   const [isNewMaterialModalOpen, setIsNewMaterialModalOpen] = useState(false);
   const [modalMaterialField, setModalMaterialField] = useState(null);
   const [vendorsList, setVendorsList] = useState([]); // from Material Inventory column K (Vendor)
-  const [newMaterialData, setNewMaterialData] = useState({
-    materialName: "",
-    unit: "",
-    minInv: "",
-    reorder: "",
-    cost: "",
-    vendor: "",
-    color: "#000000",
-  });
+  const [newMaterialData, setNewMaterialData] = useState(blankNewMaterialData());
   const [newMaterialErrors, setNewMaterialErrors] = useState({});
 
   const handleNewMaterialChange = (e) => {
@@ -1011,70 +1047,53 @@ const handleSubmit = async (e) => {
   // Show overlay immediately when submit button is clicked
   setIsSubmittingOverlay(true);
 
-  // ⛔ Skip all validation if this is a reorder
-  if (form.isReorder) {
-    return submitForm();
+  // Reorders skip company/product checks (copied from the original job),
+  // but new materials must still be added to Material Inventory.
+  if (!form.isReorder) {
+    // 1) Company check
+    const companyLower = form.company.trim().toLowerCase();
+    const knownCompanies = companies.map(c => c.value.toLowerCase());
+    if (!knownCompanies.includes(companyLower)) {
+      setIsSubmittingOverlay(false);  // Hide overlay on validation failure
+      setNewCompanyData(dc => ({ ...dc, companyName: form.company }));
+      return setIsNewCompanyModalOpen(true);
+    }
+
+    // 2) Product check
+    let table;
+    try {
+      const res = await fetch(`${API_ROOT}/table`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Table fetch failed");
+      table = await res.json();
+    } catch (err) {
+      console.error("Could not load Table data:", err);
+      setIsSubmittingOverlay(false);  // Hide overlay on validation failure
+      alert("Unable to verify product list. Please try again later.");
+      return;
+    }
+    const existingProducts = table
+      .map(r => r.Products?.toString().trim().toLowerCase())
+      .filter(Boolean);
+    const requested = form.product.trim().toLowerCase();
+    if (!existingProducts.includes(requested)) {
+      setIsSubmittingOverlay(false);  // Hide overlay on validation failure
+      setNewProductName(form.product);
+      setNewProductData(p => ({ ...p, product: form.product }));
+      return setIsNewProductModalOpen(true);
+    }
   }
 
-  // 1) Company check
-  const companyLower = form.company.trim().toLowerCase();
-  const knownCompanies = companies.map(c => c.value.toLowerCase());
-  if (!knownCompanies.includes(companyLower)) {
-    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
-    setNewCompanyData(dc => ({ ...dc, companyName: form.company }));
-    return setIsNewCompanyModalOpen(true);
-  }
-
-  // 2) Product check
-  let table;
-  try {
-    const res = await fetch(`${API_ROOT}/table`, {
-      credentials: "include",
-    });
-    if (!res.ok) throw new Error("Table fetch failed");
-    table = await res.json();
-  } catch (err) {
-    console.error("Could not load Table data:", err);
-    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
-    alert("Unable to verify product list. Please try again later.");
-    return;
-  }
-  const existingProducts = table
-    .map(r => r.Products?.toString().trim().toLowerCase())
-    .filter(Boolean);
-  const requested = form.product.trim().toLowerCase();
-  if (!existingProducts.includes(requested)) {
-    setIsSubmittingOverlay(false);  // Hide overlay on validation failure
-    setNewProductName(form.product);
-    setNewProductData(p => ({ ...p, product: form.product }));
-    return setIsNewProductModalOpen(true);
-  }
-
-  // 3) Materials check
-  const allMaterials = [
-    ...form.materials.filter(m => m.trim()),
-    form.backMaterial,
-    form.furColor
-  ].filter(Boolean);
-  const missingMat = allMaterials.find(m =>
-    !materialsInv.map(v => v.toLowerCase()).includes(m.trim().toLowerCase())
-  );
+  // 3) Materials check — always, including reorders
+  const missingMat = findMissingMaterial(form, materialsInv);
   if (missingMat) {
     setIsSubmittingOverlay(false);  // Hide overlay on validation failure
-    const matIndex = form.materials.indexOf(missingMat);
     setModalMaterialField({
-      type: matIndex >= 0 ? "materials" : "backMaterial",
-      index: matIndex >= 0 ? matIndex : null
+      type: missingMat.type,
+      index: missingMat.index,
     });
-    setNewMaterialData({
-      materialName: missingMat,
-      unit: "",
-      minInv: "",
-      reorder: "",
-      cost: "",
-      vendor: "",
-      color: "#000000",
-    });
+    setNewMaterialData(blankNewMaterialData(missingMat.name));
     return setIsNewMaterialModalOpen(true);
   }
 
@@ -1423,30 +1442,47 @@ const handleSaveNewCompany = async () => {
 
     setIsSubmittingOverlay(true);
     try {
+      const payload = [{ ...newMaterialData }];
       await axios.post(
         `${API_ROOT}/materials`,
-        newMaterialData,
+        payload,
         { withCredentials: true }
       );
       alert("Material successfully added");
 
-      // 1) Add to local list
-      setMaterialsInv((prev) => [...prev, newMaterialData.materialName]);
+      const savedName = newMaterialData.materialName;
+      const updatedInv = [...materialsInv, savedName];
+      setMaterialsInv(updatedInv);
 
       // 2) Update the form field that triggered it
-      if (modalMaterialField.type === "materials") {
+      let nextForm = form;
+      if (modalMaterialField?.type === "materials") {
         const mArr = [...form.materials];
-        mArr[modalMaterialField.index] = newMaterialData.materialName;
-        setForm((f) => ({ ...f, materials: mArr }));
-      } else if (modalMaterialField.type === "backMaterial") {
-        setForm((f) => ({ ...f, backMaterial: newMaterialData.materialName }));
-      } else {
-        setForm((f) => ({ ...f, furColor: newMaterialData.materialName }));
+        mArr[modalMaterialField.index] = savedName;
+        nextForm = { ...form, materials: mArr };
+        setForm(nextForm);
+      } else if (modalMaterialField?.type === "backMaterial") {
+        nextForm = { ...form, backMaterial: savedName };
+        setForm(nextForm);
+      } else if (modalMaterialField?.type === "furColor") {
+        nextForm = { ...form, furColor: savedName };
+        setForm(nextForm);
       }
 
-      // 3) Close modal & clear errors
-      setIsNewMaterialModalOpen(false);
       setNewMaterialErrors({});
+
+      // If another new material is still on the order, keep the modal open for it
+      const nextMissing = findMissingMaterial(nextForm, updatedInv);
+      if (nextMissing) {
+        setModalMaterialField({
+          type: nextMissing.type,
+          index: nextMissing.index,
+        });
+        setNewMaterialData(blankNewMaterialData(nextMissing.name));
+        return;
+      }
+
+      setIsNewMaterialModalOpen(false);
     } catch (err) {
       const apiMsg =
         err?.response?.data?.error ||
