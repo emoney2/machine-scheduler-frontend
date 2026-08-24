@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useParams } from "react-router-dom";
 import { socket } from "./socketClient";
@@ -35,6 +35,8 @@ export default function MachineJob({ columns }) {
   const [editValue, setEditValue] = useState("");
   const [recutOpen, setRecutOpen] = useState(false);
   const [recutNote, setRecutNote] = useState("");
+  const [postedN, setPostedN] = useState(null);
+  const postedTimer = useRef(null);
 
   const applyPayload = useCallback((data) => {
     if (!data) return;
@@ -127,10 +129,19 @@ export default function MachineJob({ columns }) {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (postedTimer.current) clearTimeout(postedTimer.current);
+    };
+  }, []);
+
   const recordCompleted = (n) => {
     if (busy || n <= 0 || left <= 0) return;
     const inc = Math.min(n, left);
     setPiecesLeft(left - inc);
+    setPostedN(inc);
+    if (postedTimer.current) clearTimeout(postedTimer.current);
+    postedTimer.current = setTimeout(() => setPostedN(null), 900);
     postProgress({ increment: inc });
   };
 
@@ -551,6 +562,53 @@ export default function MachineJob({ columns }) {
           ))
         )}
       </div>
+
+      {postedN != null && (
+        <div
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(46, 204, 113, 0.28)",
+            pointerEvents: "none",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <svg width="160" height="160" viewBox="0 0 72 72" fill="none">
+              <circle
+                cx="36"
+                cy="36"
+                r="32"
+                stroke="#1b5e20"
+                strokeWidth="4"
+                fill="rgba(255,255,255,0.9)"
+              />
+              <path
+                d="M20 37 L32 49 L52 25"
+                stroke="#1b5e20"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div
+              style={{
+                fontSize: "clamp(56px, 12vh, 120px)",
+                fontWeight: 900,
+                color: "#14532d",
+                lineHeight: 1,
+                textShadow: "0 2px 0 #fff",
+              }}
+            >
+              +{postedN}
+            </div>
+          </div>
+        </div>
+      )}
 
       {(error || flash) && (
         <div
