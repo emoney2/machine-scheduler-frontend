@@ -198,8 +198,8 @@ export default function MachineJob({ columns }) {
         background: "#111827",
         color: "#111",
         display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) 84px",
-        gridTemplateRows: "minmax(0, 1fr)",
+        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) 84px",
+        gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)",
         touchAction: "manipulation",
         WebkitUserSelect: "none",
         userSelect: "none",
@@ -210,273 +210,290 @@ export default function MachineJob({ columns }) {
         style={{
           gridColumn: 1,
           gridRow: 1,
-          background: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          minHeight: 0,
+          position: "relative",
+          background: "#f9fafb",
+          borderRight: "1px solid #e5e7eb",
+          borderBottom: "1px solid #e5e7eb",
           minWidth: 0,
+          minHeight: 0,
         }}
       >
-        <div
+        <button
+          type="button"
+          onClick={() => navigate(`/machine/${machineId}`)}
           style={{
-            flex: "0 0 25vh",
-            height: "25vh",
-            maxHeight: "25vh",
-            position: "relative",
-            background: "#f9fafb",
-            borderBottom: "1px solid #e5e7eb",
+            position: "absolute",
+            top: 8,
+            left: 8,
+            zIndex: 4,
+            minHeight: 44,
+            padding: "6px 12px",
+            fontSize: 15,
+            fontWeight: 800,
+            border: "none",
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.92)",
+            cursor: "pointer",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
           }}
         >
-          <button
-            type="button"
-            onClick={() => navigate(`/machine/${machineId}`)}
+          ← Jobs
+        </button>
+        {imageSrc ? (
+          <img
+            src={imageSrc}
+            alt={`Order ${oid}`}
+            referrerPolicy="no-referrer"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#f3f4f6",
+              color: "#6b7280",
+              fontSize: 18,
+              padding: 16,
+              textAlign: "center",
+            }}
+          >
+            {loading ? "Loading image…" : displayJob?.design || "No image"}
+          </div>
+        )}
+        {job?.embroideryComplete && (
+          <div
             style={{
               position: "absolute",
               top: 8,
-              left: 8,
+              left: "50%",
+              transform: "translateX(-50%)",
               zIndex: 4,
-              minHeight: 44,
+              background: "#dcfce7",
+              color: "#166534",
+              fontWeight: 800,
               padding: "6px 12px",
-              fontSize: 15,
-              fontWeight: 800,
-              border: "none",
               borderRadius: 8,
-              background: "rgba(255,255,255,0.92)",
-              cursor: "pointer",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+              fontSize: 14,
             }}
           >
-            ← Jobs
-          </button>
-          {imageSrc ? (
-            <img
-              src={imageSrc}
-              alt={`Order ${oid}`}
-              referrerPolicy="no-referrer"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                display: "block",
-              }}
-            />
-          ) : (
-            <div
-              style={{
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "#f3f4f6",
-                color: "#6b7280",
-                fontSize: 18,
-                padding: 16,
-                textAlign: "center",
-              }}
-            >
-              {loading ? "Loading image…" : displayJob?.design || "No image"}
-            </div>
-          )}
-          {job?.embroideryComplete && (
-            <div
-              style={{
-                position: "absolute",
-                top: 8,
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 4,
-                background: "#dcfce7",
-                color: "#166534",
-                fontWeight: 800,
-                padding: "6px 12px",
-                borderRadius: 8,
-                fontSize: 14,
-              }}
-            >
-              Embroidery complete
-            </div>
-          )}
-          {loading && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 8,
-                right: 8,
-                background: "rgba(255,255,255,0.9)",
-                padding: "4px 10px",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 700,
-              }}
-            >
-              Loading…
-            </div>
-          )}
-        </div>
-
-        <div
-          style={{
-            flex: "0 0 auto",
-            textAlign: "center",
-            padding: "8px 12px 4px",
-          }}
-        >
+            Embroidery complete
+          </div>
+        )}
+        {loading && (
           <div
             style={{
+              position: "absolute",
+              bottom: 8,
+              right: 8,
+              background: "rgba(255,255,255,0.9)",
+              padding: "4px 10px",
+              borderRadius: 8,
               fontSize: 13,
-              fontWeight: 800,
-              color: "#6b7280",
-              letterSpacing: "0.08em",
+              fontWeight: 700,
             }}
           >
-            ORDER
+            Loading…
           </div>
-          <div style={{ fontSize: 42, fontWeight: 900, lineHeight: 1, color: "#111827" }}>
-            {oid}
-          </div>
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            minHeight: 0,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-            padding: "8px 12px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "3px solid #111827",
-              borderRadius: 16,
-              padding: "8px 10px",
-              minWidth: 0,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 18, fontWeight: 800, color: "#374151" }}>Pieces Left</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setEditValue(String(left));
-                  setEditOpen(true);
-                }}
-                style={{
-                  fontSize: 14,
-                  fontWeight: 800,
-                  padding: "6px 12px",
-                  borderRadius: 999,
-                  border: "2px solid #111827",
-                  background: "#fff",
-                  cursor: "pointer",
-                }}
-              >
-                Edit
-              </button>
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(64px, 16vh, 140px)",
-                fontWeight: 900,
-                lineHeight: 0.95,
-                letterSpacing: "-0.04em",
-              }}
-            >
-              {left}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "3px solid #d1d5db",
-              borderRadius: 16,
-              background: "#f9fafb",
-              padding: "8px 10px",
-              minWidth: 0,
-            }}
-          >
-            <div style={{ fontSize: 18, fontWeight: 800, color: "#374151", textAlign: "center" }}>
-              Est. Time Remaining
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(48px, 12vh, 110px)",
-                fontWeight: 900,
-                lineHeight: 0.95,
-                letterSpacing: "-0.04em",
-                textAlign: "center",
-              }}
-            >
-              {estLabel}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            flex: "0 0 auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "8px 12px 12px",
-          }}
-        >
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setRecutOpen(true)}
-            style={{
-              width: 72,
-              height: 72,
-              flex: "0 0 72px",
-              borderRadius: "50%",
-              border: "3px solid #b91c1c",
-              background: "#fef2f2",
-              color: "#b91c1c",
-              fontWeight: 900,
-              fontSize: 13,
-              cursor: "pointer",
-              lineHeight: 1.15,
-            }}
-          >
-            Recut
-          </button>
-
-          <button
-            type="button"
-            disabled={busy}
-            onClick={finishJob}
-            style={{
-              minHeight: 72,
-              flex: 1,
-              padding: "8px 16px",
-              border: "none",
-              borderRadius: 12,
-              background: "#16a34a",
-              color: "#fff",
-              fontSize: 28,
-              fontWeight: 900,
-              cursor: "pointer",
-            }}
-          >
-            Finish
-          </button>
-        </div>
+        )}
       </div>
 
       <div
         style={{
           gridColumn: 2,
           gridRow: 1,
+          background: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          gap: 8,
+          padding: 12,
+          minWidth: 0,
+          minHeight: 0,
+          borderBottom: "1px solid #e5e7eb",
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "3px solid #111827",
+            borderRadius: 16,
+            padding: "6px 8px",
+            minHeight: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: "#374151" }}>Quantity remaining</span>
+            <button
+              type="button"
+              onClick={() => {
+                setEditValue(String(left));
+                setEditOpen(true);
+              }}
+              style={{
+                fontSize: 13,
+                fontWeight: 800,
+                padding: "4px 10px",
+                borderRadius: 999,
+                border: "2px solid #111827",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Edit
+            </button>
+          </div>
+          <div
+            style={{
+              fontSize: "clamp(56px, 12vh, 120px)",
+              fontWeight: 900,
+              lineHeight: 0.95,
+              letterSpacing: "-0.04em",
+            }}
+          >
+            {left}
+          </div>
+        </div>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "3px solid #d1d5db",
+            borderRadius: 16,
+            background: "#f9fafb",
+            padding: "6px 8px",
+            minHeight: 0,
+          }}
+        >
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#374151", textAlign: "center" }}>
+            Est. time left
+          </div>
+          <div
+            style={{
+              fontSize: "clamp(40px, 9vh, 96px)",
+              fontWeight: 900,
+              lineHeight: 0.95,
+              letterSpacing: "-0.04em",
+              textAlign: "center",
+            }}
+          >
+            {estLabel}
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          gridColumn: 1,
+          gridRow: 2,
+          background: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRight: "1px solid #e5e7eb",
+          minWidth: 0,
+          minHeight: 0,
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 800,
+            color: "#6b7280",
+            letterSpacing: "0.08em",
+          }}
+        >
+          ORDER
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(48px, 10vh, 96px)",
+            fontWeight: 900,
+            lineHeight: 0.95,
+            color: "#111827",
+          }}
+        >
+          {oid}
+        </div>
+      </div>
+
+      <div
+        style={{
+          gridColumn: 2,
+          gridRow: 2,
+          background: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 12,
+          padding: 12,
+          minWidth: 0,
+          minHeight: 0,
+        }}
+      >
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setRecutOpen(true)}
+          style={{
+            width: "min(28vw, 160px)",
+            height: "min(28vw, 160px)",
+            maxHeight: "80%",
+            borderRadius: "50%",
+            border: "4px solid #b91c1c",
+            background: "#fef2f2",
+            color: "#b91c1c",
+            fontWeight: 900,
+            fontSize: "clamp(16px, 2.4vh, 28px)",
+            cursor: "pointer",
+            lineHeight: 1.15,
+          }}
+        >
+          Recut
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={finishJob}
+          style={{
+            flex: 1,
+            height: "min(28vw, 160px)",
+            maxHeight: "80%",
+            minHeight: 72,
+            padding: "8px 16px",
+            border: "none",
+            borderRadius: 16,
+            background: "#16a34a",
+            color: "#fff",
+            fontSize: "clamp(28px, 5vh, 56px)",
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          Finish
+        </button>
+      </div>
+
+      <div
+        style={{
+          gridColumn: 3,
+          gridRow: "1 / span 2",
           background: "#111827",
           display: "flex",
           flexDirection: "column",
