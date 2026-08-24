@@ -1,3 +1,46 @@
 [build]
   command = "npm ci && npm run build"
   publish = "build"
+
+# Same-origin login + API so phone browsers keep the session cookie.
+[[redirects]]
+  from = "/login"
+  to = "https://machine-scheduler-backend.onrender.com/login"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/logout"
+  to = "https://machine-scheduler-backend.onrender.com/logout"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/socket.io/*"
+  to = "https://machine-scheduler-backend.onrender.com/socket.io/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://machine-scheduler-backend.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/print"
+  to = "https://machine-scheduler-backend.onrender.com/print"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/submit"
+  to = "https://machine-scheduler-backend.onrender.com/submit"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/thread-images/*"
+  to = "https://machine-scheduler-backend.onrender.com/thread-images/:splat"
+  status = 200
+  force = true
