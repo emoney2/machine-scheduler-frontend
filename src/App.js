@@ -41,6 +41,7 @@ import SalesPortal from "./SalesPortal";
 import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
 import { API_ROOT, getBackendOrigin, getLoginOrigin } from "./apiRoot";
+import { FullscreenToggle, useMachineFullscreen } from "./useMachineFullscreen";
 
 window._isSubmittingOrder = false;
 
@@ -371,6 +372,7 @@ export default function App() {
   const path = (location.pathname || "/").toLowerCase();
   const isCompactNav = isScheduler || path === "/sewing-priority" || path.startsWith("/sewing-priority/");
   const isMachineFloor = path.startsWith("/machine/");
+  const { isFullscreen, toggle: toggleFullscreen } = useMachineFullscreen(isMachineFloor);
 
   const prevM1Top = useRef(null);
   const prevM2Top = useRef(null);
@@ -1925,6 +1927,7 @@ useEffect(() => {
   return (
     <>
       {/* ─── Status Bar ───────────────────────────────────────────────────────────── */}
+      {!isMachineFloor && (
       <div
         style={{
           position: 'fixed',
@@ -1936,6 +1939,18 @@ useEffect(() => {
           zIndex: 1000
         }}
       />
+      )}
+      {isMachineFloor && (
+        <FullscreenToggle
+          isFullscreen={isFullscreen}
+          onToggle={toggleFullscreen}
+          style={
+            path.includes("/job/")
+              ? { left: 108, right: "auto" }
+              : { right: 8 }
+          }
+        />
+      )}
 
       {/* ─── Nav Bar (hidden on embroidery machine floor pages) ─────────────── */}
       {!isMachineFloor && <nav
