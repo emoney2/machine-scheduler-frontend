@@ -198,8 +198,8 @@ export default function MachineJob({ columns }) {
         background: "#111827",
         color: "#111",
         display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr) 84px",
-        gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)",
+        gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr)",
+        gridTemplateRows: "minmax(0, 1fr)",
         touchAction: "manipulation",
         WebkitUserSelect: "none",
         userSelect: "none",
@@ -210,6 +210,15 @@ export default function MachineJob({ columns }) {
         style={{
           gridColumn: 1,
           gridRow: 1,
+          display: "grid",
+          gridTemplateRows: "minmax(0, 3fr) minmax(0, 1fr)",
+          minWidth: 0,
+          minHeight: 0,
+          background: "#fff",
+        }}
+      >
+      <div
+        style={{
           position: "relative",
           background: "#f9fafb",
           borderRight: "1px solid #e5e7eb",
@@ -307,8 +316,53 @@ export default function MachineJob({ columns }) {
 
       <div
         style={{
+          background: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRight: "1px solid #e5e7eb",
+          minWidth: 0,
+          minHeight: 0,
+          padding: 12,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 16,
+            fontWeight: 800,
+            color: "#6b7280",
+            letterSpacing: "0.08em",
+          }}
+        >
+          ORDER
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(48px, 10vh, 96px)",
+            fontWeight: 900,
+            lineHeight: 0.95,
+            color: "#111827",
+          }}
+        >
+          {oid}
+        </div>
+      </div>
+      </div>
+
+      <div
+        style={{
           gridColumn: 2,
           gridRow: 1,
+          display: "grid",
+          gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)",
+          minWidth: 0,
+          minHeight: 0,
+          background: "#fff",
+        }}
+      >
+      <div
+        style={{
           background: "#fff",
           display: "flex",
           flexDirection: "column",
@@ -356,7 +410,7 @@ export default function MachineJob({ columns }) {
           </div>
           <div
             style={{
-              fontSize: "clamp(56px, 12vh, 120px)",
+              fontSize: "clamp(40px, 8vh, 88px)",
               fontWeight: 900,
               lineHeight: 0.95,
               letterSpacing: "-0.04em",
@@ -384,7 +438,7 @@ export default function MachineJob({ columns }) {
           </div>
           <div
             style={{
-              fontSize: "clamp(40px, 9vh, 96px)",
+              fontSize: "clamp(28px, 6vh, 64px)",
               fontWeight: 900,
               lineHeight: 0.95,
               letterSpacing: "-0.04em",
@@ -398,45 +452,6 @@ export default function MachineJob({ columns }) {
 
       <div
         style={{
-          gridColumn: 1,
-          gridRow: 2,
-          background: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRight: "1px solid #e5e7eb",
-          minWidth: 0,
-          minHeight: 0,
-          padding: 12,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 16,
-            fontWeight: 800,
-            color: "#6b7280",
-            letterSpacing: "0.08em",
-          }}
-        >
-          ORDER
-        </div>
-        <div
-          style={{
-            fontSize: "clamp(48px, 10vh, 96px)",
-            fontWeight: 900,
-            lineHeight: 0.95,
-            color: "#111827",
-          }}
-        >
-          {oid}
-        </div>
-      </div>
-
-      <div
-        style={{
-          gridColumn: 2,
-          gridRow: 2,
           background: "#fff",
           display: "flex",
           alignItems: "center",
@@ -452,17 +467,20 @@ export default function MachineJob({ columns }) {
           disabled={busy}
           onClick={() => setRecutOpen(true)}
           style={{
-            width: "min(28vw, 160px)",
-            height: "min(28vw, 160px)",
+            width: "42%",
+            maxWidth: 140,
+            aspectRatio: "1",
             maxHeight: "80%",
+            height: "auto",
             borderRadius: "50%",
             border: "4px solid #b91c1c",
             background: "#fef2f2",
             color: "#b91c1c",
             fontWeight: 900,
-            fontSize: "clamp(16px, 2.4vh, 28px)",
+            fontSize: "clamp(14px, 2vh, 22px)",
             cursor: "pointer",
             lineHeight: 1.15,
+            flexShrink: 0,
           }}
         >
           Recut
@@ -473,15 +491,14 @@ export default function MachineJob({ columns }) {
           onClick={finishJob}
           style={{
             flex: 1,
-            height: "min(28vw, 160px)",
-            maxHeight: "80%",
-            minHeight: 72,
-            padding: "8px 16px",
+            height: "80%",
+            minHeight: 64,
+            padding: "8px 12px",
             border: "none",
             borderRadius: 16,
             background: "#16a34a",
             color: "#fff",
-            fontSize: "clamp(28px, 5vh, 56px)",
+            fontSize: "clamp(22px, 4vh, 44px)",
             fontWeight: 900,
             cursor: "pointer",
           }}
@@ -489,16 +506,17 @@ export default function MachineJob({ columns }) {
           Finish
         </button>
       </div>
+      </div>
 
       <div
         style={{
           gridColumn: 3,
-          gridRow: "1 / span 2",
+          gridRow: 1,
           background: "#111827",
           display: "flex",
           flexDirection: "column",
-          padding: 6,
-          gap: 6,
+          padding: 8,
+          gap: 8,
         }}
       >
         {INCREMENTS.map((n) => (
@@ -511,10 +529,10 @@ export default function MachineJob({ columns }) {
               flex: 1,
               minHeight: 48,
               border: "none",
-              borderRadius: 10,
+              borderRadius: 14,
               background: left <= 0 ? "#374151" : "#fbbf24",
               color: "#111",
-              fontSize: 22,
+              fontSize: "clamp(28px, 4.5vh, 56px)",
               fontWeight: 900,
               cursor: left <= 0 || busy ? "default" : "pointer",
             }}
