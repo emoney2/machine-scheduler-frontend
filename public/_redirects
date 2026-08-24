@@ -1,2 +1,7 @@
+/login  https://machine-scheduler-backend.onrender.com/login  200!
+/logout https://machine-scheduler-backend.onrender.com/logout  200!
+/api/*  https://machine-scheduler-backend.onrender.com/api/:splat  200!
+/print  https://machine-scheduler-backend.onrender.com/print  200!
+/submit https://machine-scheduler-backend.onrender.com/submit  200!
+/thread-images/* https://machine-scheduler-backend.onrender.com/thread-images/:splat  200!
 /*    /index.html   200
-

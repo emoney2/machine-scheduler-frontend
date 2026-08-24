@@ -1,23 +1,24 @@
 /**
  * API base URL.
  *
- * On the hosted Netlify app, always use same-origin `/api` (proxied to Render).
- * Phone browsers block cross-site session cookies, so calling Render directly
- * from machineschedule.netlify.app makes login look like it "goes nowhere".
+ * Production talks to Render directly. Forcing same-origin `/api` on Netlify
+ * served index.html instead of JSON (the /api rewrite never took effect),
+ * which emptied the scheduler. Phone login still uses Render /login with a
+ * 200 HTML response so the session cookie can stick.
  */
+const RENDER_API = "https://machine-scheduler-backend.onrender.com/api";
+
 export function getApiRoot() {
   try {
     const host = String(window.location.hostname || "").toLowerCase();
-    if (
-      host === "machineschedule.netlify.app" ||
-      host.endsWith(".netlify.app") ||
-      host.endsWith(".netlify.com")
-    ) {
-      return "/api";
+    if (host === "localhost" || host === "127.0.0.1") {
+      const env = String(process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+      return env || "/api";
     }
   } catch (_) {}
   const env = String(process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
-  return env || "/api";
+  if (env.startsWith("http")) return env;
+  return RENDER_API;
 }
 
 export const API_ROOT = getApiRoot();
@@ -32,11 +33,6 @@ export function getBackendOrigin() {
   }
 }
 
-/**
- * Socket.IO must talk to Render directly. Netlify's HTTP rewrite has no
- * sticky sessions, so Engine.IO polling hits a new worker and logs
- * "Invalid session". Login cookies still use same-origin /api.
- */
 export function getSocketOrigin() {
   try {
     const host = String(window.location.hostname || "").toLowerCase();

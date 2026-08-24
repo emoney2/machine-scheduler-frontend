@@ -306,7 +306,10 @@ export default function App() {
         clearTimeout(to);
         if (cancelled) return;
 
-        if (res.status === 200) {
+        const ct = String(res.headers.get("content-type") || "").toLowerCase();
+        if (res.status === 200 && !ct.includes("json")) {
+          console.warn("⚠️ /api/ping returned HTML instead of JSON");
+        } else if (res.status === 200) {
           // ok
         } else if (res.status === 401) {
           console.warn("🔒 /api/ping 401 — redirecting to backend login");
@@ -1139,9 +1142,13 @@ const fetchOrdersEmbroLinksCore = async () => {
       await new Promise(r => setTimeout(r, 5000));
       combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
     }
-    const ordersRes   = { data: combinedRes.data?.orders || [] };
-    const embRes      = { data: combinedRes.data?.embroideryList || [] };
-    const linksRes    = { data: combinedRes.data?.links || {} };
+    const payload = combinedRes?.data;
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+      throw new Error("combined returned non-JSON (check the API proxy)");
+    }
+    const ordersRes   = { data: payload.orders || [] };
+    const embRes      = { data: payload.embroideryList || [] };
+    const linksRes    = { data: payload.links || {} };
 
     // drop Sewing and Complete
     let orders = (ordersRes.data || []).filter(o => {
