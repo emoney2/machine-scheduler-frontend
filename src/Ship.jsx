@@ -7,6 +7,7 @@ import {
   buildQboInvoiceOpenUrl,
   parseTxnRealmFromInvoiceUrl,
 } from "./qboInvoiceOpenUrl";
+import { getBackendOrigin } from "./apiRoot";
 
 function recordShipmentHistoryEntry(shipData, orderIds, jobs, companyHint) {
   const tracking = shipData?.tracking_numbers;
@@ -268,6 +269,20 @@ function formatSuggestionSummary(suggestion) {
     parts.push(`1× ${c.L}×${c.W}×${c.H} custom`);
   });
   return parts.join(", ") || "—";
+}
+
+function formatPackPlan(suggestion) {
+  const plan = suggestion?.pack_plan;
+  if (!Array.isArray(plan) || plan.length === 0) return "";
+  return plan
+    .map((box, i) => {
+      const size = `${box.L}×${box.W}×${box.H}`;
+      const pieces = (box.pieces || [])
+        .map((p) => `${p.qty}× ${p.product_norm}`)
+        .join(", ");
+      return `Box ${i + 1} (${size}): ${pieces || "—"}`;
+    })
+    .join(" · ");
 }
 
 function parseUpsRateNumber(rate) {
@@ -725,7 +740,7 @@ export default function Ship() {
   // NEW: Force QuickBooks auth (popup if needed), then continue
   async function ensureQboAuth() {
     try {
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const API_BASE = getBackendOrigin();
 
       // Pre-open a placeholder popup synchronously (reduces popup blockers)
       // This function MUST be called from a direct user gesture (e.g., button click).
@@ -851,7 +866,7 @@ export default function Ship() {
 
 // Session/login modal + stable API base for redirects
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+  const API_BASE = getBackendOrigin();
 
   const query = new URLSearchParams(window.location.search);
   const defaultCompany = query.get("company");
@@ -1003,7 +1018,7 @@ export default function Ship() {
 
     const interval = setInterval(() => {
       fetch(
-        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
+        `${getBackendOrigin()}/api/jobs-for-company?company=${encodeURIComponent(companyInput)}`,
         { credentials: "include" }
       )
         .then(res => {
@@ -1109,7 +1124,7 @@ export default function Ship() {
       const payload = { ...rawPending };
       delete payload._ship_history_company;
 
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const API_BASE = getBackendOrigin();
       const res = await fetch(`${API_BASE}/api/process-shipment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1200,7 +1215,7 @@ export default function Ship() {
       setPageOverlayText("Loading customers…");
 
       const res = await fetch(
-        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/company-list`,
+        `${getBackendOrigin()}/api/company-list`,
         { credentials: "include" }
       );
       const data = await res.json();
@@ -1220,7 +1235,7 @@ export default function Ship() {
       setPageOverlayText("Loading jobs…");
 
       const res = await fetch(
-        `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/jobs-for-company?company=${encodeURIComponent(company)}`,
+        `${getBackendOrigin()}/api/jobs-for-company?company=${encodeURIComponent(company)}`,
         { credentials: "include" }
       );
       if (res.status === 401) {
@@ -1337,7 +1352,7 @@ export default function Ship() {
 
         try {
           const res = await fetch(
-            `${process.env.REACT_APP_API_ROOT.replace(/\/api$/, "")}/api/process-shipment`,
+            `${getBackendOrigin()}/api/process-shipment`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1426,7 +1441,7 @@ export default function Ship() {
         else msg = "📦 Creating packing slip…";
         setShippingStage(msg);
       }
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const API_BASE = getBackendOrigin();
       let shipData;
       try {
         postShipQboClientLog([
@@ -1874,7 +1889,7 @@ export default function Ship() {
       "";
 
     if (needsDirectory && companyName) {
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const API_BASE = getBackendOrigin();
       try {
         const dirRes = await fetch(
           `${API_BASE}/api/directory-row?company=${encodeURIComponent(companyName)}`,
@@ -1953,7 +1968,7 @@ export default function Ship() {
     }
 
     // 6) Post with a mega-compatible payload; if 400, retry with minimal legacy shape
-    const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+    const API_BASE = getBackendOrigin();
     const ratesUrl =
       (process.env.REACT_APP_RATES_URL && process.env.REACT_APP_RATES_URL.trim()) ||
       `${API_BASE}/api/rate`;
@@ -3242,6 +3257,11 @@ export default function Ship() {
                       {boxSuggestion.reason || ""}
                       {" "}Pick boxes yourself anytime — nothing is applied unless you tap Apply.
                     </div>
+                    {formatPackPlan(boxSuggestion) && (
+                      <div style={{ color: "#1b5e20", marginBottom: 8, fontSize: 11 }}>
+                        Pack: {formatPackPlan(boxSuggestion)}
+                      </div>
+                    )}
                     {((boxSuggestion.boxes_summary || []).length > 0 ||
                       Object.values(boxSuggestion.box_counts || {}).some((n) => Number(n) > 0)) && (
                       <button

@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getBackendOrigin } from "./apiRoot";
 
 // ---------- helpers (local copy) ----------
 function formatDateMMDD(dateStr) {
@@ -164,7 +165,7 @@ export default function BoxSelect() {
     };
 
     try {
-      const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+      const API_BASE = getBackendOrigin();
       const url = `${API_BASE}/api/rate`; // your working endpoint
       const res = await fetch(url, {
         method: "POST",

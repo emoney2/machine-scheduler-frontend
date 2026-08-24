@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import axios from "axios";
+import { API_ROOT } from "./apiRoot";
 
-const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
 function money(x) {
   const n = parseFloat(x);

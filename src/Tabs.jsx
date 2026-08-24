@@ -1,11 +1,12 @@
 import React from "react";
 import axios from "axios";
+import { API_ROOT } from "./apiRoot";
 
 export default function Tabs({ tabs, activeTab, onSelect }) {
   const handleLogout = async () => {
     try {
       await axios.get(
-        `${process.env.REACT_APP_API_ROOT}/logout`,
+        `${API_ROOT}/logout`,
         { withCredentials: true }
       );
       // Redirect to frontend login or home page

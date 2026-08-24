@@ -1,9 +1,8 @@
 // src/MaterialLog.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { API_ROOT } from "./apiRoot";
 
-const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || "";
-const API_ROOT      = (RAW_API_ROOT || "https://machine-scheduler-backend.onrender.com/api").replace(/\/$/, "");
 
 // Extract a Drive file ID from any Drive URL
 function extractDriveId(url) {

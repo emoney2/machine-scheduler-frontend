@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_ROOT } from "./apiRoot";
 import {
   flattenShipmentRows,
   loadShipmentHistory,
@@ -90,7 +91,7 @@ export default function ShipmentsHistory() {
   const [upsPayload, setUpsPayload] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const API_BASE = process.env.REACT_APP_API_ROOT.replace(/\/api$/, "");
+  const API_BASE = API_ROOT.replace(/\/api$/, "");
 
   const loadUps = useCallback(async () => {
     setLoading(true);

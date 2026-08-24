@@ -3,8 +3,8 @@ import axios from "axios";
 import "./FileInput.css";
 import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+import { API_ROOT } from "./apiRoot";
 
-const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 
 const LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY = "jrco.last_accepted_customer_job.v1";
 
@@ -66,7 +66,7 @@ function extractPrimaryFileIdFromSubmitResponse(data) {
 /** Same-origin API path for Drive thumbnail proxy (works with <img src>). */
 function driveThumbnailSrc(fileId) {
   if (!fileId) return "";
-  const root = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+  const root = API_ROOT;
   return `${root}/drive/thumbnail?fileId=${encodeURIComponent(fileId)}&sz=w120`;
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { API_ROOT } from "./apiRoot";
 
 export default function ReorderPage() {
   const [companyList, setCompanyList] = useState([]);
@@ -24,7 +25,7 @@ export default function ReorderPage() {
     setLoadingCustomersText("Loading customers…");
     
     axios
-      .get(`${process.env.REACT_APP_API_ROOT}/directory`, {
+      .get(`${API_ROOT}/directory`, {
         cancelToken: cancelTokenSource.token
       })
       .then((res) => {
@@ -84,7 +85,7 @@ export default function ReorderPage() {
     setLoading(true);
     try {
       const res = await axios.get(
-        `${process.env.REACT_APP_API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`,
+        `${API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`,
         { cancelToken: cancelTokenSource.token }
       );
       console.log("📦 Jobs loaded:", res.data.jobs);

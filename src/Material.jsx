@@ -1,6 +1,7 @@
 // src/pages/Material.jsx
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { API_ROOT } from "./apiRoot";
 
 export default function Material() {
   const { dept, order } = useParams();
@@ -20,7 +21,7 @@ export default function Material() {
       setLoading(true); setErr("");
       try {
         // Optional API (add later). If it 404s, we fall back to stub.
-        const root = process.env.REACT_APP_API_ROOT || "/api";
+        const root = API_ROOT || "/api";
         const url  = `${root.replace(/\/$/, "")}/order-summary?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(order)}`;
         const res  = await fetch(url, { credentials: "include" });
         if (!res.ok) {

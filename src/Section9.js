@@ -1,8 +1,10 @@
 // File: frontend/src/Section9.jsx
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
 import axios from 'axios';
+import { API_ROOT } from './apiRoot';
 import ThreadConflictPanel, { ThreadConflictStrip } from './ThreadConflictPanel';
 import {
   detectThreadConflicts,
@@ -22,6 +24,7 @@ function formatStitchCountK(job) {
 }
 
 export default function Section9(props) {
+  const navigate = useNavigate();
   const [status, setStatus] = useState('');
   const [threadInventoryStatus, setThreadInventoryStatus] = useState({});
   const [threadInventoryReady, setThreadInventoryReady] = useState(false);
@@ -74,7 +77,6 @@ export default function Section9(props) {
   // Fetch thread inventory: prefer status API; fallback to raw /threadInventory and derive red/yellow/green
   // Yellow = inventory negative but on-order (Inventory..) > 0
   useEffect(() => {
-    const API_ROOT = (process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '');
     const deriveDetail = (row) => {
       const inv = Number(row.inventory ?? row.Inventory ?? row.quantity ?? row.Quantity ?? 0);
       const onOrder = Number(row['Inventory..'] ?? row.onOrder ?? row.inventoryOnOrder ?? 0);
@@ -118,7 +120,6 @@ export default function Section9(props) {
 
   // Fetch material inventory: try status endpoint first, else try GET /materialInventory and derive status
   useEffect(() => {
-    const API_ROOT = (process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '');
     const fetchMaterialStatus = async () => {
       try {
         const res = await axios.get(`${API_ROOT}/material-inventory-status`, { withCredentials: true });
@@ -452,24 +453,44 @@ export default function Section9(props) {
                     }}
                   >
                     <h4 style={{ textAlign: 'center', margin: '8px 0', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent:                                                             'center', gap: 6 }}>
-                      {col.title}
-                      {colId !== 'queue' && (
-                        <span
+                      {colId !== 'queue' ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/machine/${colId}`)}
+                          title="Open machine production page"
                           style={{
-                            display:        'inline-flex',
-                            alignItems:     'center',
-                            justifyContent: 'center',
-                            width:          24,
-                            height:         24,
-                            borderRadius:   '50%',
-                            backgroundColor:'#000',
-                            color:          '#fff',
-                            fontSize:       12,
-                            fontWeight:     'bold'
+                            all: 'unset',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontWeight: 700,
+                            color: '#1565c0',
+                            textDecoration: 'underline',
+                            textUnderlineOffset: 3,
                           }}
                         >
-                          {safeColumns[colId]?.headCount ?? 0}
-                        </span>
+                          {col.title}
+                          <span
+                            style={{
+                              display:        'inline-flex',
+                              alignItems:     'center',
+                              justifyContent: 'center',
+                              width:          24,
+                              height:         24,
+                              borderRadius:   '50%',
+                              backgroundColor:'#000',
+                              color:          '#fff',
+                              fontSize:       12,
+                              fontWeight:     'bold',
+                              textDecoration: 'none',
+                            }}
+                          >
+                            {safeColumns[colId]?.headCount ?? 0}
+                          </span>
+                        </button>
+                      ) : (
+                        col.title
                       )}
                     </h4>
 
@@ -612,7 +633,7 @@ export default function Section9(props) {
           try {
             const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
             const altId = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-            if (altId) src = `${(process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '')}/drive/proxy/${altId}?thumb=1&sz=w240`;
+            if (altId) src = `${API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
           } catch {}
         }
 
@@ -649,7 +670,7 @@ export default function Section9(props) {
                   const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
                   if (id) {
                     img.dataset.upscaled = '1';
-                    img.src = `${(process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '')}/drive/proxy/${id}?thumb=1&sz=w512`;
+                    img.src = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
                   }
                 } catch {}
               }
@@ -663,7 +684,7 @@ export default function Section9(props) {
                 const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
                 if (id) {
                   img.dataset.upscaled = '1';
-                  img.src = `${(process.env.REACT_APP_API_ROOT || '/api').replace(/\/$/, '')}/drive/proxy/${id}?thumb=1&sz=w512`;
+                  img.src = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
                 }
               } catch {}
             }}

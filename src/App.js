@@ -38,6 +38,9 @@ import KanbanPrint from "./KanbanPrint";
 import SewingPriority from './SewingPriority';
 import QueueTab from './QueueTab';
 import SalesPortal from "./SalesPortal";
+import MachineHome from "./MachineHome";
+import MachineJob from "./MachineJob";
+import { API_ROOT, getBackendOrigin } from "./apiRoot";
 
 window._isSubmittingOrder = false;
 
@@ -107,7 +110,7 @@ function displayClampTo830(iso) {
 
 
 
-// console.log('→ REACT_APP_API_ROOT =', process.env.REACT_APP_API_ROOT);
+// console.log('→ REACT_APP_API_ROOT =', API_ROOT);
 
 // Time helpers: normalize to ISO (UTC), display in Eastern
 
@@ -217,18 +220,17 @@ axios.interceptors.response.use(
   err => {
     if (err.response && err.response.status === 401) {
       const base = BACKEND_ORIGIN_FOR_REDIRECT || window.location.origin;
-      const currentPath = window.location.pathname + window.location.search;
-      window.location.href = `${base}/login?next=${encodeURIComponent(currentPath)}`;
+      const nextUrl = window.location.href;
+      window.location.href = `${base}/login?next=${encodeURIComponent(nextUrl)}`;
     }
     return Promise.reject(err);
   }
 );
 
 // CONFIGURATION
-// Use REACT_APP_API_ROOT when set (production: backend URL); else /api for local proxy.
-const RAW_API_ROOT  = process.env.REACT_APP_API_ROOT || '';
-const API_ROOT      = (RAW_API_ROOT || '/api').replace(/\/$/, '');
-BACKEND_ORIGIN_FOR_REDIRECT = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
+// Hosted Netlify uses same-origin /api (see apiRoot.js) so phone cookies work.
+const BACKEND_ORIGIN = getBackendOrigin();
+BACKEND_ORIGIN_FOR_REDIRECT = BACKEND_ORIGIN;
 
 // WORK HOURS / HOLIDAYS
 const WORK_START_HR  = 8;
@@ -272,8 +274,7 @@ function buildSchedulerColumnsTemplate() {
 }
 
 export default function App() {
-  // Derive backend origin (no /api) for login redirects
-  const BACKEND_ORIGIN = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
+  const BACKEND_ORIGIN = getBackendOrigin();
   const [manualReorder, setManualReorder] = useState(false);
 
   // NEW: prevent overlapping combined fetches
@@ -365,6 +366,7 @@ export default function App() {
   const isScheduler = location.pathname === "/";
   const path = (location.pathname || "/").toLowerCase();
   const isCompactNav = isScheduler || path === "/sewing-priority" || path.startsWith("/sewing-priority/");
+  const isMachineFloor = path.startsWith("/machine/");
 
   const prevM1Top = useRef(null);
   const prevM2Top = useRef(null);
@@ -577,7 +579,14 @@ useEffect(() => {
   };
 
   socket.on("startTimeUpdated", onStartTimeUpdated);
-  return () => socket.off("startTimeUpdated", onStartTimeUpdated);
+  const onEmbroideryFinished = () => {
+    fetchAllCombined();
+  };
+  socket.on("embroideryFinished", onEmbroideryFinished);
+  return () => {
+    socket.off("startTimeUpdated", onStartTimeUpdated);
+    socket.off("embroideryFinished", onEmbroideryFinished);
+  };
 }, [socket]);
 
 // === Section 2: Helpers ===
@@ -1920,8 +1929,8 @@ useEffect(() => {
         }}
       />
 
-      {/* ─── Nav Bar ────────────────────────────────────────────────────────── */}
-      <nav
+      {/* ─── Nav Bar (hidden on embroidery machine floor pages) ─────────────── */}
+      {!isMachineFloor && <nav
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -2023,7 +2032,7 @@ useEffect(() => {
         >
           Logout
         </button>
-      </nav>
+      </nav>}
 
       {/* ─── Route Outlet ─────────────────────────────────────────────────────── */}
       <Routes>
@@ -2067,6 +2076,8 @@ useEffect(() => {
           <Route path="/overview" element={<Overview />} />
           <Route path="/submit" element={<OrderSubmission />} />
           <Route path="/sewing-priority" element={<SewingPriority />} />
+          <Route path="/machine/:machineId/job/:orderId" element={<MachineJob columns={columns} />} />
+          <Route path="/machine/:machineId" element={<MachineHome columns={columns} loading={isLoading} />} />
           <Route path="/production-orders" element={<SewingPriority />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/inventory-ordered" element={<InventoryOrdered />} />

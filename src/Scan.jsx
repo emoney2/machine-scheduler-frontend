@@ -1,6 +1,7 @@
 // src/Scan.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { API_ROOT } from "./apiRoot";
 
 const requestCache = {};
 
@@ -12,7 +13,6 @@ async function fetchOnce(url) {
 }
 
 
-const API_ROOT = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
 const IDLE_TIMEOUT_MS = 600;
 
 // --- FAST ORDER HELPERS ---

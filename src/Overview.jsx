@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { socket } from "./socketClient";
+import { API_ROOT } from "./apiRoot";
 import { supabase } from "./supabaseClient";
 import {
   loadPersistedThreadConflicts,
@@ -138,7 +139,7 @@ export default function Overview() {
 
 
 
-const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+const ROOT = API_ROOT;
 const BACKEND_ROOT = ROOT.replace(/\/api$/, "");
 const THREAD_IMG_BASE =
   process.env.REACT_APP_THREAD_IMG_BASE || `${BACKEND_ROOT}/thread-images`;
@@ -184,7 +185,7 @@ function extractFileIdFromFormulaOrUrl(input) {
 // Prefer common fields; if none, scan the whole row for any Drive link.
 // Always return the **backend proxy** URL so auth/sizing/caching is handled server-side.
 function getJobThumbUrl(job, ROOT) {
-  const apiRoot = (ROOT || (process.env.REACT_APP_API_ROOT || "/api")).replace(/\/$/, "");
+  const apiRoot = ROOT;
   const proxyBase = apiRoot.replace(/\/api$/, "") + "/api/drive/thumbnail";
 
   const proxyForId = (id) => {
@@ -656,7 +657,7 @@ function parseDriveId(s) {
 // Build your fast, cached proxy URL (server adds ETag + max-age)
 function proxyThumb(id, size = "w96") {
   if (!id) return "";
-  const root = (process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+  const root = ROOT;
   return `${root}/drive/proxy/${id}?sz=${size}`;
 }
 

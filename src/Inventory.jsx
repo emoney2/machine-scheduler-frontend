@@ -1,6 +1,7 @@
 // --- Section 1: Imports & Constants --------------------------------------
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { API_ROOT } from "./apiRoot";
 
 const modalOverlay = {
   position: "fixed", top: 0, left: 0,
@@ -51,10 +52,10 @@ export default function Inventory() {
   useEffect(() => {
     setIsLoading(true);
     Promise.all([
-      axios.get(`${process.env.REACT_APP_API_ROOT}/thread-colors`)
+      axios.get(`${API_ROOT}/thread-colors`)
         .then(res => setThreads(res.data))
         .catch(console.error),
-      axios.get(`${process.env.REACT_APP_API_ROOT}/materials`)
+      axios.get(`${API_ROOT}/materials`)
         .then(res => setMaterials(res.data))
         .catch(console.error)
     ]).finally(() => {
@@ -165,7 +166,7 @@ const handleSubmit = async (rows, url, resetRows) => {
 
   try {
     await axios.post(
-      `${process.env.REACT_APP_API_ROOT}${url}`,
+      `${API_ROOT}${url}`,
       payload,
       { withCredentials: true }
     );
@@ -230,7 +231,7 @@ const submitThreads = async () => {
 
   try {
     const res = await axios.post(
-      `${process.env.REACT_APP_API_ROOT}/threadInventory`,
+      `${API_ROOT}/threadInventory`,
       payload,
       { withCredentials: true }
     );
@@ -292,7 +293,7 @@ const handleMaterialSubmit = async () => {
   // 3) POST to /materialInventory (only writes to your Material Log)
   try {
     await axios.post(
-      `${process.env.REACT_APP_API_ROOT}/materialInventory`,
+      `${API_ROOT}/materialInventory`,
       payload
     );
 
@@ -331,7 +332,7 @@ const handleSaveNewItem = async () => {
         cost:        newItemData.cost
       }];
       await axios.post(
-        `${process.env.REACT_APP_API_ROOT}/threads`,
+        `${API_ROOT}/threads`,
         payload
       );
       setThreads(t => [...t, newItemData.name.trim()]);
@@ -345,7 +346,7 @@ const handleSaveNewItem = async () => {
         cost:         newItemData.cost
       }];
       await axios.post(
-        `${process.env.REACT_APP_API_ROOT}/materials`,
+        `${API_ROOT}/materials`,
         payload
       );
       setMaterials(m => [...m, newItemData.name.trim()]);
@@ -387,7 +388,7 @@ const handleSaveBulkNewItems = async () => {
         notes:        newItemData.notes || ""
       }));
 
-      const url = `${process.env.REACT_APP_API_ROOT}/materialInventory`;
+      const url = `${API_ROOT}/materialInventory`;
       console.log("Posting to:", url, payload);
       await axios.post(url, payload);
 
@@ -410,7 +411,7 @@ const handleSaveBulkNewItems = async () => {
       }));
 
       await axios.post(
-        `${process.env.REACT_APP_API_ROOT}/threads`,
+        `${API_ROOT}/threads`,
         masterPayload,
         { withCredentials: true }
       );
@@ -442,7 +443,7 @@ const handleSaveBulkNewItems = async () => {
 
       console.log("Posting threads to /threadInventory:", logPayload);
       const res = await axios.post(
-        `${process.env.REACT_APP_API_ROOT}/threadInventory`,
+        `${API_ROOT}/threadInventory`,
         logPayload,
         { withCredentials: true }
       );

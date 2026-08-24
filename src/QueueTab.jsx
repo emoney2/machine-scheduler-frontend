@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
+import { API_ROOT } from "./apiRoot";
 
 // ---------- Config ----------
-const API_ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
 const BACKEND_ROOT = API_ROOT.replace(/\/api$/, "");
 
 // ---------- Utils ----------

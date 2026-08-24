@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatConflictMachines } from './utils/threadConflicts';
+import { API_ROOT } from "./apiRoot";
 
 /**
  * Detail panel / modal for one or more thread concurrency conflicts.
@@ -167,7 +168,7 @@ function ConflictBody({ conflict }) {
           const thumb =
             (j.artworkUrl && /^https?:\/\//i.test(j.artworkUrl) && j.artworkUrl) ||
             (j.imageFileId &&
-              `${(process.env.REACT_APP_API_ROOT || '').replace(/\/$/, '')}/drive/proxy/${j.imageFileId}?sz=w160`) ||
+              `${(API_ROOT || '').replace(/\/$/, '')}/drive/proxy/${j.imageFileId}?sz=w160`) ||
             '';
           return (
             <div

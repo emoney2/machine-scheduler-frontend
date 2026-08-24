@@ -1,6 +1,7 @@
 // src/pages/Material.jsx
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { API_ROOT } from "./apiRoot";
 
 export default function Material() {
   const { dept, order } = useParams();
@@ -14,7 +15,7 @@ export default function Material() {
       setLoading(true);
       setError("");
       try {
-        const root = process.env.REACT_APP_API_ROOT || "/api";
+        const root = API_ROOT || "/api";
         const url  = `${root.replace(/\/$/, "")}/materials?dept=${encodeURIComponent(dept)}&order=${encodeURIComponent(order)}`;
         const res  = await fetch(url, { credentials: "include" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

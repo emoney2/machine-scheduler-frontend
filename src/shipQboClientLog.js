@@ -4,8 +4,10 @@
  *
  * @param {Array<Record<string, unknown>>} events
  */
+import { getBackendOrigin } from "./apiRoot";
+
 export async function postShipQboClientLog(events) {
-  const root = (process.env.REACT_APP_API_ROOT || "").replace(/\/api$/i, "");
+  const root = getBackendOrigin();
   if (!root || !Array.isArray(events) || events.length === 0) return;
   try {
     await fetch(`${root}/api/shipment-client-log`, {

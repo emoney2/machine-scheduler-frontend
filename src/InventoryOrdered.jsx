@@ -1,8 +1,9 @@
 // src/components/InventoryOrdered.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { API_ROOT } from "./apiRoot";
 
-const API = process.env.REACT_APP_API_ROOT;
+const API = API_ROOT;
 
 // Google Sheets serial date → JS Date
 const SHEETS_EPOCH_MS = new Date(1899, 11, 30).getTime();

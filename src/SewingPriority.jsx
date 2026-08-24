@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { socket } from "./socketClient";
+import { API_ROOT } from "./apiRoot";
 
-const ROOT = (process.env.REACT_APP_API_ROOT || "/api").replace(/\/$/, "");
+const ROOT = API_ROOT;
 /** Tile board horizon (~one month). */
 const BOARD_DAYS_WINDOW = 30;
 /** Catch-up tracker uses the same one-month window as the board. */

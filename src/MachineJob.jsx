@@ -1,0 +1,607 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { useNavigate, useParams } from "react-router-dom";
+import { socket } from "./socketClient";
+import {
+  MACHINE_META,
+  apiRoot,
+  estimateRemainingMs,
+  findJobInColumns,
+  formatDuration,
+  jobImageUrl,
+  normalizeOrderId,
+} from "./machineFloorUtils";
+
+const ROOT = apiRoot();
+const INCREMENTS = [6, 5, 4, 3, 2, 1];
+
+export default function MachineJob({ columns }) {
+  const { machineId, orderId } = useParams();
+  const navigate = useNavigate();
+  const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
+  const oid = normalizeOrderId(orderId);
+
+  const fromColumns = useMemo(
+    () => findJobInColumns(columns, oid)?.job || null,
+    [columns, oid]
+  );
+
+  const [job, setJob] = useState(null);
+  const [piecesLeft, setPiecesLeft] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [flash, setFlash] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editValue, setEditValue] = useState("");
+  const [recutOpen, setRecutOpen] = useState(false);
+  const [recutNote, setRecutNote] = useState("");
+
+  const applyPayload = useCallback((data) => {
+    if (!data) return;
+    setJob(data);
+    if (data.piecesLeft != null) setPiecesLeft(Number(data.piecesLeft));
+  }, []);
+
+  const loadJob = useCallback(
+    async (signal) => {
+      setError("");
+      try {
+        const res = await axios.get(
+          `${ROOT}/embroidery/floor-job/${encodeURIComponent(oid)}`,
+          { withCredentials: true, signal, timeout: 25000 }
+        );
+        applyPayload(res.data);
+      } catch (e) {
+        if (axios.isCancel(e)) return;
+        if (e?.response?.status === 404) {
+          setError(`Order #${oid} was not found.`);
+        } else {
+          setError(e?.response?.data?.error || e?.message || "Failed to load job");
+        }
+      } finally {
+        setLoading(false);
+      }
+    },
+    [oid, applyPayload]
+  );
+
+  useEffect(() => {
+    if (!oid) return;
+    setLoading(true);
+    const ctrl = new AbortController();
+    loadJob(ctrl.signal);
+    return () => ctrl.abort();
+  }, [oid, loadJob]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const onProgress = (payload) => {
+      if (normalizeOrderId(payload?.orderId) !== oid) return;
+      applyPayload(payload);
+    };
+    const onFinished = (payload) => {
+      if (normalizeOrderId(payload?.orderId) !== oid) return;
+      setPiecesLeft(0);
+      setFlash("Job finished");
+    };
+    socket.on("embroideryProgressUpdated", onProgress);
+    socket.on("embroideryFinished", onFinished);
+    return () => {
+      socket.off("embroideryProgressUpdated", onProgress);
+      socket.off("embroideryFinished", onFinished);
+    };
+  }, [oid, applyPayload]);
+
+  const quantity = Number(job?.quantity ?? fromColumns?.quantity ?? 0) || 0;
+  const left = piecesLeft == null ? quantity : Math.max(0, piecesLeft);
+  const stitchCount = Number(job?.stitchCount ?? fromColumns?.stitch_count ?? 0) || 0;
+  const estLabel = formatDuration(estimateRemainingMs(stitchCount, left, meta.headCount));
+  const displayJob = job
+    ? {
+        ...fromColumns,
+        id: job.orderId,
+        company: job.company,
+        product: job.product,
+        design: job.design,
+        quantity: job.quantity,
+        imageFileId: job.imageFileId,
+        imageLink: job.imageLink,
+      }
+    : fromColumns;
+  const imageSrc = jobImageUrl(displayJob || job, "w1200");
+
+  const postProgress = async (body) => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await axios.post(
+        `${ROOT}/embroidery/progress`,
+        { orderId: oid, ...body },
+        { withCredentials: true, timeout: 25000 }
+      );
+      applyPayload(res.data);
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || "Could not save progress");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recordCompleted = (n) => {
+    if (busy || n <= 0 || left <= 0) return;
+    const inc = Math.min(n, left);
+    setPiecesLeft(left - inc);
+    postProgress({ increment: inc });
+  };
+
+  const savePiecesLeft = () => {
+    const n = parseInt(String(editValue).replace(/[^\d]/g, ""), 10);
+    if (!Number.isFinite(n) || n < 0) {
+      setError("Enter a valid pieces-left count");
+      return;
+    }
+    setEditOpen(false);
+    setPiecesLeft(n);
+    postProgress({ piecesLeft: n });
+  };
+
+  const finishJob = async () => {
+    if (busy) return;
+    if (!window.confirm(`Finish order #${oid}? This marks embroidery complete.`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      await axios.post(
+        `${ROOT}/embroidery/finish`,
+        { orderId: oid },
+        { withCredentials: true, timeout: 25000 }
+      );
+      setPiecesLeft(0);
+      setFlash("Finished — going back…");
+      setTimeout(() => navigate(`/machine/${machineId}`), 600);
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || "Could not finish job");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const sendRecut = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await axios.post(
+        `${ROOT}/embroidery/recut`,
+        { orderId: oid, machine: meta.title, note: recutNote },
+        { withCredentials: true, timeout: 25000 }
+      );
+      setRecutOpen(false);
+      setRecutNote("");
+      setFlash("Manager emailed");
+      setTimeout(() => setFlash(""), 2500);
+    } catch (e) {
+      setError(
+        e?.response?.data?.error || e?.message || "Could not email the manager"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        height: "100vh",
+        maxHeight: "100vh",
+        overflow: "hidden",
+        background: "#111827",
+        color: "#111",
+        display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) 84px",
+        gridTemplateRows: "minmax(0, 1fr) auto",
+        touchAction: "manipulation",
+        WebkitUserSelect: "none",
+        userSelect: "none",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          gridColumn: 1,
+          gridRow: 1,
+          background: "#fff",
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          position: "relative",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => navigate(`/machine/${machineId}`)}
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            zIndex: 4,
+            minHeight: 44,
+            padding: "6px 12px",
+            fontSize: 15,
+            fontWeight: 800,
+            border: "none",
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.92)",
+            cursor: "pointer",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+          }}
+        >
+          ← Jobs
+        </button>
+        {imageSrc ? (
+          <img
+            src={imageSrc}
+            alt={`Order ${oid}`}
+            referrerPolicy="no-referrer"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              background: "#f9fafb",
+              display: "block",
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "#f3f4f6",
+              color: "#6b7280",
+              fontSize: 20,
+              padding: 24,
+              textAlign: "center",
+            }}
+          >
+            {loading ? "Loading image…" : displayJob?.design || "No image"}
+          </div>
+        )}
+        {job?.embroideryComplete && (
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 4,
+              background: "#dcfce7",
+              color: "#166534",
+              fontWeight: 800,
+              padding: "6px 12px",
+              borderRadius: 8,
+              fontSize: 14,
+            }}
+          >
+            Embroidery complete
+          </div>
+        )}
+        {loading && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: 8,
+              right: 8,
+              background: "rgba(255,255,255,0.9)",
+              padding: "4px 10px",
+              borderRadius: 8,
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            Loading…
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          gridColumn: 2,
+          gridRow: "1 / span 2",
+          background: "#111827",
+          display: "flex",
+          flexDirection: "column",
+          padding: 6,
+          gap: 6,
+        }}
+      >
+        {INCREMENTS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            disabled={busy || left <= 0}
+            onClick={() => recordCompleted(n)}
+            style={{
+              flex: 1,
+              minHeight: 48,
+              border: "none",
+              borderRadius: 10,
+              background: left <= 0 ? "#374151" : "#fbbf24",
+              color: "#111",
+              fontSize: 22,
+              fontWeight: 900,
+              cursor: left <= 0 || busy ? "default" : "pointer",
+            }}
+          >
+            +{n}
+          </button>
+        ))}
+      </div>
+
+      <div
+        style={{
+          gridColumn: 1,
+          gridRow: 2,
+          background: "#fff",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px 14px",
+          borderTop: "1px solid #e5e7eb",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.04em" }}>
+            ORDER
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 900, lineHeight: 1, color: "#111827" }}>{oid}</div>
+        </div>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setRecutOpen(true)}
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: "50%",
+            border: "3px solid #b91c1c",
+            background: "#fef2f2",
+            color: "#b91c1c",
+            fontWeight: 900,
+            fontSize: 13,
+            cursor: "pointer",
+            lineHeight: 1.15,
+          }}
+        >
+          Recut
+        </button>
+
+        <button
+          type="button"
+          disabled={busy}
+          onClick={finishJob}
+          style={{
+            minHeight: 64,
+            minWidth: 110,
+            flex: "1 1 110px",
+            padding: "8px 16px",
+            border: "none",
+            borderRadius: 12,
+            background: "#16a34a",
+            color: "#fff",
+            fontSize: 22,
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          Finish
+        </button>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#374151" }}>Pieces Left</span>
+            <button
+              type="button"
+              onClick={() => {
+                setEditValue(String(left));
+                setEditOpen(true);
+              }}
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                padding: "4px 10px",
+                borderRadius: 999,
+                border: "2px solid #111827",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              Edit
+            </button>
+          </div>
+          <div
+            style={{
+              marginTop: 4,
+              minWidth: 88,
+              padding: "6px 16px",
+              border: "2px solid #111827",
+              borderRadius: 999,
+              fontSize: 28,
+              fontWeight: 900,
+              lineHeight: 1.1,
+            }}
+          >
+            {left}
+          </div>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: "#374151" }}>Est. Time Remaining</div>
+          <div
+            style={{
+              marginTop: 4,
+              minWidth: 100,
+              padding: "6px 14px",
+              border: "2px solid #d1d5db",
+              borderRadius: 999,
+              fontSize: 20,
+              fontWeight: 800,
+              background: "#f9fafb",
+            }}
+          >
+            {estLabel}
+          </div>
+        </div>
+      </div>
+
+      {(error || flash) && (
+        <div
+          style={{
+            position: "fixed",
+            top: 12,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 20,
+            padding: "10px 16px",
+            borderRadius: 10,
+            fontWeight: 800,
+            background: error ? "#fef2f2" : "#ecfdf5",
+            color: error ? "#991b1b" : "#065f46",
+            border: `1px solid ${error ? "#fecaca" : "#6ee7b7"}`,
+            maxWidth: "80vw",
+          }}
+        >
+          {error || flash}
+        </div>
+      )}
+
+      {editOpen && (
+        <Modal onClose={() => setEditOpen(false)}>
+          <h2 style={{ margin: "0 0 12px", fontSize: 22 }}>Pieces left</h2>
+          <input
+            autoFocus
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            style={{
+              width: "100%",
+              fontSize: 32,
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "2px solid #111827",
+              boxSizing: "border-box",
+              textAlign: "center",
+              WebkitUserSelect: "text",
+              userSelect: "text",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            <button type="button" onClick={() => setEditOpen(false)} style={btnGhost}>
+              Cancel
+            </button>
+            <button type="button" onClick={savePiecesLeft} style={btnPrimary}>
+              Save
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {recutOpen && (
+        <Modal onClose={() => setRecutOpen(false)}>
+          <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>Message manager</h2>
+          <p style={{ margin: "0 0 12px", color: "#4b5563" }}>
+            Email Brendan at brendan.eckard@jrcogolf.com about a recut for order #{oid} on {meta.title}.
+          </p>
+          <textarea
+            value={recutNote}
+            onChange={(e) => setRecutNote(e.target.value)}
+            placeholder="What happened? (optional)"
+            rows={3}
+            style={{
+              width: "100%",
+              fontSize: 16,
+              padding: 10,
+              borderRadius: 10,
+              border: "1px solid #d1d5db",
+              boxSizing: "border-box",
+              WebkitUserSelect: "text",
+              userSelect: "text",
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+            <button type="button" onClick={() => setRecutOpen(false)} style={btnGhost}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={sendRecut}
+              style={{ ...btnPrimary, background: "#b91c1c" }}
+            >
+              Send email
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+function Modal({ children, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 30,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#fff",
+          borderRadius: 16,
+          padding: 20,
+          width: "min(420px, 100%)",
+          boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const btnGhost = {
+  flex: 1,
+  minHeight: 48,
+  fontSize: 16,
+  fontWeight: 800,
+  borderRadius: 10,
+  border: "1px solid #d1d5db",
+  background: "#fff",
+  cursor: "pointer",
+};
+
+const btnPrimary = {
+  flex: 1,
+  minHeight: 48,
+  fontSize: 16,
+  fontWeight: 800,
+  borderRadius: 10,
+  border: "none",
+  background: "#111827",
+  color: "#fff",
+  cursor: "pointer",
+};
