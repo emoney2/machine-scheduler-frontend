@@ -122,6 +122,14 @@ export default function MachineJob({ columns }) {
         { withCredentials: true, timeout: 25000 }
       );
       applyPayload(res.data);
+      const finished =
+        !!res.data?.embroideryComplete ||
+        (res.data?.piecesLeft != null && Number(res.data.piecesLeft) <= 0);
+      if (finished) {
+        setPiecesLeft(0);
+        setFlash("Finished — going back…");
+        setTimeout(() => navigate(`/machine/${machineId}`), 900);
+      }
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || "Could not save progress");
     } finally {
