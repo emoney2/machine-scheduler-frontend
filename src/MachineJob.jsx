@@ -13,7 +13,6 @@ import {
 } from "./machineFloorUtils";
 
 const ROOT = apiRoot();
-const INCREMENTS = [6, 5, 4, 3, 2, 1];
 
 export default function MachineJob({ columns }) {
   const { machineId, orderId } = useParams();
@@ -513,33 +512,44 @@ export default function MachineJob({ columns }) {
           gridColumn: 3,
           gridRow: 1,
           background: "#111827",
-          display: "flex",
-          flexDirection: "column",
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gridTemplateRows: "1fr 1fr 1fr",
           padding: 8,
           gap: 8,
+          alignItems: "center",
+          justifyItems: "center",
         }}
       >
-        {INCREMENTS.map((n) => (
-          <button
-            key={n}
-            type="button"
-            disabled={busy || left <= 0}
-            onClick={() => recordCompleted(n)}
-            style={{
-              flex: 1,
-              minHeight: 48,
-              border: "none",
-              borderRadius: 14,
-              background: left <= 0 ? "#374151" : "#fbbf24",
-              color: "#111",
-              fontSize: "clamp(28px, 4.5vh, 56px)",
-              fontWeight: 900,
-              cursor: left <= 0 || busy ? "default" : "pointer",
-            }}
-          >
-            +{n}
-          </button>
-        ))}
+        {[
+          [6, 1],
+          [5, 2],
+          [4, 3],
+        ].flatMap((row) =>
+          row.map((n) => (
+            <button
+              key={n}
+              type="button"
+              disabled={busy || left <= 0}
+              onClick={() => recordCompleted(n)}
+              style={{
+                width: "100%",
+                maxWidth: "100%",
+                aspectRatio: "1",
+                maxHeight: "100%",
+                border: "none",
+                borderRadius: 16,
+                background: left <= 0 ? "#374151" : "#fbbf24",
+                color: "#111",
+                fontSize: "clamp(28px, 5vh, 64px)",
+                fontWeight: 900,
+                cursor: left <= 0 || busy ? "default" : "pointer",
+              }}
+            >
+              +{n}
+            </button>
+          ))
+        )}
       </div>
 
       {(error || flash) && (
