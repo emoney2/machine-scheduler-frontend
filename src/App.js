@@ -15,7 +15,7 @@ import axios from 'axios';
 import { socket } from "./socketClient";
 import Inventory from "./Inventory";
 import InventoryOrdered from "./InventoryOrdered";
-import "./axios-setup";
+import { clearLoginToken } from "./axios-setup";
 import Section9 from './Section9';
 import OrderSubmission from './OrderSubmission';
 import { subWorkDays, fmtMMDD } from './helpers';
@@ -40,7 +40,7 @@ import QueueTab from './QueueTab';
 import SalesPortal from "./SalesPortal";
 import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
-import { API_ROOT, getBackendOrigin } from "./apiRoot";
+import { API_ROOT, getBackendOrigin, getLoginOrigin } from "./apiRoot";
 
 window._isSubmittingOrder = false;
 
@@ -219,8 +219,9 @@ axios.interceptors.response.use(
   resp => resp,
   err => {
     if (err.response && err.response.status === 401) {
+      clearLoginToken();
       const base = BACKEND_ORIGIN_FOR_REDIRECT || window.location.origin;
-      const nextUrl = window.location.href;
+      const nextUrl = window.location.href.split("#")[0];
       window.location.href = `${base}/login?next=${encodeURIComponent(nextUrl)}`;
     }
     return Promise.reject(err);
@@ -230,7 +231,7 @@ axios.interceptors.response.use(
 // CONFIGURATION
 // Hosted Netlify uses same-origin /api (see apiRoot.js) so phone cookies work.
 const BACKEND_ORIGIN = getBackendOrigin();
-BACKEND_ORIGIN_FOR_REDIRECT = BACKEND_ORIGIN;
+BACKEND_ORIGIN_FOR_REDIRECT = getLoginOrigin();
 
 // WORK HOURS / HOLIDAYS
 const WORK_START_HR  = 8;
@@ -314,7 +315,7 @@ export default function App() {
         } else if (res.status === 401) {
           console.warn("🔒 /api/ping 401 — redirecting to backend login");
           const next = encodeURIComponent(window.location.href);
-          window.location.href = `${BACKEND_ORIGIN}/login?next=${next}`;
+          window.location.href = `${getLoginOrigin()}/login?next=${next}`;
           return;
         } else {
           console.warn("⚠️ /api/ping unexpected status:", res.status);
@@ -2008,7 +2009,8 @@ useEffect(() => {
         <button
           onClick={() => {
             // redirect to backend logout endpoint
-            const base = API_ROOT.startsWith('http') ? API_ROOT.replace(/\/api$/, '') : window.location.origin;
+            clearLoginToken();
+            const base = getLoginOrigin();
             window.location.href = `${base}/logout`;
           }}
           style={

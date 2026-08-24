@@ -33,6 +33,17 @@ export function getBackendOrigin() {
   }
 }
 
+/** Login page origin. On Netlify use same-host /login (proxied) so phones stay on the app. */
+export function getLoginOrigin() {
+  try {
+    const host = String(window.location.hostname || "").toLowerCase();
+    if (host.endsWith(".netlify.app") || host.endsWith(".netlify.com")) {
+      return window.location.origin;
+    }
+  } catch (_) {}
+  return getBackendOrigin() || "https://machine-scheduler-backend.onrender.com";
+}
+
 export function getSocketOrigin() {
   try {
     const host = String(window.location.hostname || "").toLowerCase();
