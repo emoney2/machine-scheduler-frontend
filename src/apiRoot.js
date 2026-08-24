@@ -31,3 +31,20 @@ export function getBackendOrigin() {
     return "";
   }
 }
+
+/**
+ * Socket.IO must talk to Render directly. Netlify's HTTP rewrite has no
+ * sticky sessions, so Engine.IO polling hits a new worker and logs
+ * "Invalid session". Login cookies still use same-origin /api.
+ */
+export function getSocketOrigin() {
+  try {
+    const host = String(window.location.hostname || "").toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1") {
+      const env = String(process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
+      if (env.startsWith("http")) return env.replace(/\/api$/, "");
+      return window.location.origin;
+    }
+  } catch (_) {}
+  return "https://machine-scheduler-backend.onrender.com";
+}

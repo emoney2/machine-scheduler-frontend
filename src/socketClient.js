@@ -3,9 +3,9 @@
  * again — duplicate clients double connections and reconnection storms against Render.
  */
 import { io } from "socket.io-client";
-import { getBackendOrigin } from "./apiRoot";
+import { getSocketOrigin } from "./apiRoot";
 
-export const SOCKET_ORIGIN = getBackendOrigin() || "https://machine-scheduler-backend.onrender.com";
+export const SOCKET_ORIGIN = getSocketOrigin();
 const SOCKET_PATH = "/socket.io";
 
 let socket = null;
