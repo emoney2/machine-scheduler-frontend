@@ -632,9 +632,9 @@ export default function MachineJob({ columns }) {
         }}
       >
         {[
-          [6, 1],
-          [5, 2],
+          [6, 5],
           [4, 3],
+          [2, 1],
         ].flatMap((row) =>
           row.map((n) => (
             <button
