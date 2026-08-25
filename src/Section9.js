@@ -555,7 +555,9 @@ export default function Section9(props) {
                             const totalQty = Number(job.quantity) || 0;
                             const inProgress = !isPh && doneQty > 0 && totalQty > 0 && doneQty < totalQty;
                             const cardBackground = job.isLate
-                              ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
+                              ? (inProgress
+                                ? `linear-gradient(rgba(34,197,94,0.22), rgba(34,197,94,0.22)), repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)`
+                                : 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)')
                               : hasThreadConflict
                               ? `linear-gradient(${THREAD_CONFLICT_BG_TINT}, ${THREAD_CONFLICT_BG_TINT}), ${base}`
                               : inProgress
@@ -1131,12 +1133,12 @@ export default function Section9(props) {
                                           left: 0,
                                           right: 0,
                                           bottom: 0,
-                                          height: 6,
-                                          background: 'rgba(0,0,0,0.08)',
+                                          height: 8,
+                                          background: 'rgba(0,0,0,0.18)',
                                           borderBottomLeftRadius: 2,
                                           borderBottomRightRadius: 2,
                                           overflow: 'hidden',
-                                          zIndex: 3,
+                                          zIndex: 9,
                                         }}
                                       >
                                         <div

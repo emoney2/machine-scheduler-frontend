@@ -42,7 +42,7 @@ import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
 import { API_ROOT, getBackendOrigin, getLoginOrigin } from "./apiRoot";
 import { FullscreenToggle, useMachineFullscreen } from "./useMachineFullscreen";
-import { estimateRemainingMs } from "./machineFloorUtils";
+import { estimateRemainingMs, isPlaceholder, normalizeOrderId } from "./machineFloorUtils";
 
 window._isSubmittingOrder = false;
 
@@ -587,7 +587,7 @@ useEffect(() => {
 
   socket.on("startTimeUpdated", onStartTimeUpdated);
   const dropFinishedJob = (orderId) => {
-    const want = String(orderId ?? "").trim();
+    const want = normalizeOrderId(orderId);
     if (!want) return;
     setColumns((prev) => {
       if (!prev) return prev;
@@ -597,7 +597,7 @@ useEffect(() => {
         if (!col?.jobs) continue;
         next[key] = {
           ...col,
-          jobs: col.jobs.filter((j) => String(j.id ?? "").trim() !== want),
+          jobs: col.jobs.filter((j) => normalizeOrderId(j.id) !== want),
         };
       }
       return next;
@@ -608,7 +608,7 @@ useEffect(() => {
     fetchAllCombined();
   };
   const onEmbroideryProgress = (payload) => {
-    const oid = String(payload?.orderId ?? "").trim();
+    const oid = normalizeOrderId(payload?.orderId);
     const done = Number(payload?.completedQty);
     const qty = Number(payload?.quantity);
     const qtyReached =
@@ -625,7 +625,7 @@ useEffect(() => {
           next[key] = {
             ...col,
             jobs: col.jobs.map((j) => {
-              if (String(j.id ?? "").trim() !== oid) return j;
+              if (normalizeOrderId(j.id) !== oid) return j;
               hit = true;
               return {
                 ...j,
@@ -990,8 +990,13 @@ function scheduleMachineJobs(jobs, machineKey = '') {
 
   // console.log(`🧵 Scheduling for ${machineKey} → ${headCount} heads`);
   let prevEnd = null;
+  let startedReal = false;
 
-  return jobs.map((job, idx) => {
+  return jobs.map((job) => {
+    const isPh = isPlaceholder(job);
+    const isTopReal = !isPh && !startedReal;
+    if (!isPh) startedReal = true;
+
     // 1) Compute late cutoff for this job
     const due = parseDueDate(job.due_date);
     let cutoff = null;
@@ -1004,7 +1009,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     let startIso = null;
     let start;
 
-    if (idx === 0) {
+    if (isTopReal) {
       // Top job: use sheet start if present, else actual now (no clamp)
       const sheetIso = job.embroidery_start ? normalizeStart(job.embroidery_start) : null;
       if (sheetIso) {
@@ -1038,7 +1043,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
 
     // In-progress top job: remaining clock starts from now so the end is elastic
     const remainingFrom =
-      idx === 0 && completed > 0 ? new Date() : start;
+      isTopReal && completed > 0 ? new Date() : start;
     const end = addWorkTime(remainingFrom, runMs);
 
     // 4) Assign computed times to job (overwrite existing values)
@@ -1046,6 +1051,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     job._rawEnd   = end;
     job.start     = fmtET(start);
     job.end       = fmtET(end);
+    job.piecesLeft = remaining;
     job.delivery  = fmtMMDD(addWorkDays(end, 6));
     job.isLate = cutoff instanceof Date && !isNaN(cutoff) && end > cutoff;
 
@@ -1250,6 +1256,23 @@ const fetchOrdersEmbroLinksCore = async () => {
     // 4) Build a map of all jobs (orders only)
     const jobById = {};
     const driveIdsToPublicize = [];
+    const liveColsEarly = columnsRef.current || columns;
+    const prevProgress = {};
+    for (const key of ["queue", ...SCHEDULER_MACHINE_KEYS]) {
+      for (const j of liveColsEarly?.[key]?.jobs || []) {
+        const k = normalizeOrderId(j?.id);
+        if (!k) continue;
+        const done = Math.max(0, Number(j.completedQty) || 0);
+        const prev = prevProgress[k];
+        if (!prev || done > (prev.completedQty || 0)) {
+          prevProgress[k] = {
+            completedQty: done,
+            avgCycleMs: Math.max(0, Number(j.avgCycleMs) || 0),
+            lastRunAt: String(j.lastRunAt || ""),
+          };
+        }
+      }
+    }
 
     orders.forEach(o => {
       const sid = String(o['Order #'] || '').trim();
@@ -1269,15 +1292,18 @@ const fetchOrdersEmbroLinksCore = async () => {
         o['Back Material'], o['Fur Color']
       ].filter(Boolean).map(s => String(s).trim()).filter(Boolean);
 
+      const nk = normalizeOrderId(sid);
+      const fromApi = Math.max(0, Number(o['Embroidery Completed Qty']) || 0);
+      const fromPrev = prevProgress[nk] || {};
       jobById[sid] = {
         id:               sid,
         company:          o['Company Name'] || '',
         product:          o['Product'] || '',
         design:           o['Design'] || '',
         quantity:         +o['Quantity'] || 0,
-        completedQty:     Math.max(0, Number(o['Embroidery Completed Qty']) || 0),
-        avgCycleMs:       Math.max(0, Number(o['Embroidery Avg Cycle Ms']) || 0),
-        lastRunAt:        String(o['Embroidery Last Run At'] || '').trim(),
+        completedQty:     Math.max(fromApi, fromPrev.completedQty || 0),
+        avgCycleMs:       Math.max(0, Number(o['Embroidery Avg Cycle Ms']) || fromPrev.avgCycleMs || 0),
+        lastRunAt:        String(o['Embroidery Last Run At'] || fromPrev.lastRunAt || '').trim(),
         stitch_count:     +o['Stitch Count'] || 0,
         due_date:         o['Due Date'] || '',
         due_type:         o['Hard Date/Soft Date'] || '',

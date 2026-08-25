@@ -43,7 +43,12 @@ export function jobImageUrl(job, sz = "w640") {
 }
 
 export function isPlaceholder(job) {
-  return String(job?.id || "").startsWith("ph-");
+  return (
+    String(job?.id || "").startsWith("ph-") ||
+    job?.placeholder === true ||
+    job?.isPlaceholder === true ||
+    job?.type === "placeholder"
+  );
 }
 
 export function isEmbroideryOpen(job) {
