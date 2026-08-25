@@ -125,27 +125,46 @@ export function formatCompactDuration(ms) {
   return m ? `${h}h${m}m` : `${h}h`;
 }
 
-/** One line: last 1–3 +N posts with clock (and cycle time when known). */
-export function formatRecentRunsLine(runs, lastRunAt) {
-  const list = (Array.isArray(runs) ? runs : [])
-    .filter((r) => r && (r.at || r.increment))
-    .slice(-3);
-  if (!list.length) {
-    const t = formatClockET(lastRunAt);
-    return t ? `Last run posted at ${t}` : "";
+export function formatSignedPerf(aheadMs) {
+  if (!Number.isFinite(aheadMs)) return null;
+  const totalMin = Math.round(aheadMs / 60000);
+  if (totalMin === 0) return { text: "0", color: "#6b7280" };
+  const faster = totalMin > 0;
+  const n = Math.abs(totalMin);
+  const body = n < 60 ? `${n}m` : `${Math.floor(n / 60)}h${n % 60 ? `${n % 60}m` : ""}`;
+  return {
+    text: faster ? `+${body}` : `-${body}`,
+    color: faster ? "#16a34a" : "#dc2626",
+  };
+}
+
+/** Last N +N posts with clock and green/red vs expected cycle (stitches/35k). */
+export function lastRunsWithPerf(runs, stitchCount, headCount, limit = 2) {
+  const raw = (Array.isArray(runs) ? runs : []).filter((r) => r && r.at);
+  const out = [];
+  for (let i = 0; i < raw.length; i++) {
+    const r = raw[i];
+    let cycleMs = Number(r.cycleMs) || 0;
+    if (!cycleMs && i > 0) {
+      const t0 = new Date(raw[i - 1].at).getTime();
+      const t1 = new Date(r.at).getTime();
+      const ms = t1 - t0;
+      if (Number.isFinite(ms) && ms >= 2 * 60 * 1000 && ms <= 4 * 60 * 60 * 1000) {
+        cycleMs = ms;
+      }
+    }
+    const inc = Number(r.increment) || 0;
+    const expectedMs = estimateRemainingMs(stitchCount, inc, headCount, 0);
+    const aheadMs =
+      cycleMs >= 2 * 60 * 1000 && expectedMs > 0 ? expectedMs - cycleMs : null;
+    out.push({
+      increment: inc,
+      at: r.at,
+      clock: formatClockET(r.at),
+      perf: aheadMs == null ? null : formatSignedPerf(aheadMs),
+    });
   }
-  const parts = list.map((r) => {
-    const n = Number(r.increment) || 0;
-    const t = formatClockET(r.at) || "";
-    const dur = formatCompactDuration(Number(r.cycleMs) || 0);
-    return [n ? `+${n}` : "", t, dur].filter(Boolean).join(" ");
-  }).filter(Boolean);
-  if (!parts.length) {
-    const t = formatClockET(lastRunAt);
-    return t ? `Last run posted at ${t}` : "";
-  }
-  if (parts.length === 1) return `Last run posted ${parts[0]}`;
-  return parts.join(" · ");
+  return out.slice(-Math.max(1, limit));
 }
 
 export function fmtMMDD(d) {

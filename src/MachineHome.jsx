@@ -3,10 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import { socket } from "./socketClient";
 import {
   MACHINE_META,
+  estimateRemainingMs,
   fmtMMDD,
-  formatRecentRunsLine,
+  formatDuration,
   jobImageUrl,
   jobsForMachine,
+  lastRunsWithPerf,
   normalizeOrderId,
 } from "./machineFloorUtils";
 
@@ -220,7 +222,15 @@ export default function MachineHome({ columns, loading }) {
               const outline = outlineByDue(due);
               const product = String(job.product || "").trim();
               const company = String(job.company || "").trim();
-              const runLine = formatRecentRunsLine(job.recentRuns, job.lastRunAt);
+              const expectedLabel = formatDuration(
+                estimateRemainingMs(job.stitch_count, meta.headCount, meta.headCount)
+              );
+              const lastTwo = lastRunsWithPerf(
+                job.recentRuns,
+                job.stitch_count,
+                meta.headCount,
+                2
+              );
 
               return (
                 <button
@@ -341,23 +351,39 @@ export default function MachineHome({ columns, loading }) {
                       </TileOverlay>
                     ) : null}
                   </div>
-                  {runLine ? (
-                    <div
-                      style={{
-                        marginTop: 4,
-                        fontSize: 12,
-                        fontWeight: 800,
-                        color: "#111827",
-                        textAlign: "center",
-                        lineHeight: 1.15,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {runLine}
-                    </div>
-                  ) : null}
+                  <div
+                    style={{
+                      marginTop: 4,
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: "#111827",
+                      textAlign: "center",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    <div>Expected {expectedLabel}</div>
+                    {lastTwo.length ? (
+                      <div
+                        style={{
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {lastTwo.map((r, i) => (
+                          <span key={r.at || i}>
+                            {i ? " · " : ""}
+                            {r.clock}
+                            {r.perf ? (
+                              <span style={{ color: r.perf.color }}> {r.perf.text}</span>
+                            ) : null}
+                          </span>
+                        ))}
+                      </div>
+                    ) : job.lastRunAt ? (
+                      <div style={{ color: "#6b7280" }}>No timed runs yet</div>
+                    ) : null}
+                  </div>
                 </button>
               );
             })}

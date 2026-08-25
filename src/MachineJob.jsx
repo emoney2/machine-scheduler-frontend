@@ -8,7 +8,7 @@ import {
   estimateRemainingMs,
   findJobInColumns,
   formatDuration,
-  formatRecentRunsLine,
+  lastRunsWithPerf,
   jobImageUrl,
   normalizeOrderId,
 } from "./machineFloorUtils";
@@ -57,7 +57,7 @@ export default function MachineJob({ columns }) {
       setError("");
       try {
         const res = await axios.get(
-          `${ROOT}/embroidery/floor-job/${encodeURIComponent(oid)}`,
+          `${ROOT}/embroidery/floor-job/${encodeURIComponent(oid)}?machineId=${encodeURIComponent(machineId || "")}`,
           { withCredentials: true, signal, timeout: 25000 }
         );
         applyPayload(res.data);
@@ -72,7 +72,7 @@ export default function MachineJob({ columns }) {
         setLoading(false);
       }
     },
-    [oid, applyPayload]
+    [oid, machineId, applyPayload]
   );
 
   useEffect(() => {
@@ -108,6 +108,18 @@ export default function MachineJob({ columns }) {
   const avgCycleMs = Number(job?.avgCycleMs ?? fromColumns?.avgCycleMs ?? 0) || 0;
   const estLabel = formatDuration(
     estimateRemainingMs(stitchCount, left, meta.headCount, avgCycleMs)
+  );
+  const expectedRunMs = Number(job?.expectedRunMs) || estimateRemainingMs(
+    stitchCount,
+    meta.headCount,
+    meta.headCount
+  );
+  const expectedRunLabel = formatDuration(expectedRunMs);
+  const lastTwo = lastRunsWithPerf(
+    job?.recentRuns || fromColumns?.recentRuns,
+    stitchCount,
+    meta.headCount,
+    2
   );
   const displayJob = job
     ? {
@@ -172,7 +184,7 @@ export default function MachineJob({ columns }) {
     try {
       const res = await axios.post(
         `${ROOT}/embroidery/progress`,
-        { orderId: oid, ...body },
+        { orderId: oid, machine: meta.title, machineId, headCount: meta.headCount, ...body },
         { withCredentials: true, timeout: 25000 }
       );
       applyPayload(res.data);
@@ -540,6 +552,9 @@ export default function MachineJob({ columns }) {
           >
             {estLabel}
           </div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#4b5563", textAlign: "center" }}>
+            Expected run {expectedRunLabel}
+          </div>
         </div>
         <div
           style={{
@@ -549,16 +564,23 @@ export default function MachineJob({ columns }) {
             fontWeight: 800,
             color: "#111827",
             padding: "2px 4px 0",
-            lineHeight: 1.15,
+            lineHeight: 1.2,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}
         >
-          {formatRecentRunsLine(
-            job?.recentRuns || fromColumns?.recentRuns,
-            lastRunAt || job?.lastRunAt || fromColumns?.lastRunAt
-          ) || "Last run posted at —"}
+          {lastTwo.length
+            ? lastTwo.map((r, i) => (
+                <span key={r.at || i}>
+                  {i ? " · " : ""}
+                  {r.clock}
+                  {r.perf ? (
+                    <span style={{ color: r.perf.color }}> {r.perf.text}</span>
+                  ) : null}
+                </span>
+              ))
+            : "Last run posted at —"}
         </div>
         </div>
       </div>
