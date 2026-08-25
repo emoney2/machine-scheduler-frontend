@@ -196,6 +196,7 @@ export default function OrderSubmission() {
     dueDate: "",
     dateType: "Hard Date",
     salesRep: "",
+    poNumber: "",
     materials: ["", "", "", "", ""],
     materialPercents: ["", "", "", "", ""],  // ← new
     backMaterial: "",
@@ -1329,6 +1330,7 @@ const submitForm = async () => {
         designName: String(form.designName || "").trim(),
         product: String(form.product || "").trim(),
         quantity: String(form.quantity || "").trim(),
+        poNumber: String(form.poNumber || "").trim(),
         ...(previewFileId ? { previewFileId } : {}),
         ...(thumbDataUrl ? { thumbDataUrl } : {}),
       };
@@ -1384,6 +1386,7 @@ const submitForm = async () => {
       dueDate: "",
       dateType: "Hard Date",
       salesRep: "",
+      poNumber: "",
       materials: ["", "", "", "", ""],
       materialPercents: ["", "", "", "", ""],  // ← add this
       backMaterial: "",
@@ -1585,6 +1588,7 @@ const handleSaveNewCompany = async () => {
           reorderJob["Sales Rep"] ??
           reorderJob["Referral"] ??
           "",
+        poNumber: "",
         notes: reorderJob["Notes"] || "",
         materials: [
           reorderJob["Material1"] || "",
@@ -1885,6 +1889,9 @@ const handleSaveNewCompany = async () => {
               {lastAcceptedCustomerJob.product || "—"}
               {lastAcceptedCustomerJob.quantity
                 ? ` · qty ${lastAcceptedCustomerJob.quantity}`
+                : ""}
+              {lastAcceptedCustomerJob.poNumber
+                ? ` · PO # ${lastAcceptedCustomerJob.poNumber}`
                 : ""}
             </span>
             <span style={{ color: "#9ca3af", marginLeft: "auto", flexShrink: 0 }}>
@@ -3021,6 +3028,20 @@ const handleSaveNewCompany = async () => {
                     </option>
                   ))}
                 </select>
+              </label>
+            </div>
+            <div>
+              <label>
+                PO #<span style={{ color: "#6b7280", fontWeight: 400 }}> (optional)</span>
+                <br />
+                <input
+                  name="poNumber"
+                  value={form.poNumber}
+                  onChange={handleChange}
+                  placeholder="Customer PO"
+                  autoComplete="off"
+                  style={{ width: "80%" }}
+                />
               </label>
             </div>
           </div>

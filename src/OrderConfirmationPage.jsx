@@ -127,6 +127,15 @@ export default function OrderConfirmationPage() {
     [jobs, selected]
   );
 
+  const sharedPo = useMemo(() => {
+    const pos = [
+      ...new Set(
+        selectedJobs.map((j) => String(j["PO #"] || "").trim()).filter(Boolean)
+      ),
+    ];
+    return pos.length === 1 ? pos[0] : "";
+  }, [selectedJobs]);
+
   const grandTotal = selectedJobs.reduce((sum, job) => sum + Number(job.LineTotal || 0), 0);
 
   const handleDownloadPdf = async () => {
@@ -267,6 +276,9 @@ export default function OrderConfirmationPage() {
             <span style={{ color: "#6b7280", marginLeft: 8 }}>
               {selected.length} of {jobs.length} selected
             </span>
+            {sharedPo ? (
+              <span style={{ marginLeft: 8, fontWeight: 600 }}>PO #: {sharedPo}</span>
+            ) : null}
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
@@ -413,6 +425,7 @@ export default function OrderConfirmationPage() {
                 <div style={{ fontSize: "0.85rem", opacity: isSelected ? 0.9 : 1, color: isSelected ? "inherit" : "#6b7280" }}>
                   Order #{job["Order #"] || "?"} | Stage: {job.Stage || "—"}
                   {job["Due Date"] ? ` | Due: ${job["Due Date"]}` : ""}
+                  {job["PO #"] ? ` | PO #: ${job["PO #"]}` : ""}
                 </div>
               </div>
               <div style={{ textAlign: "right", minWidth: 120 }}>
