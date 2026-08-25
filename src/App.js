@@ -632,6 +632,9 @@ useEffect(() => {
                 completedQty: done,
                 avgCycleMs: Number(payload?.avgCycleMs) || j.avgCycleMs || 0,
                 lastRunAt: payload?.lastRunAt || j.lastRunAt || "",
+                recentRuns: Array.isArray(payload?.recentRuns)
+                  ? payload.recentRuns
+                  : j.recentRuns,
               };
             }),
           };
@@ -1269,6 +1272,7 @@ const fetchOrdersEmbroLinksCore = async () => {
             completedQty: done,
             avgCycleMs: Math.max(0, Number(j.avgCycleMs) || 0),
             lastRunAt: String(j.lastRunAt || ""),
+            recentRuns: Array.isArray(j.recentRuns) ? j.recentRuns : [],
           };
         }
       }
@@ -1304,6 +1308,9 @@ const fetchOrdersEmbroLinksCore = async () => {
         completedQty:     Math.max(fromApi, fromPrev.completedQty || 0),
         avgCycleMs:       Math.max(0, Number(o['Embroidery Avg Cycle Ms']) || fromPrev.avgCycleMs || 0),
         lastRunAt:        String(o['Embroidery Last Run At'] || fromPrev.lastRunAt || '').trim(),
+        recentRuns:       Array.isArray(o['Embroidery Recent Runs'])
+          ? o['Embroidery Recent Runs']
+          : (fromPrev.recentRuns || []),
         stitch_count:     +o['Stitch Count'] || 0,
         due_date:         o['Due Date'] || '',
         due_type:         o['Hard Date/Soft Date'] || '',

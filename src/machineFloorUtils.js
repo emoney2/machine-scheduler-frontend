@@ -116,6 +116,38 @@ export function formatClockET(iso) {
   }).format(d);
 }
 
+export function formatCompactDuration(ms) {
+  if (!Number.isFinite(ms) || ms < 2 * 60 * 1000) return "";
+  const totalMin = Math.round(ms / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m ? `${h}h${m}m` : `${h}h`;
+}
+
+/** One line: last 1–3 +N posts with clock (and cycle time when known). */
+export function formatRecentRunsLine(runs, lastRunAt) {
+  const list = (Array.isArray(runs) ? runs : [])
+    .filter((r) => r && (r.at || r.increment))
+    .slice(-3);
+  if (!list.length) {
+    const t = formatClockET(lastRunAt);
+    return t ? `Last run posted at ${t}` : "";
+  }
+  const parts = list.map((r) => {
+    const n = Number(r.increment) || 0;
+    const t = formatClockET(r.at) || "";
+    const dur = formatCompactDuration(Number(r.cycleMs) || 0);
+    return [n ? `+${n}` : "", t, dur].filter(Boolean).join(" ");
+  }).filter(Boolean);
+  if (!parts.length) {
+    const t = formatClockET(lastRunAt);
+    return t ? `Last run posted at ${t}` : "";
+  }
+  if (parts.length === 1) return `Last run posted ${parts[0]}`;
+  return parts.join(" · ");
+}
+
 export function fmtMMDD(d) {
   if (!d) return "—";
   if (d instanceof Date && !isNaN(d)) {

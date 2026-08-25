@@ -4,7 +4,7 @@ import { socket } from "./socketClient";
 import {
   MACHINE_META,
   fmtMMDD,
-  formatClockET,
+  formatRecentRunsLine,
   jobImageUrl,
   jobsForMachine,
   normalizeOrderId,
@@ -220,6 +220,7 @@ export default function MachineHome({ columns, loading }) {
               const outline = outlineByDue(due);
               const product = String(job.product || "").trim();
               const company = String(job.company || "").trim();
+              const runLine = formatRecentRunsLine(job.recentRuns, job.lastRunAt);
 
               return (
                 <button
@@ -340,17 +341,21 @@ export default function MachineHome({ columns, loading }) {
                       </TileOverlay>
                     ) : null}
                   </div>
-                  {formatClockET(job.lastRunAt) ? (
+                  {runLine ? (
                     <div
                       style={{
                         marginTop: 4,
-                        fontSize: 14,
+                        fontSize: 12,
                         fontWeight: 800,
                         color: "#111827",
                         textAlign: "center",
+                        lineHeight: 1.15,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
                       }}
                     >
-                      Last run posted at {formatClockET(job.lastRunAt)}
+                      {runLine}
                     </div>
                   ) : null}
                 </button>

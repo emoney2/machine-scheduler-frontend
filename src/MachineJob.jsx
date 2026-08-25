@@ -8,7 +8,7 @@ import {
   estimateRemainingMs,
   findJobInColumns,
   formatDuration,
-  formatClockET,
+  formatRecentRunsLine,
   jobImageUrl,
   normalizeOrderId,
 } from "./machineFloorUtils";
@@ -545,14 +545,20 @@ export default function MachineJob({ columns }) {
           style={{
             flexShrink: 0,
             textAlign: "center",
-            fontSize: 18,
+            fontSize: 15,
             fontWeight: 800,
             color: "#111827",
             padding: "2px 4px 0",
+            lineHeight: 1.15,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
-          Last run posted at {formatClockET(lastRunAt || job?.lastRunAt || fromColumns?.lastRunAt) || "—"}
-        </div>
+          {formatRecentRunsLine(
+            job?.recentRuns || fromColumns?.recentRuns,
+            lastRunAt || job?.lastRunAt || fromColumns?.lastRunAt
+          ) || "Last run posted at —"}
         </div>
       </div>
 
