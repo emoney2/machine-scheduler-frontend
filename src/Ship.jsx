@@ -1836,14 +1836,15 @@ export default function Ship() {
     };
     const get = (obj, key) => (obj && obj[key] != null ? String(obj[key]).trim() : "");
 
-    // Build recipient from a row using your Directory headers
+    // Build recipient from a row using Directory shipping headers
     const buildRecipientFrom = (row) => ({
       Name:          get(row, "Company Name"),
       AttentionName: `${get(row, "Contact First Name")} ${get(row, "Contact Last Name")}`.trim(),
-      Phone:         get(row, "Phone Number"),
+      Phone:         get(row, "Shipping Phone") || get(row, "Phone Number"),
       Address: {
         AddressLine1:      get(row, "Street Address 1"),
         AddressLine2:      get(row, "Street Address 2"),
+        AddressLine3:      get(row, "Shipping Address 3"),
         City:              get(row, "City"),
         StateProvinceCode: toStateAbbr(get(row, "State")),
         PostalCode:        toZip5(get(row, "Zip Code")),
@@ -1910,6 +1911,7 @@ export default function Ship() {
                 ...recipient.Address,
                 AddressLine1: recipient.Address.AddressLine1 || dirRecipient.Address.AddressLine1,
                 AddressLine2: recipient.Address.AddressLine2 || dirRecipient.Address.AddressLine2,
+                AddressLine3: recipient.Address.AddressLine3 || dirRecipient.Address.AddressLine3,
                 City: recipient.Address.City || dirRecipient.Address.City,
                 StateProvinceCode:
                   recipient.Address.StateProvinceCode?.length === 2
@@ -1989,11 +1991,12 @@ export default function Ship() {
       const Phone = p?.Phone || "";
       const A1 = p?.Address?.AddressLine1 || "";
       const A2 = p?.Address?.AddressLine2 || "";
+      const A3 = p?.Address?.AddressLine3 || "";
       const City = p?.Address?.City || "";
       const State = p?.Address?.StateProvinceCode || "";
       const Zip = p?.Address?.PostalCode || "";
       const Ctry = p?.Address?.CountryCode || "US";
-      return { Name, AttentionName, Phone, A1, A2, City, State, Zip, Ctry };
+      return { Name, AttentionName, Phone, A1, A2, A3, City, State, Zip, Ctry };
     };
 
     const recip = normParty({ ...recipient, Name: fallbackRecipientName }, fallbackRecipientName);
@@ -2045,7 +2048,7 @@ export default function Ship() {
     });
 
     // Party variants: include nested PascalCase, nested camel, and flat legacy keys
-    const partyVariants = ({ Name, AttentionName, Phone, A1, A2, City, State, Zip, Ctry }) => ({
+    const partyVariants = ({ Name, AttentionName, Phone, A1, A2, A3, City, State, Zip, Ctry }) => ({
       // Nested PascalCase
       Name,
       AttentionName,
@@ -2053,6 +2056,7 @@ export default function Ship() {
       Address: {
         AddressLine1: A1,
         AddressLine2: A2,
+        AddressLine3: A3,
         City,
         StateProvinceCode: State,
         PostalCode: Zip,
@@ -2065,6 +2069,7 @@ export default function Ship() {
       address: {
         addressLine1: A1,
         addressLine2: A2,
+        addressLine3: A3,
         city: City,
         state: State,
         postalCode: Zip,
@@ -2073,6 +2078,7 @@ export default function Ship() {
       // Flat camel
       addressLine1: A1,
       addressLine2: A2,
+      addressLine3: A3,
       city: City,
       state: State,
       postalCode: Zip,
@@ -2081,6 +2087,7 @@ export default function Ship() {
       attention: AttentionName,
       addr1: A1,
       addr2: A2,
+      addr3: A3,
       zip: Zip,
       country: Ctry,
     });
@@ -2126,6 +2133,7 @@ export default function Ship() {
             phone: shipr.Phone,
             addr1: shipr.A1,
             addr2: shipr.A2,
+            addr3: shipr.A3,
             city: shipr.City,
             state: shipr.State,
             zip:   shipr.Zip,
@@ -2137,6 +2145,7 @@ export default function Ship() {
             phone: recip.Phone,
             addr1: recip.A1,
             addr2: recip.A2,
+            addr3: recip.A3,
             city: recip.City,
             state: recip.State,
             zip:   recip.Zip,
