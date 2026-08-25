@@ -451,12 +451,12 @@ export default function MachineJob({ columns }) {
           gridColumn: 2,
           gridRow: 1,
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+          gridTemplateRows: "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(72px, 0.85fr)",
           minWidth: 0,
           minHeight: 0,
           background: "#fff",
           gap: 8,
-          padding: 10,
+          padding: 8,
         }}
       >
         <div
@@ -509,152 +509,148 @@ export default function MachineJob({ columns }) {
           style={{
             display: "flex",
             flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "3px solid #d1d5db",
+            borderRadius: 16,
+            background: "#f9fafb",
+            padding: "6px 8px",
             minWidth: 0,
             minHeight: 0,
-            gap: 8,
           }}
         >
-          <div
-            style={{
-              flex: "1 1 0",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              border: "3px solid #d1d5db",
-              borderRadius: 16,
-              background: "#f9fafb",
-              padding: "6px 8px",
-              minHeight: 0,
-            }}
-          >
-            <div style={{ fontSize: 15, fontWeight: 800, color: "#374151", textAlign: "center" }}>
-              Est. time left
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(24px, 5vh, 56px)",
-                fontWeight: 900,
-                lineHeight: 0.95,
-                letterSpacing: "-0.04em",
-                textAlign: "center",
-              }}
-            >
-              {estLabel}
-            </div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#374151", textAlign: "center" }}>
+            Est. time left
           </div>
-
           <div
             style={{
-              flex: "0 0 auto",
-              border: "3px solid #d1d5db",
-              borderRadius: 16,
-              background: "#fff",
-              padding: "8px 8px 6px",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "stretch",
-              gap: 6,
-              minWidth: 0,
+              fontSize: "clamp(28px, 5.5vh, 64px)",
+              fontWeight: 900,
+              lineHeight: 0.95,
+              letterSpacing: "-0.04em",
+              textAlign: "center",
             }}
           >
-            {!manualStart && left === quantity && (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={pressStart}
-                style={{
-                  height: 40,
-                  border: "none",
-                  borderRadius: 10,
-                  background: "#2563eb",
-                  color: "#fff",
-                  fontSize: 18,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                Start
-              </button>
-            )}
-            {manualStart && (
-              <div
-                style={{
-                  textAlign: "center",
-                  fontSize: 13,
-                  fontWeight: 800,
-                  color: "#166534",
-                }}
-              >
-                Started
+            {estLabel}
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "3px solid #d1d5db",
+            borderRadius: 16,
+            background: "#fff",
+            padding: "6px 8px",
+            minWidth: 0,
+            minHeight: 0,
+            gap: 4,
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#4b5563", textAlign: "center" }}>
+            Expected run {expectedRunLabel}
+          </div>
+          {lastTwo.length
+            ? lastTwo.map((r) => (
+                <div
+                  key={r.at}
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 800,
+                    color: "#111827",
+                    lineHeight: 1.2,
+                    textAlign: "center",
+                  }}
+                >
+                  {r.clock}
+                  {r.perf ? (
+                    <span style={{ color: r.perf.color }}> {r.perf.text}</span>
+                  ) : null}
+                </div>
+              ))
+            : (
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#6b7280" }}>
+                Last run posted at —
               </div>
             )}
-            <div style={{ display: "flex", alignItems: "stretch", justifyContent: "center", gap: 8 }}>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  setRecutQty("");
-                  setRecutOpen(true);
-                }}
-                style={{
-                  width: 72,
-                  height: 44,
-                  borderRadius: 10,
-                  border: "3px solid #b91c1c",
-                  background: "#fef2f2",
-                  color: "#b91c1c",
-                  fontWeight: 900,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  flexShrink: 0,
-                }}
-              >
-                Recut
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={finishJob}
-                style={{
-                  flex: 1,
-                  height: 44,
-                  border: "none",
-                  borderRadius: 10,
-                  background: "#16a34a",
-                  color: "#fff",
-                  fontSize: 18,
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                Finish
-              </button>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#4b5563", textAlign: "center" }}>
-              Expected run {expectedRunLabel}
-            </div>
-            <div
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gridTemplateRows: !manualStart && left === quantity ? "auto 1fr" : "1fr",
+            minWidth: 0,
+            minHeight: 0,
+            border: "3px solid #d1d5db",
+            borderRadius: 16,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          {!manualStart && left === quantity && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={pressStart}
               style={{
-                textAlign: "center",
-                fontSize: 13,
-                fontWeight: 800,
-                color: "#111827",
-                lineHeight: 1.3,
+                gridColumn: "1 / -1",
+                height: 40,
+                border: "none",
+                borderBottom: "2px solid #d1d5db",
+                background: "#2563eb",
+                color: "#fff",
+                fontSize: 18,
+                fontWeight: 900,
+                cursor: "pointer",
               }}
             >
-              {lastTwo.length
-                ? lastTwo.map((r) => (
-                    <div key={r.at}>
-                      {r.clock}
-                      {r.perf ? (
-                        <span style={{ color: r.perf.color }}> {r.perf.text}</span>
-                      ) : null}
-                    </div>
-                  ))
-                : "Last run posted at —"}
-            </div>
-          </div>
+              Start
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setRecutQty("");
+              setRecutOpen(true);
+            }}
+            style={{
+              minHeight: 0,
+              height: "100%",
+              border: "none",
+              borderRight: "3px solid #d1d5db",
+              borderRadius: 0,
+              background: "#fef2f2",
+              color: "#b91c1c",
+              fontWeight: 900,
+              fontSize: "clamp(16px, 2.4vh, 22px)",
+              cursor: "pointer",
+            }}
+          >
+            Recut
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={finishJob}
+            style={{
+              minHeight: 0,
+              height: "100%",
+              border: "none",
+              borderRadius: 0,
+              background: "#16a34a",
+              color: "#fff",
+              fontSize: "clamp(16px, 2.4vh, 22px)",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Finish
+          </button>
         </div>
       </div>
 
