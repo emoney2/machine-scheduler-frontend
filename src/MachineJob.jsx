@@ -560,6 +560,7 @@ export default function MachineJob({ columns }) {
             lastRunAt || job?.lastRunAt || fromColumns?.lastRunAt
           ) || "Last run posted at —"}
         </div>
+        </div>
       </div>
 
       <div
