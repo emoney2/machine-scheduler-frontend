@@ -3164,7 +3164,7 @@ export default function Ship() {
 
       {showBoxModal && (
         <div
-          className="ms-dialog-overlay"
+          className="ms-dialog-overlay ms-dialog-overlay--roomy"
           style={{
             position: "fixed",
             inset: 0,
@@ -3185,7 +3185,7 @@ export default function Ship() {
               background: "#fafafa",
               borderRadius: 14,
               width: "min(620px, 100%)",
-              maxHeight: "min(92vh, 720px)",
+              maxHeight: "92vh",
               padding: "14px 16px 12px",
               boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
               display: "flex",
@@ -3195,15 +3195,16 @@ export default function Ship() {
               border: "1px solid #e0e0e0",
             }}
           >
-            <h3 id="ship-box-modal-title" style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
+            <h3 id="ship-box-modal-title" style={{ margin: "0 0 4px", fontSize: 18, fontWeight: 700, color: "#1a237e", flexShrink: 0 }}>
               Select boxes
             </h3>
-            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#1565c0" }}>
+            <p style={{ margin: "0 0 10px", fontSize: 12, color: "#1565c0", flexShrink: 0 }}>
               Tap a square to add one · adjust qty below · due {earliestDueSelected ? formatDateMMDD(earliestDueSelected) : "—"}
               {hardSoftSummarySelected ? (
                 <> · <strong>{hardSoftSummarySelected}</strong></>
               ) : null}
             </p>
+            <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
             {shipmentPieces.length > 0 && (
               <div
                 style={{
@@ -3395,9 +3396,6 @@ export default function Ship() {
                 marginTop: 10,
                 paddingTop: 8,
                 borderTop: "1px solid #cfd8dc",
-                flexShrink: 0,
-                maxHeight: "22vh",
-                overflow: "hidden",
               }}
             >
               <div style={{ fontSize: 11, fontWeight: 700, color: "#455a64", marginBottom: 6 }}>Summary</div>
@@ -3479,7 +3477,8 @@ export default function Ship() {
                 </div>
               )}
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, flexShrink: 0 }}>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12, flexShrink: 0, paddingTop: 4 }}>
               <button type="button" onClick={() => setShowBoxModal(false)} style={shipModalFooterBtn}>Cancel</button>
               <button
                 type="button"
@@ -3849,7 +3848,7 @@ export default function Ship() {
 
       {showRateModal && (
         <div
-          className="ms-dialog-overlay"
+          className="ms-dialog-overlay ms-dialog-overlay--roomy"
           style={{
             position: "fixed",
             inset: 0,
@@ -3870,7 +3869,7 @@ export default function Ship() {
               background: "#fafafa",
               borderRadius: 14,
               width: "min(720px, 100%)",
-              maxHeight: "min(92vh, 720px)",
+              maxHeight: "92vh",
               padding: "14px 16px 12px",
               boxShadow: "0 12px 40px rgba(0,0,0,0.25)",
               display: "flex",
@@ -3938,7 +3937,7 @@ export default function Ship() {
                   gap: 8,
                   flex: "1 1 auto",
                   minHeight: 0,
-                  overflow: "hidden",
+                  overflow: "auto",
                   alignContent: "start",
                 }}
               >

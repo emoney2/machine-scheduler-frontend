@@ -73,3 +73,13 @@ h2 {
   overflow: auto;
   margin-top: 0 !important;
 }
+
+/* Tap-heavy dialogs (box picker, rates): use the viewport; keep footer buttons on-screen. */
+.ms-dialog-overlay.ms-dialog-overlay--roomy {
+  align-items: center !important;
+  place-items: center !important;
+  padding-bottom: 12px !important;
+}
+.ms-dialog-overlay.ms-dialog-overlay--roomy > * {
+  max-height: 92vh !important;
+}
