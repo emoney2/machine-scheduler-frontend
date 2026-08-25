@@ -1992,6 +1992,7 @@ const handleSaveNewCompany = async () => {
       {/* ─── Company Modal ───────────────────────────────────── */}
       {isNewCompanyModalOpen && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             top: 0,
@@ -2000,7 +2001,7 @@ const handleSaveNewCompany = async () => {
             height: "100%",
             background: "rgba(0,0,0,0.5)",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "center",
             zIndex: 1000,
           }}
@@ -2082,13 +2083,14 @@ const handleSaveNewCompany = async () => {
       {/* Material Modal */}
       {isNewMaterialModalOpen && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             top: 0, left: 0,
             width: "100%", height: "100%",
             background: "rgba(0,0,0,0.5)",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "center",
             zIndex: 10050,
           }}
@@ -2329,6 +2331,7 @@ const handleSaveNewCompany = async () => {
       {/* ─── New Product Modal ───────────────────────────────────────── */}
       {isNewProductModalOpen && newProductName && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             top: 0,
@@ -2337,7 +2340,7 @@ const handleSaveNewCompany = async () => {
             height: "100%",
             background: "rgba(0,0,0,0.5)",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "center",
             zIndex: 1000,
           }}
@@ -2706,11 +2709,13 @@ const handleSaveNewCompany = async () => {
 
         {/* ─── Reorder Modal ──────────────────────────── */}
         {isReorderModalOpen && (
-          <div style={{
+          <div
+            className="ms-dialog-overlay"
+            style={{
             position: "fixed", top: 0, left: 0,
             width: "100%", height: "100%",
             background: "rgba(0,0,0,0.5)",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            display: "flex", alignItems: "flex-start", justifyContent: "center",
             zIndex: 1000
           }}>
             <div style={{
@@ -3460,6 +3465,7 @@ const handleSaveNewCompany = async () => {
 
       {showOrderShipAddressModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,

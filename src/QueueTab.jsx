@@ -760,13 +760,14 @@ export default function QueueTab() {
       {/* 🆕 Print Options Modal */}
       {showPrintModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.45)",
             display: "flex",
             justifyContent: "center",
-            alignItems: "center",
+            alignItems: "flex-start",
             zIndex: 9999
           }}
           onClick={() => setShowPrintModal(false)}

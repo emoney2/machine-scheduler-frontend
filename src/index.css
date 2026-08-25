@@ -55,3 +55,21 @@ h2 {
   font-size: var(--font-size-normal);
   margin: 0.5rem 0;
 }
+
+/* Keep dialogs in the upper half so Fire/tablet keyboards do not cover Save/Send. */
+.ms-dialog-overlay {
+  align-items: flex-start !important;
+  justify-content: center !important;
+  place-items: start center !important;
+  padding-top: 12px !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+  padding-bottom: 50vh !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+}
+.ms-dialog-overlay > * {
+  max-height: 46vh !important;
+  overflow: auto;
+  margin-top: 0 !important;
+}

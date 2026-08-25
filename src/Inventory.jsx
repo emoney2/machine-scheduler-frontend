@@ -7,7 +7,7 @@ const modalOverlay = {
   position: "fixed", top: 0, left: 0,
   width: "100%", height: "100%",
   background: "rgba(0,0,0,0.5)",
-  display: "flex", alignItems: "center", justifyContent: "center",
+  display: "flex", alignItems: "flex-start", justifyContent: "center",
   zIndex: 1000
 };
 const modalBox = {
@@ -515,7 +515,7 @@ const handleSaveBulkNewItems = async () => {
         </div>
       )}
 {isNewItemModalOpen && (bulkNewItems.length > 0 || newMaterialsBatch.length > 0) && (
-  <div style={modalOverlay}>
+  <div className="ms-dialog-overlay" style={modalOverlay}>
     <div style={modalBox}>
       {bulkNewItems.length > 0 ? (
         <>

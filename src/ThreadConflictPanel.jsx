@@ -19,6 +19,7 @@ export default function ThreadConflictPanel({
 
   return (
     <div
+      className="ms-dialog-overlay"
       role="dialog"
       aria-modal="true"
       aria-label={title}
@@ -28,7 +29,7 @@ export default function ThreadConflictPanel({
         background: 'rgba(15, 23, 42, 0.45)',
         zIndex: 10050,
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         padding: 16,
       }}

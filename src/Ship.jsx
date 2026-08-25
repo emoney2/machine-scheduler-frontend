@@ -586,14 +586,14 @@ function LoginModal({ open, onClose, onLogin }) {
   if (!open) return null;
   const backdropStyle = {
     position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)",
-    display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999
+    display: "flex", alignItems: "flex-start", justifyContent: "center", zIndex: 9999
   };
   const cardStyle = {
     background: "#fff", borderRadius: 12, padding: 20, width: 360, boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
   };
   const rowStyle = { display: "flex", gap: 12, justifyContent: "flex-end", marginTop: 16 };
   return (
-    <div style={backdropStyle} role="dialog" aria-modal="true">
+    <div style={backdropStyle} className="ms-dialog-overlay" role="dialog" aria-modal="true">
       <div style={cardStyle}>
         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Session expired</div>
         <div>Please log in to continue processing shipments.</div>
@@ -3164,6 +3164,7 @@ export default function Ship() {
 
       {showBoxModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,
@@ -3499,6 +3500,7 @@ export default function Ship() {
 
       {showCustomBoxModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,
@@ -3611,6 +3613,7 @@ export default function Ship() {
 
       {showAddressChoiceModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,
@@ -3758,6 +3761,7 @@ export default function Ship() {
 
       {showOneTimeAddressModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,
@@ -3845,6 +3849,7 @@ export default function Ship() {
 
       {showRateModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,

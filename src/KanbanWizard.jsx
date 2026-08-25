@@ -996,12 +996,13 @@ export default function KanbanWizard() {
 
       {cropModalOpen && cropSrc && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.55)",
             display: "grid",
-            placeItems: "center",
+            placeItems: "start center",
             zIndex: 9999,
             padding: 20,
           }}
@@ -1330,12 +1331,13 @@ function CameraCaptureModal({ onCapture, onClose }) {
 
   return (
     <div
+      className="ms-dialog-overlay"
       style={{
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.6)",
         display: "grid",
-        placeItems: "center",
+        placeItems: "start center",
         zIndex: 10000,
         padding: 20,
       }}

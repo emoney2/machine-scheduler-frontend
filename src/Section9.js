@@ -1180,6 +1180,7 @@ export default function Section9(props) {
       {/* Modal for Add / Edit Placeholder */}
       {showModal && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: 'fixed',
             top: 0,

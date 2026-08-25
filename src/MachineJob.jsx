@@ -37,7 +37,7 @@ export default function MachineJob({ columns }) {
   const [editOpen, setEditOpen] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [recutOpen, setRecutOpen] = useState(false);
-  const [recutNote, setRecutNote] = useState("");
+  const [recutQty, setRecutQty] = useState("");
   const [postedN, setPostedN] = useState(null);
   const postedTimer = useRef(null);
   const [finishOverlay, setFinishOverlay] = useState(null);
@@ -247,16 +247,21 @@ export default function MachineJob({ columns }) {
   };
 
   const sendRecut = async () => {
+    const n = parseInt(String(recutQty).replace(/[^\d]/g, ""), 10);
+    if (!Number.isFinite(n) || n <= 0) {
+      setError("Enter how many pieces need to be recut");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       await axios.post(
         `${ROOT}/embroidery/recut`,
-        { orderId: oid, machine: meta.title, note: recutNote },
+        { orderId: oid, machine: meta.title, pieces: n },
         { withCredentials: true, timeout: 25000 }
       );
       setRecutOpen(false);
-      setRecutNote("");
+      setRecutQty("");
       setFlash("Manager emailed");
       setTimeout(() => setFlash(""), 2500);
     } catch (e) {
@@ -599,7 +604,10 @@ export default function MachineJob({ columns }) {
         <button
           type="button"
           disabled={busy}
-          onClick={() => setRecutOpen(true)}
+          onClick={() => {
+            setRecutQty("");
+            setRecutOpen(true);
+          }}
           style={{
             width: "42%",
             maxWidth: 140,
@@ -842,22 +850,23 @@ export default function MachineJob({ columns }) {
 
       {recutOpen && (
         <Modal onClose={() => setRecutOpen(false)}>
-          <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>Message manager</h2>
-          <p style={{ margin: "0 0 12px", color: "#4b5563" }}>
-            Email Brendan at brendan.eckard@jrcogolf.com about a recut for order #{oid} on {meta.title}.
-          </p>
-          <textarea
-            value={recutNote}
-            onChange={(e) => setRecutNote(e.target.value)}
-            placeholder="What happened? (optional)"
-            rows={3}
+          <h2 style={{ margin: "0 0 12px", fontSize: 22 }}>How many pieces to recut?</h2>
+          <input
+            autoFocus
+            type="number"
+            inputMode="numeric"
+            min={1}
+            value={recutQty}
+            onChange={(e) => setRecutQty(e.target.value)}
+            placeholder="#"
             style={{
               width: "100%",
-              fontSize: 16,
-              padding: 10,
+              fontSize: 32,
+              padding: "10px 12px",
               borderRadius: 10,
-              border: "1px solid #d1d5db",
+              border: "2px solid #111827",
               boxSizing: "border-box",
+              textAlign: "center",
               WebkitUserSelect: "text",
               userSelect: "text",
             }}
@@ -872,7 +881,7 @@ export default function MachineJob({ columns }) {
               onClick={sendRecut}
               style={{ ...btnPrimary, background: "#b91c1c" }}
             >
-              Send email
+              Send
             </button>
           </div>
         </Modal>
@@ -884,6 +893,7 @@ export default function MachineJob({ columns }) {
 function Modal({ children, onClose }) {
   return (
     <div
+      className="ms-dialog-overlay"
       onClick={onClose}
       style={{
         position: "fixed",
@@ -891,7 +901,7 @@ function Modal({ children, onClose }) {
         background: "rgba(0,0,0,0.45)",
         zIndex: 30,
         display: "flex",
-        alignItems: "center",
+        alignItems: "flex-start",
         justifyContent: "center",
         padding: 20,
       }}

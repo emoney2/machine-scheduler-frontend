@@ -3424,6 +3424,7 @@ function col(width, center = false) {
 
           {deptDetail && (
             <div
+              className="ms-dialog-overlay"
               role="dialog"
               aria-modal="true"
               aria-label={`${deptDetail.label} jobs`}
@@ -3433,7 +3434,7 @@ function col(width, center = false) {
                 background: "rgba(15, 23, 42, 0.45)",
                 zIndex: 10050,
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "center",
                 padding: 16,
               }}
@@ -3892,12 +3893,13 @@ function col(width, center = false) {
       {/* Order modal */}
       {modalVendor && (
         <div
+          className="ms-dialog-overlay"
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,.5)",
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-start",
             justifyContent: "center",
             zIndex: 1000,
           }}
