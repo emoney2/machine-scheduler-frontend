@@ -451,28 +451,16 @@ export default function MachineJob({ columns }) {
           gridColumn: 2,
           gridRow: 1,
           display: "grid",
-          gridTemplateRows: "minmax(0, 1fr) minmax(0, 1fr)",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
           minWidth: 0,
           minHeight: 0,
           background: "#fff",
-        }}
-      >
-      <div
-        style={{
-          background: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
           gap: 8,
-          padding: 12,
-          minWidth: 0,
-          minHeight: 0,
-          borderBottom: "1px solid #e5e7eb",
+          padding: 10,
         }}
       >
         <div
           style={{
-            flex: 1,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -480,11 +468,12 @@ export default function MachineJob({ columns }) {
             border: "3px solid #111827",
             borderRadius: 16,
             padding: "6px 8px",
+            minWidth: 0,
             minHeight: 0,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ fontSize: 16, fontWeight: 800, color: "#374151" }}>Quantity remaining</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color: "#374151" }}>Quantity remaining</span>
             <button
               type="button"
               onClick={() => {
@@ -506,7 +495,7 @@ export default function MachineJob({ columns }) {
           </div>
           <div
             style={{
-              fontSize: "clamp(40px, 8vh, 88px)",
+              fontSize: "clamp(36px, 7vh, 80px)",
               fontWeight: 900,
               lineHeight: 0.95,
               letterSpacing: "-0.04em",
@@ -515,169 +504,158 @@ export default function MachineJob({ columns }) {
             {left}
           </div>
         </div>
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-            gap: 6,
-          }}
-        >
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            border: "3px solid #d1d5db",
-            borderRadius: 16,
-            background: "#f9fafb",
-            padding: "6px 8px",
-            minHeight: 0,
-          }}
-        >
-          <div style={{ fontSize: 16, fontWeight: 800, color: "#374151", textAlign: "center" }}>
-            Est. time left
-          </div>
-          <div
-            style={{
-              fontSize: "clamp(28px, 6vh, 64px)",
-              fontWeight: 900,
-              lineHeight: 0.95,
-              letterSpacing: "-0.04em",
-              textAlign: "center",
-            }}
-          >
-            {estLabel}
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "#4b5563", textAlign: "center" }}>
-            Expected run {expectedRunLabel}
-          </div>
-        </div>
-        <div
-          style={{
-            flexShrink: 0,
-            textAlign: "center",
-            fontSize: 15,
-            fontWeight: 800,
-            color: "#111827",
-            padding: "2px 4px 0",
-            lineHeight: 1.2,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {lastTwo.length
-            ? lastTwo.map((r, i) => (
-                <span key={r.at || i}>
-                  {i ? " · " : ""}
-                  {r.clock}
-                  {r.perf ? (
-                    <span style={{ color: r.perf.color }}> {r.perf.text}</span>
-                  ) : null}
-                </span>
-              ))
-            : "Last run posted at —"}
-        </div>
-        </div>
-      </div>
 
-      <div
-        style={{
-          background: "#fff",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "stretch",
-          justifyContent: "center",
-          gap: 10,
-          padding: 12,
-          minWidth: 0,
-          minHeight: 0,
-        }}
-      >
-        {!manualStart && left === quantity && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={pressStart}
-            style={{
-              height: 56,
-              border: "none",
-              borderRadius: 12,
-              background: "#2563eb",
-              color: "#fff",
-              fontSize: "clamp(20px, 3.4vh, 32px)",
-              fontWeight: 900,
-              cursor: "pointer",
-            }}
-          >
-            Start
-          </button>
-        )}
-        {manualStart && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            minWidth: 0,
+            minHeight: 0,
+            gap: 8,
+          }}
+        >
           <div
             style={{
-              textAlign: "center",
-              fontSize: 16,
-              fontWeight: 800,
-              color: "#166534",
+              flex: "1 1 0",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              border: "3px solid #d1d5db",
+              borderRadius: 16,
+              background: "#f9fafb",
+              padding: "6px 8px",
+              minHeight: 0,
             }}
           >
-            Started
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#374151", textAlign: "center" }}>
+              Est. time left
+            </div>
+            <div
+              style={{
+                fontSize: "clamp(24px, 5vh, 56px)",
+                fontWeight: 900,
+                lineHeight: 0.95,
+                letterSpacing: "-0.04em",
+                textAlign: "center",
+              }}
+            >
+              {estLabel}
+            </div>
           </div>
-        )}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flex: 1, minHeight: 0 }}>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            setRecutQty("");
-            setRecutOpen(true);
-          }}
-          style={{
-            width: "42%",
-            maxWidth: 140,
-            aspectRatio: "1",
-            maxHeight: "80%",
-            height: "auto",
-            borderRadius: "50%",
-            border: "4px solid #b91c1c",
-            background: "#fef2f2",
-            color: "#b91c1c",
-            fontWeight: 900,
-            fontSize: "clamp(14px, 2vh, 22px)",
-            cursor: "pointer",
-            lineHeight: 1.15,
-            flexShrink: 0,
-          }}
-        >
-          Recut
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={finishJob}
-          style={{
-            flex: 1,
-            height: "80%",
-            minHeight: 64,
-            padding: "8px 12px",
-            border: "none",
-            borderRadius: 16,
-            background: "#16a34a",
-            color: "#fff",
-            fontSize: "clamp(22px, 4vh, 44px)",
-            fontWeight: 900,
-            cursor: "pointer",
-          }}
-        >
-          Finish
-        </button>
+
+          <div
+            style={{
+              flex: "0 0 auto",
+              border: "3px solid #d1d5db",
+              borderRadius: 16,
+              background: "#fff",
+              padding: "8px 8px 6px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "stretch",
+              gap: 6,
+              minWidth: 0,
+            }}
+          >
+            {!manualStart && left === quantity && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={pressStart}
+                style={{
+                  height: 40,
+                  border: "none",
+                  borderRadius: 10,
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontSize: 18,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Start
+              </button>
+            )}
+            {manualStart && (
+              <div
+                style={{
+                  textAlign: "center",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  color: "#166534",
+                }}
+              >
+                Started
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "stretch", justifyContent: "center", gap: 8 }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setRecutQty("");
+                  setRecutOpen(true);
+                }}
+                style={{
+                  width: 72,
+                  height: 44,
+                  borderRadius: 10,
+                  border: "3px solid #b91c1c",
+                  background: "#fef2f2",
+                  color: "#b91c1c",
+                  fontWeight: 900,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                }}
+              >
+                Recut
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={finishJob}
+                style={{
+                  flex: 1,
+                  height: 44,
+                  border: "none",
+                  borderRadius: 10,
+                  background: "#16a34a",
+                  color: "#fff",
+                  fontSize: 18,
+                  fontWeight: 900,
+                  cursor: "pointer",
+                }}
+              >
+                Finish
+              </button>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#4b5563", textAlign: "center" }}>
+              Expected run {expectedRunLabel}
+            </div>
+            <div
+              style={{
+                textAlign: "center",
+                fontSize: 13,
+                fontWeight: 800,
+                color: "#111827",
+                lineHeight: 1.3,
+              }}
+            >
+              {lastTwo.length
+                ? lastTwo.map((r) => (
+                    <div key={r.at}>
+                      {r.clock}
+                      {r.perf ? (
+                        <span style={{ color: r.perf.color }}> {r.perf.text}</span>
+                      ) : null}
+                    </div>
+                  ))
+                : "Last run posted at —"}
+            </div>
+          </div>
         </div>
-      </div>
       </div>
 
       <div
