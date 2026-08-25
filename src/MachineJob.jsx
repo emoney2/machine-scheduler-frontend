@@ -121,6 +121,7 @@ export default function MachineJob({ columns }) {
     meta.headCount,
     2
   );
+  const showStart = !manualStart && left === quantity;
   const displayJob = job
     ? {
         ...fromColumns,
@@ -451,7 +452,9 @@ export default function MachineJob({ columns }) {
           gridColumn: 2,
           gridRow: 1,
           display: "grid",
-          gridTemplateRows: "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(72px, 0.85fr)",
+          gridTemplateRows: showStart
+            ? "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(36px, 0.35fr) minmax(140px, 1.35fr)"
+            : "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(72px, 0.85fr)",
           minWidth: 0,
           minHeight: 0,
           background: "#fff",
@@ -544,45 +547,58 @@ export default function MachineJob({ columns }) {
             border: "3px solid #d1d5db",
             borderRadius: 16,
             background: "#fff",
-            padding: "6px 8px",
+            padding: showStart ? "4px 8px" : "6px 8px",
             minWidth: 0,
             minHeight: 0,
-            gap: 4,
+            gap: showStart ? 0 : 4,
+            overflow: "hidden",
           }}
         >
-          <div style={{ fontSize: 14, fontWeight: 800, color: "#4b5563", textAlign: "center" }}>
+          <div
+            style={{
+              fontSize: showStart ? 12 : 14,
+              fontWeight: 800,
+              color: "#4b5563",
+              textAlign: "center",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              width: "100%",
+            }}
+          >
             Expected run {expectedRunLabel}
           </div>
-          {lastTwo.length
-            ? lastTwo.map((r) => (
-                <div
-                  key={r.at}
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 800,
-                    color: "#111827",
-                    lineHeight: 1.2,
-                    textAlign: "center",
-                  }}
-                >
-                  {r.clock}
-                  {r.perf ? (
-                    <span style={{ color: r.perf.color }}> {r.perf.text}</span>
-                  ) : null}
+          {!showStart &&
+            (lastTwo.length
+              ? lastTwo.map((r) => (
+                  <div
+                    key={r.at}
+                    style={{
+                      fontSize: 15,
+                      fontWeight: 800,
+                      color: "#111827",
+                      lineHeight: 1.2,
+                      textAlign: "center",
+                    }}
+                  >
+                    {r.clock}
+                    {r.perf ? (
+                      <span style={{ color: r.perf.color }}> {r.perf.text}</span>
+                    ) : null}
+                  </div>
+                ))
+              : (
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#6b7280" }}>
+                  Last run posted at —
                 </div>
-              ))
-            : (
-              <div style={{ fontSize: 14, fontWeight: 800, color: "#6b7280" }}>
-                Last run posted at —
-              </div>
-            )}
+              ))}
         </div>
 
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gridTemplateRows: !manualStart && left === quantity ? "auto 1fr" : "1fr",
+            gridTemplateRows: showStart ? "auto 1fr" : "1fr",
             minWidth: 0,
             minHeight: 0,
             border: "3px solid #d1d5db",
@@ -591,19 +607,19 @@ export default function MachineJob({ columns }) {
             background: "#fff",
           }}
         >
-          {!manualStart && left === quantity && (
+          {showStart && (
             <button
               type="button"
               disabled={busy}
               onClick={pressStart}
               style={{
                 gridColumn: "1 / -1",
-                height: 40,
+                height: 80,
                 border: "none",
                 borderBottom: "2px solid #d1d5db",
                 background: "#2563eb",
                 color: "#fff",
-                fontSize: 18,
+                fontSize: 22,
                 fontWeight: 900,
                 cursor: "pointer",
               }}
