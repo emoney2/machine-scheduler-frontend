@@ -350,7 +350,7 @@ export default function MachineHome({ columns, loading }) {
                         textAlign: "center",
                       }}
                     >
-                      Last + {formatClockET(job.lastRunAt)}
+                      Last run posted at {formatClockET(job.lastRunAt)}
                     </div>
                   ) : null}
                 </button>

@@ -551,7 +551,7 @@ export default function MachineJob({ columns }) {
             padding: "2px 4px 0",
           }}
         >
-          Last +N {formatClockET(lastRunAt || job?.lastRunAt || fromColumns?.lastRunAt) || "—"}
+          Last run posted at {formatClockET(lastRunAt || job?.lastRunAt || fromColumns?.lastRunAt) || "—"}
         </div>
         </div>
       </div>
