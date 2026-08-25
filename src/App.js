@@ -1034,7 +1034,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     job.start_date = startIso;
 
 
-    // 3) Remaining work: observed +N cycle time if we have it, else stitches/35k
+    // 3) Remaining work: observed +N cycle time if we have it, else stitches/30k
     const completed = Math.max(0, Number(job.completedQty) || 0);
     const remaining = Math.max(0, (Number(job.quantity) || 0) - completed);
     const runMs = estimateRemainingMs(

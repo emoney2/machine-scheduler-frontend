@@ -84,7 +84,7 @@ export function jobsForMachine(columns, machineKey) {
   return list.filter((j) => j && j.id != null && !isPlaceholder(j) && isEmbroideryOpen(j));
 }
 
-/** Same runtime as the scheduler: observed cycle if known, else stitches / 35k per head-run. */
+/** Same runtime as the scheduler: observed cycle if known, else stitches / 30k per head-run. */
 export function estimateRemainingMs(stitchCount, piecesLeft, headCount, avgCycleMs = 0) {
   const heads = Math.max(1, Number(headCount) || 6);
   const left = Math.max(0, Number(piecesLeft) || 0);
@@ -92,7 +92,7 @@ export function estimateRemainingMs(stitchCount, piecesLeft, headCount, avgCycle
   const avg = Number(avgCycleMs) || 0;
   if (avg > 0 && runs > 0) return avg * runs;
   const stitches = Number(stitchCount) > 0 ? Number(stitchCount) : 30000;
-  return (stitches / 35000) * runs * 3600000;
+  return (stitches / 30000) * runs * 3600000;
 }
 
 export function formatDuration(ms) {
@@ -138,7 +138,7 @@ export function formatSignedPerf(aheadMs) {
   };
 }
 
-/** Last N +N posts with clock and green/red vs expected cycle (stitches/35k). */
+/** Last N +N posts with clock and green/red vs expected cycle (stitches/30k). */
 export function lastRunsWithPerf(runs, stitchCount, headCount, limit = 2) {
   const raw = (Array.isArray(runs) ? runs : []).filter((r) => r && r.at);
   const out = [];
