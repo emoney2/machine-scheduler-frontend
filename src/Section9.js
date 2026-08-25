@@ -551,10 +551,15 @@ export default function Section9(props) {
                               : hasThreadConflict
                               ? THREAD_CONFLICT_BORDER
                               : bCol;
+                            const doneQty = Number(job.completedQty) || 0;
+                            const totalQty = Number(job.quantity) || 0;
+                            const inProgress = !isPh && doneQty > 0 && totalQty > 0 && doneQty < totalQty;
                             const cardBackground = job.isLate
                               ? 'repeating-linear-gradient(45deg, rgba(255,0,0,0.5) 0, rgba(255,0,0,0.5) 6px, transparent 6px, transparent 12px)'
                               : hasThreadConflict
                               ? `linear-gradient(${THREAD_CONFLICT_BG_TINT}, ${THREAD_CONFLICT_BG_TINT}), ${base}`
+                              : inProgress
+                              ? `linear-gradient(rgba(34,197,94,0.16), rgba(34,197,94,0.16)), ${base}`
                               : base;
 
                             return (
@@ -577,7 +582,7 @@ export default function Section9(props) {
                                       rowGap: 4,
                                       // give room for a 56px thumb + 8px gap on the left when artwork exists
                                       paddingTop: 6,
-                                      paddingBottom: 6,
+                                      paddingBottom: inProgress ? 12 : 6,
                                       paddingRight: rightPadding,
                                       paddingLeft: job.imageLink ? 6 + 56 + 8 : 6,
                                       margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
@@ -968,7 +973,9 @@ export default function Section9(props) {
                                           whiteSpace: 'nowrap'
                                         }}
                                       >
-                                        {job.quantity}
+                                        {isPh
+                                          ? job.quantity
+                                          : `${Number(job.completedQty) || 0}/${job.quantity}`}
                                       </span>
                                     </div>
 
@@ -1114,6 +1121,31 @@ export default function Section9(props) {
                                               </span>
                                             );
                                           })}
+                                      </div>
+                                    )}
+                                    {inProgress && (
+                                      <div
+                                        title={`${doneQty} of ${totalQty} embroidered`}
+                                        style={{
+                                          position: 'absolute',
+                                          left: 0,
+                                          right: 0,
+                                          bottom: 0,
+                                          height: 6,
+                                          background: 'rgba(0,0,0,0.08)',
+                                          borderBottomLeftRadius: 2,
+                                          borderBottomRightRadius: 2,
+                                          overflow: 'hidden',
+                                          zIndex: 3,
+                                        }}
+                                      >
+                                        <div
+                                          style={{
+                                            width: `${Math.min(100, (doneQty / totalQty) * 100)}%`,
+                                            height: '100%',
+                                            background: '#22c55e',
+                                          }}
+                                        />
                                       </div>
                                     )}
                                   </div>

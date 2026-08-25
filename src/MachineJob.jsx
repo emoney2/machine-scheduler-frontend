@@ -13,6 +13,8 @@ import {
 } from "./machineFloorUtils";
 
 const ROOT = apiRoot();
+const PLUS_FLASH_MS = 2500;
+const JOB_COMPLETE_MS = 2000;
 
 export default function MachineJob({ columns }) {
   const { machineId, orderId } = useParams();
@@ -37,11 +39,14 @@ export default function MachineJob({ columns }) {
   const [recutNote, setRecutNote] = useState("");
   const [postedN, setPostedN] = useState(null);
   const postedTimer = useRef(null);
+  const [finishOverlay, setFinishOverlay] = useState(null);
+  const [manualStart, setManualStart] = useState(false);
 
   const applyPayload = useCallback((data) => {
     if (!data) return;
     setJob(data);
     if (data.piecesLeft != null) setPiecesLeft(Number(data.piecesLeft));
+    if (data.manualStart != null) setManualStart(!!data.manualStart);
   }, []);
 
   const loadJob = useCallback(
@@ -97,7 +102,10 @@ export default function MachineJob({ columns }) {
   const quantity = Number(job?.quantity ?? fromColumns?.quantity ?? 0) || 0;
   const left = piecesLeft == null ? quantity : Math.max(0, piecesLeft);
   const stitchCount = Number(job?.stitchCount ?? fromColumns?.stitch_count ?? 0) || 0;
-  const estLabel = formatDuration(estimateRemainingMs(stitchCount, left, meta.headCount));
+  const avgCycleMs = Number(job?.avgCycleMs ?? fromColumns?.avgCycleMs ?? 0) || 0;
+  const estLabel = formatDuration(
+    estimateRemainingMs(stitchCount, left, meta.headCount, avgCycleMs)
+  );
   const displayJob = job
     ? {
         ...fromColumns,
@@ -112,9 +120,52 @@ export default function MachineJob({ columns }) {
     : fromColumns;
   const imageSrc = jobImageUrl(displayJob || job, "w1200");
 
+  const stampInferredStart = (piecesJustFinished) => {
+    if (manualStart) return;
+    const runMs = estimateRemainingMs(stitchCount, piecesJustFinished, meta.headCount);
+    const started = new Date(Date.now() - Math.max(0, runMs));
+    axios
+      .post(
+        `${ROOT}/updateStartTime`,
+        {
+          orderNumber: oid,
+          startTime: started.toISOString(),
+          source: "floor",
+        },
+        { withCredentials: true, timeout: 15000 }
+      )
+      .catch(() => {});
+  };
+
+  const pressStart = async () => {
+    if (busy || manualStart) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await axios.post(
+        `${ROOT}/updateStartTime`,
+        {
+          orderNumber: oid,
+          startTime: new Date().toISOString(),
+          source: "manual",
+        },
+        { withCredentials: true, timeout: 15000 }
+      );
+      setManualStart(true);
+      setJob((prev) => (prev ? { ...prev, manualStart: true } : prev));
+      if (res?.data?.ok) setFlash("Started");
+      setTimeout(() => setFlash(""), 2000);
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || "Could not start job");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const postProgress = async (body) => {
     setBusy(true);
     setError("");
+    let finished = false;
     try {
       const res = await axios.post(
         `${ROOT}/embroidery/progress`,
@@ -122,18 +173,22 @@ export default function MachineJob({ columns }) {
         { withCredentials: true, timeout: 25000 }
       );
       applyPayload(res.data);
-      const finished =
+      finished =
         !!res.data?.embroideryComplete ||
         (res.data?.piecesLeft != null && Number(res.data.piecesLeft) <= 0);
       if (finished) {
         setPiecesLeft(0);
-        setFlash("Finished — going back…");
-        setTimeout(() => navigate(`/machine/${machineId}`), 900);
+        if (postedTimer.current) clearTimeout(postedTimer.current);
+        postedTimer.current = setTimeout(() => {
+          setPostedN(null);
+          setFinishOverlay("complete");
+          setTimeout(() => navigate(`/machine/${machineId}`), JOB_COMPLETE_MS);
+        }, PLUS_FLASH_MS);
       }
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || "Could not save progress");
     } finally {
-      setBusy(false);
+      if (!finished) setBusy(false);
     }
   };
 
@@ -149,7 +204,8 @@ export default function MachineJob({ columns }) {
     setPiecesLeft(left - inc);
     setPostedN(inc);
     if (postedTimer.current) clearTimeout(postedTimer.current);
-    postedTimer.current = setTimeout(() => setPostedN(null), 900);
+    postedTimer.current = setTimeout(() => setPostedN(null), PLUS_FLASH_MS);
+    if (left === quantity) stampInferredStart(inc);
     postProgress({ increment: inc });
   };
 
@@ -169,6 +225,7 @@ export default function MachineJob({ columns }) {
     if (!window.confirm(`Finish order #${oid}? This marks embroidery complete.`)) return;
     setBusy(true);
     setError("");
+    setFinishOverlay("recording");
     try {
       await axios.post(
         `${ROOT}/embroidery/finish`,
@@ -176,11 +233,11 @@ export default function MachineJob({ columns }) {
         { withCredentials: true, timeout: 25000 }
       );
       setPiecesLeft(0);
-      setFlash("Finished — going back…");
-      setTimeout(() => navigate(`/machine/${machineId}`), 600);
+      setFinishOverlay("complete");
+      setTimeout(() => navigate(`/machine/${machineId}`), JOB_COMPLETE_MS);
     } catch (e) {
+      setFinishOverlay(null);
       setError(e?.response?.data?.error || e?.message || "Could not finish job");
-    } finally {
       setBusy(false);
     }
   };
@@ -472,14 +529,47 @@ export default function MachineJob({ columns }) {
         style={{
           background: "#fff",
           display: "flex",
-          alignItems: "center",
+          flexDirection: "column",
+          alignItems: "stretch",
           justifyContent: "center",
-          gap: 12,
+          gap: 10,
           padding: 12,
           minWidth: 0,
           minHeight: 0,
         }}
       >
+        {!manualStart && left === quantity && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={pressStart}
+            style={{
+              height: 56,
+              border: "none",
+              borderRadius: 12,
+              background: "#2563eb",
+              color: "#fff",
+              fontSize: "clamp(20px, 3.4vh, 32px)",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            Start
+          </button>
+        )}
+        {manualStart && (
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: 16,
+              fontWeight: 800,
+              color: "#166534",
+            }}
+          >
+            Started
+          </div>
+        )}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flex: 1, minHeight: 0 }}>
         <button
           type="button"
           disabled={busy}
@@ -523,6 +613,7 @@ export default function MachineJob({ columns }) {
         >
           Finish
         </button>
+        </div>
       </div>
       </div>
 
@@ -571,7 +662,7 @@ export default function MachineJob({ columns }) {
         )}
       </div>
 
-      {postedN != null && (
+      {postedN != null && !finishOverlay && (
         <div
           aria-live="polite"
           style={{
@@ -613,6 +704,57 @@ export default function MachineJob({ columns }) {
               }}
             >
               +{postedN}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {finishOverlay && (
+        <div
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 55,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background:
+              finishOverlay === "recording"
+                ? "rgba(187, 247, 208, 0.72)"
+                : "rgba(46, 204, 113, 0.38)",
+            pointerEvents: "auto",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+            {finishOverlay === "complete" && (
+              <svg width="180" height="180" viewBox="0 0 72 72" fill="none">
+                <circle
+                  cx="36"
+                  cy="36"
+                  r="32"
+                  stroke="#1b5e20"
+                  strokeWidth="4"
+                  fill="rgba(255,255,255,0.92)"
+                />
+                <path
+                  d="M20 37 L32 49 L52 25"
+                  stroke="#1b5e20"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+            <div
+              style={{
+                fontSize: finishOverlay === "recording" ? 42 : 48,
+                fontWeight: 900,
+                color: "#14532d",
+                textShadow: "0 1px 0 #fff",
+              }}
+            >
+              {finishOverlay === "recording" ? "Recording…" : "Job Complete"}
             </div>
           </div>
         </div>

@@ -42,6 +42,7 @@ import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
 import { API_ROOT, getBackendOrigin, getLoginOrigin } from "./apiRoot";
 import { FullscreenToggle, useMachineFullscreen } from "./useMachineFullscreen";
+import { estimateRemainingMs } from "./machineFloorUtils";
 
 window._isSubmittingOrder = false;
 
@@ -284,6 +285,7 @@ export default function App() {
 
   // Keep last-seen hashes for delta polling
   const changesHashesRef = useRef({});
+  const changesEmbRevRef = useRef(null);
 
   // Log once on mount (optional — keeps your existing console signal)
   useEffect(() => {
@@ -585,13 +587,76 @@ useEffect(() => {
   };
 
   socket.on("startTimeUpdated", onStartTimeUpdated);
-  const onEmbroideryFinished = () => {
+  const dropFinishedJob = (orderId) => {
+    const want = String(orderId ?? "").trim();
+    if (!want) return;
+    setColumns((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      for (const key of [...SCHEDULER_MACHINE_KEYS, "queue"]) {
+        const col = next[key];
+        if (!col?.jobs) continue;
+        next[key] = {
+          ...col,
+          jobs: col.jobs.filter((j) => String(j.id ?? "").trim() !== want),
+        };
+      }
+      return next;
+    });
+  };
+  const onEmbroideryFinished = (payload) => {
+    dropFinishedJob(payload?.orderId);
     fetchAllCombined();
   };
+  const onEmbroideryProgress = (payload) => {
+    const oid = String(payload?.orderId ?? "").trim();
+    const done = Number(payload?.completedQty);
+    const qty = Number(payload?.quantity);
+    const qtyReached =
+      !!payload?.embroideryComplete ||
+      (Number.isFinite(done) && Number.isFinite(qty) && qty > 0 && done >= qty);
+    if (oid && Number.isFinite(done)) {
+      setColumns((prev) => {
+        if (!prev) return prev;
+        const next = { ...prev };
+        let hit = false;
+        for (const key of [...SCHEDULER_MACHINE_KEYS, "queue"]) {
+          const col = next[key];
+          if (!col?.jobs) continue;
+          next[key] = {
+            ...col,
+            jobs: col.jobs.map((j) => {
+              if (String(j.id ?? "").trim() !== oid) return j;
+              hit = true;
+              return {
+                ...j,
+                completedQty: done,
+                avgCycleMs: Number(payload?.avgCycleMs) || j.avgCycleMs || 0,
+              };
+            }),
+          };
+        }
+        if (!hit) return prev;
+        SCHEDULER_MACHINE_KEYS.forEach((key) => {
+          next[key].jobs = scheduleMachineJobs(
+            next[key].jobs,
+            SCHEDULER_MACHINE_LABELS[key]
+          );
+        });
+        return next;
+      });
+    }
+    if (qtyReached) {
+      dropFinishedJob(payload?.orderId);
+      fetchAllCombined();
+    }
+  };
   socket.on("embroideryFinished", onEmbroideryFinished);
+  socket.on("embroideryProgressUpdated", onEmbroideryProgress);
   return () => {
     socket.off("startTimeUpdated", onStartTimeUpdated);
     socket.off("embroideryFinished", onEmbroideryFinished);
+    socket.off("embroideryProgressUpdated", onEmbroideryProgress);
   };
 }, [socket]);
 
@@ -961,15 +1026,20 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     job.start_date = startIso;
 
 
-    // 3) Calculate end time based on stitches and head count
-    const qty = job.quantity % headCount === 0
-      ? job.quantity
-      : Math.ceil(job.quantity / headCount) * headCount;
+    // 3) Remaining work: observed +N cycle time if we have it, else stitches/35k
+    const completed = Math.max(0, Number(job.completedQty) || 0);
+    const remaining = Math.max(0, (Number(job.quantity) || 0) - completed);
+    const runMs = estimateRemainingMs(
+      job.stitch_count,
+      remaining,
+      headCount,
+      job.avgCycleMs
+    );
 
-    const stitches = job.stitch_count > 0 ? job.stitch_count : 30000;
-    const runMs    = (stitches / 35000) * (qty / headCount) * 3600000;
-
-    const end = addWorkTime(start, runMs);
+    // In-progress top job: remaining clock starts from now so the end is elastic
+    const remainingFrom =
+      idx === 0 && completed > 0 ? new Date() : start;
+    const end = addWorkTime(remainingFrom, runMs);
 
     // 4) Assign computed times to job (overwrite existing values)
     job._rawStart = start;
@@ -1153,10 +1223,17 @@ const fetchOrdersEmbroLinksCore = async () => {
     const embRes      = { data: payload.embroideryList || [] };
     const linksRes    = { data: payload.links || {} };
 
-    // drop Sewing and Complete
+    // drop Sewing and Complete — also drop when the floor already finished
+    // embroidery even if Production Orders Stage has not recalculated yet
     let orders = (ordersRes.data || []).filter(o => {
       const stage = String(o['Stage'] || '').toLowerCase();
-      return stage !== 'sewing' && stage !== 'complete';
+      if (stage === 'sewing' || stage === 'complete' || stage === 'completed') return false;
+      const embSt = String(o['Embroidery List Status'] || '').trim().toUpperCase();
+      if (embSt === 'COMPLETE') return false;
+      const qty = Number(o['Quantity']) || 0;
+      const done = Number(o['Embroidery Completed Qty']) || 0;
+      if (qty > 0 && done >= qty) return false;
+      return true;
     });
     const embList = embRes.data || [];
     let linksData = linksRes.data || {};
@@ -1198,6 +1275,8 @@ const fetchOrdersEmbroLinksCore = async () => {
         product:          o['Product'] || '',
         design:           o['Design'] || '',
         quantity:         +o['Quantity'] || 0,
+        completedQty:     Math.max(0, Number(o['Embroidery Completed Qty']) || 0),
+        avgCycleMs:       Math.max(0, Number(o['Embroidery Avg Cycle Ms']) || 0),
         stitch_count:     +o['Stitch Count'] || 0,
         due_date:         o['Due Date'] || '',
         due_type:         o['Hard Date/Soft Date'] || '',
@@ -1475,9 +1554,14 @@ const fetchManualStateCore = async (previousCols) => {
 
         const serverHashes = data?.hashes || {};
         const prevHashes   = changesHashesRef.current || {};
+        const embRev = data?.embRev;
 
         // Figure out if anything changed or was removed
         let somethingChanged = false;
+        if (embRev != null && changesEmbRevRef.current != null && embRev !== changesEmbRevRef.current) {
+          somethingChanged = true;
+        }
+        if (embRev != null) changesEmbRevRef.current = embRev;
 
         // changed/added
         for (const [oid, h] of Object.entries(serverHashes)) {
@@ -1511,15 +1595,14 @@ const fetchManualStateCore = async (previousCols) => {
 
   }, []);
 
-// ─── Section 5E: Always ensure top jobs have a start time (no clamp) ───
+// ─── Section 5E: Estimated start on the top job until floor Start / first +N ───
 useEffect(() => {
   if (!isScheduler) return;
 
   const maybeStamp = (top, ref) => {
     if (!top) { ref.current = null; return; }
 
-    const hasStart = !!top?.embroidery_start; // raw from server/sheet
-    // Order # lives on job.id
+    const hasStart = !!top?.embroidery_start;
     const key = String(top?.id ?? "").trim();
     if (!key) { ref.current = null; return; }
 
@@ -1900,7 +1983,6 @@ const onDragEnd = async (result) => {
   } finally {
     manualStateSaveInFlight.current = false;
   }
-  // NEW: only set start time when moved into a machine column (preserves drop index)
   if (SCHEDULER_MACHINE_KEYS.includes(dstCol)) {
     const head = movedJobs?.[0];
     if (head && !head.embroidery_start) {

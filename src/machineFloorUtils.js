@@ -79,12 +79,14 @@ export function jobsForMachine(columns, machineKey) {
   return list.filter((j) => j && j.id != null && !isPlaceholder(j) && isEmbroideryOpen(j));
 }
 
-/** Same runtime as the scheduler: stitches / 35k per hour per head. */
-export function estimateRemainingMs(stitchCount, piecesLeft, headCount) {
-  const stitches = Number(stitchCount) > 0 ? Number(stitchCount) : 30000;
+/** Same runtime as the scheduler: observed cycle if known, else stitches / 35k per head-run. */
+export function estimateRemainingMs(stitchCount, piecesLeft, headCount, avgCycleMs = 0) {
   const heads = Math.max(1, Number(headCount) || 6);
   const left = Math.max(0, Number(piecesLeft) || 0);
   const runs = Math.ceil(left / heads) || 0;
+  const avg = Number(avgCycleMs) || 0;
+  if (avg > 0 && runs > 0) return avg * runs;
+  const stitches = Number(stitchCount) > 0 ? Number(stitchCount) : 30000;
   return (stitches / 35000) * runs * 3600000;
 }
 
