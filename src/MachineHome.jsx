@@ -4,6 +4,7 @@ import { socket } from "./socketClient";
 import {
   MACHINE_META,
   fmtMMDD,
+  formatClockET,
   jobImageUrl,
   jobsForMachine,
   normalizeOrderId,
@@ -339,6 +340,19 @@ export default function MachineHome({ columns, loading }) {
                       </TileOverlay>
                     ) : null}
                   </div>
+                  {formatClockET(job.lastRunAt) ? (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: "#111827",
+                        textAlign: "center",
+                      }}
+                    >
+                      Last + {formatClockET(job.lastRunAt)}
+                    </div>
+                  ) : null}
                 </button>
               );
             })}

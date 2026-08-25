@@ -8,6 +8,7 @@ import {
   estimateRemainingMs,
   findJobInColumns,
   formatDuration,
+  formatClockET,
   jobImageUrl,
   normalizeOrderId,
 } from "./machineFloorUtils";
@@ -41,12 +42,14 @@ export default function MachineJob({ columns }) {
   const postedTimer = useRef(null);
   const [finishOverlay, setFinishOverlay] = useState(null);
   const [manualStart, setManualStart] = useState(false);
+  const [lastRunAt, setLastRunAt] = useState("");
 
   const applyPayload = useCallback((data) => {
     if (!data) return;
     setJob(data);
     if (data.piecesLeft != null) setPiecesLeft(Number(data.piecesLeft));
     if (data.manualStart != null) setManualStart(!!data.manualStart);
+    if (data.lastRunAt) setLastRunAt(String(data.lastRunAt));
   }, []);
 
   const loadJob = useCallback(
@@ -203,6 +206,7 @@ export default function MachineJob({ columns }) {
     const inc = Math.min(n, left);
     setPiecesLeft(left - inc);
     setPostedN(inc);
+    setLastRunAt(new Date().toISOString());
     if (postedTimer.current) clearTimeout(postedTimer.current);
     postedTimer.current = setTimeout(() => setPostedN(null), PLUS_FLASH_MS);
     if (left === quantity) stampInferredStart(inc);
@@ -499,6 +503,15 @@ export default function MachineJob({ columns }) {
             flex: 1,
             display: "flex",
             flexDirection: "column",
+            minHeight: 0,
+            gap: 6,
+          }}
+        >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             border: "3px solid #d1d5db",
@@ -522,6 +535,19 @@ export default function MachineJob({ columns }) {
           >
             {estLabel}
           </div>
+        </div>
+        <div
+          style={{
+            flexShrink: 0,
+            textAlign: "center",
+            fontSize: 18,
+            fontWeight: 800,
+            color: "#111827",
+            padding: "2px 4px 0",
+          }}
+        >
+          Last +N {formatClockET(lastRunAt || job?.lastRunAt || fromColumns?.lastRunAt) || "—"}
+        </div>
         </div>
       </div>
 

@@ -304,7 +304,6 @@ export default function App() {
         const res = await fetch(`${API_ROOT}/ping`, {
           method: "GET",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
           signal: ac.signal,
         });
         clearTimeout(to);
@@ -632,6 +631,7 @@ useEffect(() => {
                 ...j,
                 completedQty: done,
                 avgCycleMs: Number(payload?.avgCycleMs) || j.avgCycleMs || 0,
+                lastRunAt: payload?.lastRunAt || j.lastRunAt || "",
               };
             }),
           };
@@ -1277,6 +1277,7 @@ const fetchOrdersEmbroLinksCore = async () => {
         quantity:         +o['Quantity'] || 0,
         completedQty:     Math.max(0, Number(o['Embroidery Completed Qty']) || 0),
         avgCycleMs:       Math.max(0, Number(o['Embroidery Avg Cycle Ms']) || 0),
+        lastRunAt:        String(o['Embroidery Last Run At'] || '').trim(),
         stitch_count:     +o['Stitch Count'] || 0,
         due_date:         o['Due Date'] || '',
         due_type:         o['Hard Date/Soft Date'] || '',
@@ -2028,7 +2029,7 @@ useEffect(() => {
           onToggle={toggleFullscreen}
           style={
             path.includes("/job/")
-              ? { left: 108, right: "auto" }
+              ? { left: 8, top: 56, right: "auto" }
               : { right: 8 }
           }
         />

@@ -99,6 +99,18 @@ export function formatDuration(ms) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
+export function formatClockET(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (!(d instanceof Date) || isNaN(d)) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(d);
+}
+
 export function fmtMMDD(d) {
   if (!d) return "—";
   if (d instanceof Date && !isNaN(d)) {
