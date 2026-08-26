@@ -543,11 +543,11 @@ export default function MachineJob({ columns }) {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
+            justifyContent: "flex-start",
             border: "3px solid #d1d5db",
             borderRadius: 16,
             background: "#fff",
-            padding: showStart ? "4px 8px" : "6px 8px",
+            padding: showStart ? "6px 8px 4px" : "10px 8px 6px",
             minWidth: 0,
             minHeight: 0,
             gap: showStart ? 0 : 4,
@@ -556,7 +556,7 @@ export default function MachineJob({ columns }) {
         >
           <div
             style={{
-              fontSize: showStart ? 12 : 14,
+              fontSize: showStart ? 14 : 18,
               fontWeight: 800,
               color: "#4b5563",
               textAlign: "center",
@@ -564,6 +564,7 @@ export default function MachineJob({ columns }) {
               overflow: "hidden",
               textOverflow: "ellipsis",
               width: "100%",
+              lineHeight: 1.15,
             }}
           >
             Expected run {expectedRunLabel}
