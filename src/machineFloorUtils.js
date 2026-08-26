@@ -89,10 +89,12 @@ export function estimateRemainingMs(stitchCount, piecesLeft, headCount, avgCycle
   const heads = Math.max(1, Number(headCount) || 6);
   const left = Math.max(0, Number(piecesLeft) || 0);
   const runs = Math.ceil(left / heads) || 0;
-  const avg = Number(avgCycleMs) || 0;
-  if (avg > 0 && runs > 0) return avg * runs;
   const stitches = Number(stitchCount) > 0 ? Number(stitchCount) : 30000;
-  return (stitches / 30000) * runs * 3600000;
+  const expectedCycle = (stitches / 30000) * 3600000;
+  const avg = Number(avgCycleMs) || 0;
+  const maxAvg = Math.max(expectedCycle * 2, expectedCycle + 15 * 60 * 1000);
+  if (avg > 0 && avg <= maxAvg && runs > 0) return avg * runs;
+  return expectedCycle * runs;
 }
 
 export function formatDuration(ms) {
