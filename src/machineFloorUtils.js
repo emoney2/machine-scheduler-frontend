@@ -140,8 +140,8 @@ export function formatSignedPerf(aheadMs) {
   };
 }
 
-/** Last N +N posts with clock and green/red vs expected cycle (stitches/30k). */
-export function lastRunsWithPerf(runs, stitchCount, headCount, limit = 2) {
+/** Last N +N posts with clock and green/red vs the post above (previous cycle). */
+export function lastRunsWithPerf(runs, stitchCount, headCount, limit = 3) {
   const raw = (Array.isArray(runs) ? runs : []).filter((r) => r && r.at);
   const out = [];
   for (let i = 0; i < raw.length; i++) {
@@ -156,14 +156,24 @@ export function lastRunsWithPerf(runs, stitchCount, headCount, limit = 2) {
       }
     }
     const inc = Number(r.increment) || 0;
-    const expectedMs = estimateRemainingMs(stitchCount, inc, headCount, 0);
-    const aheadMs =
-      cycleMs >= 2 * 60 * 1000 && expectedMs > 0 ? expectedMs - cycleMs : null;
+    let vsPrevMs =
+      r.vsPrevMs == null || r.vsPrevMs === "" ? NaN : Number(r.vsPrevMs);
+    if (!Number.isFinite(vsPrevMs) && cycleMs >= 2 * 60 * 1000) {
+      const prev = raw[i - 1];
+      const prevCycle = Number(prev?.cycleMs) || 0;
+      const prevInc = Number(prev?.increment) || 0;
+      if (prevCycle >= 2 * 60 * 1000 && prevInc > 0 && inc > 0) {
+        vsPrevMs = (prevCycle / prevInc) * inc - cycleMs;
+      } else {
+        const expectedMs = estimateRemainingMs(stitchCount, inc, headCount, 0);
+        vsPrevMs = expectedMs > 0 ? expectedMs - cycleMs : NaN;
+      }
+    }
     out.push({
       increment: inc,
       at: r.at,
       clock: formatClockET(r.at),
-      perf: aheadMs == null ? null : formatSignedPerf(aheadMs),
+      perf: Number.isFinite(vsPrevMs) ? formatSignedPerf(vsPrevMs) : null,
     });
   }
   return out.slice(-Math.max(1, limit));

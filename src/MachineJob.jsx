@@ -115,11 +115,11 @@ export default function MachineJob({ columns }) {
     meta.headCount
   );
   const expectedRunLabel = formatDuration(expectedRunMs);
-  const lastTwo = lastRunsWithPerf(
+  const lastThree = lastRunsWithPerf(
     job?.recentRuns || fromColumns?.recentRuns,
     stitchCount,
     meta.headCount,
-    2
+    3
   );
   const showStart = !manualStart && left === quantity;
   const displayJob = job
@@ -454,7 +454,7 @@ export default function MachineJob({ columns }) {
           display: "grid",
           gridTemplateRows: showStart
             ? "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(36px, 0.35fr) minmax(140px, 1.35fr)"
-            : "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(72px, 0.85fr)",
+            : "minmax(0, 1.05fr) minmax(0, 1.05fr) minmax(0, 1.2fr) minmax(72px, 0.8fr)",
           minWidth: 0,
           minHeight: 0,
           background: "#fff",
@@ -569,12 +569,12 @@ export default function MachineJob({ columns }) {
             Expected run {expectedRunLabel}
           </div>
           {!showStart &&
-            (lastTwo.length
-              ? lastTwo.map((r) => (
+            (lastThree.length
+              ? lastThree.map((r) => (
                   <div
                     key={r.at}
                     style={{
-                      fontSize: 15,
+                      fontSize: 14,
                       fontWeight: 800,
                       color: "#111827",
                       lineHeight: 1.2,
@@ -582,6 +582,7 @@ export default function MachineJob({ columns }) {
                     }}
                   >
                     {r.clock}
+                    {r.increment ? ` +${r.increment}` : ""}
                     {r.perf ? (
                       <span style={{ color: r.perf.color }}> {r.perf.text}</span>
                     ) : null}

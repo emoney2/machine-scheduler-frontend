@@ -225,11 +225,11 @@ export default function MachineHome({ columns, loading }) {
               const expectedLabel = formatDuration(
                 estimateRemainingMs(job.stitch_count, meta.headCount, meta.headCount)
               );
-              const lastTwo = lastRunsWithPerf(
+              const lastThree = lastRunsWithPerf(
                 job.recentRuns,
                 job.stitch_count,
                 meta.headCount,
-                2
+                3
               );
 
               return (
@@ -362,24 +362,16 @@ export default function MachineHome({ columns, loading }) {
                     }}
                   >
                     <div>Expected {expectedLabel}</div>
-                    {lastTwo.length ? (
-                      <div
-                        style={{
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {lastTwo.map((r, i) => (
-                          <span key={r.at || i}>
-                            {i ? " · " : ""}
-                            {r.clock}
-                            {r.perf ? (
-                              <span style={{ color: r.perf.color }}> {r.perf.text}</span>
-                            ) : null}
-                          </span>
-                        ))}
-                      </div>
+                    {lastThree.length ? (
+                      lastThree.map((r, i) => (
+                        <div key={r.at || i}>
+                          {r.clock}
+                          {r.increment ? ` +${r.increment}` : ""}
+                          {r.perf ? (
+                            <span style={{ color: r.perf.color }}> {r.perf.text}</span>
+                          ) : null}
+                        </div>
+                      ))
                     ) : job.lastRunAt ? (
                       <div style={{ color: "#6b7280" }}>No timed runs yet</div>
                     ) : null}
