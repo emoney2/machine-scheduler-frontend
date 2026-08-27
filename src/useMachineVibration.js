@@ -269,7 +269,7 @@ export function useMachineVibration(machineId) {
   };
 }
 
-export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audioLevel, audioOn }) {
+export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audioOn }) {
   const on = !!vibrating;
   const n = Number(level);
   const label = Number.isFinite(n) ? n.toFixed(2) : "—";
@@ -313,11 +313,51 @@ export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audio
       >
         V
       </div>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 800,
+          color: on ? "#16a34a" : "#dc2626",
+          lineHeight: 1,
+          textShadow: "0 0 3px #fff, 0 0 3px #fff",
+        }}
+      >
+        {label}
+      </span>
+      <div
+        title={audioOn ? "Listening for chime" : "Mic off"}
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: audioOn ? "#16a34a" : "#6b7280",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
+        }}
+      >
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
+          <path
+            d="M6.2 3.4c2.4-1.2 5.6.2 5.6 3.4 0 2.2-1.3 3.4-2.4 4.4-.5.5-.8 1.1-.8 1.8v.6"
+            stroke="#fff"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+          <path
+            d="M6.2 3.4C4.8 4.2 4 5.6 4 7.2c0 1.4.6 2.5 1.4 3.2"
+            stroke="#fff"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+          <circle cx="6.4" cy="13.2" r="1.1" fill="#fff" />
+        </svg>
+      </div>
       {melodyPending ? (
         <div
           key={melodyKey || "melody"}
           className="ms-melody-dot"
-          title="Melody heard"
+          title="Chime heard"
           style={{
             width: 16,
             height: 16,
@@ -335,45 +375,8 @@ export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audio
           </svg>
         </div>
       ) : null}
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 800,
-          color: on ? "#16a34a" : "#dc2626",
-          lineHeight: 1,
-          textShadow: "0 0 3px #fff, 0 0 3px #fff",
-        }}
-      >
-        {label}
-      </span>
-      <div
-        style={{
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
-          background: audioOn ? (Number(audioLevel) > 0.03 ? "#16a34a" : "#2563eb") : "#6b7280",
-          color: "#fff",
-          fontSize: 9,
-          fontWeight: 900,
-          lineHeight: "16px",
-          textAlign: "center",
-          boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
-        }}
-      >
-        A
-      </div>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 800,
-          color: audioOn ? (Number(audioLevel) > 0.03 ? "#16a34a" : "#2563eb") : "#6b7280",
-          lineHeight: 1,
-          textShadow: "0 0 3px #fff, 0 0 3px #fff",
-        }}
-      >
-        {Number.isFinite(Number(audioLevel)) ? Number(audioLevel).toFixed(2) : "—"}
-      </span>
     </div>
   );
 }
+
 

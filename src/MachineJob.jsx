@@ -51,7 +51,9 @@ export default function MachineJob({ columns }) {
   const [missedAsk, setMissedAsk] = useState(false);
   const [missedPlus, setMissedPlus] = useState(false);
   const [melodyAt, setMelodyAt] = useState("");
-  const [chimeHeardOpen, setChimeHeardOpen] = useState(false);
+  const lastRunAtRef = useRef("");
+  const leftRef = useRef(0);
+  const lastVibRef = useRef("");
 
   const applyPayload = useCallback((data) => {
     if (!data) return;
@@ -123,14 +125,45 @@ export default function MachineJob({ columns }) {
     meta.headCount,
     meta.headCount
   );
+  lastRunAtRef.current = lastRunAt;
+  leftRef.current = left;
+  lastVibRef.current = vibration.lastVibrationAt;
   const expectedRunLabel = formatDuration(expectedRunMs);
 
   useEffect(() => {
     if (!chime.heardAt) return;
     setMelodyAt(chime.heardAt);
-    setChimeHeardOpen(true);
     chime.consume();
   }, [chime.heardAt, chime.consume]);
+
+  useEffect(() => {
+    if (!melodyAt || missedAsk || missedPlus) return undefined;
+    const heardMs = new Date(melodyAt).getTime();
+    if (!Number.isFinite(heardMs)) return undefined;
+    let cancelled = false;
+    let asked = false;
+
+    const tick = () => {
+      if (cancelled || asked) return;
+      const postedMs = lastRunAtRef.current
+        ? new Date(lastRunAtRef.current).getTime()
+        : 0;
+      if (Number.isFinite(postedMs) && postedMs >= heardMs) return;
+      const now = Date.now();
+      if (now - heardMs < 2500) return;
+      const vibMs = new Date(lastVibRef.current).getTime();
+      if (!Number.isFinite(vibMs) || vibMs < heardMs + 2500) return;
+      if (leftRef.current <= 0) return;
+      asked = true;
+      setMissedAsk(true);
+    };
+
+    const id = setInterval(tick, 250);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [melodyAt, missedAsk, missedPlus]);
 
   const lastThree = lastRunsWithPerf(
     job?.recentRuns || fromColumns?.recentRuns,
@@ -909,26 +942,14 @@ export default function MachineJob({ columns }) {
         </Modal>
       )}
 
-      {chimeHeardOpen && (
-        <Modal onClose={() => setChimeHeardOpen(false)}>
-          <h2 style={{ margin: "0 0 16px", fontSize: 24, lineHeight: 1.2 }}>
-            Chime has been heard
-          </h2>
-          <button
-            type="button"
-            onClick={() => setChimeHeardOpen(false)}
-            style={btnPrimary}
-          >
-            OK
-          </button>
-        </Modal>
-      )}
-
       {missedAsk && (
         <Modal onClose={() => {}}>
           <h2 style={{ margin: "0 0 16px", fontSize: 26, lineHeight: 1.2 }}>
             Did you miss a post?
           </h2>
+          <p style={{ margin: "0 0 16px", fontSize: 16, lineHeight: 1.35, color: "#374151" }}>
+            The hoop finished and the next run started without a +N. Yes to post pieces. No to go back to jobs.
+          </p>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               type="button"
@@ -1064,7 +1085,6 @@ export default function MachineJob({ columns }) {
         level={vibration.level}
         melodyPending={!!melodyAt}
         melodyKey={melodyAt}
-        audioLevel={chime.level}
         audioOn={chime.listening}
       />
     </div>

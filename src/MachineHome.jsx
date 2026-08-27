@@ -68,7 +68,6 @@ export default function MachineHome({ columns, loading }) {
   const [lookup, setLookup] = useState("");
   const [lookupError, setLookupError] = useState("");
   const [finishedIds, setFinishedIds] = useState(() => new Set());
-  const [chimeHeardOpen, setChimeHeardOpen] = useState(false);
 
   const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
   const vibration = useMachineVibration(machineId);
@@ -95,12 +94,6 @@ export default function MachineHome({ columns, loading }) {
     socket.on("embroideryFinished", onFinished);
     return () => socket.off("embroideryFinished", onFinished);
   }, []);
-
-  useEffect(() => {
-    if (!chime.heardAt) return;
-    setChimeHeardOpen(true);
-    chime.consume();
-  }, [chime.heardAt, chime.consume]);
 
   const openJob = (orderId) => {
     const id = normalizeOrderId(orderId);
@@ -478,58 +471,9 @@ export default function MachineHome({ columns, loading }) {
           <div style={{ color: "#b91c1c", marginTop: 6, fontWeight: 700 }}>{lookupError}</div>
         ) : null}
       </form>
-      {chimeHeardOpen ? (
-        <div
-          className="ms-dialog-overlay"
-          onClick={() => setChimeHeardOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            zIndex: 30,
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: 20,
-              width: "min(420px, 100%)",
-              boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
-            }}
-          >
-            <h2 style={{ margin: "0 0 16px", fontSize: 24, lineHeight: 1.2 }}>
-              Chime has been heard
-            </h2>
-            <button
-              type="button"
-              onClick={() => setChimeHeardOpen(false)}
-              style={{
-                width: "100%",
-                minHeight: 48,
-                fontSize: 16,
-                fontWeight: 800,
-                borderRadius: 10,
-                border: "none",
-                background: "#111827",
-                color: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      ) : null}
       <VibrationDot
         vibrating={vibration.vibrating}
         level={vibration.level}
-        audioLevel={chime.level}
         audioOn={chime.listening}
       />
     </div>
