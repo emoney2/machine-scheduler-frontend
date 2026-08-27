@@ -1,16 +1,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-const LS_EVENTS = "jrco.sensorTest.events.v1";
-const LS_SETTINGS = "jrco.sensorTest.settings.v1";
+const LS_EVENTS = "jrco.sensorTest.events.v2";
+const LS_SETTINGS = "jrco.sensorTest.settings.v2";
+const LS_CLOCK = "jrco.sensorTest.clock.v2";
 const MAX_EVENTS = 200;
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
 const DEFAULTS = {
-  threshold: 0.45,
-  startHoldMs: 400,
-  stopHoldMs: 1500,
-  darknessPct: 12,
-  darknessSec: 8,
+  threshold: 0.05,
+  pauseQuietMs: TWO_HOURS_MS,
+};
+
+const EMPTY_CLOCK = {
+  lastVibrationAt: "",
+  workStartedAt: "",
+  pausedAt: "",
+  pauses: [],
 };
 
 function nowIso() {
@@ -28,6 +34,15 @@ function formatClock(iso) {
     second: "2-digit",
     hour12: true,
   }).format(d);
+}
+
+function formatElapsed(ms) {
+  if (!Number.isFinite(ms) || ms <= 0) return "0:00:00";
+  const total = Math.floor(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 function loadJson(key, fallback) {
@@ -66,25 +81,31 @@ function magFromMotion(ev) {
   return null;
 }
 
+function workElapsedMs(clock, nowMs) {
+  if (!clock?.workStartedAt) return 0;
+  const start = new Date(clock.workStartedAt).getTime();
+  if (!Number.isFinite(start)) return 0;
+  let paused = 0;
+  for (const p of clock.pauses || []) {
+    const from = new Date(p.from).getTime();
+    const to = p.to ? new Date(p.to).getTime() : nowMs;
+    if (Number.isFinite(from) && Number.isFinite(to) && to > from) paused += to - from;
+  }
+  return Math.max(0, nowMs - start - paused);
+}
+
 function probeApis() {
   const dme = typeof window.DeviceMotionEvent !== "undefined";
-  const doe = typeof window.DeviceOrientationEvent !== "undefined";
   return {
     secureContext: !!window.isSecureContext,
-    protocol: window.location.protocol,
-    host: window.location.host,
     userAgent: navigator.userAgent || "",
     silk: /silk/i.test(navigator.userAgent || ""),
-    fireOs: /kf[a-z0-9]+|fire[\s_-]?os|amazon/i.test(navigator.userAgent || ""),
     deviceMotionEvent: dme,
     deviceMotionPermission: !!(dme && window.DeviceMotionEvent.requestPermission),
-    deviceOrientationEvent: doe,
+    deviceOrientationEvent: typeof window.DeviceOrientationEvent !== "undefined",
     accelerometer: typeof window.Accelerometer === "function",
     linearAccelerationSensor: typeof window.LinearAccelerationSensor === "function",
     gyroscope: typeof window.Gyroscope === "function",
-    genericSensor: typeof window.Sensor === "function",
-    mediaDevices: !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
-    permissionsApi: !!(navigator.permissions && navigator.permissions.query),
     localStorage: (() => {
       try {
         const k = "__jrco_sensor_probe__";
@@ -141,49 +162,69 @@ export default function MachineSensorTest() {
   const [motionDetail, setMotionDetail] = useState("Tap Enable motion to start. No values until the Fire sends real events.");
   const [rawLevel, setRawLevel] = useState(null);
   const [smoothLevel, setSmoothLevel] = useState(null);
-  const [running, setRunning] = useState(false);
+  const [vibrating, setVibrating] = useState(false);
   const [motionCount, setMotionCount] = useState(0);
-  const [lastMotionAt, setLastMotionAt] = useState("");
+  const [tick, setTick] = useState(Date.now());
   const [settings, setSettings] = useState(() => ({
     ...DEFAULTS,
     ...(loadJson(LS_SETTINGS, {}) || {}),
   }));
   const [events, setEvents] = useState(() => loadJson(LS_EVENTS, []) || []);
-  const [camStatus, setCamStatus] = useState("off");
-  const [camDetail, setCamDetail] = useState("Camera off. First test is vibration only — leave this off.");
-  const [brightness, setBrightness] = useState(null);
-  const [lightsOn, setLightsOn] = useState(null);
-  const [endOfDay, setEndOfDay] = useState("");
+  const [clock, setClock] = useState(() => ({
+    ...EMPTY_CLOCK,
+    ...(loadJson(LS_CLOCK, {}) || {}),
+  }));
 
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const camTimerRef = useRef(null);
-  const darkSinceRef = useRef(null);
   const motionWatchRef = useRef(null);
   const accRef = useRef(null);
   const listeningRef = useRef(false);
-  const runningRef = useRef(false);
-  const overSinceRef = useRef(null);
-  const underSinceRef = useRef(null);
   const smoothRef = useRef(0);
   const hasSmoothRef = useRef(false);
   const settingsRef = useRef(settings);
-  const eventsRef = useRef(events);
+  const clockRef = useRef(clock);
 
   useEffect(() => {
     settingsRef.current = settings;
     saveJson(LS_SETTINGS, settings);
   }, [settings]);
   useEffect(() => {
-    eventsRef.current = events;
-    saveJson(LS_EVENTS, events.slice(0, MAX_EVENTS));
+    clockRef.current = clock;
+    saveJson(LS_CLOCK, clock);
+  }, [clock]);
+  useEffect(() => {
+    saveJson(LS_EVENTS, (events || []).slice(0, MAX_EVENTS));
   }, [events]);
 
   const pushEvent = useCallback((type, extra = {}) => {
-    const rec = { type, at: nowIso(), ...extra };
+    const rec = { type, at: extra.at || nowIso(), ...extra };
     setEvents((prev) => [rec, ...(Array.isArray(prev) ? prev : [])].slice(0, MAX_EVENTS));
     return rec;
   }, []);
+
+  const maybePause = useCallback(() => {
+    const c = clockRef.current;
+    if (!c.lastVibrationAt || c.pausedAt) return;
+    const quietMs = Number(settingsRef.current.pauseQuietMs) || TWO_HOURS_MS;
+    const last = new Date(c.lastVibrationAt).getTime();
+    const now = Date.now();
+    if (!Number.isFinite(last) || now - last <= quietMs) return;
+    const pausedAt = c.lastVibrationAt;
+    setClock((prev) => {
+      if (prev.pausedAt) return prev;
+      const next = {
+        ...prev,
+        pausedAt,
+        pauses: [...(prev.pauses || []), { from: pausedAt, to: null }],
+      };
+      clockRef.current = next;
+      return next;
+    });
+    pushEvent("pause", {
+      at: pausedAt,
+      detectedAt: nowIso(),
+      lastVibrationAt: pausedAt,
+    });
+  }, [pushEvent]);
 
   const applyMotionSample = useCallback(
     (raw, source) => {
@@ -191,32 +232,38 @@ export default function MachineSensorTest() {
       setMotionStatus("available");
       setMotionDetail(`Live from ${source}. These are device values, not estimates.`);
       setRawLevel(raw);
-      setLastMotionAt(nowIso());
       setMotionCount((n) => n + 1);
       const next = hasSmoothRef.current ? smoothRef.current * 0.82 + raw * 0.18 : raw;
       hasSmoothRef.current = true;
       smoothRef.current = next;
       setSmoothLevel(next);
 
-      const { threshold, startHoldMs, stopHoldMs } = settingsRef.current;
-      const t = Number(threshold) || 0;
-      const now = Date.now();
-      if (next >= t) {
-        underSinceRef.current = null;
-        if (!overSinceRef.current) overSinceRef.current = now;
-        if (!runningRef.current && now - overSinceRef.current >= (Number(startHoldMs) || 0)) {
-          runningRef.current = true;
-          setRunning(true);
-          pushEvent("vibration-start", { level: Number(next.toFixed(3)), source });
+      const t = Number(settingsRef.current.threshold);
+      const threshold = Number.isFinite(t) ? t : 0.05;
+      const above = next >= threshold;
+      setVibrating(above);
+      if (!above) return;
+
+      const iso = nowIso();
+      const wasPaused = !!clockRef.current.pausedAt;
+      setClock((prev) => {
+        let pauses = prev.pauses || [];
+        if (prev.pausedAt) {
+          pauses = pauses.map((p, i) =>
+            i === pauses.length - 1 && !p.to ? { ...p, to: iso } : p
+          );
         }
-      } else {
-        overSinceRef.current = null;
-        if (!underSinceRef.current) underSinceRef.current = now;
-        if (runningRef.current && now - underSinceRef.current >= (Number(stopHoldMs) || 0)) {
-          runningRef.current = false;
-          setRunning(false);
-          pushEvent("vibration-stop", { level: Number(next.toFixed(3)), source });
-        }
+        const next = {
+          lastVibrationAt: iso,
+          workStartedAt: prev.workStartedAt || iso,
+          pausedAt: "",
+          pauses,
+        };
+        clockRef.current = next;
+        return next;
+      });
+      if (wasPaused) {
+        pushEvent("unpause", { at: iso, level: Number(next.toFixed(3)), source });
       }
     },
     [pushEvent]
@@ -262,6 +309,7 @@ export default function MachineSensorTest() {
     setRawLevel(null);
     setSmoothLevel(null);
     setMotionCount(0);
+    setVibrating(false);
     setMotionStatus("listening");
     setMotionDetail("Waiting for a real accelerometer event from Silk…");
 
@@ -296,9 +344,7 @@ export default function MachineSensorTest() {
           const z = Number(acc.z) || 0;
           applyMotionSample(Math.abs(Math.sqrt(x * x + y * y + z * z) - 9.81), "Accelerometer");
         });
-        acc.addEventListener("error", () => {
-          /* DeviceMotion may still work */
-        });
+        acc.addEventListener("error", () => {});
         acc.start();
         accRef.current = acc;
       } catch {
@@ -319,117 +365,31 @@ export default function MachineSensorTest() {
 
   useEffect(() => () => stopMotion(), [stopMotion]);
 
-  const stopCamera = useCallback(() => {
-    if (camTimerRef.current) {
-      clearInterval(camTimerRef.current);
-      camTimerRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    const v = videoRef.current;
-    if (v) v.srcObject = null;
-    darkSinceRef.current = null;
-    setCamStatus("off");
-    setCamDetail("Camera off. First test is vibration only — leave this off.");
-    setBrightness(null);
-    setLightsOn(null);
-  }, []);
-
-  const sampleFrame = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || video.readyState < 2) return;
-    const w = 64;
-    const h = 36;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, w, h);
-    const { data } = ctx.getImageData(0, 0, w, h);
-    let sum = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      sum += (data[i] + data[i + 1] + data[i + 2]) / 3;
-    }
-    const pct = (sum / (data.length / 4) / 255) * 100;
-    setBrightness(pct);
-    const limit = Number(settingsRef.current.darknessPct) || 0;
-    const needMs = (Number(settingsRef.current.darknessSec) || 0) * 1000;
-    const dark = pct < limit;
-    const now = Date.now();
-    if (dark) {
-      if (!darkSinceRef.current) darkSinceRef.current = now;
-      if (now - darkSinceRef.current >= needMs) {
-        setLightsOn((prev) => {
-          if (prev === false) return prev;
-          const lightsOutAt = nowIso();
-          const stop = (eventsRef.current || []).find((e) => e.type === "vibration-stop");
-          const eod = stop?.at || "";
-          setEndOfDay(eod);
-          pushEvent("lights-out", {
-            brightness: Number(pct.toFixed(1)),
-            endOfDay: eod || null,
-          });
-          return false;
-        });
-      }
-    } else {
-      darkSinceRef.current = null;
-      setLightsOn((prev) => {
-        if (prev === true) return prev;
-        if (prev === false) pushEvent("lights-on", { brightness: Number(pct.toFixed(1)) });
-        return true;
-      });
-    }
-  }, [pushEvent]);
-
-  const enableCamera = useCallback(async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      setCamStatus("unsupported");
-      setCamDetail("Camera API not available in this browser.");
-      return;
-    }
-    setCamStatus("requesting");
-    setCamDetail("Waiting for Silk camera permission…");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 320 }, height: { ideal: 180 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      const v = videoRef.current;
-      if (v) {
-        v.srcObject = stream;
-        await v.play().catch(() => {});
-      }
-      setCamStatus("granted");
-      setCamDetail("Sampling brightness only. Frames are discarded immediately. Nothing is stored.");
-      camTimerRef.current = setInterval(sampleFrame, 400);
-    } catch (err) {
-      const name = err?.name || "";
-      setCamStatus(name === "NotAllowedError" ? "denied" : "error");
-      setCamDetail(`Camera blocked: ${err?.message || String(err)}`);
-    }
-  }, [sampleFrame]);
-
-  useEffect(() => () => stopCamera(), [stopCamera]);
+  useEffect(() => {
+    const id = setInterval(() => {
+      maybePause();
+      setTick(Date.now());
+    }, 1000);
+    maybePause();
+    return () => clearInterval(id);
+  }, [maybePause]);
 
   const clearHistory = () => {
-    if (!window.confirm("Clear all local test start/stop history on this tablet?")) return;
+    if (!window.confirm("Clear local vibration / pause history on this tablet?")) return;
     setEvents([]);
-    setEndOfDay("");
+    setClock({ ...EMPTY_CLOCK });
     saveJson(LS_EVENTS, []);
+    saveJson(LS_CLOCK, EMPTY_CLOCK);
   };
+
+  const paused = !!clock.pausedAt;
+  const elapsed = workElapsedMs(clock, tick);
+  const quietMs = clock.lastVibrationAt ? Math.max(0, tick - new Date(clock.lastVibrationAt).getTime()) : 0;
+  const pauseAfterMs = Number(settings.pauseQuietMs) || TWO_HOURS_MS;
 
   const motionTone =
     motionStatus === "available" ? "go" : motionStatus === "not-available" ? "stop" : "warn";
-  const runTone = running ? "go" : "stop";
-  const camTone =
-    camStatus === "granted" ? "go" : camStatus === "off" ? "neutral" : camStatus === "denied" ? "stop" : "warn";
-  const lightTone =
-    lightsOn == null ? "neutral" : lightsOn ? "go" : "stop";
+  const clockTone = !clock.workStartedAt ? "neutral" : paused ? "stop" : "go";
 
   const apiRows = useMemo(
     () => [
@@ -441,7 +401,6 @@ export default function MachineSensorTest() {
       ["Accelerometer (Generic Sensor)", apis.accelerometer ? "present" : "missing"],
       ["LinearAccelerationSensor", apis.linearAccelerationSensor ? "present" : "missing"],
       ["Gyroscope", apis.gyroscope ? "present" : "missing"],
-      ["getUserMedia (camera)", apis.mediaDevices ? "present" : "missing"],
       ["localStorage", apis.localStorage ? "present" : "missing"],
     ],
     [apis]
@@ -472,8 +431,8 @@ export default function MachineSensorTest() {
           <Link to="/" style={{ color: "#93c5fd", fontWeight: 800, fontSize: 16 }}>
             ← Scheduler
           </Link>
-          <div style={{ fontWeight: 900, fontSize: 18 }}>Fire HD 10 sensor test</div>
-          <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.8 }}>TEMP · no Sheets</div>
+          <div style={{ fontWeight: 900, fontSize: 18 }}>Fire HD 10 vibration clock</div>
+          <div style={{ fontSize: 13, fontWeight: 700, opacity: 0.8 }}>TEMP · no Sheets · no camera</div>
         </div>
 
         <div
@@ -485,17 +444,13 @@ export default function MachineSensorTest() {
             marginBottom: 12,
           }}
         >
-          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 6 }}>First test: vibration only</div>
-          <ol style={{ margin: 0, paddingLeft: 22, fontSize: 16, fontWeight: 700, lineHeight: 1.45 }}>
-            <li>On the Fire HD 10, open Silk and go to this page (already logged in): <code>machineschedule.netlify.app/machine-sensor-test</code></li>
-            <li>Leave camera off. Do not tap Enable camera yet.</li>
-            <li>Tape or set the tablet on the machine in the spot you want to use (firm contact helps).</li>
-            <li>Tap <b>Enable motion</b>. If it says <b>Motion sensor not available</b>, Silk blocked it — stop and tell us. Do not guess values.</li>
-            <li>With the machine idle, watch Vibration level. Drag the threshold just above that idle number.</li>
-            <li>Start a hoop. The state should go <b>RUNNING</b> and a start should appear in history.</li>
-            <li>Stop the machine. It should go <b>STOPPED</b> and log a stop. Repeat a few times.</li>
-            <li>Lights / end-of-day come later. This first pass is vibration start/stop only.</li>
-          </ol>
+          <div style={{ fontSize: 20, fontWeight: 900, marginBottom: 6 }}>Pause rule (vibration only)</div>
+          <ul style={{ margin: 0, paddingLeft: 22, fontSize: 16, fontWeight: 700, lineHeight: 1.45 }}>
+            <li>Vibration below <b>0.05</b> for <b>more than 2 hours</b> → machine is paused.</li>
+            <li>Pause time is <b>the last vibration</b>, not the 2-hour mark. The clock jumps back to that time.</li>
+            <li>When vibration starts again, the clock <b>unpauses</b> at that moment.</li>
+            <li>A short stop under 2 hours is not a pause. Camera is off for now.</li>
+          </ul>
         </div>
 
         <div
@@ -523,48 +478,42 @@ export default function MachineSensorTest() {
           <Readout
             label="Vibration level"
             value={smoothLevel == null ? "—" : smoothLevel.toFixed(2)}
-            sub={rawLevel == null ? "No fake values" : `raw ${rawLevel.toFixed(2)} · ${motionCount} events`}
-            tone={smoothLevel == null ? "neutral" : "neutral"}
-          />
-          <Readout
-            label="Machine"
-            value={smoothLevel == null ? "—" : running ? "RUNNING" : "STOPPED"}
-            sub={lastMotionAt ? `last sample ${formatClock(lastMotionAt)}` : "Waiting for sensor"}
-            tone={smoothLevel == null ? "neutral" : runTone}
-          />
-          <Readout
-            label="Camera permission"
-            value={camStatus === "granted" ? "Granted" : camStatus === "denied" ? "Denied" : camStatus === "off" ? "Off" : camStatus}
-            sub={camDetail}
-            tone={camTone}
-          />
-          <Readout
-            label="Brightness"
-            value={brightness == null ? "—" : `${Math.round(brightness)}%`}
-            sub="Average of one discarded camera frame"
-            tone="neutral"
-          />
-          <Readout
-            label="Lights"
-            value={lightsOn == null ? "—" : lightsOn ? "ON" : "OFF"}
             sub={
-              endOfDay
-                ? `End of day = last vibration stop ${formatClock(endOfDay)}`
-                : "End of day uses last vibration stop before lights-out"
+              rawLevel == null
+                ? "No fake values"
+                : `${vibrating ? "vibrating" : "quiet"} · threshold ${Number(settings.threshold).toFixed(2)} · raw ${rawLevel.toFixed(2)}`
             }
-            tone={lightTone}
+            tone={smoothLevel == null ? "neutral" : vibrating ? "go" : "warn"}
+          />
+          <Readout
+            label="Clock"
+            value={!clock.workStartedAt ? "—" : paused ? "PAUSED" : "RUNNING"}
+            sub={
+              paused
+                ? `Paused at last vibration ${formatClock(clock.pausedAt)}`
+                : clock.lastVibrationAt
+                  ? `Last vibration ${formatClock(clock.lastVibrationAt)}`
+                  : "Waiting for vibration"
+            }
+            tone={clockTone}
+          />
+          <Readout
+            label="Work clock"
+            value={formatElapsed(elapsed)}
+            sub={
+              paused
+                ? "Frozen as of last vibration (2h quiet backdated)"
+                : quietMs > 0 && !vibrating
+                  ? `Quiet ${formatElapsed(quietMs)} — pause after 2h`
+                  : "Counts only while not paused"
+            }
+            tone={clockTone}
           />
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
           <button type="button" onClick={enableMotion} style={btnStyle("#111827", "#fff")}>
             Enable motion
-          </button>
-          <button type="button" onClick={enableCamera} style={btnStyle("#1d4ed8", "#fff")}>
-            Enable camera (later)
-          </button>
-          <button type="button" onClick={stopCamera} style={btnStyle("#e5e7eb", "#111827")}>
-            Stop camera
           </button>
           <button type="button" onClick={clearHistory} style={btnStyle("#991b1b", "#fff")}>
             Clear test history
@@ -581,45 +530,21 @@ export default function MachineSensorTest() {
         >
           <Slider
             label={`Vibration threshold (${Number(settings.threshold).toFixed(2)})`}
-            min={0.05}
-            max={6}
-            step={0.05}
+            min={0.02}
+            max={1}
+            step={0.01}
             value={settings.threshold}
             onChange={(v) => setSettings((s) => ({ ...s, threshold: v }))}
-            hint="Idle should sit below this. Running should sit above it."
+            hint="At or above this counts as vibration. Default 0.05."
           />
           <Slider
-            label={`Start hold (${settings.startHoldMs} ms)`}
-            min={100}
-            max={3000}
-            step={100}
-            value={settings.startHoldMs}
-            onChange={(v) => setSettings((s) => ({ ...s, startHoldMs: v }))}
-          />
-          <Slider
-            label={`Stop hold (${settings.stopHoldMs} ms)`}
-            min={200}
-            max={8000}
-            step={100}
-            value={settings.stopHoldMs}
-            onChange={(v) => setSettings((s) => ({ ...s, stopHoldMs: v }))}
-          />
-          <Slider
-            label={`Darkness threshold (${settings.darknessPct}%)`}
-            min={1}
-            max={40}
-            step={1}
-            value={settings.darknessPct}
-            onChange={(v) => setSettings((s) => ({ ...s, darknessPct: v }))}
-            hint="Skip for first test. Lights-out only if brightness stays below this."
-          />
-          <Slider
-            label={`Darkness duration (${settings.darknessSec}s)`}
-            min={2}
-            max={30}
-            step={1}
-            value={settings.darknessSec}
-            onChange={(v) => setSettings((s) => ({ ...s, darknessSec: v }))}
+            label={`Pause after quiet (${(pauseAfterMs / 3600000).toFixed(2)} h)`}
+            min={0.05}
+            max={8}
+            step={0.05}
+            value={pauseAfterMs / 3600000}
+            onChange={(v) => setSettings((s) => ({ ...s, pauseQuietMs: v * 3600000 }))}
+            hint="Must stay quiet longer than this, then pause is stamped at last vibration. Default 2 hours."
           />
         </div>
 
@@ -637,7 +562,18 @@ export default function MachineSensorTest() {
             {apis.userAgent}
           </div>
           {apiRows.map(([k, v]) => (
-            <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontWeight: 700, fontSize: 15, padding: "4px 0", borderBottom: "1px solid #e5e7eb" }}>
+            <div
+              key={k}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                fontWeight: 700,
+                fontSize: 15,
+                padding: "4px 0",
+                borderBottom: "1px solid #e5e7eb",
+              }}
+            >
               <span>{k}</span>
               <span>{v}</span>
             </div>
@@ -655,13 +591,8 @@ export default function MachineSensorTest() {
           <div style={{ fontSize: 18, fontWeight: 900, marginBottom: 8 }}>
             Local history ({events.length}) — not sent to Sheets
           </div>
-          {endOfDay ? (
-            <div style={{ fontWeight: 900, fontSize: 20, marginBottom: 10, color: "#1d4ed8" }}>
-              End of day = {formatClock(endOfDay)}
-            </div>
-          ) : null}
           {events.length === 0 ? (
-            <div style={{ fontWeight: 700, color: "#6b7280" }}>No start/stop events yet.</div>
+            <div style={{ fontWeight: 700, color: "#6b7280" }}>No pause / unpause events yet.</div>
           ) : (
             events.slice(0, 40).map((e, i) => (
               <div
@@ -677,19 +608,14 @@ export default function MachineSensorTest() {
                 }}
               >
                 <span>{e.type}</span>
-                <span>{formatClock(e.at)}</span>
+                <span>
+                  {formatClock(e.at)}
+                  {e.detectedAt ? ` · seen ${formatClock(e.detectedAt)}` : ""}
+                </span>
               </div>
             ))
           )}
         </div>
-
-        <video
-          ref={videoRef}
-          playsInline
-          muted
-          autoPlay
-          style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
-        />
       </div>
     </div>
   );
