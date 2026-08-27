@@ -12,7 +12,7 @@ import {
   lastRunsWithPerf,
   normalizeOrderId,
 } from "./machineFloorUtils";
-import { useMachineVibration } from "./useMachineVibration";
+import { useMachineVibration, VibrationDot } from "./useMachineVibration";
 
 function outlineByDue(due) {
   if (!due) return "#9ca3af";
@@ -133,6 +133,7 @@ export default function MachineHome({ columns, loading }) {
         touchAction: "manipulation",
         WebkitUserSelect: "none",
         userSelect: "none",
+        position: "relative",
       }}
     >
       <div
@@ -468,6 +469,7 @@ export default function MachineHome({ columns, loading }) {
           <div style={{ color: "#b91c1c", marginTop: 6, fontWeight: 700 }}>{lookupError}</div>
         ) : null}
       </form>
+      <VibrationDot vibrating={vibration.vibrating} />
     </div>
   );
 }

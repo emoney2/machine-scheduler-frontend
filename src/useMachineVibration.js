@@ -222,3 +222,31 @@ export function useMachineVibration(machineId) {
     hoopEndedAt: clock.lastVibrationAt || "",
   };
 }
+
+export function VibrationDot({ vibrating }) {
+  const on = !!vibrating;
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        left: 6,
+        bottom: 6,
+        zIndex: 6,
+        width: 16,
+        height: 16,
+        borderRadius: "50%",
+        background: on ? "#16a34a" : "#dc2626",
+        color: "#fff",
+        fontSize: 9,
+        fontWeight: 900,
+        lineHeight: "16px",
+        textAlign: "center",
+        pointerEvents: "none",
+        boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
+      }}
+    >
+      V
+    </div>
+  );
+}

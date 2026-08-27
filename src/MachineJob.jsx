@@ -13,7 +13,7 @@ import {
   jobImageUrl,
   normalizeOrderId,
 } from "./machineFloorUtils";
-import { useMachineVibration } from "./useMachineVibration";
+import { useMachineVibration, VibrationDot } from "./useMachineVibration";
 
 const ROOT = apiRoot();
 const PLUS_FLASH_MS = 2500;
@@ -310,6 +310,7 @@ export default function MachineJob({ columns }) {
         WebkitUserSelect: "none",
         userSelect: "none",
         boxSizing: "border-box",
+        position: "relative",
       }}
     >
       <div
@@ -929,6 +930,7 @@ export default function MachineJob({ columns }) {
           </div>
         </Modal>
       )}
+      <VibrationDot vibrating={vibration.vibrating} />
     </div>
   );
 }
