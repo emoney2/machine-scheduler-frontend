@@ -17,8 +17,8 @@ const COOLDOWN_MS = 6000;
 const PEAK_GAP_MIN = 450;
 const PEAK_GAP_MAX = 900;
 const PEAK_REFRACTORY = 400;
-const OWN_RUN_MAX_MS = 15000;
-const STILL_SEWING_LEVEL = 0.08;
+const OWN_RUN_MAX_MS = 20000;
+const STILL_SEWING_LEVEL = 0.07;
 
 function bandAvg(bytes, sampleRate, f0, f1) {
   const binHz = sampleRate / FFT_SIZE;
@@ -31,17 +31,14 @@ function bandAvg(bytes, sampleRate, f0, f1) {
 }
 
 function ownBedCanClaimChime(motion) {
-  // Neighbor machines chime too. This tablet only shakes on its own bed.
-  // Do not require a fully quiet bed: the melody starts as the machine is
-  // still winding down, and wiping audio then misses the whole chime.
+  // The chime plays when THIS bed is idle (hoop just finished). Green V for
+  // 12s after the last shake is a hold, not sewing — do not treat that as running.
   if (!motion?.motionAvailable) return true;
-  const lastAct = Number(motion.lastActivityAt) || 0;
-  if (!lastAct) return false;
-  const dt = Date.now() - lastAct;
-  if (dt > OWN_RUN_MAX_MS) return false;
   const level = Number(motion.level) || 0;
   if (level >= STILL_SEWING_LEVEL) return false;
-  return true;
+  const lastAct = Number(motion.lastActivityAt) || 0;
+  if (!lastAct) return true;
+  return Date.now() - lastAct <= OWN_RUN_MAX_MS;
 }
 
 async function openMic() {
