@@ -269,7 +269,7 @@ export function useMachineVibration(machineId) {
   };
 }
 
-export function VibrationDot({ vibrating, level }) {
+export function VibrationDot({ vibrating, level, melodyPending, melodyKey }) {
   const on = !!vibrating;
   const n = Number(level);
   const label = Number.isFinite(n) ? n.toFixed(2) : "—";
@@ -287,6 +287,16 @@ export function VibrationDot({ vibrating, level }) {
         pointerEvents: "none",
       }}
     >
+      <style>{`
+        @keyframes ms-melody-flash {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          20% { opacity: 0.2; transform: scale(0.8); }
+          40% { opacity: 1; transform: scale(1.15); }
+          60% { opacity: 0.2; transform: scale(0.8); }
+          80% { opacity: 1; transform: scale(1.1); }
+        }
+        .ms-melody-dot { animation: ms-melody-flash 0.9s ease-out 1; }
+      `}</style>
       <div
         style={{
           width: 16,
@@ -303,6 +313,28 @@ export function VibrationDot({ vibrating, level }) {
       >
         V
       </div>
+      {melodyPending ? (
+        <div
+          key={melodyKey || "melody"}
+          className="ms-melody-dot"
+          title="Melody heard"
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: "50%",
+            background: "#6d28d9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
+            transformOrigin: "center",
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="#fff" aria-hidden>
+            <path d="M12 2v8.2a2.4 2.4 0 1 1-1.2-.2V5.2L6.5 6.4v5.8a2.4 2.4 0 1 1-1.2-.2V4.3L12 2z" />
+          </svg>
+        </div>
+      ) : null}
       <span
         style={{
           fontSize: 11,
@@ -317,3 +349,4 @@ export function VibrationDot({ vibrating, level }) {
     </div>
   );
 }
+

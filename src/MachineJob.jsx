@@ -50,8 +50,8 @@ export default function MachineJob({ columns }) {
   const [lastRunAt, setLastRunAt] = useState("");
   const [missedAsk, setMissedAsk] = useState(false);
   const [missedPlus, setMissedPlus] = useState(false);
+  const [melodyAt, setMelodyAt] = useState("");
   const lastRunAtRef = useRef("");
-  const expectedRunRef = useRef(0);
   const leftRef = useRef(0);
   const lastVibRef = useRef("");
 
@@ -126,54 +126,44 @@ export default function MachineJob({ columns }) {
     meta.headCount
   );
   lastRunAtRef.current = lastRunAt;
-  expectedRunRef.current = expectedRunMs;
   leftRef.current = left;
   lastVibRef.current = vibration.lastVibrationAt;
   const expectedRunLabel = formatDuration(expectedRunMs);
 
   useEffect(() => {
-    if (!chime.heardAt) return undefined;
-    const heardIso = chime.heardAt;
-    const heardMs = new Date(heardIso).getTime();
+    if (!chime.heardAt) return;
+    setMelodyAt(chime.heardAt);
+    chime.consume();
+  }, [chime.heardAt, chime.consume]);
+
+  useEffect(() => {
+    if (!melodyAt || missedAsk || missedPlus) return undefined;
+    const heardMs = new Date(melodyAt).getTime();
     if (!Number.isFinite(heardMs)) return undefined;
     let cancelled = false;
-    let done = false;
-
-    const finish = (ask) => {
-      if (done || cancelled) return;
-      done = true;
-      chime.consume();
-      if (ask) setMissedAsk(true);
-    };
+    let asked = false;
 
     const tick = () => {
-      if (cancelled || done) return;
+      if (cancelled || asked) return;
+      const postedMs = lastRunAtRef.current
+        ? new Date(lastRunAtRef.current).getTime()
+        : 0;
+      if (Number.isFinite(postedMs) && postedMs >= heardMs) return;
       const now = Date.now();
       if (now - heardMs < 2500) return;
       const vibMs = new Date(lastVibRef.current).getTime();
       if (!Number.isFinite(vibMs) || vibMs < heardMs + 2500) return;
-
-      const postedMs = lastRunAtRef.current
-        ? new Date(lastRunAtRef.current).getTime()
-        : 0;
-      if (Number.isFinite(postedMs) && postedMs >= heardMs) {
-        finish(false);
-        return;
-      }
-      const expected = expectedRunRef.current > 0 ? expectedRunRef.current : 3 * 60 * 1000;
-      const elapsed = postedMs ? now - postedMs : Infinity;
-      const overdue = elapsed > Math.max(expected * 0.75, 45 * 1000);
-      finish(overdue && leftRef.current > 0);
+      if (leftRef.current <= 0) return;
+      asked = true;
+      setMissedAsk(true);
     };
 
     const id = setInterval(tick, 250);
-    const giveUp = setTimeout(() => finish(false), 10 * 60 * 1000);
     return () => {
       cancelled = true;
       clearInterval(id);
-      clearTimeout(giveUp);
     };
-  }, [chime.heardAt, chime.consume]);
+  }, [melodyAt, missedAsk, missedPlus]);
 
   const lastThree = lastRunsWithPerf(
     job?.recentRuns || fromColumns?.recentRuns,
@@ -279,6 +269,7 @@ export default function MachineJob({ columns }) {
     const inc = Math.min(n, left);
     setMissedPlus(false);
     setMissedAsk(false);
+    setMelodyAt("");
     setPiecesLeft(left - inc);
     setPostedN(inc);
     setLastRunAt(new Date().toISOString());
@@ -1086,7 +1077,12 @@ export default function MachineJob({ columns }) {
           </div>
         </Modal>
       )}
-      <VibrationDot vibrating={vibration.vibrating} level={vibration.level} />
+      <VibrationDot
+        vibrating={vibration.vibrating}
+        level={vibration.level}
+        melodyPending={!!melodyAt}
+        melodyKey={melodyAt}
+      />
     </div>
   );
 }
