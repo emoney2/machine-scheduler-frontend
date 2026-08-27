@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const THRESHOLD = 0.05;
+// Idle sits at ~0.01–0.02. Thread trims / slow stitches look the same for a
+// couple of seconds, then the machine picks back up. Instant amplitude cannot
+// tell those apart — stay "running" until quiet lasts longer than a trim.
+const ACTIVITY_THRESHOLD = 0.03;
+const SLOW_HOLD_MS = 12000;
 const PAUSE_AFTER_MS = 2 * 60 * 60 * 1000;
 const LS_PREFIX = "jrco.machineVibration.v1.";
 
@@ -68,7 +72,7 @@ function magFromMotion(ev) {
 
 /**
  * Silent Fire HD vibration pause/unpause for machine floor pages.
- * No sliders. Threshold 0.05; pause after >2h quiet, backdated to last vibration.
+ * Burst above idle + 12s hold covers trims. Pause after >2h quiet, backdated.
  */
 export function useMachineVibration(machineId) {
   const [clock, setClock] = useState(() => loadClock(machineId));
@@ -83,6 +87,7 @@ export function useMachineVibration(machineId) {
   const accRef = useRef(null);
   const startedOkRef = useRef(false);
   const lastUiRef = useRef(0);
+  const lastActivityRef = useRef(0);
   const machineRef = useRef(machineId);
 
   useEffect(() => {
@@ -92,6 +97,7 @@ export function useMachineVibration(machineId) {
     setClock(next);
     hasSmoothRef.current = false;
     smoothRef.current = 0;
+    lastActivityRef.current = 0;
     setVibrating(false);
     setLevel(null);
   }, [machineId]);
@@ -107,16 +113,16 @@ export function useMachineVibration(machineId) {
     const next = hasSmoothRef.current ? smoothRef.current * 0.82 + raw * 0.18 : raw;
     hasSmoothRef.current = true;
     smoothRef.current = next;
-    const above = next >= THRESHOLD;
     const t = Date.now();
+    const burst = next >= ACTIVITY_THRESHOLD;
+    if (burst) lastActivityRef.current = t;
+    const running = lastActivityRef.current > 0 && t - lastActivityRef.current < SLOW_HOLD_MS;
     if (t - lastUiRef.current >= 150) {
       lastUiRef.current = t;
-      setVibrating(above);
+      setVibrating(running);
       setLevel(next);
-    } else {
-      setVibrating(above);
     }
-    if (!above) return;
+    if (!burst) return;
 
     const iso = nowIso();
     setClock((prev) => {
@@ -200,6 +206,16 @@ export function useMachineVibration(machineId) {
       stop();
     };
   }, [start, stop, machineId]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const t = Date.now();
+      setVibrating(
+        lastActivityRef.current > 0 && t - lastActivityRef.current < SLOW_HOLD_MS
+      );
+    }, 400);
+    return () => clearInterval(id);
+  }, [machineId]);
 
   useEffect(() => {
     const id = setInterval(() => {
