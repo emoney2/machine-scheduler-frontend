@@ -13,13 +13,12 @@ const B3_LO = 2720;
 const B3_HI = 3380;
 const BASS_LO = 150;
 const BASS_HI = 1300;
-export const CHIME_PRACTICE = false;
 const COOLDOWN_MS = 6000;
-const PEAK_GAP_MIN = 480;
-const PEAK_GAP_MAX = 850;
+const PEAK_GAP_MIN = 450;
+const PEAK_GAP_MAX = 900;
 const PEAK_REFRACTORY = 400;
-const OWN_STOP_MIN_MS = 80;
-const OWN_STOP_MAX_MS = 8000;
+const OWN_RUN_MAX_MS = 15000;
+const STILL_SEWING_LEVEL = 0.08;
 
 function bandAvg(bytes, sampleRate, f0, f1) {
   const binHz = sampleRate / FFT_SIZE;
@@ -31,14 +30,18 @@ function bandAvg(bytes, sampleRate, f0, f1) {
   return s / (b - a + 1);
 }
 
-function ownMachineStopped(motion, atMs) {
-  if (CHIME_PRACTICE) return true;
-  if (!motion?.motionAvailable) return false;
-  if (motion.bursting) return false;
+function ownBedCanClaimChime(motion) {
+  // Neighbor machines chime too. This tablet only shakes on its own bed.
+  // Do not require a fully quiet bed: the melody starts as the machine is
+  // still winding down, and wiping audio then misses the whole chime.
+  if (!motion?.motionAvailable) return true;
   const lastAct = Number(motion.lastActivityAt) || 0;
   if (!lastAct) return false;
-  const dt = atMs - lastAct;
-  return dt >= OWN_STOP_MIN_MS && dt <= OWN_STOP_MAX_MS;
+  const dt = Date.now() - lastAct;
+  if (dt > OWN_RUN_MAX_MS) return false;
+  const level = Number(motion.level) || 0;
+  if (level >= STILL_SEWING_LEVEL) return false;
+  return true;
 }
 
 async function openMic() {
@@ -190,12 +193,8 @@ export function useMachineChime(enabled, motionLiveRef) {
         hist.push({ t: now, b3, b4, bass });
         while (hist.length && now - hist[0].t > 2800) hist.shift();
 
-        if (!CHIME_PRACTICE && (motion.bursting || !motion.motionAvailable)) {
-          hist.length = 0;
-          return;
-        }
-        if (!CHIME_PRACTICE && !ownMachineStopped(motion, now)) return;
         if (now - lastDetect <= COOLDOWN_MS) return;
+        if (!ownBedCanClaimChime(motion)) return;
         if (!melodyDetected(hist, b3Noise.mean, b4Noise.mean)) return;
         lastDetect = now;
         hist.length = 0;
