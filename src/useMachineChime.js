@@ -1,17 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** Tajima-style end-of-hoop chime from shop floor video: 3 high beeps ~0.6s apart, 2.8–4.3 kHz. */
+/**
+ * Tajima end-of-hoop melody from the shop clip (IMG_8969):
+ * three rising phrases ~0.62s apart, ~1.85s total.
+ * Each phrase: strong 4.08–4.32 kHz, then 2.79–3.31 kHz, then 4.1 kHz again.
+ * Not a volume beep — shop noise/speech lives below ~1.5 kHz.
+ */
 const FFT_SIZE = 2048;
-const HIGH_LO = 3850;
-const HIGH_HI = 4450;
-const MID_LO = 2700;
-const MID_HI = 3600;
-const LOW_LO = 200;
-const LOW_HI = 1400;
-/** Phone/floor practice: hear any 3-beep melody; skip missed-post and own-bed gating. */
+const B4_LO = 3920;
+const B4_HI = 4420;
+const B3_LO = 2720;
+const B3_HI = 3380;
+const BASS_LO = 150;
+const BASS_HI = 1300;
 export const CHIME_PRACTICE = true;
-const COOLDOWN_MS = CHIME_PRACTICE ? 2500 : 8000;
-const MIN_PULSE_PEAK = 40;
+const COOLDOWN_MS = 6000;
+const PEAK_GAP_MIN = 480;
+const PEAK_GAP_MAX = 850;
+const PEAK_REFRACTORY = 400;
 const OWN_STOP_MIN_MS = 80;
 const OWN_STOP_MAX_MS = 8000;
 
@@ -23,15 +29,6 @@ function bandAvg(bytes, sampleRate, f0, f1) {
   let s = 0;
   for (let i = a; i <= b; i++) s += bytes[i];
   return s / (b - a + 1);
-}
-
-function rmsFromWave(wave) {
-  let s = 0;
-  for (let i = 0; i < wave.length; i++) {
-    const v = (wave[i] - 128) / 128;
-    s += v * v;
-  }
-  return Math.sqrt(s / wave.length);
 }
 
 function ownMachineStopped(motion, atMs) {
@@ -65,6 +62,46 @@ async function openMic() {
     }
   }
   throw lastErr || new Error("mic");
+}
+
+function maxB4Before(hist, peakT) {
+  let m = 0;
+  for (let i = 0; i < hist.length; i++) {
+    const h = hist[i];
+    if (h.t >= peakT - 380 && h.t <= peakT - 40) m = Math.max(m, h.b4);
+  }
+  return m;
+}
+
+function melodyDetected(hist, b3Noise, b4Noise) {
+  if (hist.length < 12) return false;
+  const peaks = [];
+  for (let i = 2; i < hist.length - 2; i++) {
+    const p = hist[i];
+    const isPeak =
+      p.b3 >= hist[i - 1].b3 &&
+      p.b3 >= hist[i + 1].b3 &&
+      p.b3 >= hist[i - 2].b3 &&
+      p.b3 >= hist[i + 2].b3;
+    if (!isPeak) continue;
+    if (p.b3 < b3Noise * 2.4 + 14) continue;
+    if (p.b3 < p.bass * 1.08) continue;
+    if (peaks.length && p.t - peaks[peaks.length - 1].t < PEAK_REFRACTORY) continue;
+    peaks.push(p);
+  }
+  if (peaks.length < 3) return false;
+  const a = peaks[peaks.length - 3];
+  const b = peaks[peaks.length - 2];
+  const c = peaks[peaks.length - 1];
+  const d1 = b.t - a.t;
+  const d2 = c.t - b.t;
+  if (d1 < PEAK_GAP_MIN || d1 > PEAK_GAP_MAX) return false;
+  if (d2 < PEAK_GAP_MIN || d2 > PEAK_GAP_MAX) return false;
+  const needB4 = b4Noise * 2.2 + 10;
+  if (maxB4Before(hist, a.t) < needB4) return false;
+  if (maxB4Before(hist, b.t) < needB4) return false;
+  if (maxB4Before(hist, c.t) < needB4) return false;
+  return true;
 }
 
 export function useMachineChime(enabled, motionLiveRef) {
@@ -113,126 +150,58 @@ export function useMachineChime(enabled, motionLiveRef) {
       const src = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = FFT_SIZE;
-      analyser.smoothingTimeConstant = 0.08;
+      analyser.smoothingTimeConstant = 0.18;
       src.connect(analyser);
-      // Some WebKit builds skip analyser work unless it feeds the destination.
       const mute = ctx.createGain();
       mute.gain.value = 0;
       analyser.connect(mute);
       mute.connect(ctx.destination);
       const bytes = new Uint8Array(analyser.frequencyBinCount);
-      const wave = new Uint8Array(analyser.fftSize);
-      const pulses = [];
-      const peaks = [];
-      let inPulse = false;
-      let pulseStart = 0;
-      let pulsePeak = 0;
+      const hist = [];
       let lastDetect = 0;
-      let wasLoud = false;
-      const noise = { n: 0, mean: 0 };
-      const rmsNoise = { n: 0, mean: 0.01 };
+      const b3Noise = { n: 0, mean: 8 };
+      const b4Noise = { n: 0, mean: 6 };
       setListening(true);
-
-      const fire = (now) => {
-        if (now - lastDetect <= COOLDOWN_MS) return;
-        lastDetect = now;
-        pulses.length = 0;
-        peaks.length = 0;
-        const iso = new Date().toISOString();
-        heardAtRef.current = iso;
-        setHeardAt(iso);
-      };
 
       const tick = () => {
         rafRef.current = requestAnimationFrame(tick);
-        analyser.getByteTimeDomainData(wave);
         analyser.getByteFrequencyData(bytes);
-        const rms = rmsFromWave(wave);
-        const high = bandAvg(bytes, ctx.sampleRate, HIGH_LO, HIGH_HI);
-        const mid = bandAvg(bytes, ctx.sampleRate, MID_LO, MID_HI);
-        const low = bandAvg(bytes, ctx.sampleRate, LOW_LO, LOW_HI);
+        const b4 = bandAvg(bytes, ctx.sampleRate, B4_LO, B4_HI);
+        const b3 = bandAvg(bytes, ctx.sampleRate, B3_LO, B3_HI);
+        const bass = bandAvg(bytes, ctx.sampleRate, BASS_LO, BASS_HI);
         const now = Date.now();
         const motion = motionHolder.current?.current || {};
+        const melody = Math.max(b3, b4);
         if (now - lastUiRef.current >= 120) {
           lastUiRef.current = now;
-          setLevel(rms);
+          setLevel(melody / 255);
         }
 
-        if (CHIME_PRACTICE) {
-          if (rms < rmsNoise.mean * 1.35 + 0.008) {
-            rmsNoise.n = Math.min(120, rmsNoise.n + 1);
-            rmsNoise.mean += (rms - rmsNoise.mean) / rmsNoise.n;
-          }
-          const loud = rms > Math.max(rmsNoise.mean * 2.4, 0.028);
-          if (loud && !wasLoud && now - (peaks[peaks.length - 1] || 0) >= 260) {
-            peaks.push(now);
-          }
-          wasLoud = loud;
-          while (peaks.length && now - peaks[0] > 2800) peaks.shift();
-          if (peaks.length >= 3) {
-            const a = peaks[peaks.length - 3];
-            const b = peaks[peaks.length - 2];
-            const c = peaks[peaks.length - 1];
-            const d1 = b - a;
-            const d2 = c - b;
-            if (d1 >= 260 && d1 <= 1200 && d2 >= 260 && d2 <= 1200) fire(now);
-          }
+        const likely =
+          (b4 > b4Noise.mean * 2.2 + 8 && b4 > bass * 0.9) ||
+          (b3 > b3Noise.mean * 2.2 + 10 && b3 > bass * 0.95);
+        if (!likely) {
+          b3Noise.n = Math.min(100, b3Noise.n + 1);
+          b3Noise.mean += (b3 - b3Noise.mean) / b3Noise.n;
+          b4Noise.n = Math.min(100, b4Noise.n + 1);
+          b4Noise.mean += (b4 - b4Noise.mean) / b4Noise.n;
+        }
+
+        hist.push({ t: now, b3, b4, bass });
+        while (hist.length && now - hist[0].t > 2800) hist.shift();
+
+        if (!CHIME_PRACTICE && (motion.bursting || !motion.motionAvailable)) {
+          hist.length = 0;
           return;
         }
-
-        const chimeFrame =
-          high > 22 &&
-          high > noise.mean * 1.85 + 8 &&
-          high + mid > low * 1.15;
-        if (!chimeFrame) {
-          noise.n = Math.min(80, noise.n + 1);
-          noise.mean += (high - noise.mean) / noise.n;
-        }
-
-        if (motion.bursting || !motion.motionAvailable) {
-          inPulse = false;
-          pulsePeak = 0;
-          pulses.length = 0;
-          return;
-        }
-
-        if (chimeFrame && ownMachineStopped(motion, now)) {
-          if (!inPulse) {
-            inPulse = true;
-            pulseStart = now;
-            pulsePeak = high;
-          } else {
-            pulsePeak = Math.max(pulsePeak, high);
-          }
-        } else if (inPulse) {
-          if (
-            now - pulseStart >= 220 &&
-            pulsePeak >= MIN_PULSE_PEAK &&
-            ownMachineStopped(motion, pulseStart)
-          ) {
-            pulses.push(pulseStart);
-          }
-          inPulse = false;
-          pulsePeak = 0;
-        }
-
-        while (pulses.length && now - pulses[0] > 2600) pulses.shift();
-        if (pulses.length >= 3 && now - lastDetect > COOLDOWN_MS) {
-          const a = pulses[pulses.length - 3];
-          const b = pulses[pulses.length - 2];
-          const c = pulses[pulses.length - 1];
-          const d1 = b - a;
-          const d2 = c - b;
-          if (
-            d1 >= 380 &&
-            d1 <= 950 &&
-            d2 >= 380 &&
-            d2 <= 950 &&
-            ownMachineStopped(motion, a)
-          ) {
-            fire(now);
-          }
-        }
+        if (!CHIME_PRACTICE && !ownMachineStopped(motion, now)) return;
+        if (now - lastDetect <= COOLDOWN_MS) return;
+        if (!melodyDetected(hist, b3Noise.mean, b4Noise.mean)) return;
+        lastDetect = now;
+        hist.length = 0;
+        const iso = new Date().toISOString();
+        heardAtRef.current = iso;
+        setHeardAt(iso);
       };
       rafRef.current = requestAnimationFrame(tick);
     } catch {
