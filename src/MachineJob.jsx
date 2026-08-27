@@ -930,7 +930,7 @@ export default function MachineJob({ columns }) {
           </div>
         </Modal>
       )}
-      <VibrationDot vibrating={vibration.vibrating} />
+      <VibrationDot vibrating={vibration.vibrating} level={vibration.level} />
     </div>
   );
 }

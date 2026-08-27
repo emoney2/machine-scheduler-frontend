@@ -74,6 +74,7 @@ export function useMachineVibration(machineId) {
   const [clock, setClock] = useState(() => loadClock(machineId));
   const [vibrating, setVibrating] = useState(false);
   const [motionAvailable, setMotionAvailable] = useState(false);
+  const [level, setLevel] = useState(null);
 
   const clockRef = useRef(clock);
   const smoothRef = useRef(0);
@@ -81,6 +82,7 @@ export function useMachineVibration(machineId) {
   const listeningRef = useRef(false);
   const accRef = useRef(null);
   const startedOkRef = useRef(false);
+  const lastUiRef = useRef(0);
   const machineRef = useRef(machineId);
 
   useEffect(() => {
@@ -91,6 +93,7 @@ export function useMachineVibration(machineId) {
     hasSmoothRef.current = false;
     smoothRef.current = 0;
     setVibrating(false);
+    setLevel(null);
   }, [machineId]);
 
   useEffect(() => {
@@ -105,7 +108,14 @@ export function useMachineVibration(machineId) {
     hasSmoothRef.current = true;
     smoothRef.current = next;
     const above = next >= THRESHOLD;
-    setVibrating(above);
+    const t = Date.now();
+    if (t - lastUiRef.current >= 150) {
+      lastUiRef.current = t;
+      setVibrating(above);
+      setLevel(next);
+    } else {
+      setVibrating(above);
+    }
     if (!above) return;
 
     const iso = nowIso();
@@ -218,13 +228,16 @@ export function useMachineVibration(machineId) {
     pausedAt: clock.pausedAt || "",
     lastVibrationAt: clock.lastVibrationAt || "",
     vibrating,
+    level,
     motionAvailable,
     hoopEndedAt: clock.lastVibrationAt || "",
   };
 }
 
-export function VibrationDot({ vibrating }) {
+export function VibrationDot({ vibrating, level }) {
   const on = !!vibrating;
+  const n = Number(level);
+  const label = Number.isFinite(n) ? n.toFixed(2) : "—";
   return (
     <div
       aria-hidden
@@ -233,20 +246,39 @@ export function VibrationDot({ vibrating }) {
         left: 6,
         bottom: 6,
         zIndex: 6,
-        width: 16,
-        height: 16,
-        borderRadius: "50%",
-        background: on ? "#16a34a" : "#dc2626",
-        color: "#fff",
-        fontSize: 9,
-        fontWeight: 900,
-        lineHeight: "16px",
-        textAlign: "center",
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
         pointerEvents: "none",
-        boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
       }}
     >
-      V
+      <div
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: on ? "#16a34a" : "#dc2626",
+          color: "#fff",
+          fontSize: 9,
+          fontWeight: 900,
+          lineHeight: "16px",
+          textAlign: "center",
+          boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
+        }}
+      >
+        V
+      </div>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 800,
+          color: on ? "#16a34a" : "#dc2626",
+          lineHeight: 1,
+          textShadow: "0 0 3px #fff, 0 0 3px #fff",
+        }}
+      >
+        {label}
+      </span>
     </div>
   );
 }

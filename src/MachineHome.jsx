@@ -469,7 +469,7 @@ export default function MachineHome({ columns, loading }) {
           <div style={{ color: "#b91c1c", marginTop: 6, fontWeight: 700 }}>{lookupError}</div>
         ) : null}
       </form>
-      <VibrationDot vibrating={vibration.vibrating} />
+      <VibrationDot vibrating={vibration.vibrating} level={vibration.level} />
     </div>
   );
 }
