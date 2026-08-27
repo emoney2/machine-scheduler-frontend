@@ -1,0 +1,224 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const THRESHOLD = 0.05;
+const PAUSE_AFTER_MS = 2 * 60 * 60 * 1000;
+const LS_PREFIX = "jrco.machineVibration.v1.";
+
+function lsKey(machineId) {
+  return `${LS_PREFIX}${String(machineId || "unknown")}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function loadClock(machineId) {
+  let clock = { lastVibrationAt: "", pausedAt: "", pauses: [] };
+  try {
+    const raw = localStorage.getItem(lsKey(machineId));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      clock = {
+        lastVibrationAt: String(parsed?.lastVibrationAt || ""),
+        pausedAt: String(parsed?.pausedAt || ""),
+        pauses: Array.isArray(parsed?.pauses) ? parsed.pauses : [],
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  if (clock.lastVibrationAt && !clock.pausedAt) {
+    const last = new Date(clock.lastVibrationAt).getTime();
+    if (Number.isFinite(last) && Date.now() - last > PAUSE_AFTER_MS) {
+      clock = {
+        ...clock,
+        pausedAt: clock.lastVibrationAt,
+        pauses: [...clock.pauses, { from: clock.lastVibrationAt, to: null }].slice(-50),
+      };
+    }
+  }
+  return clock;
+}
+
+function saveClock(machineId, clock) {
+  try {
+    localStorage.setItem(lsKey(machineId), JSON.stringify(clock));
+  } catch {
+    /* ignore */
+  }
+}
+
+function magFromMotion(ev) {
+  const a = ev?.acceleration;
+  if (a && (a.x != null || a.y != null || a.z != null)) {
+    const x = Number(a.x) || 0;
+    const y = Number(a.y) || 0;
+    const z = Number(a.z) || 0;
+    return Math.sqrt(x * x + y * y + z * z);
+  }
+  const g = ev?.accelerationIncludingGravity;
+  if (g && (g.x != null || g.y != null || g.z != null)) {
+    const x = Number(g.x) || 0;
+    const y = Number(g.y) || 0;
+    const z = Number(g.z) || 0;
+    return Math.abs(Math.sqrt(x * x + y * y + z * z) - 9.81);
+  }
+  return null;
+}
+
+/**
+ * Silent Fire HD vibration pause/unpause for machine floor pages.
+ * No sliders. Threshold 0.05; pause after >2h quiet, backdated to last vibration.
+ */
+export function useMachineVibration(machineId) {
+  const [clock, setClock] = useState(() => loadClock(machineId));
+  const [vibrating, setVibrating] = useState(false);
+  const [motionAvailable, setMotionAvailable] = useState(false);
+
+  const clockRef = useRef(clock);
+  const smoothRef = useRef(0);
+  const hasSmoothRef = useRef(false);
+  const listeningRef = useRef(false);
+  const accRef = useRef(null);
+  const startedOkRef = useRef(false);
+  const machineRef = useRef(machineId);
+
+  useEffect(() => {
+    machineRef.current = machineId;
+    const next = loadClock(machineId);
+    clockRef.current = next;
+    setClock(next);
+    hasSmoothRef.current = false;
+    smoothRef.current = 0;
+    setVibrating(false);
+  }, [machineId]);
+
+  useEffect(() => {
+    clockRef.current = clock;
+    saveClock(machineId, clock);
+  }, [clock, machineId]);
+
+  const applySample = useCallback((raw) => {
+    if (raw == null || !Number.isFinite(raw)) return;
+    setMotionAvailable(true);
+    const next = hasSmoothRef.current ? smoothRef.current * 0.82 + raw * 0.18 : raw;
+    hasSmoothRef.current = true;
+    smoothRef.current = next;
+    const above = next >= THRESHOLD;
+    setVibrating(above);
+    if (!above) return;
+
+    const iso = nowIso();
+    setClock((prev) => {
+      let pauses = prev.pauses || [];
+      if (prev.pausedAt) {
+        pauses = pauses.map((p, i) =>
+          i === pauses.length - 1 && !p.to ? { ...p, to: iso } : p
+        );
+      }
+      const updated = {
+        lastVibrationAt: iso,
+        pausedAt: "",
+        pauses: pauses.slice(-50),
+      };
+      clockRef.current = updated;
+      return updated;
+    });
+  }, []);
+
+  const onDeviceMotion = useCallback(
+    (ev) => {
+      const mag = magFromMotion(ev);
+      if (mag == null) return;
+      applySample(mag);
+    },
+    [applySample]
+  );
+
+  const stop = useCallback(() => {
+    listeningRef.current = false;
+    startedOkRef.current = false;
+    window.removeEventListener("devicemotion", onDeviceMotion, true);
+    if (accRef.current) {
+      try {
+        accRef.current.stop();
+      } catch {
+        /* ignore */
+      }
+      accRef.current = null;
+    }
+  }, [onDeviceMotion]);
+
+  const start = useCallback(async () => {
+    if (startedOkRef.current) return;
+    if (typeof window.DeviceMotionEvent?.requestPermission === "function") {
+      try {
+        const res = await window.DeviceMotionEvent.requestPermission();
+        if (res !== "granted") return;
+      } catch {
+        return;
+      }
+    }
+    startedOkRef.current = true;
+    listeningRef.current = true;
+    if (typeof window.DeviceMotionEvent !== "undefined") {
+      window.addEventListener("devicemotion", onDeviceMotion, true);
+    }
+    if (typeof window.Accelerometer === "function") {
+      try {
+        const acc = new window.Accelerometer({ frequency: 30 });
+        acc.addEventListener("reading", () => {
+          const x = Number(acc.x) || 0;
+          const y = Number(acc.y) || 0;
+          const z = Number(acc.z) || 0;
+          applySample(Math.abs(Math.sqrt(x * x + y * y + z * z) - 9.81));
+        });
+        acc.start();
+        accRef.current = acc;
+      } catch {
+        /* Silk often has no Generic Sensor API */
+      }
+    }
+  }, [applySample, onDeviceMotion]);
+
+  useEffect(() => {
+    start();
+    const kick = () => start();
+    document.addEventListener("pointerdown", kick, true);
+    return () => {
+      document.removeEventListener("pointerdown", kick, true);
+      stop();
+    };
+  }, [start, stop, machineId]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const c = clockRef.current;
+      if (!c.lastVibrationAt || c.pausedAt) return;
+      const last = new Date(c.lastVibrationAt).getTime();
+      if (!Number.isFinite(last) || Date.now() - last <= PAUSE_AFTER_MS) return;
+      const pausedAt = c.lastVibrationAt;
+      setClock((prev) => {
+        if (prev.pausedAt) return prev;
+        const updated = {
+          ...prev,
+          pausedAt,
+          pauses: [...(prev.pauses || []), { from: pausedAt, to: null }].slice(-50),
+        };
+        clockRef.current = updated;
+        return updated;
+      });
+    }, 5000);
+    return () => clearInterval(id);
+  }, [machineId]);
+
+  const paused = !!clock.pausedAt;
+  return {
+    paused,
+    pausedAt: clock.pausedAt || "",
+    lastVibrationAt: clock.lastVibrationAt || "",
+    vibrating,
+    motionAvailable,
+    hoopEndedAt: clock.lastVibrationAt || "",
+  };
+}

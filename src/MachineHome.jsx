@@ -6,11 +6,13 @@ import {
   estimateRemainingMs,
   fmtMMDD,
   formatDuration,
+  formatClockET,
   jobImageUrl,
   jobsForMachine,
   lastRunsWithPerf,
   normalizeOrderId,
 } from "./machineFloorUtils";
+import { useMachineVibration } from "./useMachineVibration";
 
 function outlineByDue(due) {
   if (!due) return "#9ca3af";
@@ -67,6 +69,7 @@ export default function MachineHome({ columns, loading }) {
   const [finishedIds, setFinishedIds] = useState(() => new Set());
 
   const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
+  const vibration = useMachineVibration(machineId);
   const jobs = useMemo(
     () =>
       jobsForMachine(columns, machineId).filter(
@@ -185,6 +188,22 @@ export default function MachineHome({ columns, loading }) {
         >
           {meta.headCount}
         </span>
+        {vibration.paused ? (
+          <span
+            style={{
+              marginLeft: "auto",
+              fontSize: 16,
+              fontWeight: 900,
+              color: "#b45309",
+              background: "#fef3c7",
+              border: "2px solid #b45309",
+              borderRadius: 999,
+              padding: "6px 12px",
+            }}
+          >
+            PAUSED {formatClockET(vibration.pausedAt)}
+          </span>
+        ) : null}
       </div>
 
       <div

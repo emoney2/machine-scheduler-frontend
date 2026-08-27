@@ -8,10 +8,12 @@ import {
   estimateRemainingMs,
   findJobInColumns,
   formatDuration,
+  formatClockET,
   lastRunsWithPerf,
   jobImageUrl,
   normalizeOrderId,
 } from "./machineFloorUtils";
+import { useMachineVibration } from "./useMachineVibration";
 
 const ROOT = apiRoot();
 const PLUS_FLASH_MS = 2500;
@@ -22,6 +24,7 @@ export default function MachineJob({ columns }) {
   const navigate = useNavigate();
   const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
   const oid = normalizeOrderId(orderId);
+  const vibration = useMachineVibration(machineId);
 
   const fromColumns = useMemo(
     () => findJobInColumns(columns, oid)?.job || null,
@@ -223,7 +226,13 @@ export default function MachineJob({ columns }) {
     if (postedTimer.current) clearTimeout(postedTimer.current);
     postedTimer.current = setTimeout(() => setPostedN(null), PLUS_FLASH_MS);
     if (left === quantity) stampInferredStart(inc);
-    postProgress({ increment: inc });
+    const body = { increment: inc };
+    if (vibration.motionAvailable && vibration.hoopEndedAt) {
+      body.hoopEndedAt = vibration.paused
+        ? vibration.pausedAt
+        : vibration.hoopEndedAt;
+    }
+    postProgress(body);
   };
 
   const savePiecesLeft = () => {
@@ -536,6 +545,19 @@ export default function MachineJob({ columns }) {
           >
             {estLabel}
           </div>
+          {vibration.paused ? (
+            <div
+              style={{
+                marginTop: 4,
+                fontSize: 14,
+                fontWeight: 900,
+                color: "#b45309",
+                textAlign: "center",
+              }}
+            >
+              PAUSED {formatClockET(vibration.pausedAt)}
+            </div>
+          ) : null}
         </div>
 
         <div
