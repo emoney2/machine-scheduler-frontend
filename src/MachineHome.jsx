@@ -526,7 +526,12 @@ export default function MachineHome({ columns, loading }) {
           </div>
         </div>
       ) : null}
-      <VibrationDot vibrating={vibration.vibrating} level={vibration.level} />
+      <VibrationDot
+        vibrating={vibration.vibrating}
+        level={vibration.level}
+        audioLevel={chime.level}
+        audioOn={chime.listening}
+      />
     </div>
   );
 }

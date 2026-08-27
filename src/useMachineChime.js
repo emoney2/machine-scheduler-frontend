@@ -8,10 +8,10 @@ const MID_LO = 2700;
 const MID_HI = 3600;
 const LOW_LO = 200;
 const LOW_HI = 1400;
-/** Phone/floor practice: listen for the melody only; skip missed-post and own-bed gating. */
+/** Phone/floor practice: hear any 3-beep melody; skip missed-post and own-bed gating. */
 export const CHIME_PRACTICE = true;
-const COOLDOWN_MS = CHIME_PRACTICE ? 4000 : 8000;
-const MIN_PULSE_PEAK = CHIME_PRACTICE ? 16 : 40;
+const COOLDOWN_MS = CHIME_PRACTICE ? 2500 : 8000;
+const MIN_PULSE_PEAK = 40;
 const OWN_STOP_MIN_MS = 80;
 const OWN_STOP_MAX_MS = 8000;
 
@@ -25,6 +25,15 @@ function bandAvg(bytes, sampleRate, f0, f1) {
   return s / (b - a + 1);
 }
 
+function rmsFromWave(wave) {
+  let s = 0;
+  for (let i = 0; i < wave.length; i++) {
+    const v = (wave[i] - 128) / 128;
+    s += v * v;
+  }
+  return Math.sqrt(s / wave.length);
+}
+
 function ownMachineStopped(motion, atMs) {
   if (CHIME_PRACTICE) return true;
   if (!motion?.motionAvailable) return false;
@@ -35,18 +44,45 @@ function ownMachineStopped(motion, atMs) {
   return dt >= OWN_STOP_MIN_MS && dt <= OWN_STOP_MAX_MS;
 }
 
+async function openMic() {
+  const attempts = [
+    {
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+      },
+      video: false,
+    },
+    { audio: true, video: false },
+  ];
+  let lastErr;
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("mic");
+}
+
 export function useMachineChime(enabled, motionLiveRef) {
   const [heardAt, setHeardAt] = useState("");
+  const [level, setLevel] = useState(null);
+  const [listening, setListening] = useState(false);
   const heardAtRef = useRef("");
   const ctxRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(0);
   const startedRef = useRef(false);
+  const lastUiRef = useRef(0);
   const motionHolder = useRef(motionLiveRef);
   motionHolder.current = motionLiveRef;
 
   const stop = useCallback(() => {
     startedRef.current = false;
+    setListening(false);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = 0;
     if (streamRef.current) {
@@ -60,18 +96,15 @@ export function useMachineChime(enabled, motionLiveRef) {
   }, []);
 
   const start = useCallback(async () => {
-    if (!enabled || startedRef.current) return;
+    if (!enabled) return;
+    if (ctxRef.current?.state === "suspended") {
+      await ctxRef.current.resume().catch(() => {});
+    }
+    if (startedRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia) return;
     startedRef.current = true;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-        video: false,
-      });
+      const stream = await openMic();
       streamRef.current = stream;
       const Ctx = window.AudioContext || window.webkitAudioContext;
       const ctx = new Ctx();
@@ -80,34 +113,83 @@ export function useMachineChime(enabled, motionLiveRef) {
       const src = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = FFT_SIZE;
-      analyser.smoothingTimeConstant = 0.12;
+      analyser.smoothingTimeConstant = 0.08;
       src.connect(analyser);
+      // Some WebKit builds skip analyser work unless it feeds the destination.
+      const mute = ctx.createGain();
+      mute.gain.value = 0;
+      analyser.connect(mute);
+      mute.connect(ctx.destination);
       const bytes = new Uint8Array(analyser.frequencyBinCount);
+      const wave = new Uint8Array(analyser.fftSize);
       const pulses = [];
+      const peaks = [];
       let inPulse = false;
       let pulseStart = 0;
       let pulsePeak = 0;
       let lastDetect = 0;
+      let wasLoud = false;
       const noise = { n: 0, mean: 0 };
+      const rmsNoise = { n: 0, mean: 0.01 };
+      setListening(true);
+
+      const fire = (now) => {
+        if (now - lastDetect <= COOLDOWN_MS) return;
+        lastDetect = now;
+        pulses.length = 0;
+        peaks.length = 0;
+        const iso = new Date().toISOString();
+        heardAtRef.current = iso;
+        setHeardAt(iso);
+      };
 
       const tick = () => {
         rafRef.current = requestAnimationFrame(tick);
+        analyser.getByteTimeDomainData(wave);
         analyser.getByteFrequencyData(bytes);
+        const rms = rmsFromWave(wave);
         const high = bandAvg(bytes, ctx.sampleRate, HIGH_LO, HIGH_HI);
         const mid = bandAvg(bytes, ctx.sampleRate, MID_LO, MID_HI);
         const low = bandAvg(bytes, ctx.sampleRate, LOW_LO, LOW_HI);
         const now = Date.now();
         const motion = motionHolder.current?.current || {};
-        const peak = CHIME_PRACTICE ? Math.max(high, mid) : high;
-        const chimeFrame = CHIME_PRACTICE
-          ? peak > 14 && peak > noise.mean * 1.55 + 5 && high + mid > low * 0.95
-          : high > 22 && high > noise.mean * 1.85 + 8 && high + mid > low * 1.15;
-        if (!chimeFrame) {
-          noise.n = Math.min(80, noise.n + 1);
-          noise.mean += ((CHIME_PRACTICE ? peak : high) - noise.mean) / noise.n;
+        if (now - lastUiRef.current >= 120) {
+          lastUiRef.current = now;
+          setLevel(rms);
         }
 
-        if (!CHIME_PRACTICE && (motion.bursting || !motion.motionAvailable)) {
+        if (CHIME_PRACTICE) {
+          if (rms < rmsNoise.mean * 1.35 + 0.008) {
+            rmsNoise.n = Math.min(120, rmsNoise.n + 1);
+            rmsNoise.mean += (rms - rmsNoise.mean) / rmsNoise.n;
+          }
+          const loud = rms > Math.max(rmsNoise.mean * 2.4, 0.028);
+          if (loud && !wasLoud && now - (peaks[peaks.length - 1] || 0) >= 260) {
+            peaks.push(now);
+          }
+          wasLoud = loud;
+          while (peaks.length && now - peaks[0] > 2800) peaks.shift();
+          if (peaks.length >= 3) {
+            const a = peaks[peaks.length - 3];
+            const b = peaks[peaks.length - 2];
+            const c = peaks[peaks.length - 1];
+            const d1 = b - a;
+            const d2 = c - b;
+            if (d1 >= 260 && d1 <= 1200 && d2 >= 260 && d2 <= 1200) fire(now);
+          }
+          return;
+        }
+
+        const chimeFrame =
+          high > 22 &&
+          high > noise.mean * 1.85 + 8 &&
+          high + mid > low * 1.15;
+        if (!chimeFrame) {
+          noise.n = Math.min(80, noise.n + 1);
+          noise.mean += (high - noise.mean) / noise.n;
+        }
+
+        if (motion.bursting || !motion.motionAvailable) {
           inPulse = false;
           pulsePeak = 0;
           pulses.length = 0;
@@ -118,13 +200,13 @@ export function useMachineChime(enabled, motionLiveRef) {
           if (!inPulse) {
             inPulse = true;
             pulseStart = now;
-            pulsePeak = peak;
+            pulsePeak = high;
           } else {
-            pulsePeak = Math.max(pulsePeak, peak);
+            pulsePeak = Math.max(pulsePeak, high);
           }
         } else if (inPulse) {
           if (
-            now - pulseStart >= (CHIME_PRACTICE ? 150 : 220) &&
+            now - pulseStart >= 220 &&
             pulsePeak >= MIN_PULSE_PEAK &&
             ownMachineStopped(motion, pulseStart)
           ) {
@@ -141,21 +223,21 @@ export function useMachineChime(enabled, motionLiveRef) {
           const c = pulses[pulses.length - 1];
           const d1 = b - a;
           const d2 = c - b;
-          const gapOk = CHIME_PRACTICE
-            ? d1 >= 300 && d1 <= 1100 && d2 >= 300 && d2 <= 1100
-            : d1 >= 380 && d1 <= 950 && d2 >= 380 && d2 <= 950;
-          if (gapOk && ownMachineStopped(motion, a)) {
-            lastDetect = now;
-            pulses.length = 0;
-            const iso = new Date().toISOString();
-            heardAtRef.current = iso;
-            setHeardAt(iso);
+          if (
+            d1 >= 380 &&
+            d1 <= 950 &&
+            d2 >= 380 &&
+            d2 <= 950 &&
+            ownMachineStopped(motion, a)
+          ) {
+            fire(now);
           }
         }
       };
       rafRef.current = requestAnimationFrame(tick);
     } catch {
       startedRef.current = false;
+      setListening(false);
     }
   }, [enabled]);
 
@@ -178,5 +260,5 @@ export function useMachineChime(enabled, motionLiveRef) {
     setHeardAt("");
   }, []);
 
-  return { heardAt, consume };
+  return { heardAt, consume, level, listening };
 }

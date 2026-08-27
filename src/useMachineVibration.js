@@ -269,7 +269,7 @@ export function useMachineVibration(machineId) {
   };
 }
 
-export function VibrationDot({ vibrating, level, melodyPending, melodyKey }) {
+export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audioLevel, audioOn }) {
   const on = !!vibrating;
   const n = Number(level);
   const label = Number.isFinite(n) ? n.toFixed(2) : "—";
@@ -345,6 +345,33 @@ export function VibrationDot({ vibrating, level, melodyPending, melodyKey }) {
         }}
       >
         {label}
+      </span>
+      <div
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: audioOn ? (Number(audioLevel) > 0.03 ? "#16a34a" : "#2563eb") : "#6b7280",
+          color: "#fff",
+          fontSize: 9,
+          fontWeight: 900,
+          lineHeight: "16px",
+          textAlign: "center",
+          boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
+        }}
+      >
+        A
+      </div>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 800,
+          color: audioOn ? (Number(audioLevel) > 0.03 ? "#16a34a" : "#2563eb") : "#6b7280",
+          lineHeight: 1,
+          textShadow: "0 0 3px #fff, 0 0 3px #fff",
+        }}
+      >
+        {Number.isFinite(Number(audioLevel)) ? Number(audioLevel).toFixed(2) : "—"}
       </span>
     </div>
   );

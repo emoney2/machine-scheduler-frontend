@@ -1064,6 +1064,8 @@ export default function MachineJob({ columns }) {
         level={vibration.level}
         melodyPending={!!melodyAt}
         melodyKey={melodyAt}
+        audioLevel={chime.level}
+        audioOn={chime.listening}
       />
     </div>
   );
