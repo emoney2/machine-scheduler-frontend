@@ -14,6 +14,7 @@ import {
   normalizeOrderId,
 } from "./machineFloorUtils";
 import { useMachineVibration, VibrationDot } from "./useMachineVibration";
+import { useMachineChime } from "./useMachineChime";
 
 const ROOT = apiRoot();
 const PLUS_FLASH_MS = 2500;
@@ -25,6 +26,7 @@ export default function MachineJob({ columns }) {
   const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
   const oid = normalizeOrderId(orderId);
   const vibration = useMachineVibration(machineId);
+  const chime = useMachineChime(true);
 
   const fromColumns = useMemo(
     () => findJobInColumns(columns, oid)?.job || null,
@@ -46,6 +48,12 @@ export default function MachineJob({ columns }) {
   const [finishOverlay, setFinishOverlay] = useState(null);
   const [manualStart, setManualStart] = useState(false);
   const [lastRunAt, setLastRunAt] = useState("");
+  const [missedAsk, setMissedAsk] = useState(false);
+  const [missedPlus, setMissedPlus] = useState(false);
+  const lastRunAtRef = useRef("");
+  const expectedRunRef = useRef(0);
+  const leftRef = useRef(0);
+  const lastVibRef = useRef("");
 
   const applyPayload = useCallback((data) => {
     if (!data) return;
@@ -117,7 +125,56 @@ export default function MachineJob({ columns }) {
     meta.headCount,
     meta.headCount
   );
+  lastRunAtRef.current = lastRunAt;
+  expectedRunRef.current = expectedRunMs;
+  leftRef.current = left;
+  lastVibRef.current = vibration.lastVibrationAt;
   const expectedRunLabel = formatDuration(expectedRunMs);
+
+  useEffect(() => {
+    if (!chime.heardAt) return undefined;
+    const heardIso = chime.heardAt;
+    const heardMs = new Date(heardIso).getTime();
+    if (!Number.isFinite(heardMs)) return undefined;
+    let cancelled = false;
+    let done = false;
+
+    const finish = (ask) => {
+      if (done || cancelled) return;
+      done = true;
+      chime.consume();
+      if (ask) setMissedAsk(true);
+    };
+
+    const tick = () => {
+      if (cancelled || done) return;
+      const now = Date.now();
+      if (now - heardMs < 2500) return;
+      const vibMs = new Date(lastVibRef.current).getTime();
+      if (!Number.isFinite(vibMs) || vibMs < heardMs + 2500) return;
+
+      const postedMs = lastRunAtRef.current
+        ? new Date(lastRunAtRef.current).getTime()
+        : 0;
+      if (Number.isFinite(postedMs) && postedMs >= heardMs) {
+        finish(false);
+        return;
+      }
+      const expected = expectedRunRef.current > 0 ? expectedRunRef.current : 3 * 60 * 1000;
+      const elapsed = postedMs ? now - postedMs : Infinity;
+      const overdue = elapsed > Math.max(expected * 0.75, 45 * 1000);
+      finish(overdue && leftRef.current > 0);
+    };
+
+    const id = setInterval(tick, 250);
+    const giveUp = setTimeout(() => finish(false), 10 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      clearTimeout(giveUp);
+    };
+  }, [chime.heardAt, chime.consume]);
+
   const lastThree = lastRunsWithPerf(
     job?.recentRuns || fromColumns?.recentRuns,
     stitchCount,
@@ -220,6 +277,8 @@ export default function MachineJob({ columns }) {
   const recordCompleted = (n) => {
     if (busy || n <= 0 || left <= 0) return;
     const inc = Math.min(n, left);
+    setMissedPlus(false);
+    setMissedAsk(false);
     setPiecesLeft(left - inc);
     setPostedN(inc);
     setLastRunAt(new Date().toISOString());
@@ -890,6 +949,103 @@ export default function MachineJob({ columns }) {
             </button>
           </div>
         </Modal>
+      )}
+
+      {missedAsk && (
+        <Modal onClose={() => {}}>
+          <h2 style={{ margin: "0 0 16px", fontSize: 26, lineHeight: 1.2 }}>
+            Did you miss a post?
+          </h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => {
+                setMissedAsk(false);
+                navigate(`/machine/${machineId}`);
+              }}
+              style={btnGhost}
+            >
+              No
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMissedAsk(false);
+                setMissedPlus(true);
+              }}
+              style={btnPrimary}
+            >
+              Yes
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {missedPlus && (
+        <div
+          className="ms-dialog-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 40,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#111827",
+              borderRadius: 16,
+              padding: 16,
+              width: "min(520px, 100%)",
+              boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div
+              style={{
+                color: "#fff",
+                fontWeight: 900,
+                fontSize: 20,
+                textAlign: "center",
+                marginBottom: 12,
+              }}
+            >
+              How many did you finish?
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gridTemplateRows: "1fr 1fr 1fr",
+                gap: 10,
+              }}
+            >
+              {[6, 5, 4, 3, 2, 1].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={busy || left <= 0}
+                  onClick={() => recordCompleted(n)}
+                  style={{
+                    minHeight: 72,
+                    border: "none",
+                    borderRadius: 14,
+                    background: left <= 0 ? "#374151" : "#fbbf24",
+                    color: "#111",
+                    fontSize: 36,
+                    fontWeight: 900,
+                    cursor: left <= 0 || busy ? "default" : "pointer",
+                  }}
+                >
+                  +{n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {recutOpen && (
