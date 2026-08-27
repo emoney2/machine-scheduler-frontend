@@ -26,7 +26,7 @@ export default function MachineJob({ columns }) {
   const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
   const oid = normalizeOrderId(orderId);
   const vibration = useMachineVibration(machineId);
-  const chime = useMachineChime(true);
+  const chime = useMachineChime(true, vibration.liveRef);
 
   const fromColumns = useMemo(
     () => findJobInColumns(columns, oid)?.job || null,

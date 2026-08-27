@@ -88,6 +88,12 @@ export function useMachineVibration(machineId) {
   const startedOkRef = useRef(false);
   const lastUiRef = useRef(0);
   const lastActivityRef = useRef(0);
+  const liveRef = useRef({
+    level: 0,
+    lastActivityAt: 0,
+    bursting: false,
+    motionAvailable: false,
+  });
   const machineRef = useRef(machineId);
 
   useEffect(() => {
@@ -98,6 +104,12 @@ export function useMachineVibration(machineId) {
     hasSmoothRef.current = false;
     smoothRef.current = 0;
     lastActivityRef.current = 0;
+    liveRef.current = {
+      level: 0,
+      lastActivityAt: 0,
+      bursting: false,
+      motionAvailable: liveRef.current.motionAvailable,
+    };
     setVibrating(false);
     setLevel(null);
   }, [machineId]);
@@ -116,6 +128,12 @@ export function useMachineVibration(machineId) {
     const t = Date.now();
     const burst = next >= ACTIVITY_THRESHOLD;
     if (burst) lastActivityRef.current = t;
+    liveRef.current = {
+      level: next,
+      lastActivityAt: lastActivityRef.current,
+      bursting: burst,
+      motionAvailable: true,
+    };
     const running = lastActivityRef.current > 0 && t - lastActivityRef.current < SLOW_HOLD_MS;
     if (t - lastUiRef.current >= 150) {
       lastUiRef.current = t;
@@ -247,6 +265,7 @@ export function useMachineVibration(machineId) {
     level,
     motionAvailable,
     hoopEndedAt: clock.lastVibrationAt || "",
+    liveRef,
   };
 }
 
