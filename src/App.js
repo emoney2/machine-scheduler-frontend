@@ -40,6 +40,7 @@ import QueueTab from './QueueTab';
 import SalesPortal from "./SalesPortal";
 import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
+import MachineSensorTest from "./MachineSensorTest";
 import { API_ROOT, getBackendOrigin, getLoginOrigin } from "./apiRoot";
 import { FullscreenToggle, useMachineFullscreen } from "./useMachineFullscreen";
 import { estimateRemainingMs, isPlaceholder, normalizeOrderId } from "./machineFloorUtils";
@@ -373,6 +374,8 @@ export default function App() {
   const path = (location.pathname || "/").toLowerCase();
   const isCompactNav = isScheduler || path === "/sewing-priority" || path.startsWith("/sewing-priority/");
   const isMachineFloor = path.startsWith("/machine/");
+  const isSensorTest = path.startsWith("/machine-sensor");
+  const hideChrome = isMachineFloor || isSensorTest;
   const { isFullscreen, toggle: toggleFullscreen } = useMachineFullscreen(isMachineFloor);
 
   const prevM1Top = useRef(null);
@@ -2043,7 +2046,7 @@ useEffect(() => {
   return (
     <>
       {/* ─── Status Bar ───────────────────────────────────────────────────────────── */}
-      {!isMachineFloor && (
+      {!hideChrome && (
       <div
         style={{
           position: 'fixed',
@@ -2069,7 +2072,7 @@ useEffect(() => {
       )}
 
       {/* ─── Nav Bar (hidden on embroidery machine floor pages) ─────────────── */}
-      {!isMachineFloor && <nav
+      {!hideChrome && <nav
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -2216,6 +2219,7 @@ useEffect(() => {
           <Route path="/overview" element={<Overview />} />
           <Route path="/submit" element={<OrderSubmission />} />
           <Route path="/sewing-priority" element={<SewingPriority />} />
+          <Route path="/machine-sensor-test" element={<MachineSensorTest />} />
           <Route path="/machine/:machineId/job/:orderId" element={<MachineJob columns={columns} />} />
           <Route path="/machine/:machineId" element={<MachineHome columns={columns} loading={isLoading} />} />
           <Route path="/production-orders" element={<SewingPriority />} />
