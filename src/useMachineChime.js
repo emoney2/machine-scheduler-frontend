@@ -8,10 +8,10 @@ const MID_LO = 2700;
 const MID_HI = 3600;
 const LOW_LO = 200;
 const LOW_HI = 1400;
-const COOLDOWN_MS = 8000;
-/** Local chime is louder on this tablet than a neighbor across the aisle. */
-const MIN_PULSE_PEAK = 40;
-/** This machine must have just stopped sewing — not still stitching, not idle. */
+/** Phone/floor practice: listen for the melody only; skip missed-post and own-bed gating. */
+export const CHIME_PRACTICE = true;
+const COOLDOWN_MS = CHIME_PRACTICE ? 4000 : 8000;
+const MIN_PULSE_PEAK = CHIME_PRACTICE ? 16 : 40;
 const OWN_STOP_MIN_MS = 80;
 const OWN_STOP_MAX_MS = 8000;
 
@@ -26,6 +26,7 @@ function bandAvg(bytes, sampleRate, f0, f1) {
 }
 
 function ownMachineStopped(motion, atMs) {
+  if (CHIME_PRACTICE) return true;
   if (!motion?.motionAvailable) return false;
   if (motion.bursting) return false;
   const lastAct = Number(motion.lastActivityAt) || 0;
@@ -97,18 +98,16 @@ export function useMachineChime(enabled, motionLiveRef) {
         const low = bandAvg(bytes, ctx.sampleRate, LOW_LO, LOW_HI);
         const now = Date.now();
         const motion = motionHolder.current?.current || {};
-        const chimeFrame =
-          high > 22 &&
-          high > noise.mean * 1.85 + 8 &&
-          high + mid > low * 1.15;
+        const peak = CHIME_PRACTICE ? Math.max(high, mid) : high;
+        const chimeFrame = CHIME_PRACTICE
+          ? peak > 14 && peak > noise.mean * 1.55 + 5 && high + mid > low * 0.95
+          : high > 22 && high > noise.mean * 1.85 + 8 && high + mid > low * 1.15;
         if (!chimeFrame) {
           noise.n = Math.min(80, noise.n + 1);
-          noise.mean += (high - noise.mean) / noise.n;
+          noise.mean += ((CHIME_PRACTICE ? peak : high) - noise.mean) / noise.n;
         }
 
-        // Neighbor machines can chime too. Only this tablet feels this bed
-        // shake, so ignore beeps unless this machine just went quiet.
-        if (motion.bursting || !motion.motionAvailable) {
+        if (!CHIME_PRACTICE && (motion.bursting || !motion.motionAvailable)) {
           inPulse = false;
           pulsePeak = 0;
           pulses.length = 0;
@@ -119,13 +118,13 @@ export function useMachineChime(enabled, motionLiveRef) {
           if (!inPulse) {
             inPulse = true;
             pulseStart = now;
-            pulsePeak = high;
+            pulsePeak = peak;
           } else {
-            pulsePeak = Math.max(pulsePeak, high);
+            pulsePeak = Math.max(pulsePeak, peak);
           }
         } else if (inPulse) {
           if (
-            now - pulseStart >= 220 &&
+            now - pulseStart >= (CHIME_PRACTICE ? 150 : 220) &&
             pulsePeak >= MIN_PULSE_PEAK &&
             ownMachineStopped(motion, pulseStart)
           ) {
@@ -142,13 +141,10 @@ export function useMachineChime(enabled, motionLiveRef) {
           const c = pulses[pulses.length - 1];
           const d1 = b - a;
           const d2 = c - b;
-          if (
-            d1 >= 380 &&
-            d1 <= 950 &&
-            d2 >= 380 &&
-            d2 <= 950 &&
-            ownMachineStopped(motion, a)
-          ) {
+          const gapOk = CHIME_PRACTICE
+            ? d1 >= 300 && d1 <= 1100 && d2 >= 300 && d2 <= 1100
+            : d1 >= 380 && d1 <= 950 && d2 >= 380 && d2 <= 950;
+          if (gapOk && ownMachineStopped(motion, a)) {
             lastDetect = now;
             pulses.length = 0;
             const iso = new Date().toISOString();
