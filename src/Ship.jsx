@@ -2177,7 +2177,7 @@ export default function Ship() {
 
       if (!res.ok) {
         const detail = (body && (body.error || body.message || body.detail)) || raw || `HTTP ${res.status}`;
-        console.error(`❌ UPS rates failed at ${ratesUrl} [${res.status}]:`, detail);
+        console.error(`❌ UPS rates failed at ${ratesUrl} [${res.status}]:`, detail, body);
         notify(`UPS rates error [${res.status}]: ${String(detail).slice(0, 500)}`);
         setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
         return;
@@ -2186,10 +2186,11 @@ export default function Ship() {
       const optionsLocal = Array.isArray(body)
         ? body
         : (body?.options || body?.rates || []);
-      console.log("✅ UPS rates response ←", optionsLocal);
+      console.log("✅ UPS rates response ←", optionsLocal, { status: res.status, body });
 
       if (!Array.isArray(optionsLocal) || optionsLocal.length === 0) {
-        notify("No live UPS rates returned; using manual shipping.");
+        const detail = (body && (body.error || body.message)) || "empty options list";
+        notify(`No live UPS rates returned (${detail}); using manual shipping.`);
         setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
         return;
       }
