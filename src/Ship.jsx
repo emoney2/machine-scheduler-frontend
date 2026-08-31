@@ -173,15 +173,33 @@ function boxesSummaryFromCounts(counts) {
   }));
 }
 
-/** Preset counts + user-entered custom boxes → flat package list for rates / UPS. */
+/** UPS wants Length = longest side, whole inches. */
+function orderUpsBoxDims(L, W, H) {
+  const sides = [L, W, H]
+    .map((n) => {
+      const v = Number(n);
+      if (!Number.isFinite(v) || v <= 0) return 1;
+      return Math.max(1, Math.min(108, Math.ceil(v - 1e-9)));
+    })
+    .sort((a, b) => b - a);
+  return { L: sides[0], W: sides[1], H: sides[2] };
+}
+
+function upsSmallPackageLimitNotes(L, W, H, weight) {
+  const girth = 2 * W + 2 * H;
+  const notes = [];
+  if (L > 108) notes.push("longest side over 108 in");
+  if (L + girth > 165) notes.push("length + girth over 165 in");
+  if (Number(weight) > 150) notes.push("weight over 150 lb");
+  return notes;
+}
+
 function buildShipmentPackages(counts, customBoxes) {
   const fromPresets = expandPackagesFromCounts(counts);
-  const fromCustom = (customBoxes || []).map((c) => ({
-    L: c.L,
-    W: c.W,
-    H: c.H,
-    weight: c.weight,
-  }));
+  const fromCustom = (customBoxes || []).map((c) => {
+    const d = orderUpsBoxDims(c.L, c.W, c.H);
+    return { L: d.L, W: d.W, H: d.H, weight: c.weight };
+  });
   return [...fromPresets, ...fromCustom];
 }
 
@@ -1950,15 +1968,18 @@ export default function Ship() {
     // 4) Build packages: wizard override, else defaults
     let boxesToUse;
     if (packagesFlatOverride && packagesFlatOverride.length > 0) {
-      boxesToUse = packagesFlatOverride.map((p) => ({
-        PackagingType: "02",
-        Weight: Number(p.weight) || 1,
-        Dimensions: {
-          Length: Number(p.L) || 10,
-          Width: Number(p.W) || 10,
-          Height: Number(p.H) || 10,
-        },
-      }));
+      boxesToUse = packagesFlatOverride.map((p) => {
+        const d = orderUpsBoxDims(p.L, p.W, p.H);
+        return {
+          PackagingType: "02",
+          Weight: Number(p.weight) || 1,
+          Dimensions: {
+            Length: d.L,
+            Width: d.W,
+            Height: d.H,
+          },
+        };
+      });
     } else {
       boxesToUse = packagesPayload;
     }
@@ -2279,8 +2300,18 @@ export default function Ship() {
       );
       return;
     }
+    const ordered = orderUpsBoxDims(L, W, H);
+    const limitNotes = upsSmallPackageLimitNotes(
+      ordered.L,
+      ordered.W,
+      ordered.H,
+      weight
+    );
+    if (limitNotes.length) {
+      alert(`UPS may reject this box: ${limitNotes.join("; ")}.`);
+    }
     const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    setCustomBoxes((prev) => [...prev, { id, L, W, H, weight }]);
+    setCustomBoxes((prev) => [...prev, { id, ...ordered, weight }]);
     setCustomBoxForm({ L: "", W: "", H: "", weight: "" });
     setShowCustomBoxModal(false);
   };
@@ -3539,8 +3570,9 @@ export default function Ship() {
             <h3 id="ship-custom-box-title" style={{ margin: "0 0 8px", fontSize: 18, fontWeight: 700, color: "#1a237e" }}>
               Custom box
             </h3>
-            <p style={{ margin: "0 0 12px", fontSize: 12, color: "#546e7a" }}>
+    <p style={{ margin: "0 0 12px", fontSize: 12, color: "#546e7a" }}>
               Enter inside dimensions (inches) and total package weight (lbs).
+              UPS uses the longest side as length; fractional inches are rounded up.
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, fontWeight: 600, color: "#37474f" }}>
