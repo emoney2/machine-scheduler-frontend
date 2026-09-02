@@ -14,9 +14,9 @@ const B3_HI = 3380;
 const BASS_LO = 150;
 const BASS_HI = 1300;
 const COOLDOWN_MS = 6000;
-const PEAK_GAP_MIN = 450;
-const PEAK_GAP_MAX = 900;
-const PEAK_REFRACTORY = 400;
+const PEAK_GAP_MIN = 350;
+const PEAK_GAP_MAX = 1100;
+const PEAK_REFRACTORY = 280;
 
 function bandAvg(bytes, sampleRate, f0, f1) {
   const binHz = sampleRate / FFT_SIZE;
@@ -55,7 +55,7 @@ function maxB4Before(hist, peakT) {
   let m = 0;
   for (let i = 0; i < hist.length; i++) {
     const h = hist[i];
-    if (h.t >= peakT - 380 && h.t <= peakT - 40) m = Math.max(m, h.b4);
+    if (h.t >= peakT - 500 && h.t <= peakT + 80) m = Math.max(m, h.b4);
   }
   return m;
 }
@@ -71,24 +71,29 @@ function melodyDetected(hist, b3Noise, b4Noise) {
       p.b3 >= hist[i - 2].b3 &&
       p.b3 >= hist[i + 2].b3;
     if (!isPeak) continue;
-    if (p.b3 < b3Noise * 2.4 + 14) continue;
-    if (p.b3 < p.bass * 1.08) continue;
+    if (p.b3 < b3Noise * 1.65 + 8) continue;
     if (peaks.length && p.t - peaks[peaks.length - 1].t < PEAK_REFRACTORY) continue;
     peaks.push(p);
   }
   if (peaks.length < 3) return false;
-  const a = peaks[peaks.length - 3];
-  const b = peaks[peaks.length - 2];
-  const c = peaks[peaks.length - 1];
-  const d1 = b.t - a.t;
-  const d2 = c.t - b.t;
-  if (d1 < PEAK_GAP_MIN || d1 > PEAK_GAP_MAX) return false;
-  if (d2 < PEAK_GAP_MIN || d2 > PEAK_GAP_MAX) return false;
-  const needB4 = b4Noise * 2.2 + 10;
-  if (maxB4Before(hist, a.t) < needB4) return false;
-  if (maxB4Before(hist, b.t) < needB4) return false;
-  if (maxB4Before(hist, c.t) < needB4) return false;
-  return true;
+  const needB4 = b4Noise * 1.6 + 6;
+  for (let i = 0; i < peaks.length - 2; i++) {
+    for (let j = i + 1; j < peaks.length - 1; j++) {
+      const d1 = peaks[j].t - peaks[i].t;
+      if (d1 < PEAK_GAP_MIN) continue;
+      if (d1 > PEAK_GAP_MAX) break;
+      for (let k = j + 1; k < peaks.length; k++) {
+        const d2 = peaks[k].t - peaks[j].t;
+        if (d2 < PEAK_GAP_MIN) continue;
+        if (d2 > PEAK_GAP_MAX) break;
+        const highToneCount = [peaks[i], peaks[j], peaks[k]].filter(
+          (peak) => maxB4Before(hist, peak.t) >= needB4
+        ).length;
+        if (highToneCount >= 2) return true;
+      }
+    }
+  }
+  return false;
 }
 
 export function useMachineChime(enabled) {
