@@ -19,6 +19,34 @@ import { useMachineChime } from "./useMachineChime";
 const ROOT = apiRoot();
 const PLUS_FLASH_MS = 2500;
 const JOB_COMPLETE_MS = 2000;
+const PENDING_CHIMES_PREFIX = "jrco.machinePendingChimes.v1.";
+
+function pendingChimesKey(machineId, orderId) {
+  return `${PENDING_CHIMES_PREFIX}${String(machineId || "unknown")}.${String(orderId || "unknown")}`;
+}
+
+function loadPendingChimes(machineId, orderId) {
+  try {
+    const raw = localStorage.getItem(pendingChimesKey(machineId, orderId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed)
+      ? parsed.map((value) => String(value || "")).filter(Boolean)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePendingChimes(machineId, orderId, pendingChimes) {
+  try {
+    localStorage.setItem(
+      pendingChimesKey(machineId, orderId),
+      JSON.stringify(pendingChimes)
+    );
+  } catch {
+    /* ignore unavailable tablet storage */
+  }
+}
 
 export default function MachineJob({ columns }) {
   const { machineId, orderId } = useParams();
@@ -50,7 +78,9 @@ export default function MachineJob({ columns }) {
   const [lastRunAt, setLastRunAt] = useState("");
   const [missedAsk, setMissedAsk] = useState(false);
   const [missedPlus, setMissedPlus] = useState(false);
-  const [melodyAt, setMelodyAt] = useState("");
+  const [pendingChimes, setPendingChimes] = useState(() =>
+    loadPendingChimes(machineId, oid)
+  );
   const lastRunAtRef = useRef("");
   const leftRef = useRef(0);
   const lastVibRef = useRef("");
@@ -132,13 +162,19 @@ export default function MachineJob({ columns }) {
 
   useEffect(() => {
     if (!chime.heardAt) return;
-    setMelodyAt(chime.heardAt);
+    setPendingChimes((previous) => [...previous, chime.heardAt]);
     chime.consume();
   }, [chime.heardAt, chime.consume]);
 
   useEffect(() => {
-    if (!melodyAt || missedAsk || missedPlus) return undefined;
-    const heardMs = new Date(melodyAt).getTime();
+    savePendingChimes(machineId, oid, pendingChimes);
+  }, [machineId, oid, pendingChimes]);
+
+  const oldestPendingChime = pendingChimes[0] || "";
+
+  useEffect(() => {
+    if (!oldestPendingChime || missedAsk || missedPlus) return undefined;
+    const heardMs = new Date(oldestPendingChime).getTime();
     if (!Number.isFinite(heardMs)) return undefined;
     let cancelled = false;
     let asked = false;
@@ -163,7 +199,7 @@ export default function MachineJob({ columns }) {
       cancelled = true;
       clearInterval(id);
     };
-  }, [melodyAt, missedAsk, missedPlus]);
+  }, [oldestPendingChime, missedAsk, missedPlus]);
 
   const lastThree = lastRunsWithPerf(
     job?.recentRuns || fromColumns?.recentRuns,
@@ -269,7 +305,7 @@ export default function MachineJob({ columns }) {
     const inc = Math.min(n, left);
     setMissedPlus(false);
     setMissedAsk(false);
-    setMelodyAt("");
+    setPendingChimes((previous) => previous.slice(1));
     setPiecesLeft(left - inc);
     setPostedN(inc);
     setLastRunAt(new Date().toISOString());
@@ -1083,8 +1119,7 @@ export default function MachineJob({ columns }) {
       <VibrationDot
         vibrating={vibration.vibrating}
         level={vibration.level}
-        melodyPending={!!melodyAt}
-        melodyKey={melodyAt}
+        pendingChimes={pendingChimes}
         audioOn={chime.listening}
       />
     </div>

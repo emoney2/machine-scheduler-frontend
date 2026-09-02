@@ -269,7 +269,7 @@ export function useMachineVibration(machineId) {
   };
 }
 
-export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audioOn }) {
+export function VibrationDot({ vibrating, level, pendingChimes = [], audioOn }) {
   const on = !!vibrating;
   const n = Number(level);
   const label = Number.isFinite(n) ? n.toFixed(2) : "—";
@@ -353,11 +353,11 @@ export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audio
           <circle cx="6.4" cy="13.2" r="1.1" fill="#fff" />
         </svg>
       </div>
-      {melodyPending ? (
+      {pendingChimes.map((heardAt, index) => (
         <div
-          key={melodyKey || "melody"}
+          key={`${heardAt}-${index}`}
           className="ms-melody-dot"
-          title="Chime heard"
+          title="Finished run waiting for +N"
           style={{
             width: 16,
             height: 16,
@@ -370,11 +370,17 @@ export function VibrationDot({ vibrating, level, melodyPending, melodyKey, audio
             transformOrigin: "center",
           }}
         >
-          <svg width="11" height="11" viewBox="0 0 16 16" fill="#fff" aria-hidden>
-            <path d="M12 2v8.2a2.4 2.4 0 1 1-1.2-.2V5.2L6.5 6.4v5.8a2.4 2.4 0 1 1-1.2-.2V4.3L12 2z" />
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path
+              d="M3 8.2 6.4 11.5 13 4.8"
+              stroke="#fff"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </div>
-      ) : null}
+      ))}
     </div>
   );
 }
