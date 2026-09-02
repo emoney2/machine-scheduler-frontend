@@ -17,8 +17,6 @@ const COOLDOWN_MS = 6000;
 const PEAK_GAP_MIN = 450;
 const PEAK_GAP_MAX = 900;
 const PEAK_REFRACTORY = 400;
-const OWN_RUN_MAX_MS = 20000;
-const STILL_SEWING_LEVEL = 0.07;
 
 function bandAvg(bytes, sampleRate, f0, f1) {
   const binHz = sampleRate / FFT_SIZE;
@@ -28,17 +26,6 @@ function bandAvg(bytes, sampleRate, f0, f1) {
   let s = 0;
   for (let i = a; i <= b; i++) s += bytes[i];
   return s / (b - a + 1);
-}
-
-function ownBedCanClaimChime(motion) {
-  // The chime plays when THIS bed is idle (hoop just finished). Green V for
-  // 12s after the last shake is a hold, not sewing — do not treat that as running.
-  if (!motion?.motionAvailable) return true;
-  const level = Number(motion.level) || 0;
-  if (level >= STILL_SEWING_LEVEL) return false;
-  const lastAct = Number(motion.lastActivityAt) || 0;
-  if (!lastAct) return true;
-  return Date.now() - lastAct <= OWN_RUN_MAX_MS;
 }
 
 async function openMic() {
@@ -104,7 +91,7 @@ function melodyDetected(hist, b3Noise, b4Noise) {
   return true;
 }
 
-export function useMachineChime(enabled, motionLiveRef) {
+export function useMachineChime(enabled) {
   const [heardAt, setHeardAt] = useState("");
   const [level, setLevel] = useState(null);
   const [listening, setListening] = useState(false);
@@ -114,9 +101,6 @@ export function useMachineChime(enabled, motionLiveRef) {
   const rafRef = useRef(0);
   const startedRef = useRef(false);
   const lastUiRef = useRef(0);
-  const motionHolder = useRef(motionLiveRef);
-  motionHolder.current = motionLiveRef;
-
   const stop = useCallback(() => {
     startedRef.current = false;
     setListening(false);
@@ -170,7 +154,6 @@ export function useMachineChime(enabled, motionLiveRef) {
         const b3 = bandAvg(bytes, ctx.sampleRate, B3_LO, B3_HI);
         const bass = bandAvg(bytes, ctx.sampleRate, BASS_LO, BASS_HI);
         const now = Date.now();
-        const motion = motionHolder.current?.current || {};
         const melody = Math.max(b3, b4);
         if (now - lastUiRef.current >= 120) {
           lastUiRef.current = now;
@@ -191,7 +174,6 @@ export function useMachineChime(enabled, motionLiveRef) {
         while (hist.length && now - hist[0].t > 2800) hist.shift();
 
         if (now - lastDetect <= COOLDOWN_MS) return;
-        if (!ownBedCanClaimChime(motion)) return;
         if (!melodyDetected(hist, b3Noise.mean, b4Noise.mean)) return;
         lastDetect = now;
         hist.length = 0;
