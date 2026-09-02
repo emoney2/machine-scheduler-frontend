@@ -30,6 +30,15 @@ export default function Inventory() {
   const [threadRows, setThreadRows]     = useState(() => initRows());
   const [materialRows, setMaterialRows] = useState(() => initRows());
   const [isLoading, setIsLoading]       = useState(true);
+  const [inventoryDetails, setInventoryDetails] = useState({});
+  const [showReadjustmentForm, setShowReadjustmentForm] = useState(false);
+  const [isReviewingReadjustment, setIsReviewingReadjustment] = useState(false);
+  const [isSavingReadjustment, setIsSavingReadjustment] = useState(false);
+  const [readjustment, setReadjustment] = useState({
+    materialName: "",
+    physicalQuantity: ""
+  });
+  const [readjustmentPreview, setReadjustmentPreview] = useState(null);
 
   // --- Section 2.2: New-Item Modal State --------------------------------
   const [isNewItemModalOpen, setIsNewItemModalOpen] = useState(false);
@@ -57,6 +66,29 @@ export default function Inventory() {
         .catch(console.error),
       axios.get(`${API_ROOT}/materials`)
         .then(res => setMaterials(res.data))
+        .catch(console.error),
+      axios.get(`${API_ROOT}/inventory`, { withCredentials: true })
+        .then(res => {
+          const headers = Array.isArray(res.data?.headers) ? res.data.headers : [];
+          const rows = Array.isArray(res.data?.rows) ? res.data.rows : [];
+          const normalized = h => String(h || "").trim().toLowerCase();
+          const materialKey = headers.find(h => ["material", "materials"].includes(normalized(h)));
+          const inventoryKey = headers.find(h => normalized(h) === "inventory");
+          const unitKey = headers.find(h => normalized(h) === "unit");
+          if (!materialKey) return;
+
+          const details = {};
+          rows.forEach(row => {
+            const name = String(row?.[materialKey] || "").trim();
+            if (!name) return;
+            details[name.toLowerCase()] = {
+              name,
+              inventory: inventoryKey ? row?.[inventoryKey] : "",
+              unit: unitKey ? String(row?.[unitKey] || "").trim() : ""
+            };
+          });
+          setInventoryDetails(details);
+        })
         .catch(console.error)
     ]).finally(() => {
       setIsLoading(false);
@@ -175,6 +207,108 @@ const handleSubmit = async (rows, url, resetRows) => {
   } catch (err) {
     console.error(err);
     alert("Submission failed");
+  }
+};
+
+const reviewReadjustment = async (physicalOverride) => {
+  const materialName = readjustment.materialName.trim();
+  const rawQuantity =
+    physicalOverride === undefined
+      ? readjustment.physicalQuantity
+      : String(physicalOverride);
+  const physicalQuantity = Number(rawQuantity);
+  if (!materialName || !Object.prototype.hasOwnProperty.call(
+    inventoryDetails,
+    materialName.toLowerCase()
+  )) {
+    alert("Choose an existing material.");
+    return;
+  }
+  if (rawQuantity === "" || !Number.isFinite(physicalQuantity) || physicalQuantity < 0) {
+    alert("Enter the physical amount remaining, using zero if you ran out.");
+    return;
+  }
+
+  if (physicalOverride !== undefined) {
+    setReadjustment(current => ({
+      ...current,
+      physicalQuantity: rawQuantity
+    }));
+  }
+
+  setIsReviewingReadjustment(true);
+  try {
+    const res = await axios.get(
+      `${API_ROOT}/materialInventory/readjustment`,
+      {
+        params: { materialName, physicalQuantity },
+        withCredentials: true
+      }
+    );
+    setReadjustmentPreview(res.data);
+  } catch (err) {
+    console.error("Material readjustment preview failed", err);
+    alert(err?.response?.data?.error || "Could not review this material.");
+  } finally {
+    setIsReviewingReadjustment(false);
+  }
+};
+
+const postReadjustment = async () => {
+  if (!readjustmentPreview) return;
+  setIsSavingReadjustment(true);
+  try {
+    const res = await axios.post(
+      `${API_ROOT}/materialInventory/readjustment`,
+      {
+        materialName: readjustmentPreview.materialName,
+        physicalQuantity: readjustmentPreview.physicalQuantity,
+        expectedCurrentQuantity: readjustmentPreview.currentQuantity,
+        expectedUncutDemand: readjustmentPreview.uncutDemand
+      },
+      { withCredentials: true }
+    );
+
+    let rebuilt = true;
+    try {
+      await axios.post(
+        `${API_ROOT}/overview/rebuild-materials`,
+        {},
+        { withCredentials: true }
+      );
+    } catch (rebuildErr) {
+      rebuilt = false;
+      console.error("Available remainder saved, but Overview rebuild failed", rebuildErr);
+    }
+
+    const saved = res.data;
+    setInventoryDetails(details => ({
+      ...details,
+      [saved.materialName.toLowerCase()]: {
+        ...details[saved.materialName.toLowerCase()],
+        inventory: saved.targetQuantity,
+        unit: saved.unit
+      }
+    }));
+    setReadjustment({
+      materialName: "",
+      physicalQuantity: ""
+    });
+    setReadjustmentPreview(null);
+    setShowReadjustmentForm(false);
+    alert(
+      rebuilt
+        ? `${saved.materialName} was readjusted and the order list was recalculated.`
+        : `${saved.materialName} was readjusted, but Overview could not recalculate. Use Recalculate Lists on Overview.`
+    );
+  } catch (err) {
+    console.error("Material readjustment failed", err);
+    if (err?.response?.status === 409 && err?.response?.data?.preview) {
+      setReadjustmentPreview(err.response.data.preview);
+    }
+    alert(err?.response?.data?.error || "Material readjustment failed");
+  } finally {
+    setIsSavingReadjustment(false);
   }
 };
 
@@ -490,6 +624,9 @@ const handleSaveBulkNewItems = async () => {
 
 
   // --- Section 6: Render -----------------------------------------------
+  const selectedReadjustmentMaterial =
+    inventoryDetails[readjustment.materialName.trim().toLowerCase()];
+
   return (
     <>
       {/* Loading overlay */}
@@ -728,6 +865,162 @@ const handleSaveBulkNewItems = async () => {
     </div>
   </div>
 )}
+
+      <div style={{ padding: "16px 16px 0" }}>
+        <button onClick={() => {
+          setShowReadjustmentForm(open => !open);
+          setReadjustmentPreview(null);
+        }}>
+          {showReadjustmentForm ? "Cancel Readjustment" : "Readjust Material Inventory"}
+        </button>
+
+        {showReadjustmentForm && (
+          <fieldset style={{ maxWidth: 900, marginTop: 12 }}>
+            <legend>Readjust Material Inventory</legend>
+            <p style={{ marginTop: 4 }}>
+              Enter what is physically left. The review will show every job that
+              still needs to be cut before posting a labeled Material Log readjustment.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(240px, 2fr) minmax(140px, 1fr) 90px auto",
+                gap: 8,
+                alignItems: "end"
+              }}
+            >
+              <label>
+                Material
+                <input
+                  list="readjustment-material-list"
+                  value={readjustment.materialName}
+                  onChange={e => {
+                    setReadjustment(current => ({
+                      ...current,
+                      materialName: e.target.value
+                    }));
+                    setReadjustmentPreview(null);
+                  }}
+                  placeholder="Choose a material…"
+                  style={{ ...inputStyle, boxSizing: "border-box", marginTop: 4 }}
+                />
+              </label>
+              <label>
+                Physical amount left
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={readjustment.physicalQuantity}
+                  onChange={e => {
+                    setReadjustment(current => ({
+                      ...current,
+                      physicalQuantity: e.target.value
+                    }));
+                    setReadjustmentPreview(null);
+                  }}
+                  style={{ ...inputStyle, boxSizing: "border-box", marginTop: 4 }}
+                />
+              </label>
+              <div style={{ paddingBottom: 5, fontWeight: "bold" }}>
+                {selectedReadjustmentMaterial?.unit || "—"}
+              </div>
+              <button
+                onClick={() => reviewReadjustment()}
+                disabled={isReviewingReadjustment}
+                style={{ marginBottom: 1 }}
+              >
+                {isReviewingReadjustment ? "Checking…" : "Review"}
+              </button>
+            </div>
+            <datalist id="readjustment-material-list">
+              {Object.values(inventoryDetails).map(item => (
+                <option key={item.name} value={item.name} />
+              ))}
+            </datalist>
+            <button
+              onClick={() => reviewReadjustment(0)}
+              disabled={isReviewingReadjustment || !selectedReadjustmentMaterial}
+              style={{ marginTop: 10 }}
+            >
+              We Ran Out — Review at 0
+            </button>
+
+            {readjustmentPreview && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+                  <strong>
+                    Physically left: {readjustmentPreview.physicalQuantity}{" "}
+                    {readjustmentPreview.unit}
+                  </strong>
+                  <strong>
+                    Still needed for uncut jobs: {readjustmentPreview.uncutDemand}{" "}
+                    {readjustmentPreview.unit}
+                  </strong>
+                  <strong>
+                    Scheduling balance after adjustment:{" "}
+                    {readjustmentPreview.targetQuantity} {readjustmentPreview.unit}
+                  </strong>
+                </div>
+
+                <h3 style={{ marginBottom: 6 }}>
+                  Jobs Not Yet Cut ({readjustmentPreview.jobs.length})
+                </h3>
+                {readjustmentPreview.jobs.length ? (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>
+                          {["Order #", "Company", "Product", "Panel", "Needed", "Cut Status", "Due"].map(label => (
+                            <th
+                              key={label}
+                              style={{ border: "1px solid #ccc", padding: 5, textAlign: "left" }}
+                            >
+                              {label}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {readjustmentPreview.jobs.map(job => (
+                          <tr key={`${job.orderNumber}-${job.panel}`}>
+                            <td style={{ border: "1px solid #ddd", padding: 5 }}>{job.orderNumber}</td>
+                            <td style={{ border: "1px solid #ddd", padding: 5 }}>{job.companyName}</td>
+                            <td style={{ border: "1px solid #ddd", padding: 5 }}>{job.product}</td>
+                            <td style={{ border: "1px solid #ddd", padding: 5 }}>{job.panel}</td>
+                            <td style={{ border: "1px solid #ddd", padding: 5 }}>
+                              {job.requiredQuantity} {job.unit}
+                            </td>
+                            <td style={{ border: "1px solid #ddd", padding: 5 }}>{job.cutStatus}</td>
+                            <td style={{ border: "1px solid #ddd", padding: 5 }}>{job.dueDate}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p>No jobs using this material are waiting to be cut.</p>
+                )}
+
+                <p>
+                  Material Log entry:{" "}
+                  <strong>
+                    READJUSTMENT —{" "}
+                    {readjustmentPreview.adjustment > 0 ? "IN" : readjustmentPreview.adjustment < 0 ? "OUT" : "no change"}{" "}
+                    {Math.abs(readjustmentPreview.adjustment)} {readjustmentPreview.unit}
+                  </strong>
+                </p>
+                <button
+                  onClick={postReadjustment}
+                  disabled={isSavingReadjustment}
+                >
+                  {isSavingReadjustment ? "Posting…" : "Post Readjustment"}
+                </button>
+              </div>
+            )}
+          </fieldset>
+        )}
+      </div>
 
       <div style={{ display:"flex", gap:32, padding:16 }}>
         {/* Thread Inventory */}
