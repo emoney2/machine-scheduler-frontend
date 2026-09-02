@@ -14,9 +14,9 @@ const B3_HI = 3380;
 const BASS_LO = 150;
 const BASS_HI = 1300;
 const COOLDOWN_MS = 6000;
-const PEAK_GAP_MIN = 350;
-const PEAK_GAP_MAX = 1100;
-const PEAK_REFRACTORY = 280;
+const PEAK_GAP_MIN = 480;
+const PEAK_GAP_MAX = 820;
+const PEAK_REFRACTORY = 400;
 
 function bandAvg(bytes, sampleRate, f0, f1) {
   const binHz = sampleRate / FFT_SIZE;
@@ -55,7 +55,7 @@ function maxB4Before(hist, peakT) {
   let m = 0;
   for (let i = 0; i < hist.length; i++) {
     const h = hist[i];
-    if (h.t >= peakT - 500 && h.t <= peakT + 80) m = Math.max(m, h.b4);
+    if (h.t >= peakT - 420 && h.t <= peakT - 20) m = Math.max(m, h.b4);
   }
   return m;
 }
@@ -86,10 +86,10 @@ function melodyDetected(hist, b3Noise, b4Noise) {
         const d2 = peaks[k].t - peaks[j].t;
         if (d2 < PEAK_GAP_MIN) continue;
         if (d2 > PEAK_GAP_MAX) break;
-        const highToneCount = [peaks[i], peaks[j], peaks[k]].filter(
+        const allHaveRisingTone = [peaks[i], peaks[j], peaks[k]].every(
           (peak) => maxB4Before(hist, peak.t) >= needB4
-        ).length;
-        if (highToneCount >= 2) return true;
+        );
+        if (allHaveRisingTone) return true;
       }
     }
   }

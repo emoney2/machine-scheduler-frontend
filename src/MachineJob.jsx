@@ -984,14 +984,14 @@ export default function MachineJob({ columns }) {
             Did you miss a post?
           </h2>
           <p style={{ margin: "0 0 16px", fontSize: 16, lineHeight: 1.35, color: "#374151" }}>
-            The hoop finished and the next run started without a +N. Yes to post pieces. No to go back to jobs.
+            The hoop finished and the next run started without a +N. Yes to post pieces. No to dismiss this alert.
           </p>
           <div style={{ display: "flex", gap: 8 }}>
             <button
               type="button"
               onClick={() => {
                 setMissedAsk(false);
-                navigate(`/machine/${machineId}`);
+                setPendingChimes((previous) => previous.slice(1));
               }}
               style={btnGhost}
             >
