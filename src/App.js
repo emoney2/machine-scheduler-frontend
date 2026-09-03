@@ -587,8 +587,13 @@ useEffect(() => {
     }
     fetchAllCombined();
   };
+  const onSchedulerStateUpdated = () => {
+    if (!isManualStateGuarded()) fetchAllCombined();
+  };
 
   socket.on("startTimeUpdated", onStartTimeUpdated);
+  socket.on("manualStateUpdated", onSchedulerStateUpdated);
+  socket.on("linksUpdated", onSchedulerStateUpdated);
   const dropFinishedJob = (orderId) => {
     const want = normalizeOrderId(orderId);
     if (!want) return;
@@ -661,6 +666,8 @@ useEffect(() => {
   socket.on("embroideryProgressUpdated", onEmbroideryProgress);
   return () => {
     socket.off("startTimeUpdated", onStartTimeUpdated);
+    socket.off("manualStateUpdated", onSchedulerStateUpdated);
+    socket.off("linksUpdated", onSchedulerStateUpdated);
     socket.off("embroideryFinished", onEmbroideryFinished);
     socket.off("embroideryProgressUpdated", onEmbroideryProgress);
   };
@@ -1562,7 +1569,6 @@ const fetchManualStateCore = async (previousCols) => {
 
 
 
-  // ─── Section 5D: On mount, do one combined fetch; then every 20 s do the same combined fetch ─────────────
   // ─── Section 5D: Initial full load, then every 30s ask "did anything change?" ─────────────
   useEffect(() => {
     // Disable polling on Scan and Reorder pages for speed and to prevent memory leaks
@@ -1579,7 +1585,10 @@ const fetchManualStateCore = async (previousCols) => {
     async function pollChanges() {
       try {
         const url  = `${API_ROOT}/changes`;
-        const res  = await fetch(url, { credentials: "include" });
+        const res  = await fetch(url, {
+          credentials: "include",
+          cache: "no-store",
+        });
         if (!res.ok) return; // silent skip on transient errors
         let data = null;
         try {
@@ -1628,9 +1637,36 @@ const fetchManualStateCore = async (previousCols) => {
       if (!canceled && !window._isSubmittingOrder) pollChanges();
     }, 30000);
 
-    return () => { canceled = true; clearInterval(handle); };
+    const pollAfterWake = () => {
+      if (!canceled && !window._isSubmittingOrder) pollChanges();
+    };
+    const pollWhenVisible = () => {
+      if (document.visibilityState === "visible") pollAfterWake();
+    };
+    window.addEventListener("online", pollAfterWake);
+    window.addEventListener("focus", pollAfterWake);
+    document.addEventListener("visibilitychange", pollWhenVisible);
 
+    return () => {
+      canceled = true;
+      clearInterval(handle);
+      window.removeEventListener("online", pollAfterWake);
+      window.removeEventListener("focus", pollAfterWake);
+      document.removeEventListener("visibilitychange", pollWhenVisible);
+    };
   }, []);
+
+  // Daily kiosk reset. If the computer sleeps through 2 AM, the suspended timer
+  // fires when it wakes; turning off only the attached TV does not affect it.
+  useEffect(() => {
+    if (!isScheduler) return;
+    const now = new Date();
+    const nextRefresh = new Date(now);
+    nextRefresh.setHours(2, 0, 0, 0);
+    if (nextRefresh <= now) nextRefresh.setDate(nextRefresh.getDate() + 1);
+    const handle = setTimeout(() => window.location.reload(), nextRefresh - now);
+    return () => clearTimeout(handle);
+  }, [isScheduler]);
 
 // ─── Section 5E: Estimated start on the top job until floor Start / first +N ───
 useEffect(() => {
