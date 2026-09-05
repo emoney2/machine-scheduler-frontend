@@ -88,12 +88,6 @@ export function useMachineVibration(machineId) {
   const startedOkRef = useRef(false);
   const lastUiRef = useRef(0);
   const lastActivityRef = useRef(0);
-  const liveRef = useRef({
-    level: 0,
-    lastActivityAt: 0,
-    bursting: false,
-    motionAvailable: false,
-  });
   const machineRef = useRef(machineId);
 
   useEffect(() => {
@@ -104,12 +98,6 @@ export function useMachineVibration(machineId) {
     hasSmoothRef.current = false;
     smoothRef.current = 0;
     lastActivityRef.current = 0;
-    liveRef.current = {
-      level: 0,
-      lastActivityAt: 0,
-      bursting: false,
-      motionAvailable: liveRef.current.motionAvailable,
-    };
     setVibrating(false);
     setLevel(null);
   }, [machineId]);
@@ -128,12 +116,6 @@ export function useMachineVibration(machineId) {
     const t = Date.now();
     const burst = next >= ACTIVITY_THRESHOLD;
     if (burst) lastActivityRef.current = t;
-    liveRef.current = {
-      level: next,
-      lastActivityAt: lastActivityRef.current,
-      bursting: burst,
-      motionAvailable: true,
-    };
     const running = lastActivityRef.current > 0 && t - lastActivityRef.current < SLOW_HOLD_MS;
     if (t - lastUiRef.current >= 150) {
       lastUiRef.current = t;
@@ -265,11 +247,10 @@ export function useMachineVibration(machineId) {
     level,
     motionAvailable,
     hoopEndedAt: clock.lastVibrationAt || "",
-    liveRef,
   };
 }
 
-export function VibrationDot({ vibrating, level, pendingChimes = [], audioOn }) {
+export function VibrationDot({ vibrating, level }) {
   const on = !!vibrating;
   const n = Number(level);
   const label = Number.isFinite(n) ? n.toFixed(2) : "—";
@@ -287,16 +268,6 @@ export function VibrationDot({ vibrating, level, pendingChimes = [], audioOn }) 
         pointerEvents: "none",
       }}
     >
-      <style>{`
-        @keyframes ms-melody-flash {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          20% { opacity: 0.2; transform: scale(0.8); }
-          40% { opacity: 1; transform: scale(1.15); }
-          60% { opacity: 0.2; transform: scale(0.8); }
-          80% { opacity: 1; transform: scale(1.1); }
-        }
-        .ms-melody-dot { animation: ms-melody-flash 0.9s ease-out 1; }
-      `}</style>
       <div
         style={{
           width: 16,
@@ -324,63 +295,6 @@ export function VibrationDot({ vibrating, level, pendingChimes = [], audioOn }) 
       >
         {label}
       </span>
-      <div
-        title={audioOn ? "Listening for chime" : "Mic off"}
-        style={{
-          width: 16,
-          height: 16,
-          borderRadius: "50%",
-          background: audioOn ? "#16a34a" : "#6b7280",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
-        }}
-      >
-        <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
-          <path
-            d="M6.2 3.4c2.4-1.2 5.6.2 5.6 3.4 0 2.2-1.3 3.4-2.4 4.4-.5.5-.8 1.1-.8 1.8v.6"
-            stroke="#fff"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-          <path
-            d="M6.2 3.4C4.8 4.2 4 5.6 4 7.2c0 1.4.6 2.5 1.4 3.2"
-            stroke="#fff"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-          <circle cx="6.4" cy="13.2" r="1.1" fill="#fff" />
-        </svg>
-      </div>
-      {pendingChimes.map((heardAt, index) => (
-        <div
-          key={`${heardAt}-${index}`}
-          className="ms-melody-dot"
-          title="Finished run waiting for +N"
-          style={{
-            width: 16,
-            height: 16,
-            borderRadius: "50%",
-            background: "#6d28d9",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "0 0 0 1px rgba(0,0,0,0.25)",
-            transformOrigin: "center",
-          }}
-        >
-          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
-            <path
-              d="M3 8.2 6.4 11.5 13 4.8"
-              stroke="#fff"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-      ))}
     </div>
   );
 }

@@ -14,39 +14,10 @@ import {
   normalizeOrderId,
 } from "./machineFloorUtils";
 import { useMachineVibration, VibrationDot } from "./useMachineVibration";
-import { useMachineChime } from "./useMachineChime";
 
 const ROOT = apiRoot();
 const PLUS_FLASH_MS = 2500;
 const JOB_COMPLETE_MS = 2000;
-const PENDING_CHIMES_PREFIX = "jrco.machinePendingChimes.v1.";
-
-function pendingChimesKey(machineId, orderId) {
-  return `${PENDING_CHIMES_PREFIX}${String(machineId || "unknown")}.${String(orderId || "unknown")}`;
-}
-
-function loadPendingChimes(machineId, orderId) {
-  try {
-    const raw = localStorage.getItem(pendingChimesKey(machineId, orderId));
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed)
-      ? parsed.map((value) => String(value || "")).filter(Boolean)
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function savePendingChimes(machineId, orderId, pendingChimes) {
-  try {
-    localStorage.setItem(
-      pendingChimesKey(machineId, orderId),
-      JSON.stringify(pendingChimes)
-    );
-  } catch {
-    /* ignore unavailable tablet storage */
-  }
-}
 
 export default function MachineJob({ columns }) {
   const { machineId, orderId } = useParams();
@@ -54,7 +25,6 @@ export default function MachineJob({ columns }) {
   const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
   const oid = normalizeOrderId(orderId);
   const vibration = useMachineVibration(machineId);
-  const chime = useMachineChime(true);
 
   const fromColumns = useMemo(
     () => findJobInColumns(columns, oid)?.job || null,
@@ -75,22 +45,12 @@ export default function MachineJob({ columns }) {
   const postedTimer = useRef(null);
   const [finishOverlay, setFinishOverlay] = useState(null);
   const [manualStart, setManualStart] = useState(false);
-  const [lastRunAt, setLastRunAt] = useState("");
-  const [missedAsk, setMissedAsk] = useState(false);
-  const [missedPlus, setMissedPlus] = useState(false);
-  const [pendingChimes, setPendingChimes] = useState(() =>
-    loadPendingChimes(machineId, oid)
-  );
-  const lastRunAtRef = useRef("");
-  const leftRef = useRef(0);
-  const lastVibRef = useRef("");
 
   const applyPayload = useCallback((data) => {
     if (!data) return;
     setJob(data);
     if (data.piecesLeft != null) setPiecesLeft(Number(data.piecesLeft));
     if (data.manualStart != null) setManualStart(!!data.manualStart);
-    if (data.lastRunAt) setLastRunAt(String(data.lastRunAt));
   }, []);
 
   const loadJob = useCallback(
@@ -155,51 +115,7 @@ export default function MachineJob({ columns }) {
     meta.headCount,
     meta.headCount
   );
-  lastRunAtRef.current = lastRunAt;
-  leftRef.current = left;
-  lastVibRef.current = vibration.lastVibrationAt;
   const expectedRunLabel = formatDuration(expectedRunMs);
-
-  useEffect(() => {
-    if (!chime.heardAt) return;
-    setPendingChimes((previous) => [...previous, chime.heardAt]);
-    chime.consume();
-  }, [chime.heardAt, chime.consume]);
-
-  useEffect(() => {
-    savePendingChimes(machineId, oid, pendingChimes);
-  }, [machineId, oid, pendingChimes]);
-
-  const oldestPendingChime = pendingChimes[0] || "";
-
-  useEffect(() => {
-    if (!oldestPendingChime || missedAsk || missedPlus) return undefined;
-    const heardMs = new Date(oldestPendingChime).getTime();
-    if (!Number.isFinite(heardMs)) return undefined;
-    let cancelled = false;
-    let asked = false;
-
-    const tick = () => {
-      if (cancelled || asked) return;
-      const postedMs = lastRunAtRef.current
-        ? new Date(lastRunAtRef.current).getTime()
-        : 0;
-      if (Number.isFinite(postedMs) && postedMs >= heardMs) return;
-      const now = Date.now();
-      if (now - heardMs < 2500) return;
-      const vibMs = new Date(lastVibRef.current).getTime();
-      if (!Number.isFinite(vibMs) || vibMs < heardMs + 2500) return;
-      if (leftRef.current <= 0) return;
-      asked = true;
-      setMissedAsk(true);
-    };
-
-    const id = setInterval(tick, 250);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [oldestPendingChime, missedAsk, missedPlus]);
 
   const lastThree = lastRunsWithPerf(
     job?.recentRuns || fromColumns?.recentRuns,
@@ -303,12 +219,8 @@ export default function MachineJob({ columns }) {
   const recordCompleted = (n) => {
     if (busy || n <= 0 || left <= 0) return;
     const inc = Math.min(n, left);
-    setMissedPlus(false);
-    setMissedAsk(false);
-    setPendingChimes((previous) => previous.slice(1));
     setPiecesLeft(left - inc);
     setPostedN(inc);
-    setLastRunAt(new Date().toISOString());
     if (postedTimer.current) clearTimeout(postedTimer.current);
     postedTimer.current = setTimeout(() => setPostedN(null), PLUS_FLASH_MS);
     if (left === quantity) stampInferredStart(inc);
@@ -978,106 +890,6 @@ export default function MachineJob({ columns }) {
         </Modal>
       )}
 
-      {missedAsk && (
-        <Modal onClose={() => {}}>
-          <h2 style={{ margin: "0 0 16px", fontSize: 26, lineHeight: 1.2 }}>
-            Did you miss a post?
-          </h2>
-          <p style={{ margin: "0 0 16px", fontSize: 16, lineHeight: 1.35, color: "#374151" }}>
-            The hoop finished and the next run started without a +N. Yes to post pieces. No to dismiss this alert.
-          </p>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => {
-                setMissedAsk(false);
-                setPendingChimes((previous) => previous.slice(1));
-              }}
-              style={btnGhost}
-            >
-              No
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMissedAsk(false);
-                setMissedPlus(true);
-              }}
-              style={btnPrimary}
-            >
-              Yes
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      {missedPlus && (
-        <div
-          className="ms-dialog-overlay"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 40,
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <div
-            style={{
-              background: "#111827",
-              borderRadius: 16,
-              padding: 16,
-              width: "min(520px, 100%)",
-              boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
-            }}
-          >
-            <div
-              style={{
-                color: "#fff",
-                fontWeight: 900,
-                fontSize: 20,
-                textAlign: "center",
-                marginBottom: 12,
-              }}
-            >
-              How many did you finish?
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gridTemplateRows: "1fr 1fr 1fr",
-                gap: 10,
-              }}
-            >
-              {[6, 5, 4, 3, 2, 1].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={busy || left <= 0}
-                  onClick={() => recordCompleted(n)}
-                  style={{
-                    minHeight: 72,
-                    border: "none",
-                    borderRadius: 14,
-                    background: left <= 0 ? "#374151" : "#fbbf24",
-                    color: "#111",
-                    fontSize: 36,
-                    fontWeight: 900,
-                    cursor: left <= 0 || busy ? "default" : "pointer",
-                  }}
-                >
-                  +{n}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
       {recutOpen && (
         <Modal onClose={() => setRecutOpen(false)}>
           <h2 style={{ margin: "0 0 12px", fontSize: 22 }}>How many pieces to recut?</h2>
@@ -1119,8 +931,6 @@ export default function MachineJob({ columns }) {
       <VibrationDot
         vibrating={vibration.vibrating}
         level={vibration.level}
-        pendingChimes={pendingChimes}
-        audioOn={chime.listening}
       />
     </div>
   );

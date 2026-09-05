@@ -13,7 +13,6 @@ import {
   normalizeOrderId,
 } from "./machineFloorUtils";
 import { useMachineVibration, VibrationDot } from "./useMachineVibration";
-import { useMachineChime } from "./useMachineChime";
 
 function outlineByDue(due) {
   if (!due) return "#9ca3af";
@@ -71,7 +70,6 @@ export default function MachineHome({ columns, loading }) {
 
   const meta = MACHINE_META[machineId] || { title: "Machine", headCount: 6 };
   const vibration = useMachineVibration(machineId);
-  const chime = useMachineChime(true, vibration.liveRef);
   const jobs = useMemo(
     () =>
       jobsForMachine(columns, machineId).filter(
@@ -474,7 +472,6 @@ export default function MachineHome({ columns, loading }) {
       <VibrationDot
         vibrating={vibration.vibrating}
         level={vibration.level}
-        audioOn={chime.listening}
       />
     </div>
   );
