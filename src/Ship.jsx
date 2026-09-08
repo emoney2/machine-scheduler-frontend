@@ -786,6 +786,22 @@ export default function Ship() {
     const labelRaw = Array.isArray(data?.labels_api_raw) ? data.labels_api_raw : [];
     const openLabels = data?.open_label_windows !== false;
     const openSlips = data?.open_slip_windows === true;
+    const rawInvoiceUrl =
+      typeof data?.invoice === "string" ? data.invoice.trim() : "";
+    let invoiceId = String(data?.qbo_invoice_id ?? "").trim();
+    let realmId = String(data?.qbo_realm_id ?? "").trim();
+    if ((!invoiceId || !realmId) && rawInvoiceUrl) {
+      const parsed = parseTxnRealmFromInvoiceUrl(rawInvoiceUrl);
+      if (!invoiceId) invoiceId = parsed.txnId;
+      if (!realmId) realmId = parsed.realmId;
+    }
+    const invoiceUrl =
+      buildQboInvoiceOpenUrl(
+        invoiceId,
+        realmId,
+        inferQboInvoiceEnv(data, rawInvoiceUrl),
+        rawInvoiceUrl
+      ) || (isHttpUrl(rawInvoiceUrl) ? rawInvoiceUrl : "");
 
     const labelHttp = labels.filter(isHttpUrl);
     if (labelRaw.length) {
@@ -800,6 +816,7 @@ export default function Ship() {
         message: "openResultsWindows",
         openLabels,
         openSlips,
+        invoiceUrl,
         labelUrls: labelHttp,
         slipUrls: slipHttp,
         labels_copied_to_folder: data?.labels_copied_to_folder,
@@ -824,6 +841,12 @@ export default function Ship() {
           if (w) w.blur();
         }
       });
+    }
+
+    // Open the exact QuickBooks invoice created by this shipment.
+    if (invoiceUrl) {
+      const w = window.open(invoiceUrl, "_blank", "noopener,noreferrer");
+      if (w) w.blur();
     }
   }
 
