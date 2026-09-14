@@ -2,6 +2,9 @@
   command = "npm ci && npm run build"
   publish = "build"
 
+[build.environment]
+  REACT_APP_GMAIL_AUTHUSER = "justin.eckard@jrcogolf.com"
+
 # Same-origin login + API so phone browsers keep the session cookie.
 [[redirects]]
   from = "/login"

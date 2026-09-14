@@ -388,19 +388,33 @@ function openUrlReturn(url) {
 }
 
 
+// Work Gmail that should own material-order drafts. Numeric authuser (0/1/…)
+// follows Chrome login order, so 0 is usually a personal account.
+const DEFAULT_GMAIL_ACCOUNT = "justin.eckard@jrcogolf.com";
+
+function resolveGmailAuthUser() {
+  const raw = String(process.env.REACT_APP_GMAIL_AUTHUSER || "").trim();
+  if (!raw || raw === "0") return DEFAULT_GMAIL_ACCOUNT;
+  return raw;
+}
+
 // Opens Gmail in compose mode with subject/body prefilled
 function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
-  const base = "https://mail.google.com/mail/";
+  const account = String(authUser ?? "").trim();
   const p = new URLSearchParams({ view: "cm", fs: "1" });
   if (to) p.set("to", to);
   if (cc) p.set("cc", cc);
   if (bcc) p.set("bcc", bcc);
   if (subject) p.set("su", subject);
   if (body) p.set("body", body);
-  if (authUser !== undefined && authUser !== null && String(authUser) !== "") {
-    p.set("authuser", String(authUser));
+  if (!account) {
+    return `https://mail.google.com/mail/?${p.toString()}`;
   }
-  return `${base}?${p.toString()}`;
+  if (/^\d+$/.test(account)) {
+    return `https://mail.google.com/mail/u/${account}/?${p.toString()}`;
+  }
+  p.set("authuser", account);
+  return `https://mail.google.com/mail/u/?${p.toString()}`;
 }
 
 
@@ -1840,7 +1854,7 @@ function col(width, center = false) {
       let emailRows = rows;
       let emailTo = normList(v.email);
       const cc = normList(v.cc);
-      const authUser = process.env.REACT_APP_GMAIL_AUTHUSER; // optional, 0/1/etc
+      const authUser = resolveGmailAuthUser();
 
       // Madeira threads: email contactus@madeirausa.com and list only thread items
       if ((modalVendor || "").toLowerCase().includes("madeira")) {
