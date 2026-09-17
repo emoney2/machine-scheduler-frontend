@@ -17,6 +17,10 @@ export default function KanbanQueue() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [overlay, setOverlay] = useState(null); // { message: string } | null
+  const [search, setSearch] = useState("");
+  const [savedItems, setSavedItems] = useState([]);
+  const [savedLoading, setSavedLoading] = useState(true);
+  const [savedErr, setSavedErr] = useState("");
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +37,45 @@ export default function KanbanQueue() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      setSavedLoading(true);
+      setSavedErr("");
+      try {
+        const r = await fetch(
+          `${BACKEND}/api/kanban/items?q=${encodeURIComponent(search.trim())}`,
+          {
+            credentials: "include",
+            cache: "no-store",
+            signal: controller.signal,
+          }
+        );
+        if (!r.ok) {
+          const text = await r.text().catch(() => "");
+          throw new Error(`HTTP ${r.status}${text ? `: ${text}` : ""}`);
+        }
+        const payload = await r.json();
+        const items = Array.isArray(payload)
+          ? payload
+          : payload?.items || payload?.results || payload?.rows || payload?.data || [];
+        setSavedItems(Array.isArray(items) ? items : []);
+      } catch (e) {
+        if (e?.name !== "AbortError") {
+          setSavedItems([]);
+          setSavedErr(String(e?.message || e));
+        }
+      } finally {
+        if (!controller.signal.aborted) setSavedLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search]);
 
   const grouped = useMemo(() => {
     const open = [];
@@ -215,6 +258,75 @@ export default function KanbanQueue() {
             </a>
           </div>
         </div>
+
+        <section
+          aria-labelledby="saved-kanban-heading"
+          style={{
+            marginTop: 24,
+            padding: 16,
+            border: "1px solid #dbe3ee",
+            borderRadius: 12,
+            background: "#f8fafc",
+          }}
+        >
+          <div>
+            <h2 id="saved-kanban-heading" style={{ margin: 0, fontSize: 18 }}>
+              Saved Kanban Cards
+            </h2>
+            <p style={{ margin: "4px 0 12px", color: "#64748b", fontSize: 13 }}>
+              Search by item name or Kanban code. Leave blank to show recent cards.
+            </p>
+          </div>
+          <label style={{ display: "block", fontWeight: 700, marginBottom: 6 }} htmlFor="kanban-search">
+            Find a card
+          </label>
+          <input
+            id="kanban-search"
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Item name or Kanban code"
+            autoComplete="off"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "10px 12px",
+              border: "1px solid #94a3b8",
+              borderRadius: 8,
+              fontSize: 16,
+              background: "white",
+            }}
+          />
+
+          <div aria-live="polite" style={{ marginTop: 12 }}>
+            {savedLoading ? (
+              <div style={{ color: "#64748b" }}>Loading saved cards…</div>
+            ) : savedErr ? (
+              <div style={{ color: "#b91c1c" }}>Could not load saved cards: {savedErr}</div>
+            ) : savedItems.length === 0 ? (
+              <div style={{ color: "#64748b" }}>
+                {search.trim() ? "No matching cards." : "No saved cards found."}
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
+                  gap: 12,
+                }}
+              >
+                {savedItems.map((item, index) => (
+                  <SavedKanbanCard
+                    key={getKanbanItemId(item) || `saved-kanban-${index}`}
+                    item={item}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <h2 style={{ margin: "26px 0 0", fontSize: 18 }}>Ordering Queue</h2>
         {grouped.all.length === 0 ? (
           <div style={{ marginTop: 16, color: "#6b7280" }}>No open requests.</div>
         ) : (
@@ -503,6 +615,133 @@ function Chip({ label, value, mono }) {
     </span>
   );
 }
+
+function getItemValue(item, ...keys) {
+  for (const key of keys) {
+    const value = item?.[key];
+    if (value !== null && value !== undefined && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
+function getKanbanItemId(item) {
+  return getItemValue(
+    item,
+    "kanbanId",
+    "kanbanCode",
+    "Kanban ID",
+    "Kanban Code",
+    "id",
+    "ID"
+  );
+}
+
+function SavedKanbanCard({ item }) {
+  const id = getKanbanItemId(item);
+  const name = getItemValue(item, "itemName", "name", "Item Name") || "(unnamed)";
+  const photo = getItemValue(item, "photoUrl", "photo", "Photo URL");
+  const sku = getItemValue(item, "sku", "SKU");
+  const location = getItemValue(item, "location", "Location");
+  const supplier = getItemValue(item, "supplier", "vendorName", "Supplier", "Vendor");
+  const previewUrl = id ? `/kanban/preview/${encodeURIComponent(id)}` : "";
+
+  const openPreview = () => {
+    if (previewUrl) window.location.assign(previewUrl);
+  };
+
+  return (
+    <article
+      role={id ? "link" : undefined}
+      tabIndex={id ? 0 : undefined}
+      onClick={openPreview}
+      onKeyDown={(e) => {
+        if (id && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          openPreview();
+        }
+      }}
+      style={{
+        display: "grid",
+        gridTemplateRows: "auto 1fr auto",
+        border: "1px solid #dbe3ee",
+        borderRadius: 10,
+        background: "white",
+        overflow: "hidden",
+        cursor: id ? "pointer" : "default",
+        minWidth: 0,
+      }}
+    >
+      {photo ? (
+        <img
+          src={photo}
+          alt=""
+          loading="lazy"
+          style={{ width: "100%", height: 132, objectFit: "contain", background: "#f1f5f9" }}
+        />
+      ) : (
+        <div
+          style={{
+            height: 132,
+            display: "grid",
+            placeItems: "center",
+            color: "#94a3b8",
+            background: "#f1f5f9",
+          }}
+        >
+          No photo
+        </div>
+      )}
+      <div style={{ padding: 12, minWidth: 0 }}>
+        <div style={{ fontWeight: 800, overflowWrap: "anywhere" }}>{name}</div>
+        <div
+          style={{
+            marginTop: 4,
+            color: "#334155",
+            fontWeight: 700,
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {id || "No Kanban code"}
+        </div>
+        <div style={{ marginTop: 8, display: "grid", gap: 3, fontSize: 13, color: "#475569" }}>
+          {sku && <div><strong>SKU:</strong> {sku}</div>}
+          {location && <div><strong>Location:</strong> {location}</div>}
+          {supplier && <div><strong>Supplier:</strong> {supplier}</div>}
+        </div>
+      </div>
+      <div
+        style={{ display: "flex", gap: 8, padding: "0 12px 12px", flexWrap: "wrap" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <a
+          href={id ? `/kanban/preview/${encodeURIComponent(id)}?print=1` : undefined}
+          style={savedActionStyle}
+        >
+          Print
+        </a>
+        <a
+          href={id ? `/kanban/new?edit=${encodeURIComponent(id)}` : undefined}
+          style={savedActionStyle}
+        >
+          Edit
+        </a>
+      </div>
+    </article>
+  );
+}
+
+const savedActionStyle = {
+  padding: "6px 10px",
+  border: "1px solid #cbd5e1",
+  borderRadius: 7,
+  color: "#0f172a",
+  background: "white",
+  fontWeight: 700,
+  textDecoration: "none",
+};
 
 function formatWhen(ts) {
   if (!ts) return "";

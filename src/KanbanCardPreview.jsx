@@ -28,6 +28,77 @@ function showVal(v) {
   return s.trim() === "" ? "—" : s;
 }
 
+const CODE39_PATTERNS = {
+  "0": "nnnwwnwnn", "1": "wnnwnnnnw", "2": "nnwwnnnnw", "3": "wnwwnnnnn",
+  "4": "nnnwwnnnw", "5": "wnnwwnnnn", "6": "nnwwwnnnn", "7": "nnnwnnwnw",
+  "8": "wnnwnnwnn", "9": "nnwwnnwnn", A: "wnnnnwnnw", B: "nnwnnwnnw",
+  C: "wnwnnwnnn", D: "nnnnwwnnw", E: "wnnnwwnnn", F: "nnwnwwnnn",
+  G: "nnnnnwwnw", H: "wnnnnwwnn", I: "nnwnnwwnn", J: "nnnnwwwnn",
+  K: "wnnnnnnww", L: "nnwnnnnww", M: "wnwnnnnwn", N: "nnnnwnnww",
+  O: "wnnnwnnwn", P: "nnwnwnnwn", Q: "nnnnnnwww", R: "wnnnnnwwn",
+  S: "nnwnnnwwn", T: "nnnnwnwwn", U: "wwnnnnnnw", V: "nwwnnnnnw",
+  W: "wwwnnnnnn", X: "nwnnwnnnw", Y: "wwnnwnnnn", Z: "nwwnwnnnn",
+  "-": "nwnnnnwnw", ".": "wwnnnnwnn", " ": "nwwnnnwnn", "$": "nwnwnwnnn",
+  "/": "nwnwnnnwn", "+": "nwnnnwnwn", "%": "nnnwnwnwn", "*": "nwnnwnwnn",
+};
+
+function normalizeCode39Value(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^0-9A-Z.\- $/+%]/g, "-");
+}
+
+function Code39Barcode({ value }) {
+  const encodedValue = normalizeCode39Value(value);
+  if (!encodedValue) return null;
+
+  const sequence = `*${encodedValue}*`;
+  const bars = [];
+  let x = 0;
+  const narrow = 1;
+  const wide = 3;
+  const gap = 1;
+
+  for (const character of sequence) {
+    const pattern = CODE39_PATTERNS[character];
+    pattern.split("").forEach((widthCode, index) => {
+      const width = widthCode === "w" ? wide : narrow;
+      if (index % 2 === 0) {
+        bars.push(<rect key={`${character}-${x}-${index}`} x={x} y="0" width={width} height="34" />);
+      }
+      x += width;
+    });
+    x += gap;
+  }
+
+  return (
+    <div style={{ display: "grid", justifyItems: "center", gap: 2, minWidth: 0 }}>
+      <svg
+        role="img"
+        aria-label={`Code 39 barcode for ${encodedValue}`}
+        viewBox={`0 0 ${x} 34`}
+        preserveAspectRatio="none"
+        style={{ width: "100%", maxWidth: 330, height: 34, display: "block" }}
+      >
+        <title>{`Code 39: ${encodedValue}`}</title>
+        <g fill="#000">{bars}</g>
+      </svg>
+      <div
+        style={{
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+          fontSize: "clamp(11px, 1.35vw, 15px)",
+          fontWeight: 800,
+          letterSpacing: 1,
+          lineHeight: 1,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {encodedValue}
+      </div>
+    </div>
+  );
+}
+
 function getLocationStyles(locKey) {
   const k = (locKey || "").toLowerCase().trim();
   const COLORS = {
@@ -90,6 +161,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
     let alive = true;
     (async () => {
       try {
+        if (!effectiveId) throw new Error("Preview failed: missing Kanban ID");
         const r = await fetch(
           `${BACKEND}/api/kanban/get-item?id=${encodeURIComponent(effectiveId)}`,
           { credentials: "omit" }
@@ -143,6 +215,17 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
     return () => { alive = false; };
   }, [effectiveId]);
 
+  useEffect(() => {
+    if (!item) return;
+    let shouldPrint = false;
+    try {
+      shouldPrint = new URLSearchParams(window.location.search).get("print") === "1";
+    } catch {}
+    if (!shouldPrint) return;
+    const timer = setTimeout(() => window.print(), 250);
+    return () => clearTimeout(timer);
+  }, [item]);
+
   if (err) {
     return (
       <div style={{ padding: 24 }}>
@@ -159,7 +242,8 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
   const { bg: locBg, text: locText } = getLocationStyles(item.location);
 
   // Build public QR endpoints from canonical Kanban ID
-  const kanbanIdForQr = item["Kanban ID"] || item.kanbanId || routeKanbanId;
+  const effectiveKanbanId = item["Kanban ID"] || item.kanbanId || effectiveId;
+  const kanbanIdForQr = effectiveKanbanId;
   const defaultQty = String(item.reorderQtyBasis || 1).trim() || "1";
   const scanUrl = `https://machine-scheduler-backend.onrender.com/kanban/scan?id=${encodeURIComponent(
     kanbanIdForQr
@@ -184,7 +268,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
 
 
-  const fallbackOpen = `https://machineschedule.netlify.app/kanban/open?id=${encodeURIComponent(item.kanbanId || routeKanbanId)}`;
+  const fallbackOpen = `https://machineschedule.netlify.app/kanban/open?id=${encodeURIComponent(effectiveKanbanId)}`;
   const orderQrUrl = shortOrderUrl || orderTarget || fallbackOpen;
 
   // DIRECT Google Form submission URL (no app, no login)
@@ -202,7 +286,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
     <div style={{ padding: 24 }}>
       <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
         <button
-          onClick={() => nav(`/kanban/new?edit=${encodeURIComponent(item.kanbanId || routeKanbanId)}`)}
+          onClick={() => nav(`/kanban/new?edit=${encodeURIComponent(effectiveKanbanId)}`)}
           style={btnSecondary}
         >
           Edit
@@ -238,8 +322,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
 
 
         {/* Title */}
-        <div style={{ fontWeight: 900, fontSize: "clamp(20px, 2.4vw, 28px)", letterSpacing: 0.3, textAlign: "center" }}>
-          KANBAN CARD
+        <div style={{ display: "grid", gap: 4 }}>
+          <div style={{ fontWeight: 900, fontSize: "clamp(18px, 2.1vw, 25px)", letterSpacing: 0.3, textAlign: "center" }}>
+            KANBAN CARD
+          </div>
+          <Code39Barcode value={effectiveKanbanId} />
         </div>
 
         {/* Location banner */}
