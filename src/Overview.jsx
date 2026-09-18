@@ -3000,6 +3000,8 @@ function col(width, center = false) {
               padding: 12,
               overflow: "hidden",
               position: "relative",
+              display: "flex",
+              flexDirection: "column",
             }}
           >
             {kanbanMarkingOverlay && (
@@ -3063,6 +3065,8 @@ function col(width, center = false) {
                   background: "#eff6ff",
                   fontSize: 12,
                   color: "#475569",
+                  order: 10,
+                  marginTop: 12,
                 }}
               >
                 Calculating magnet inventory and forecast…
@@ -3079,6 +3083,8 @@ function col(width, center = false) {
                   background: "#fef2f2",
                   color: "#991b1b",
                   fontSize: 12,
+                  order: 10,
+                  marginTop: 10,
                 }}
               >
                 Magnet Kanban: {magnetStatusError}
@@ -3116,7 +3122,8 @@ function col(width, center = false) {
                     borderRadius: 10,
                     background: pale,
                     padding: 12,
-                    marginBottom: 14,
+                    marginTop: 14,
+                    order: 10,
                   }}
                 >
                   <div
