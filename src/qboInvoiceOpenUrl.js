@@ -5,8 +5,7 @@
 
 export function buildQboInvoiceOpenUrl(txnId, realmId, qeHint, invoiceUrlHint) {
   const t = String(txnId || "").trim();
-  const r = String(realmId || "").trim();
-  if (!t || !r) return "";
+  if (!t) return "";
   const qev = String(qeHint || "").trim().toLowerCase();
   let origin;
   if (qev === "sandbox") {

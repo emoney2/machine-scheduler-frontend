@@ -5,6 +5,7 @@ import { postShipQboClientLog } from "./shipQboClientLog";
 import { appendShipmentHistory } from "./shipmentHistoryStorage";
 import {
   buildQboInvoiceOpenUrl,
+  normalizeQboInvoiceUrl,
   parseTxnRealmFromInvoiceUrl,
 } from "./qboInvoiceOpenUrl";
 import { getBackendOrigin } from "./apiRoot";
@@ -774,13 +775,14 @@ export default function Ship() {
       if (!invoiceId) invoiceId = parsed.txnId;
       if (!realmId) realmId = parsed.realmId;
     }
-    const invoiceUrl =
+    const invoiceUrl = normalizeQboInvoiceUrl(
       buildQboInvoiceOpenUrl(
         invoiceId,
         realmId,
         inferQboInvoiceEnv(data, rawInvoiceUrl),
         rawInvoiceUrl
-      ) || (isHttpUrl(rawInvoiceUrl) ? rawInvoiceUrl : "");
+      ) || rawInvoiceUrl
+    );
 
     const labelHttp = labels.filter(isHttpUrl);
     if (labelRaw.length) {
