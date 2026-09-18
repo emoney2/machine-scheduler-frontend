@@ -1053,6 +1053,10 @@ function col(width, center = false) {
   const [kanbanQueueRows, setKanbanQueueRows] = useState([]);
   const [loadingKanbanQueue, setLoadingKanbanQueue] = useState(true);
   const [kanbanMarkingOverlay, setKanbanMarkingOverlay] = useState(null);
+  const [magnetStatus, setMagnetStatus] = useState(null);
+  const [loadingMagnetStatus, setLoadingMagnetStatus] = useState(true);
+  const [magnetStatusError, setMagnetStatusError] = useState("");
+  const [updatingMagnetStatus, setUpdatingMagnetStatus] = useState(false);
 
   const [selections, setSelections] = useState({});
   const [daysWindow, setDaysWindow] = useState("7");
@@ -1510,6 +1514,96 @@ function col(width, center = false) {
     return () => clearInterval(id);
   }, [fetchKanbanQueue]);
 
+  const fetchMagnetStatus = useCallback(
+    async ({ fresh = false, showLoading = true } = {}) => {
+      if (showLoading) setLoadingMagnetStatus(true);
+      setMagnetStatusError("");
+      try {
+        const res = await axios.get(
+          `${ROOT}/kanban/magnets/status${fresh ? "?fresh=1" : ""}`,
+          { withCredentials: true, timeout: 45000 }
+        );
+        setMagnetStatus(res.data || null);
+      } catch (e) {
+        const message =
+          e?.response?.data?.error || e?.message || "Could not load magnet inventory.";
+        setMagnetStatusError(String(message));
+      } finally {
+        if (showLoading) setLoadingMagnetStatus(false);
+      }
+    },
+    [ROOT]
+  );
+
+  useEffect(() => {
+    fetchMagnetStatus({ fresh: false, showLoading: true });
+    const id = setInterval(
+      () => fetchMagnetStatus({ fresh: true, showLoading: false }),
+      300000
+    );
+    return () => clearInterval(id);
+  }, [fetchMagnetStatus]);
+
+  const receiveInitialMagnetShipment = useCallback(async () => {
+    if (!window.confirm("Mark the 5,000 N + 5,000 S shipment as received?")) return;
+    setUpdatingMagnetStatus(true);
+    setMagnetStatusError("");
+    try {
+      const res = await axios.post(
+        `${ROOT}/kanban/magnets/receive-initial`,
+        {},
+        { withCredentials: true, timeout: 45000 }
+      );
+      setMagnetStatus(res.data || null);
+    } catch (e) {
+      setMagnetStatusError(
+        String(e?.response?.data?.error || e?.message || "Could not record receipt.")
+      );
+    } finally {
+      setUpdatingMagnetStatus(false);
+    }
+  }, [ROOT]);
+
+  const updateMagnetPhysicalCount = useCallback(async () => {
+    const currentNorth = magnetStatus?.northOnHand ?? "";
+    const northRaw = window.prompt("Current NORTH magnet count:", String(currentNorth));
+    if (northRaw == null) return;
+    const southRaw = window.prompt(
+      "Current SOUTH magnet count:",
+      String(magnetStatus?.southOnHand ?? "")
+    );
+    if (southRaw == null) return;
+    const north = Number(northRaw);
+    const south = Number(southRaw);
+    if (
+      !Number.isFinite(north) ||
+      !Number.isFinite(south) ||
+      north < 0 ||
+      south < 0 ||
+      !Number.isInteger(north) ||
+      !Number.isInteger(south)
+    ) {
+      window.alert("Enter whole-number counts of zero or greater.");
+      return;
+    }
+    setUpdatingMagnetStatus(true);
+    setMagnetStatusError("");
+    try {
+      const res = await axios.post(
+        `${ROOT}/kanban/magnets/count`,
+        { north, south },
+        { withCredentials: true, timeout: 45000 }
+      );
+      setMagnetStatus(res.data || null);
+    } catch (e) {
+      setMagnetStatusError(
+        String(e?.response?.data?.error || e?.message || "Could not update counts.")
+      );
+    } finally {
+      setUpdatingMagnetStatus(false);
+    }
+  }, [ROOT, magnetStatus]);
+
   const markKanbanOrdered = useCallback(
     async (row) => {
       const eventIdKey = Object.keys(row || {}).find(
@@ -1551,6 +1645,9 @@ function col(width, center = false) {
           { withCredentials: true, timeout: 30000 }
         );
         await fetchKanbanQueue({ showLoading: false });
+        if (kanbanId === "MAGNETS-NS") {
+          await fetchMagnetStatus({ fresh: true, showLoading: false });
+        }
       } catch (e) {
         const msg =
           e?.response?.data?.error ||
@@ -1562,7 +1659,7 @@ function col(width, center = false) {
         setKanbanMarkingOverlay(null);
       }
     },
-    [ROOT, fetchKanbanQueue]
+    [ROOT, fetchKanbanQueue, fetchMagnetStatus]
   );
 
   const markKanbanReceived = useCallback(
@@ -1601,6 +1698,9 @@ function col(width, center = false) {
           { withCredentials: true, timeout: 30000 }
         );
         await fetchKanbanQueue({ showLoading: false });
+        if (kanbanId === "MAGNETS-NS") {
+          await fetchMagnetStatus({ fresh: true, showLoading: false });
+        }
       } catch (e) {
         const msg =
           e?.response?.data?.error ||
@@ -1612,7 +1712,7 @@ function col(width, center = false) {
         setKanbanMarkingOverlay(null);
       }
     },
-    [ROOT, fetchKanbanQueue]
+    [ROOT, fetchKanbanQueue, fetchMagnetStatus]
   );
 
   // Load vendor directory once
@@ -2952,6 +3052,247 @@ function col(width, center = false) {
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
               Left: needs order. Right: ordered and waiting on receipt. Mark ordered/received updates the Kanban sheet status.
             </div>
+
+            {loadingMagnetStatus && !magnetStatus && (
+              <div
+                style={{
+                  padding: 12,
+                  marginBottom: 12,
+                  border: "1px solid #dbeafe",
+                  borderRadius: 9,
+                  background: "#eff6ff",
+                  fontSize: 12,
+                  color: "#475569",
+                }}
+              >
+                Calculating magnet inventory and forecast…
+              </div>
+            )}
+            {magnetStatusError && (
+              <div
+                role="alert"
+                style={{
+                  padding: "8px 10px",
+                  marginBottom: 10,
+                  border: "1px solid #fecaca",
+                  borderRadius: 8,
+                  background: "#fef2f2",
+                  color: "#991b1b",
+                  fontSize: 12,
+                }}
+              >
+                Magnet Kanban: {magnetStatusError}
+              </div>
+            )}
+            {magnetStatus && (() => {
+              const level = String(magnetStatus.level || "healthy");
+              const isOrderNow = level === "order_now";
+              const isWatch = level === "watch";
+              const accent = isOrderNow ? "#dc2626" : isWatch ? "#d97706" : "#15803d";
+              const pale = isOrderNow ? "#fef2f2" : isWatch ? "#fffbeb" : "#f0fdf4";
+              const label = isOrderNow
+                ? "ORDER NOW"
+                : isWatch
+                ? "CHECK INBOUND"
+                : "HEALTHY";
+              const fmt = (value) =>
+                Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+              const fmtDate = (value) => {
+                if (!value) return "—";
+                const parsed = new Date(`${value}T12:00:00`);
+                return Number.isNaN(parsed.getTime())
+                  ? String(value)
+                  : parsed.toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+              };
+              return (
+                <section
+                  aria-label="Magnet electronic Kanban"
+                  style={{
+                    border: `1px solid ${accent}`,
+                    borderRadius: 10,
+                    background: pale,
+                    padding: 12,
+                    marginBottom: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
+                        Magnet E-Kanban
+                      </div>
+                      <div style={{ marginTop: 2, fontSize: 11, color: "#64748b" }}>
+                        One pair = one N + one S magnet
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        background: accent,
+                        color: "white",
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))",
+                      gap: 8,
+                      marginTop: 12,
+                    }}
+                  >
+                    {[
+                      ["N on hand", fmt(magnetStatus.northOnHand)],
+                      ["S on hand", fmt(magnetStatus.southOnHand)],
+                      ["Committed", fmt(magnetStatus.committedPairs)],
+                      ["Usable now", fmt(magnetStatus.uncommittedPairs)],
+                      ["Inbound", fmt(magnetStatus.inboundPairs)],
+                      ["Inventory position", fmt(magnetStatus.inventoryPositionPairs)],
+                    ].map(([metricLabel, metricValue]) => (
+                      <div
+                        key={metricLabel}
+                        style={{
+                          padding: "7px 8px",
+                          border: "1px solid rgba(148,163,184,0.45)",
+                          borderRadius: 7,
+                          background: "rgba(255,255,255,0.78)",
+                          minWidth: 0,
+                        }}
+                      >
+                        <div style={{ fontSize: 9, color: "#64748b", fontWeight: 700 }}>
+                          {metricLabel}
+                        </div>
+                        <div style={{ marginTop: 2, fontSize: 16, color: "#111827", fontWeight: 800 }}>
+                          {metricValue}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))",
+                      gap: "5px 14px",
+                      marginTop: 10,
+                      fontSize: 11,
+                      color: "#334155",
+                    }}
+                  >
+                    <div>
+                      Reorder at <strong>{fmt(magnetStatus.reorderPointPairs)} pairs</strong>
+                    </div>
+                    <div>
+                      Recommended order:{" "}
+                      <strong>{fmt(magnetStatus.recommendedOrderPairs)} of each</strong>
+                    </div>
+                    <div>
+                      Demand: <strong>{fmt(magnetStatus.weeklyDemandPairs)} pairs/week</strong>
+                    </div>
+                    <div>
+                      13-week growth: <strong>{fmt(magnetStatus.quarterGrowthPct)}%</strong>
+                    </div>
+                    <div>
+                      Projected next trigger:{" "}
+                      <strong>{fmtDate(magnetStatus.projectedReorderDate)}</strong>
+                    </div>
+                    <div>
+                      99% safety stock: <strong>{fmt(magnetStatus.safetyStockPairs)} pairs</strong>
+                    </div>
+                  </div>
+
+                  {!magnetStatus.initialInboundReceived && Number(magnetStatus.initialInboundPairs) > 0 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        marginTop: 11,
+                        paddingTop: 10,
+                        borderTop: "1px solid rgba(148,163,184,0.45)",
+                      }}
+                    >
+                      <div style={{ fontSize: 11, color: "#334155" }}>
+                        <strong>{fmt(magnetStatus.initialInboundPairs)} of each</strong> expected{" "}
+                        {fmtDate(magnetStatus.initialInboundDue)}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={receiveInitialMagnetShipment}
+                        disabled={updatingMagnetStatus}
+                        style={{
+                          padding: "6px 9px",
+                          borderRadius: 7,
+                          border: "1px solid #166534",
+                          background: "#16a34a",
+                          color: "white",
+                          fontSize: 10,
+                          fontWeight: 800,
+                          cursor: updatingMagnetStatus ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        Mark shipment received
+                      </button>
+                    </div>
+                  )}
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
+                      marginTop: 10,
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: "#64748b" }}>
+                      Automatically recalculates from Production Orders and unfinished Fur List work.
+                      {" "}Reorder alerts email info@jrco.us.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={updateMagnetPhysicalCount}
+                      disabled={updatingMagnetStatus}
+                      style={{
+                        padding: "5px 8px",
+                        borderRadius: 7,
+                        border: "1px solid #94a3b8",
+                        background: "white",
+                        color: "#334155",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        cursor: updatingMagnetStatus ? "not-allowed" : "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Update physical count
+                    </button>
+                  </div>
+                </section>
+              );
+            })()}
+
             {loadingKanbanQueue && (
               <div style={{ fontSize: 12, color: "#9ca3af" }}>Loading Kanban…</div>
             )}
