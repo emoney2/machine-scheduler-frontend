@@ -1,25 +1,27 @@
 ﻿// src/ShipmentComplete.jsx
 import React, { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
-
-/** QBO sales invoices list — reliable target vs per-invoice deeplinks. */
-export const QBO_OPEN_INVOICES_URL =
-  "https://qbo.intuit.com/app/invoices?jobId=sales-payments";
+import { resolveShipmentInvoiceUrl } from "./qboInvoiceOpenUrl";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { state } = location;
+  const qi = (searchParams.get("qi") || "").trim();
+  const qr = (searchParams.get("qr") || "").trim();
+  const qeParam = (searchParams.get("qe") || "").trim().toLowerCase();
+  const invoiceUrl = resolveShipmentInvoiceUrl({ qi, qr, qeParam, state });
 
   useEffect(() => {
     postShipQboClientLog([
       {
         message: "shipment_complete_mount",
-        openInvoicesUrl: QBO_OPEN_INVOICES_URL,
+        invoiceUrl,
       },
     ]);
-  }, [location.key]);
+  }, [invoiceUrl, location.key]);
 
   function mergedShipmentFlags(navState) {
     let shippedOk = navState?.shippedOk ?? false;
@@ -45,10 +47,10 @@ export default function ShipmentComplete() {
     postShipQboClientLog([
       {
         message: "open_invoice_click",
-        openInvoicesUrl: QBO_OPEN_INVOICES_URL,
+        invoiceUrl,
       },
     ]);
-    window.open(QBO_OPEN_INVOICES_URL, "_blank", "noopener,noreferrer");
+    window.open(invoiceUrl, "_blank", "noopener,noreferrer");
   };
 
   const renderStatus = (ok, label) => (
@@ -57,7 +59,7 @@ export default function ShipmentComplete() {
     </li>
   );
 
-  const canOpenInvoice = shippedOk;
+  const canOpenInvoice = !!invoiceUrl;
   const openBtnStyle = {
     margin: "0.5rem",
     padding: "0.75rem 1.5rem",
@@ -95,7 +97,7 @@ export default function ShipmentComplete() {
       <div style={{ marginTop: "2rem", textAlign: "center" }}>
         {canOpenInvoice ? (
           <a
-            href={QBO_OPEN_INVOICES_URL}
+            href={invoiceUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => {

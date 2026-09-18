@@ -700,31 +700,6 @@ export default function Ship() {
   // Helpers must live inside the component (hooks rule)
   const openedOnceRef = useRef(false);
 
-  /** Stable browser deeplink (txnId + realm). Prefer over raw invoice URLs that may omit txnId after redirects. */
-  function buildCanonicalQboInvoiceOpenUrl(txnId, realmId, invoiceUrlHint, qeLabel) {
-    const tid = String(txnId || "").trim();
-    const rid = String(realmId || "").trim();
-    if (!tid || !rid) return "";
-    const qev = String(qeLabel || "").trim().toLowerCase();
-    let origin;
-    if (qev === "sandbox") {
-      origin = "https://app.sandbox.qbo.intuit.com";
-    } else if (qev === "production") {
-      origin = "https://app.qbo.intuit.com";
-    } else {
-      const hint = String(invoiceUrlHint || "").toLowerCase();
-      origin = hint.includes("sandbox")
-        ? "https://app.sandbox.qbo.intuit.com"
-        : "https://app.qbo.intuit.com";
-    }
-    const q = new URLSearchParams();
-    q.set("txnId", tid);
-    q.set("txnType", "Invoice");
-    q.set("companyId", rid);
-    q.set("deeplinkcompanyid", rid);
-    return `${origin}/app/invoice?${q.toString()}`;
-  }
-
   /** Kept in sync: invoice id + realm (pair), plus ?qi=&qr=&qe= for refresh-safe Open Invoice. */
   function persistShipmentCompleteQbo(invoiceUrl, qboInvoiceId, qboRealmId, qboInvoiceEnv) {
     const inv = String(invoiceUrl || "").trim();
@@ -746,6 +721,8 @@ export default function Ship() {
       const canon = buildQboInvoiceOpenUrl(id, re, qe, inv);
       if (canon) {
         sessionStorage.setItem("jrco_lastInvoiceDeeplink", canon);
+      } else {
+        sessionStorage.removeItem("jrco_lastInvoiceDeeplink");
       }
       if (id && re) {
         sessionStorage.setItem(
@@ -759,6 +736,8 @@ export default function Ship() {
             t: Date.now(),
           })
         );
+      } else {
+        sessionStorage.removeItem("jrco_lastShipmentQbo");
       }
     } catch {
       /* ignore */
