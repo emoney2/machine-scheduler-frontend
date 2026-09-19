@@ -459,6 +459,7 @@ function SewingCard({ job, draggable, imageHint, tv, split }) {
         <div className="ps-sched-flags">
           {job.locked && <span>Locked</span>}
           {split && <span>Split · {todayQty} pcs today</span>}
+          {(job.emergencyUsed || Number(job.emergencyCapacity) > 0) && <span className="warning">Emergency sewing</span>}
           {hard && <span>Hard</span>}
           {job.rush && <span>Rush</span>}
           {late && <span className="danger">Late</span>}
