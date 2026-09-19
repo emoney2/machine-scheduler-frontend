@@ -10,6 +10,16 @@ function asList(value) {
   return Array.isArray(value) ? value : [];
 }
 
+function friendlyError(err) {
+  const raw = err?.response?.data?.error ?? err?.message ?? err;
+  const text = typeof raw === "string" ? raw : JSON.stringify(raw || "");
+  if (/RATE_LIMIT|quota exceeded|429/i.test(text)) {
+    return "Google Sheets is temporarily busy. Wait about a minute and refresh.";
+  }
+  const compact = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return compact.length > 220 ? `${compact.slice(0, 220)}…` : compact || "Could not load schedule";
+}
+
 function fmtDate(value) {
   if (!value) return "—";
   const raw = String(value).slice(0, 10);
@@ -50,7 +60,7 @@ function useScheduleData({ tv = false } = {}) {
         setProposal(prop.data || null);
       }
     } catch (e) {
-      setError(e?.response?.data?.error || e?.message || "Could not load schedule");
+      setError(friendlyError(e));
     } finally {
       setLoading(false);
     }
@@ -207,7 +217,7 @@ export function SewingCalendar({ tv = false }) {
       setShowProposal(true);
       await data.reload();
     } catch (e) {
-      window.alert(e?.response?.data?.error || e?.message || "Schedule rebuild failed");
+      window.alert(friendlyError(e) || "Schedule rebuild failed");
     } finally {
       setBusy(false);
     }
@@ -359,7 +369,7 @@ export function EmbroideryCalendar() {
       setShowProposal(true);
       await data.reload();
     } catch (e) {
-      window.alert(e?.response?.data?.error || e?.message || "Schedule rebuild failed");
+      window.alert(friendlyError(e) || "Schedule rebuild failed");
     } finally {
       setBusy(false);
     }
