@@ -6,6 +6,10 @@ import "./ProductionSchedule.css";
 const ROOT = `${API_ROOT}/schedule`;
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function asList(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function fmtDate(value) {
   if (!value) return "—";
   const raw = String(value).slice(0, 10);
@@ -123,7 +127,7 @@ function Banner({ error, proposed }) {
 }
 
 function dateRange(schedule, field = "date") {
-  const dates = (schedule || []).map((r) => String(r[field] || r.start || "").slice(0, 10)).filter(Boolean).sort();
+  const dates = asList(schedule).map((r) => String(r[field] || r.start || "").slice(0, 10)).filter(Boolean).sort();
   if (!dates.length) return [];
   const start = new Date(`${dates[0]}T12:00:00`);
   start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
@@ -140,9 +144,9 @@ function dateRange(schedule, field = "date") {
 
 function UnscheduledOrders({ schedule, type }) {
   const planned = new Set(
-    (type === "sewing" ? schedule?.sewing : schedule?.embroidery || []).map((r) => String(r.orderNumber))
+    asList(type === "sewing" ? schedule?.sewing : schedule?.embroidery).map((r) => String(r.orderNumber || r.order_number || ""))
   );
-  const missing = (schedule?.orders || []).filter((r) => !planned.has(String(r.order_number)));
+  const missing = asList(schedule?.orders).filter((r) => !planned.has(String(r.order_number || r.orderNumber || "")));
   if (!missing.length) return null;
   return (
     <div className="ps-unscheduled">
@@ -164,8 +168,8 @@ export function SewingCalendar({ tv = false }) {
   const [showProposal, setShowProposal] = useState(!tv);
   const [busy, setBusy] = useState(false);
   const active = chooseSchedule(data, !tv && showProposal);
-  const schedule = active.schedule || {};
-  const rows = schedule.sewing || [];
+  const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
+  const rows = asList(schedule.sewing);
   const days = useMemo(() => dateRange(rows), [rows]);
   const byDay = useMemo(() => {
     const map = {};
@@ -180,7 +184,7 @@ export function SewingCalendar({ tv = false }) {
   const rebuild = async () => {
     setBusy(true);
     try {
-      await axios.post(`${ROOT}/rebuild`, { reason: "administrator requested rebuild" }, { timeout: 120000 });
+      await axios.post(`${ROOT}/rebuild`, { reason: "administrator requested rebuild" }, { timeout: 180000 });
       setShowProposal(true);
       await data.reload();
     } catch (e) {
@@ -257,7 +261,11 @@ export function SewingCalendar({ tv = false }) {
           );
         })}
       </div>
-      {!days.length && !data.loading ? <div className="ps-empty">No published sewing work is available.</div> : null}
+      {!days.length && !data.loading ? (
+        <div className="ps-empty">
+          {active.version ? "No sewing work is placed on this schedule yet." : "No published schedule yet. Click Rebuild Schedule to create the first baseline."}
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -314,10 +322,10 @@ export function EmbroideryCalendar() {
   const [showProposal, setShowProposal] = useState(true);
   const [busy, setBusy] = useState(false);
   const active = chooseSchedule(data, showProposal);
-  const schedule = active.schedule || {};
+  const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
   const byMachine = useMemo(() => {
     const map = { "Machine 1": [], "Machine 2": [], "Machine 3": [] };
-    (schedule.embroidery || []).forEach((job) => {
+    asList(schedule.embroidery).forEach((job) => {
       (map[job.machine] ||= []).push(job);
     });
     Object.values(map).forEach((jobs) => jobs.sort((a, b) => String(a.start).localeCompare(String(b.start))));
@@ -327,9 +335,11 @@ export function EmbroideryCalendar() {
   const rebuild = async () => {
     setBusy(true);
     try {
-      await axios.post(`${ROOT}/rebuild`, { reason: "administrator requested rebuild" }, { timeout: 120000 });
+      await axios.post(`${ROOT}/rebuild`, { reason: "administrator requested rebuild" }, { timeout: 180000 });
       setShowProposal(true);
       await data.reload();
+    } catch (e) {
+      window.alert(e?.response?.data?.error || e?.message || "Schedule rebuild failed");
     } finally {
       setBusy(false);
     }
@@ -427,7 +437,7 @@ export function ScheduleApprovals() {
           />
           <ChangeList
             title="Conflicts"
-            items={(schedule.conflicts || []).map((r) => `${r.orderNumber ? `#${r.orderNumber}: ` : ""}${r.message}`)}
+            items={asList(schedule.conflicts).map((r) => `${r.orderNumber ? `#${r.orderNumber}: ` : ""}${r.message}`)}
             danger
           />
           <label className="ps-notes">
@@ -448,8 +458,8 @@ export function ScheduleConflicts() {
   const data = useScheduleData();
   const [showProposal, setShowProposal] = useState(true);
   const active = chooseSchedule(data, showProposal);
-  const conflicts = active.schedule?.conflicts || [];
-  const warnings = active.schedule?.warnings || [];
+  const conflicts = asList(active.schedule?.conflicts);
+  const warnings = asList(active.schedule?.warnings);
   return (
     <main className="ps-page">
       <ScheduleHeader
