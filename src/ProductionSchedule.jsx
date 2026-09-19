@@ -449,7 +449,12 @@ function SewingCard({ job, draggable, imageHint, tv, split }) {
         <div className="ps-sched-meta">
           <span>{fmtTime(job.start)}–{fmtTime(job.finish)}</span>
           <span>Due {fmtDate(job.dueDate)}</span>
-          <span>Ship {fmtDate(job.requiredShipDate)}</span>
+          <span>
+            Ship {fmtDate(job.requiredShipDate)}
+            {Number(job.transitBusinessDays) > 0
+              ? ` · ${job.transitBusinessDays}-day ${job.shippingMethod || "Ground"}`
+              : ""}
+          </span>
         </div>
         <div className="ps-sched-flags">
           {job.locked && <span>Locked</span>}
