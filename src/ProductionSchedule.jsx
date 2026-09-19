@@ -142,16 +142,35 @@ function dateRange(schedule, field = "date") {
   return days;
 }
 
+function needsSewing(order) {
+  return Number(order.remaining_quantity || order.remainingQuantity || 0) > 0;
+}
+
+function needsEmbroidery(order) {
+  const stage = String(order.stage || "").toUpperCase();
+  if (stage.includes("SEW") || stage === "COMPLETE" || stage === "SHIPPED") return false;
+  return Number(order.stitch_count || order.stitchCount || 0) > 0
+    && Number(order.embroidery_remaining ?? order.embroideryRemaining ?? order.remaining_quantity ?? 0) > 0;
+}
+
 function UnscheduledOrders({ schedule, type }) {
   const planned = new Set(
     asList(type === "sewing" ? schedule?.sewing : schedule?.embroidery).map((r) => String(r.orderNumber || r.order_number || ""))
   );
-  const missing = asList(schedule?.orders).filter((r) => !planned.has(String(r.order_number || r.orderNumber || "")));
+  const missing = asList(schedule?.orders).filter((r) => {
+    const id = String(r.order_number || r.orderNumber || "");
+    if (!id || planned.has(id)) return false;
+    return type === "sewing" ? needsSewing(r) : needsEmbroidery(r);
+  });
   if (!missing.length) return null;
   return (
     <div className="ps-unscheduled">
-      <strong>Unscheduled open work ({missing.length})</strong>
-      <span>These orders remain visible because missing data, readiness, or capacity prevented placement.</span>
+      <strong>{type === "sewing" ? "Unscheduled sewing work" : "Unscheduled embroidery work"} ({missing.length})</strong>
+      <span>
+        {type === "sewing"
+          ? "These open orders still need sewing capacity and could not be placed."
+          : "These orders still need embroidery and could not be placed. Orders that are already sewing, or that do not have stitch counts yet, are omitted here."}
+      </span>
       <div className="ps-chip-row">
         {missing.map((r) => (
           <span className="ps-chip danger" key={r.order_number}>
@@ -311,7 +330,8 @@ function SewingCard({ job, draggable }) {
         {job.readinessOverride && <span>Readiness override</span>}
         {job.frenchSeam && <span>French seam</span>}
         {job.unusualShape && <span>Unusual shape</span>}
-        {job.conflict && <span className="danger">Conflict</span>}
+        {job.late && <span className="danger">Late vs ship date</span>}
+        {job.conflict && !job.late && <span className="danger">Conflict</span>}
       </div>
     </article>
   );
