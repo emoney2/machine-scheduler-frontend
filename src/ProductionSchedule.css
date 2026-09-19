@@ -91,7 +91,7 @@
 .ps-badges .ok { color: #166534; background: #dcfce7; }
 .ps-badges .danger, .ps-chip.danger { color: #991b1b; background: #fee2e2; }
 .ps-badges .warning { color: #854d0e; background: #fef3c7; }
-.ps-machines { display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+.ps-machines { display: grid; grid-template-columns: repeat(4, minmax(220px, 1fr)); gap: 12px; align-items: start; }
 .ps-machine { border: 1px solid #d1d5db; border-radius: 10px; padding: 10px; background: #f8fafc; display: grid; gap: 8px; }
 .ps-machine h2 { margin: 0 0 2px; font-size: 18px; color: #111827; }
 .ps-machine h2 span { float: right; font-size: 10px; color: #64748b; font-weight: 500; }
@@ -118,8 +118,13 @@
 .ps-help { color: #64748b; font-size: 12px; }
 .ps-empty { padding: 40px; text-align: center; color: #64748b; }
 .ps-empty.small { padding: 12px; }
+@media (max-width: 1400px) {
+  .ps-machines { grid-template-columns: repeat(2, minmax(220px, 1fr)); }
+}
 @media (max-width: 1100px) {
   .ps-week-labels, .ps-calendar { min-width: 900px; }
-  .ps-machines { grid-template-columns: 1fr; }
   .ps-header { flex-direction: column; }
+}
+@media (max-width: 700px) {
+  .ps-machines { grid-template-columns: 1fr; }
 }

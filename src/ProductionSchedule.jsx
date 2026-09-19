@@ -368,9 +368,18 @@ export function EmbroideryCalendar() {
   const active = chooseSchedule(data, showProposal);
   const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
   const byMachine = useMemo(() => {
-    const map = { "Machine 1": [], "Machine 2": [], "Machine 3": [] };
+    const map = {
+      "Single Head Machine": [],
+      "Machine 2": [],
+      "Machine 3": [],
+      "Machine 4": [],
+    };
     asList(schedule.embroidery).forEach((job) => {
-      (map[job.machine] ||= []).push(job);
+      const raw = job.machine || "";
+      const machine = ["Machine 1", "Single Head", "Single Head Machine"].includes(raw)
+        ? "Single Head Machine"
+        : (raw || "Machine 2");
+      (map[machine] ||= []).push(job);
     });
     Object.values(map).forEach((jobs) => jobs.sort((a, b) => String(a.start).localeCompare(String(b.start))));
     return map;
@@ -405,14 +414,14 @@ export function EmbroideryCalendar() {
       <div className="ps-machines">
         {Object.entries(byMachine).map(([machine, jobs]) => (
           <section className="ps-machine" key={machine}>
-            <h2>{machine} <span>6 heads · 30,000 stitches/hour</span></h2>
+            <h2>{machine} <span>{machine === "Single Head Machine" ? "1 head" : "6 heads"} · 30,000 stitches/hour</span></h2>
             {jobs.map((job) => (
               <article className={`ps-card ${job.threadConflict ? "conflict" : ""}`} key={`${job.orderNumber}-${job.start}`}>
                 <div className="ps-card-title"><strong>#{job.orderNumber}</strong><span>{job.sameDaySewing ? "Same-day sewing" : ""}</span></div>
                 <div>{job.customer}</div>
                 <div className="muted">{[job.product, job.design].filter(Boolean).join(" · ")}</div>
                 <dl>
-                  <dt>Quantity / runs</dt><dd>{job.quantity} / {job.runs}</dd>
+                  <dt>Quantity / runs</dt><dd>{job.quantity} / {job.runs} · {job.heads || (machine === "Single Head Machine" ? 1 : 6)}-head</dd>
                   <dt>Stitches</dt><dd>{Number(job.stitchCount || 0).toLocaleString()}</dd>
                   <dt>Duration</dt><dd>{Number(job.durationHours || 0).toFixed(2)} hours</dd>
                   <dt>Start / finish</dt><dd>{fmtDate(job.start)} {fmtTime(job.start)} → {fmtDate(job.finish)} {fmtTime(job.finish)}</dd>
