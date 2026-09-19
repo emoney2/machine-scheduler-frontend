@@ -106,7 +106,8 @@
   font-weight: 800;
 }
 .ps-sched-name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ps-sched-qty { flex: 0 0 auto; font-size: 15px; font-weight: 800; }
+.ps-sched-qty { flex: 0 0 auto; font-size: 15px; font-weight: 800; white-space: nowrap; }
+.ps-sched-qty.split { font-size: 12px; color: #111827; }
 .ps-sched-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .ps-sched-meta span { background: rgba(255,255,255,.72); border-radius: 10px; padding: 0 6px; font-size: 11px; font-weight: 600; }
 .ps-sched-flags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }

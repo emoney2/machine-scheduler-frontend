@@ -190,8 +190,22 @@ function openJobImage(raw) {
   }
 }
 
+function isBackProduct(product) {
+  return /(?:^|\s)backs?$/i.test(String(product || "").trim());
+}
+
 function needsSewing(order) {
+  if (order.needs_sewing === false || order.needsSewing === false) return false;
+  if (isBackProduct(order.product)) return false;
   return Number(order.remaining_quantity || order.remainingQuantity || 0) > 0;
+}
+
+function dayPieces(job) {
+  const explicit = Number(job.dayQuantity);
+  if (Number.isFinite(explicit) && explicit > 0) return Math.round(explicit);
+  const units = Number(job.capacityUnits);
+  if (Number.isFinite(units) && units > 0) return Math.round(units);
+  return Number(job.remainingQuantity || 0);
 }
 
 function needsEmbroidery(order) {
@@ -236,7 +250,15 @@ export function SewingCalendar({ tv = false, columns }) {
   const [busy, setBusy] = useState(false);
   const active = chooseSchedule(data, !tv && showProposal);
   const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
-  const rows = asList(schedule.sewing);
+  const rows = asList(schedule.sewing).filter((row) => !isBackProduct(row.product));
+  const splitCounts = useMemo(() => {
+    const counts = {};
+    rows.forEach((row) => {
+      const id = String(row.orderNumber || "");
+      if (id) counts[id] = (counts[id] || 0) + 1;
+    });
+    return counts;
+  }, [rows]);
   const images = useMemo(
     () => collectJobImages(columns, schedule.orders),
     [columns, schedule.orders]
@@ -324,6 +346,7 @@ export function SewingCalendar({ tv = false, columns }) {
                   <SewingCard
                     key={`${job.orderNumber}-${job.start}-${index}`}
                     job={job}
+                    split={!!job.split || (splitCounts[String(job.orderNumber)] || 0) > 1}
                     imageHint={images[orderKey(job.orderNumber)]}
                     tv={tv}
                     draggable={!tv && active.proposed && !job.locked}
@@ -343,10 +366,15 @@ export function SewingCalendar({ tv = false, columns }) {
   );
 }
 
-function SewingCard({ job, draggable, imageHint, tv }) {
+function SewingCard({ job, draggable, imageHint, tv, split }) {
   const hard = !!job.hardDate;
   const sample = Number(job.quantity) === 1;
   const late = !!job.late || !!job.conflict;
+  const todayQty = dayPieces(job);
+  const totalQty = Number(job.remainingQuantity ?? job.quantity ?? 0);
+  const qtyLabel = split
+    ? `${todayQty} today / ${totalQty || "—"}`
+    : `${totalQty || 0}/${job.quantity ?? "—"}`;
   const classes = [
     "ps-sched-card",
     hard ? "hard" : "soft",
@@ -359,7 +387,7 @@ function SewingCard({ job, draggable, imageHint, tv }) {
     job.customer,
     job.product,
     job.design,
-    `qty ${job.remainingQuantity ?? "—"}/${job.quantity ?? "—"}`,
+    split ? `${todayQty} pieces today of ${totalQty || "—"}` : `qty ${job.remainingQuantity ?? "—"}/${job.quantity ?? "—"}`,
     `due ${fmtDate(job.dueDate)}`,
     `ship ${fmtDate(job.requiredShipDate)}`,
     job.shippingGroupId && job.shippingGroupId.startsWith("ORDER-") ? "" : job.shippingGroupId,
@@ -416,7 +444,7 @@ function SewingCard({ job, draggable, imageHint, tv }) {
             {job.customer || "No customer"}
             {job.product ? ` - ${job.product}` : ""}
           </span>
-          <span className="ps-sched-qty">{job.remainingQuantity ?? 0}/{job.quantity ?? "—"}</span>
+          <span className={`ps-sched-qty ${split ? "split" : ""}`}>{qtyLabel}</span>
         </div>
         <div className="ps-sched-meta">
           <span>{fmtTime(job.start)}–{fmtTime(job.finish)}</span>
@@ -425,6 +453,7 @@ function SewingCard({ job, draggable, imageHint, tv }) {
         </div>
         <div className="ps-sched-flags">
           {job.locked && <span>Locked</span>}
+          {split && <span>Split · {todayQty} pcs today</span>}
           {hard && <span>Hard</span>}
           {job.rush && <span>Rush</span>}
           {late && <span className="danger">Late</span>}
