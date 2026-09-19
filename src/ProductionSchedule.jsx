@@ -4,7 +4,7 @@ import { API_ROOT } from "./apiRoot";
 import "./ProductionSchedule.css";
 
 const ROOT = `${API_ROOT}/schedule`;
-const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
 function asList(value) {
   return Array.isArray(value) ? value : [];
@@ -142,11 +142,12 @@ function dateRange(schedule, field = "date") {
   const start = new Date(`${dates[0]}T12:00:00`);
   start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
   const finish = new Date(`${dates[dates.length - 1]}T12:00:00`);
-  finish.setDate(finish.getDate() + (6 - ((finish.getDay() + 6) % 7)));
   const days = [];
   const cursor = new Date(start);
   while (cursor <= finish && days.length < 371) {
-    days.push(cursor.toISOString().slice(0, 10));
+    if (cursor.getDay() !== 0 && cursor.getDay() !== 6) {
+      days.push(cursor.toISOString().slice(0, 10));
+    }
     cursor.setDate(cursor.getDate() + 1);
   }
   return days;
@@ -300,15 +301,30 @@ export function SewingCalendar({ tv = false }) {
 }
 
 function SewingCard({ job, draggable }) {
+  const hard = !!job.hardDate;
+  const sample = Number(job.quantity) === 1;
+  const late = !!job.late || !!job.conflict;
   const classes = [
-    "ps-card",
-    job.conflict ? "conflict" : "",
+    "ps-sched-card",
+    hard ? "hard" : "soft",
+    sample ? "sample" : "",
+    late ? "late" : "",
     job.locked ? "locked" : "",
-    !job.materialsReady ? "warning" : "",
   ].filter(Boolean).join(" ");
+  const title = [
+    `#${job.orderNumber}`,
+    job.customer,
+    job.product,
+    job.design,
+    `qty ${job.remainingQuantity ?? "—"}/${job.quantity ?? "—"}`,
+    `due ${fmtDate(job.dueDate)}`,
+    `ship ${fmtDate(job.requiredShipDate)}`,
+    job.shippingGroupId && job.shippingGroupId.startsWith("ORDER-") ? "" : job.shippingGroupId,
+  ].filter(Boolean).join(" · ");
   return (
     <article
       className={classes}
+      title={title}
       draggable={draggable}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = "move";
@@ -318,30 +334,28 @@ function SewingCard({ job, draggable }) {
         }));
       }}
     >
-      <div className="ps-card-title">
-        <strong>#{job.orderNumber}</strong>
-        <span>{job.locked ? "🔒 Locked" : job.hardDate ? "Hard date" : job.rush ? "Rush" : ""}</span>
-      </div>
-      <div>{job.customer || "No customer"}</div>
-      <div className="muted">{[job.product, job.design].filter(Boolean).join(" · ")}</div>
-      <dl>
-        <dt>Qty / remaining</dt><dd>{job.quantity ?? "—"} / {job.remainingQuantity ?? "—"}</dd>
-        <dt>Planned</dt><dd>{fmtTime(job.start)}–{fmtTime(job.finish)}</dd>
-        <dt>Units</dt><dd>{Number(job.capacityUnits || 0).toFixed(1)} + {Number(job.setupUnits || 0).toFixed(1)} setup</dd>
-        <dt>Due / in-hand</dt><dd>{fmtDate(job.dueDate)} / {fmtDate(job.inHandDate)}</dd>
-        <dt>Required ship</dt><dd>{fmtDate(job.requiredShipDate)}</dd>
-        <dt>Group</dt><dd>{job.shippingGroupId || "Single order"}</dd>
-      </dl>
-      <div className="ps-badges">
-        <span className={job.embroideryReady ? "ok" : "danger"}>
-          {job.embroideryReady ? "Embroidery ready" : "Embroidery not ready"}
+      <div className="ps-sched-top">
+        <span className="ps-sched-id">{job.orderNumber}</span>
+        <span className="ps-sched-name">
+          {job.customer || "No customer"}
+          {job.product ? ` - ${job.product}` : ""}
         </span>
-        {!job.materialsReady && <span className="warning">Materials warning</span>}
-        {job.readinessOverride && <span>Readiness override</span>}
+        <span className="ps-sched-qty">{job.remainingQuantity ?? 0}/{job.quantity ?? "—"}</span>
+      </div>
+      <div className="ps-sched-meta">
+        <span>{fmtTime(job.start)}–{fmtTime(job.finish)}</span>
+        <span>Due {fmtDate(job.dueDate)}</span>
+        <span>Ship {fmtDate(job.requiredShipDate)}</span>
+      </div>
+      <div className="ps-sched-flags">
+        {job.locked && <span>Locked</span>}
+        {hard && <span>Hard</span>}
+        {job.rush && <span>Rush</span>}
+        {late && <span className="danger">Late</span>}
+        {!job.embroideryReady && <span className="danger">Emb not ready</span>}
+        {!job.materialsReady && <span className="warning">Materials</span>}
         {job.frenchSeam && <span>French seam</span>}
-        {job.unusualShape && <span>Unusual shape</span>}
-        {job.late && <span className="danger">Late vs ship date</span>}
-        {job.conflict && !job.late && <span className="danger">Conflict</span>}
+        {job.unusualShape && <span>Shape</span>}
       </div>
     </article>
   );
