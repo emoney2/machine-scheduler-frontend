@@ -44,6 +44,13 @@ import MachineSensorTest from "./MachineSensorTest";
 import { API_ROOT, getBackendOrigin, getLoginOrigin } from "./apiRoot";
 import { FullscreenToggle, useMachineFullscreen } from "./useMachineFullscreen";
 import { estimateRemainingMs, isPlaceholder, normalizeOrderId } from "./machineFloorUtils";
+import {
+  SewingCalendar,
+  EmbroideryCalendar,
+  ScheduleApprovals,
+  ScheduleConflicts,
+  SchedulingSettings,
+} from "./ProductionSchedule";
 
 window._isSubmittingOrder = false;
 
@@ -375,7 +382,8 @@ export default function App() {
   const isCompactNav = isScheduler || path === "/sewing-priority" || path.startsWith("/sewing-priority/");
   const isMachineFloor = path.startsWith("/machine/");
   const isSensorTest = path.startsWith("/machine-sensor");
-  const hideChrome = isMachineFloor || isSensorTest;
+  const isSewingTv = path === "/sewing-calendar/tv";
+  const hideChrome = isMachineFloor || isSensorTest || isSewingTv;
   const { isFullscreen, toggle: toggleFullscreen } = useMachineFullscreen(isMachineFloor);
 
   const prevM1Top = useRef(null);
@@ -2134,7 +2142,12 @@ useEffect(() => {
          { to: "/departments",       label: "Departments" },
          { to: "/kanban/queue",      label: "Kanban Queue" },
          { to: "/sales",             label: "Sales" },
-         { to: "/sewing-priority",   label: "Sewing Priority" }
+         { to: "/sewing-priority",   label: "Sewing Priority" },
+         { to: "/sewing-calendar",   label: "Sewing Calendar" },
+         { to: "/embroidery-calendar", label: "Embroidery Calendar" },
+         { to: "/schedule-approvals", label: "Schedule Approvals" },
+         { to: "/schedule-conflicts", label: "Conflicts" },
+         { to: "/scheduling-settings", label: "Scheduling Settings" }
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => (
             isCompactNav
@@ -2255,6 +2268,12 @@ useEffect(() => {
           <Route path="/overview" element={<Overview />} />
           <Route path="/submit" element={<OrderSubmission />} />
           <Route path="/sewing-priority" element={<SewingPriority />} />
+          <Route path="/sewing-calendar" element={<SewingCalendar />} />
+          <Route path="/sewing-calendar/tv" element={<SewingCalendar tv />} />
+          <Route path="/embroidery-calendar" element={<EmbroideryCalendar />} />
+          <Route path="/schedule-approvals" element={<ScheduleApprovals />} />
+          <Route path="/schedule-conflicts" element={<ScheduleConflicts />} />
+          <Route path="/scheduling-settings" element={<SchedulingSettings />} />
           <Route path="/machine-sensor-test" element={<MachineSensorTest />} />
           <Route path="/machine/:machineId/job/:orderId" element={<MachineJob columns={columns} />} />
           <Route path="/machine/:machineId" element={<MachineHome columns={columns} loading={isLoading} />} />
