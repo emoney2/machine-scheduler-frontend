@@ -14,6 +14,7 @@ import {
   normalizeOrderId,
 } from "./machineFloorUtils";
 import { useMachineVibration, VibrationDot } from "./useMachineVibration";
+import { getTabletMachineId } from "./tabletMachine";
 
 const ROOT = apiRoot();
 const PLUS_FLASH_MS = 2500;
@@ -45,6 +46,11 @@ export default function MachineJob({ columns }) {
   const postedTimer = useRef(null);
   const [finishOverlay, setFinishOverlay] = useState(null);
   const [manualStart, setManualStart] = useState(false);
+  const [tabletMachine] = useState(() => getTabletMachineId());
+  const [sendAgent, setSendAgent] = useState(null);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendBusy, setSendBusy] = useState(false);
+  const [sendOutcome, setSendOutcome] = useState(null);
 
   const applyPayload = useCallback((data) => {
     if (!data) return;
@@ -83,6 +89,24 @@ export default function MachineJob({ columns }) {
     loadJob(ctrl.signal);
     return () => ctrl.abort();
   }, [oid, loadJob]);
+
+  const loadSendAgent = useCallback(async () => {
+    try {
+      const res = await axios.get(`${ROOT}/embroidery/send-file/status`, {
+        withCredentials: true,
+        timeout: 15000,
+      });
+      setSendAgent(res.data || {});
+    } catch (_) {
+      setSendAgent({ configured: true, online: false, configuredMachines: [] });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSendAgent();
+    const timer = setInterval(loadSendAgent, 10000);
+    return () => clearInterval(timer);
+  }, [loadSendAgent]);
 
   useEffect(() => {
     if (!socket) return;
@@ -293,6 +317,73 @@ export default function MachineJob({ columns }) {
     }
   };
 
+  const sendReadiness = (() => {
+    if (!tabletMachine) return { ready: false, label: "Designate tablet on Jobs page" };
+    if (tabletMachine !== machineId) {
+      return {
+        ready: false,
+        label: `Tablet is set to ${MACHINE_META[tabletMachine]?.title || tabletMachine}`,
+      };
+    }
+    if (!sendAgent) return { ready: false, label: "Checking warehouse computer…" };
+    if (!sendAgent.configured) return { ready: false, label: "Warehouse helper setup needed" };
+    if (!sendAgent.online) return { ready: false, label: "Warehouse computer offline" };
+    if (!(sendAgent.configuredMachines || []).includes(machineId)) {
+      return { ready: false, label: "Machine mapping needed" };
+    }
+    return { ready: true, label: `Send file to ${meta.title}` };
+  })();
+
+  const sendEmbroideryFile = async () => {
+    if (!sendReadiness.ready || sendBusy) return;
+    setSendBusy(true);
+    setSendOutcome({ kind: "working", message: "Waiting for warehouse computer…" });
+    try {
+      const created = await axios.post(
+        `${ROOT}/embroidery/send-file`,
+        { orderId: oid, machineId: tabletMachine },
+        { withCredentials: true, timeout: 15000 }
+      );
+      const commandId = created.data?.id;
+      if (!commandId) throw new Error("The backend did not return a send request");
+
+      let finalResult = null;
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const response = await axios.get(
+          `${ROOT}/embroidery/send-file/${encodeURIComponent(commandId)}`,
+          { withCredentials: true, timeout: 15000 }
+        );
+        const result = response.data || {};
+        if (result.status === "processing") {
+          setSendOutcome({ kind: "working", message: "Wilcom is sending the file…" });
+        }
+        if (result.status === "completed" || result.status === "failed") {
+          finalResult = result;
+          break;
+        }
+      }
+      if (!finalResult) {
+        throw new Error("No result from the warehouse computer. Check Wilcom before retrying.");
+      }
+      if (finalResult.status !== "completed") {
+        throw new Error(finalResult.message || "Wilcom could not send the file");
+      }
+      setSendOutcome({
+        kind: "success",
+        message: finalResult.message || `Order ${oid} sent to ${meta.title}`,
+      });
+    } catch (e) {
+      setSendOutcome({
+        kind: "error",
+        message: e?.response?.data?.error || e?.message || "Could not send embroidery file",
+      });
+      loadSendAgent();
+    } finally {
+      setSendBusy(false);
+    }
+  };
+
   return (
     <div
       style={{
@@ -452,6 +543,29 @@ export default function MachineJob({ columns }) {
         >
           {oid}
         </div>
+        <button
+          type="button"
+          disabled={!sendReadiness.ready || sendBusy}
+          onClick={() => {
+            setSendOutcome(null);
+            setSendOpen(true);
+          }}
+          style={{
+            minHeight: 54,
+            marginTop: 12,
+            padding: "8px 18px",
+            border: "none",
+            borderRadius: 12,
+            background: sendReadiness.ready ? "#2563eb" : "#d1d5db",
+            color: sendReadiness.ready ? "#fff" : "#4b5563",
+            fontSize: "clamp(15px, 2.2vh, 21px)",
+            fontWeight: 900,
+            cursor: sendReadiness.ready ? "pointer" : "default",
+            maxWidth: "92%",
+          }}
+        >
+          {sendReadiness.label}
+        </button>
       </div>
       </div>
 
@@ -855,6 +969,87 @@ export default function MachineJob({ columns }) {
         >
           {error || flash}
         </div>
+      )}
+
+      {sendOpen && (
+        <Modal onClose={() => {
+          if (!sendBusy) setSendOpen(false);
+        }}>
+          {!sendOutcome ? (
+            <>
+              <h2 style={{ margin: "0 0 8px", fontSize: 24 }}>
+                Send order #{oid}?
+              </h2>
+              <p style={{ margin: "0 0 8px", fontSize: 17, fontWeight: 800 }}>
+                Destination: {meta.title}
+              </p>
+              <p style={{ margin: "0 0 14px", color: "#4b5563" }}>
+                The warehouse computer will open the exact file named {oid}.EMB
+                and send it through Wilcom.
+              </p>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setSendOpen(false)}
+                  style={btnGhost}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={sendEmbroideryFile}
+                  style={{ ...btnPrimary, background: "#2563eb" }}
+                >
+                  Send to {meta.title}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: 24,
+                  color:
+                    sendOutcome.kind === "success"
+                      ? "#166534"
+                      : sendOutcome.kind === "error"
+                        ? "#991b1b"
+                        : "#1d4ed8",
+                }}
+              >
+                {sendOutcome.kind === "success"
+                  ? "File sent"
+                  : sendOutcome.kind === "error"
+                    ? "Send failed"
+                    : "Sending…"}
+              </h2>
+              <p style={{ margin: "0 0 14px", fontSize: 17, fontWeight: 700 }}>
+                {sendOutcome.message}
+              </p>
+              {sendOutcome.kind !== "working" && (
+                <div style={{ display: "flex", gap: 8 }}>
+                  {sendOutcome.kind === "error" && (
+                    <button
+                      type="button"
+                      onClick={() => setSendOutcome(null)}
+                      style={btnGhost}
+                    >
+                      Try again
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSendOpen(false)}
+                    style={btnPrimary}
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </Modal>
       )}
 
       {editOpen && (

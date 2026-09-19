@@ -13,6 +13,7 @@ import {
   normalizeOrderId,
 } from "./machineFloorUtils";
 import { useMachineVibration, VibrationDot } from "./useMachineVibration";
+import { getTabletMachineId, setTabletMachineId } from "./tabletMachine";
 
 function outlineByDue(due) {
   if (!due) return "#9ca3af";
@@ -64,6 +65,8 @@ function TileOverlay({ children, style, color = "#111827" }) {
 export default function MachineHome({ columns, loading }) {
   const { machineId } = useParams();
   const navigate = useNavigate();
+  const [tabletMachine, setTabletMachine] = useState(() => getTabletMachineId());
+  const [machineSetupOpen, setMachineSetupOpen] = useState(false);
   const [lookup, setLookup] = useState("");
   const [lookupError, setLookupError] = useState("");
   const [finishedIds, setFinishedIds] = useState(() => new Set());
@@ -189,6 +192,27 @@ export default function MachineHome({ columns, loading }) {
         >
           {meta.headCount}
         </span>
+        <button
+          type="button"
+          onClick={() => setMachineSetupOpen(true)}
+          style={{
+            minHeight: 42,
+            padding: "7px 12px",
+            borderRadius: 10,
+            border: tabletMachine === machineId
+              ? "2px solid #16a34a"
+              : "2px solid #d97706",
+            background: tabletMachine === machineId ? "#dcfce7" : "#fef3c7",
+            color: tabletMachine === machineId ? "#166534" : "#92400e",
+            fontSize: 14,
+            fontWeight: 900,
+            cursor: "pointer",
+          }}
+        >
+          {tabletMachine
+            ? `This tablet: ${MACHINE_META[tabletMachine]?.title || tabletMachine}`
+            : "Set this tablet's machine"}
+        </button>
         {vibration.paused ? (
           <span
             style={{
@@ -473,6 +497,83 @@ export default function MachineHome({ columns, loading }) {
         vibrating={vibration.vibrating}
         level={vibration.level}
       />
+      {machineSetupOpen && (
+        <div
+          className="ms-dialog-overlay"
+          onClick={() => setMachineSetupOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 30,
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: 20,
+            background: "rgba(0,0,0,0.5)",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(440px, 100%)",
+              padding: 20,
+              borderRadius: 16,
+              background: "#fff",
+              boxShadow: "0 10px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <h2 style={{ margin: "0 0 6px", fontSize: 24 }}>Designate this tablet</h2>
+            <p style={{ margin: "0 0 14px", color: "#4b5563", fontWeight: 700 }}>
+              Embroidery files sent from this tablet will go only to the selected machine.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              {Object.entries(MACHINE_META).map(([id, item]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setTabletMachineId(id);
+                    setTabletMachine(id);
+                    setMachineSetupOpen(false);
+                    if (id !== machineId) navigate(`/machine/${id}`);
+                  }}
+                  style={{
+                    minHeight: 64,
+                    borderRadius: 12,
+                    border: tabletMachine === id
+                      ? "3px solid #16a34a"
+                      : "2px solid #d1d5db",
+                    background: tabletMachine === id ? "#dcfce7" : "#f9fafb",
+                    color: "#111827",
+                    fontSize: 19,
+                    fontWeight: 900,
+                    cursor: "pointer",
+                  }}
+                >
+                  {item.title}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setMachineSetupOpen(false)}
+              style={{
+                width: "100%",
+                minHeight: 48,
+                marginTop: 12,
+                borderRadius: 10,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
