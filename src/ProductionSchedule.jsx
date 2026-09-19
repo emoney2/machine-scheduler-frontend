@@ -369,7 +369,7 @@ export function SewingCalendar({ tv = false, columns }) {
 function SewingCard({ job, draggable, imageHint, tv, split }) {
   const hard = !!job.hardDate;
   const sample = Number(job.quantity) === 1;
-  const late = !!job.late || !!job.conflict;
+  const late = !hard && (!!job.late || !!job.conflict);
   const todayQty = dayPieces(job);
   const totalQty = Number(job.remainingQuantity ?? job.quantity ?? 0);
   const qtyLabel = split
