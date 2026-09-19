@@ -2268,8 +2268,8 @@ useEffect(() => {
           <Route path="/overview" element={<Overview />} />
           <Route path="/submit" element={<OrderSubmission />} />
           <Route path="/sewing-priority" element={<SewingPriority />} />
-          <Route path="/sewing-calendar" element={<SewingCalendar />} />
-          <Route path="/sewing-calendar/tv" element={<SewingCalendar tv />} />
+          <Route path="/sewing-calendar" element={<SewingCalendar columns={columns} />} />
+          <Route path="/sewing-calendar/tv" element={<SewingCalendar tv columns={columns} />} />
           <Route path="/embroidery-calendar" element={<EmbroideryCalendar />} />
           <Route path="/schedule-approvals" element={<ScheduleApprovals />} />
           <Route path="/schedule-conflicts" element={<ScheduleConflicts />} />

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
+import { extractFileId, jobImageUrl } from "./machineFloorUtils";
 import "./ProductionSchedule.css";
 
 const ROOT = `${API_ROOT}/schedule`;
@@ -153,6 +154,42 @@ function dateRange(schedule, field = "date") {
   return days;
 }
 
+function orderKey(value) {
+  return String(value || "").replace(/^#/, "").trim();
+}
+
+function collectJobImages(columns, orders) {
+  const map = {};
+  asList(orders).forEach((order) => {
+    const id = orderKey(order.order_number || order.orderNumber);
+    const image = order.image || order.Image || order.Preview || "";
+    if (id && image) map[id] = { imageLink: image, imageFileId: extractFileId(image) || "" };
+  });
+  Object.values(columns || {}).forEach((col) => {
+    asList(col?.jobs).forEach((job) => {
+      const id = orderKey(job.id || job.orderNumber);
+      const image = job.imageLink || job.Image || job.image || "";
+      if (!id || !(image || job.imageFileId)) return;
+      map[id] = {
+        imageLink: image || map[id]?.imageLink || "",
+        imageFileId: job.imageFileId || extractFileId(image) || map[id]?.imageFileId || "",
+      };
+    });
+  });
+  return map;
+}
+
+function openJobImage(raw) {
+  const id = extractFileId(raw);
+  if (id) {
+    window.open(`https://drive.google.com/file/d/${id}/view`, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (/^https?:\/\//i.test(String(raw || ""))) {
+    window.open(raw, "_blank", "noopener,noreferrer");
+  }
+}
+
 function needsSewing(order) {
   return Number(order.remaining_quantity || order.remainingQuantity || 0) > 0;
 }
@@ -193,13 +230,17 @@ function UnscheduledOrders({ schedule, type }) {
   );
 }
 
-export function SewingCalendar({ tv = false }) {
+export function SewingCalendar({ tv = false, columns }) {
   const data = useScheduleData({ tv });
   const [showProposal, setShowProposal] = useState(!tv);
   const [busy, setBusy] = useState(false);
   const active = chooseSchedule(data, !tv && showProposal);
   const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
   const rows = asList(schedule.sewing);
+  const images = useMemo(
+    () => collectJobImages(columns, schedule.orders),
+    [columns, schedule.orders]
+  );
   const days = useMemo(() => dateRange(rows), [rows]);
   const byDay = useMemo(() => {
     const map = {};
@@ -283,6 +324,8 @@ export function SewingCalendar({ tv = false }) {
                   <SewingCard
                     key={`${job.orderNumber}-${job.start}-${index}`}
                     job={job}
+                    imageHint={images[orderKey(job.orderNumber)]}
+                    tv={tv}
                     draggable={!tv && active.proposed && !job.locked}
                   />
                 ))}
@@ -300,7 +343,7 @@ export function SewingCalendar({ tv = false }) {
   );
 }
 
-function SewingCard({ job, draggable }) {
+function SewingCard({ job, draggable, imageHint, tv }) {
   const hard = !!job.hardDate;
   const sample = Number(job.quantity) === 1;
   const late = !!job.late || !!job.conflict;
@@ -321,6 +364,13 @@ function SewingCard({ job, draggable }) {
     `ship ${fmtDate(job.requiredShipDate)}`,
     job.shippingGroupId && job.shippingGroupId.startsWith("ORDER-") ? "" : job.shippingGroupId,
   ].filter(Boolean).join(" · ");
+  const rawImage = job.image || job.imageLink || imageHint?.imageLink || "";
+  const thumb = jobImageUrl({
+    image: rawImage,
+    imageLink: rawImage,
+    Image: rawImage,
+    imageFileId: job.imageFileId || imageHint?.imageFileId || "",
+  }, tv ? "w240" : "w160");
   return (
     <article
       className={classes}
@@ -334,28 +384,55 @@ function SewingCard({ job, draggable }) {
         }));
       }}
     >
-      <div className="ps-sched-top">
-        <span className="ps-sched-id">{job.orderNumber}</span>
-        <span className="ps-sched-name">
-          {job.customer || "No customer"}
-          {job.product ? ` - ${job.product}` : ""}
-        </span>
-        <span className="ps-sched-qty">{job.remainingQuantity ?? 0}/{job.quantity ?? "—"}</span>
-      </div>
-      <div className="ps-sched-meta">
-        <span>{fmtTime(job.start)}–{fmtTime(job.finish)}</span>
-        <span>Due {fmtDate(job.dueDate)}</span>
-        <span>Ship {fmtDate(job.requiredShipDate)}</span>
-      </div>
-      <div className="ps-sched-flags">
-        {job.locked && <span>Locked</span>}
-        {hard && <span>Hard</span>}
-        {job.rush && <span>Rush</span>}
-        {late && <span className="danger">Late</span>}
-        {!job.embroideryReady && <span className="danger">Emb not ready</span>}
-        {!job.materialsReady && <span className="warning">Materials</span>}
-        {job.frenchSeam && <span>French seam</span>}
-        {job.unusualShape && <span>Shape</span>}
+      <button
+        type="button"
+        className={`ps-sched-thumb ${thumb ? "" : "missing"}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (rawImage) openJobImage(rawImage);
+        }}
+        disabled={!rawImage}
+        title={rawImage ? "Open artwork" : "No image"}
+      >
+        {thumb ? (
+          <img
+            src={thumb}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <span>No img</span>
+        )}
+      </button>
+      <div className="ps-sched-body">
+        <div className="ps-sched-top">
+          <span className="ps-sched-id">{job.orderNumber}</span>
+          <span className="ps-sched-name">
+            {job.customer || "No customer"}
+            {job.product ? ` - ${job.product}` : ""}
+          </span>
+          <span className="ps-sched-qty">{job.remainingQuantity ?? 0}/{job.quantity ?? "—"}</span>
+        </div>
+        <div className="ps-sched-meta">
+          <span>{fmtTime(job.start)}–{fmtTime(job.finish)}</span>
+          <span>Due {fmtDate(job.dueDate)}</span>
+          <span>Ship {fmtDate(job.requiredShipDate)}</span>
+        </div>
+        <div className="ps-sched-flags">
+          {job.locked && <span>Locked</span>}
+          {hard && <span>Hard</span>}
+          {job.rush && <span>Rush</span>}
+          {late && <span className="danger">Late</span>}
+          {!job.embroideryReady && <span className="danger">Emb not ready</span>}
+          {!job.materialsReady && <span className="warning">Materials</span>}
+          {job.frenchSeam && <span>French seam</span>}
+          {job.unusualShape && <span>Shape</span>}
+        </div>
       </div>
     </article>
   );

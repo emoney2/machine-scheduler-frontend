@@ -47,12 +47,39 @@
 .ps-card dt { color: #64748b; }
 .ps-card dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .ps-sched-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
   border: 2px solid #616161;
   border-radius: 4px;
   padding: 6px 7px;
   background: #eceff1;
   font-size: 12px;
 }
+.ps-sched-thumb {
+  flex: 0 0 56px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, .18);
+  border-radius: 4px;
+  background: #fff;
+  overflow: hidden;
+  cursor: pointer;
+}
+.ps-page.tv .ps-sched-thumb { flex-basis: 72px; width: 72px; height: 72px; }
+.ps-sched-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.ps-sched-thumb.missing, .ps-sched-thumb:disabled {
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, .55);
+}
+.ps-sched-body { flex: 1 1 auto; min-width: 0; }
 .ps-sched-card.hard { background: #e1bee7; border-color: #6a1b9a; }
 .ps-sched-card.sample { background: #ffe0b2; border-color: #ef6c00; }
 .ps-sched-card.late {
