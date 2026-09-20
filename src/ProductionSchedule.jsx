@@ -28,6 +28,13 @@ function fmtDate(value) {
   return y && m && d ? `${m}/${d}/${y}` : String(value);
 }
 
+function fmtCardDate(value) {
+  if (!value) return "—";
+  const raw = String(value).slice(0, 10);
+  const [y, m, d] = raw.split("-");
+  return y && m && d ? `${Number(m)}/${Number(d)}` : String(value);
+}
+
 function weekdayName(value) {
   const raw = String(value || "").slice(0, 10);
   const dt = new Date(`${raw}T12:00:00`);
@@ -541,7 +548,7 @@ function SewingCard({ job, draggable, imageHint, tv, split }) {
   const todayQty = dayPieces(job);
   const totalQty = Number(job.remainingQuantity ?? job.quantity ?? 0);
   const qtyLabel = split
-    ? `${todayQty} today / ${totalQty || "—"}`
+    ? `${todayQty}/${totalQty || "—"}`
     : `${totalQty || 0}/${job.quantity ?? "—"}`;
   const classes = [
     "ps-sched-card",
@@ -566,7 +573,8 @@ function SewingCard({ job, draggable, imageHint, tv, split }) {
     imageLink: rawImage,
     Image: rawImage,
     imageFileId: job.imageFileId || imageHint?.imageFileId || "",
-  }, tv ? "w240" : "w160");
+  }, tv ? "w320" : "w240");
+  const transitDays = Number(job.transitBusinessDays) || 0;
   return (
     <article
       className={classes}
@@ -608,34 +616,24 @@ function SewingCard({ job, draggable, imageHint, tv, split }) {
       <div className="ps-sched-body">
         <div className="ps-sched-top">
           <span className="ps-sched-id">{job.orderNumber}</span>
-          <span className="ps-sched-name">
-            {job.customer || "No customer"}
-            {job.product ? ` - ${job.product}` : ""}
-          </span>
           <span className={`ps-sched-qty ${split ? "split" : ""}`}>{qtyLabel}</span>
         </div>
-        <div className="ps-sched-meta">
-          <span>{fmtTime(job.start)}–{fmtTime(job.finish)}</span>
-          <span>Due {fmtDate(job.dueDate)}</span>
-          <span>
-            Ship {fmtDate(job.requiredShipDate)}
-            {Number(job.transitBusinessDays) > 0
-              ? ` · ${job.transitBusinessDays}-day ${job.shippingMethod || "Ground"}`
-              : ""}
-          </span>
-        </div>
-        <div className="ps-sched-flags">
-          {job.locked && <span>Locked</span>}
-          {split && <span>Split · {todayQty} pcs today</span>}
-          {(job.emergencyUsed || Number(job.emergencyCapacity) > 0) && <span className="warning">Emergency sewing</span>}
-          {hard && <span>Hard</span>}
-          {job.rush && <span>Rush</span>}
-          {late && <span className="danger">Late</span>}
-          {!job.embroideryReady && <span className="danger">Emb not ready</span>}
-          {!job.materialsReady && <span className="warning">Materials</span>}
-          {job.frenchSeam && <span>French seam</span>}
-          {job.unusualShape && <span>Shape</span>}
-        </div>
+        <span className="ps-sched-name">
+          {job.customer || "No customer"}
+          {job.product ? ` - ${job.product}` : ""}
+        </span>
+      </div>
+      <div className="ps-sched-facts">
+        <span>Due {fmtCardDate(job.dueDate)}</span>
+        <span>
+          Ship {fmtCardDate(job.requiredShipDate)}
+          {transitDays > 0 ? ` · ${transitDays}-day` : ""}
+        </span>
+        <span>{hard ? "Hard date" : "Soft date"}</span>
+        {(job.emergencyUsed || Number(job.emergencyCapacity) > 0) && (
+          <span className="warning">Emergency</span>
+        )}
+        {!job.embroideryReady && <span className="danger">Emb not ready</span>}
       </div>
     </article>
   );

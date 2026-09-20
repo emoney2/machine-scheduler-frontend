@@ -47,27 +47,34 @@
 .ps-card dt { color: #64748b; }
 .ps-card dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
 .ps-sched-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) max-content;
+  align-items: stretch;
+  column-gap: 6px;
   border: 2px solid #616161;
   border-radius: 4px;
-  padding: 6px 7px;
+  padding: 4px;
   background: #eceff1;
   font-size: 12px;
+  box-sizing: border-box;
+  min-height: 84px;
 }
 .ps-sched-thumb {
-  flex: 0 0 56px;
-  width: 56px;
-  height: 56px;
+  width: 76px;
+  height: 76px;
   padding: 0;
   border: 1px solid rgba(0, 0, 0, .18);
   border-radius: 4px;
   background: #fff;
   overflow: hidden;
   cursor: pointer;
+  align-self: center;
 }
-.ps-page.tv .ps-sched-thumb { flex-basis: 72px; width: 72px; height: 72px; }
+.ps-page.tv .ps-sched-card {
+  grid-template-columns: 88px minmax(0, 1fr) max-content;
+  min-height: 96px;
+}
+.ps-page.tv .ps-sched-thumb { width: 88px; height: 88px; }
 .ps-sched-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .ps-sched-thumb.missing, .ps-sched-thumb:disabled {
   cursor: default;
@@ -79,7 +86,13 @@
   font-weight: 700;
   background: rgba(255, 255, 255, .55);
 }
-.ps-sched-body { flex: 1 1 auto; min-width: 0; }
+.ps-sched-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
 .ps-sched-card.hard { background: #e1bee7; border-color: #6a1b9a; }
 .ps-sched-card.sample { background: #ffe0b2; border-color: #ef6c00; }
 .ps-sched-card.late {
@@ -94,7 +107,7 @@
 .ps-sched-id {
   flex: 0 0 auto;
   min-width: 28px;
-  height: 28px;
+  height: 22px;
   padding: 0 5px;
   border-radius: 999px;
   background: #111;
@@ -105,15 +118,30 @@
   font-size: 10px;
   font-weight: 800;
 }
-.ps-sched-name { flex: 1 1 auto; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-sched-name {
+  min-width: 0;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ps-sched-qty { flex: 0 0 auto; font-size: 15px; font-weight: 800; white-space: nowrap; }
 .ps-sched-qty.split { font-size: 12px; color: #111827; }
-.ps-sched-meta { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-.ps-sched-meta span { background: rgba(255,255,255,.72); border-radius: 10px; padding: 0 6px; font-size: 11px; font-weight: 600; }
-.ps-sched-flags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
-.ps-sched-flags span { padding: 1px 5px; border-radius: 999px; background: rgba(255,255,255,.8); font-size: 9px; font-weight: 700; }
-.ps-sched-flags .danger { color: #991b1b; background: #fee2e2; }
-.ps-sched-flags .warning { color: #854d0e; background: #fef3c7; }
+.ps-sched-facts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  text-align: right;
+  line-height: 1.15;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ps-sched-facts .danger { color: #991b1b; }
+.ps-sched-facts .warning { color: #854d0e; }
 .ps-badges { display: flex; flex-wrap: wrap; gap: 3px; }
 .ps-badges span, .ps-chip { padding: 2px 5px; border-radius: 999px; background: #e2e8f0; font-size: 9px; font-weight: 700; }
 .ps-badges .ok { color: #166534; background: #dcfce7; }
