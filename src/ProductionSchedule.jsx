@@ -420,6 +420,15 @@ export function SewingCalendar({ tv = false, columns }) {
       if (!map[key]) map[key] = [];
       map[key].push(row);
     });
+    Object.values(map).forEach((list) => {
+      list.sort((a, b) => {
+        const hardA = a.hardDate ? 0 : 1;
+        const hardB = b.hardDate ? 0 : 1;
+        if (hardA !== hardB) return hardA - hardB;
+        return String(a.start || "").localeCompare(String(b.start || ""))
+          || String(a.orderNumber || "").localeCompare(String(b.orderNumber || ""));
+      });
+    });
     return map;
   }, [rows]);
 
