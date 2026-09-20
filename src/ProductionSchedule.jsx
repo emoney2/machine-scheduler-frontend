@@ -837,6 +837,7 @@ function ConflictList({ title, rows, severity }) {
               row.missingSewingUnits != null && `Missing ${row.missingSewingUnits} sewing units`,
               row.missingEmbroideryHours != null && `Missing ${row.missingEmbroideryHours} embroidery hours`,
               row.thirdSewerWouldHelp && `Third sewer: ${row.thirdSewerDaysNeeded} day(s) may help`,
+              row.overtimeDaysNeeded != null && `Overtime / extra helpers: ${row.overtimeDaysNeeded} day(s)`,
             ].filter(Boolean).join(" · ")}
           </small>
         </article>
@@ -876,6 +877,9 @@ export function SchedulingSettings() {
     <main className="ps-page">
       <div className="ps-header"><div><h1>Scheduling Settings</h1><div className="ps-subtitle">Deterministic capacity settings require administrator approval.</div></div></div>
       {message && <div className="ps-banner">{message}</div>}
+      <p className="ps-help">
+        If Conflicts says a hard job still needs more sewing after the emergency sewer, add overtime / extra-helper dates here and rebuild. That is extra people helping sewers, or overtime, on those days only.
+      </p>
       <div className="ps-settings-grid">
         <Setting label="Regular sewing capacity (normal-equivalent pieces/day)" value={settings.regularSewingCapacity} onChange={(v) => set("regularSewingCapacity", Number(v))} />
         <Setting label="Third sewer capacity (pieces/day)" value={settings.emergencySewingCapacity} onChange={(v) => set("emergencySewingCapacity", Number(v))} />
@@ -884,6 +888,8 @@ export function SchedulingSettings() {
         <Setting label="Unusual-shape factor (blank = warning + standard)" value={settings.unusualShapeFactor ?? ""} onChange={(v) => set("unusualShapeFactor", v === "" ? null : Number(v))} />
         <Setting label="Holidays / unavailable dates (YYYY-MM-DD, comma separated)" value={(settings.holidays || []).join(", ")} onChange={(v) => set("holidays", v.split(",").map((x) => x.trim()).filter(Boolean))} text />
         <Setting label="Approved third-sewer dates (YYYY-MM-DD, comma separated)" value={(settings.approvedEmergencyDates || []).join(", ")} onChange={(v) => set("approvedEmergencyDates", v.split(",").map((x) => x.trim()).filter(Boolean))} text />
+        <Setting label="Overtime / extra-helper dates (YYYY-MM-DD, comma separated)" value={(settings.overtimeSewingDates || []).join(", ")} onChange={(v) => set("overtimeSewingDates", v.split(",").map((x) => x.trim()).filter(Boolean))} text />
+        <Setting label="Overtime / extra-helper capacity (pieces/day)" value={settings.overtimeSewingCapacity ?? 50} onChange={(v) => set("overtimeSewingCapacity", Number(v))} />
       </div>
       <label className="ps-notes">
         Product capacity factors (JSON: product name → factor)
