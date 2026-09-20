@@ -194,9 +194,15 @@ function isBackProduct(product) {
   return /(?:^|\s)backs?$/i.test(String(product || "").trim());
 }
 
+function isTowelOrNeedlepoint(product) {
+  const name = String(product || "").toLowerCase().replace(/[-_]+/g, " ");
+  if (name.includes("towel")) return true;
+  return name.replace(/\s+/g, "").includes("needlepoint");
+}
+
 function needsSewing(order) {
   if (order.needs_sewing === false || order.needsSewing === false) return false;
-  if (isBackProduct(order.product)) return false;
+  if (isBackProduct(order.product) || isTowelOrNeedlepoint(order.product)) return false;
   return Number(order.remaining_quantity || order.remainingQuantity || 0) > 0;
 }
 
@@ -211,6 +217,7 @@ function dayPieces(job) {
 function needsEmbroidery(order) {
   const stage = String(order.stage || "").toUpperCase();
   if (stage.includes("SEW") || stage === "COMPLETE" || stage === "SHIPPED") return false;
+  if (isTowelOrNeedlepoint(order.product)) return false;
   return Number(order.stitch_count || order.stitchCount || 0) > 0
     && Number(order.embroidery_remaining ?? order.embroideryRemaining ?? order.remaining_quantity ?? 0) > 0;
 }
@@ -250,7 +257,9 @@ export function SewingCalendar({ tv = false, columns }) {
   const [busy, setBusy] = useState(false);
   const active = chooseSchedule(data, !tv && showProposal);
   const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
-  const rows = asList(schedule.sewing).filter((row) => !isBackProduct(row.product));
+  const rows = asList(schedule.sewing).filter(
+    (row) => !isBackProduct(row.product) && !isTowelOrNeedlepoint(row.product)
+  );
   const splitCounts = useMemo(() => {
     const counts = {};
     rows.forEach((row) => {
@@ -487,6 +496,7 @@ export function EmbroideryCalendar() {
       "Machine 4": [],
     };
     asList(schedule.embroidery).forEach((job) => {
+      if (isTowelOrNeedlepoint(job.product)) return;
       const raw = job.machine || "";
       const machine = ["Machine 1", "Single Head", "Single Head Machine"].includes(raw)
         ? "Single Head Machine"
