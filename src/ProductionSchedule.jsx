@@ -42,9 +42,12 @@ function fmtDayHeading(value) {
   return dt.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
-    year: "numeric",
     timeZone: "America/New_York",
   });
+}
+
+function wholeQty(value) {
+  return Math.round(Number(value) || 0);
 }
 
 function outPhrase(names) {
@@ -486,16 +489,14 @@ export function SewingCalendar({ tv = false, columns }) {
                   onClick={() => !tv && setStaffDate(day)}
                   disabled={tv}
                 >
-                  <div className="ps-day-weekday">
-                    <span>{weekdayName(day)}</span>
-                    {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
-                  </div>
-                  <div className="ps-day-date">{fmtDayHeading(day)}</div>
+                  <span className="ps-day-weekday">{weekdayName(day)}</span>
+                  {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
+                  <span className="ps-day-date">{fmtDayHeading(day)}</span>
                 </button>
-                <span className="ps-day-units">{scheduled.toFixed(1)} / {(regular + emergency).toFixed(0)}</span>
+                <span className="ps-day-units">{wholeQty(scheduled)} / {wholeQty(regular + emergency)}</span>
               </header>
               <div className="ps-capacity">
-                Regular {regular.toFixed(0)} · Emergency {emergency.toFixed(0)} · Remaining {remaining.toFixed(1)}
+                Regular {wholeQty(regular)} · Emergency {wholeQty(emergency)} · Remaining {wholeQty(remaining)}
               </div>
               <div className="ps-cards">
                 {jobs.map((job, index) => (
