@@ -195,6 +195,7 @@ export default function OrderSubmission() {
     price: "",
     dueDate: "",
     dateType: "Hard Date",
+    shippingType: "UPS",
     salesRep: "",
     poNumber: "",
     materials: ["", "", "", "", ""],
@@ -1385,6 +1386,7 @@ const submitForm = async () => {
       price: "",
       dueDate: "",
       dateType: "Hard Date",
+      shippingType: "UPS",
       salesRep: "",
       poNumber: "",
       materials: ["", "", "", "", ""],
@@ -1583,6 +1585,16 @@ const handleSaveNewCompany = async () => {
         price: reorderJob["Price"] || "",
         dueDate: "", // force user to select a new one
         dateType: reorderJob["Hard Date/Soft Date"] || "Hard Date",
+        shippingType: /local/i.test(
+          String(
+            reorderJob["Shipping Method"]
+            || reorderJob["Shipping Type"]
+            || reorderJob["Ship Via"]
+            || ""
+          )
+        )
+          ? "Local Delivery"
+          : "UPS",
         salesRep:
           reorderJob["REP"] ??
           reorderJob["Sales Rep"] ??
@@ -3011,6 +3023,24 @@ const handleSaveNewCompany = async () => {
                   <option>Soft Date</option>
                 </select>
               </label>
+            </div>
+            <div>
+              <label>
+                Shipping*<br />
+                <select
+                  name="shippingType"
+                  value={form.shippingType}
+                  onChange={handleChange}
+                  required
+                  style={{ width: "80%" }}
+                >
+                  <option value="UPS">UPS</option>
+                  <option value="Local Delivery">Local delivery</option>
+                </select>
+              </label>
+              <div style={{ marginTop: "0.25rem", color: "#6b7280", maxWidth: "80%" }}>
+                Local delivery skips UPS transit. The one-day buffer still applies.
+              </div>
             </div>
             <div>
               <label>
