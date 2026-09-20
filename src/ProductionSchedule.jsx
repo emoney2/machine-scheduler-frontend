@@ -93,7 +93,7 @@ function chooseSchedule(data, showProposal) {
   };
 }
 
-function ScheduleHeader({ title, active, canPropose, showProposal, setShowProposal, onRebuild, busy, tv }) {
+function ScheduleHeader({ title, active, canPropose, showProposal, setShowProposal, onRebuild, onStaff, busy, tv }) {
   return (
     <div className="ps-header">
       <div>
@@ -115,6 +115,11 @@ function ScheduleHeader({ title, active, canPropose, showProposal, setShowPropos
                 Proposal
               </button>
             </div>
+          )}
+          {onStaff && (
+            <button type="button" onClick={onStaff} disabled={busy}>
+              Staff
+            </button>
           )}
           <button className="ps-primary" onClick={onRebuild} disabled={busy}>
             {busy ? "Building…" : "Rebuild Schedule"}
@@ -251,10 +256,101 @@ function UnscheduledOrders({ schedule, type }) {
   );
 }
 
+function nextWeekdayIso(from = new Date()) {
+  const d = new Date(from);
+  d.setHours(12, 0, 0, 0);
+  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function StaffModal({ date, onClose, onSaved }) {
+  const [day, setDay] = useState(date || nextWeekdayIso());
+  const [sewers, setSewers] = useState([]);
+  const [out, setOut] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    axios.get(`${ROOT}/staff`, { timeout: 60000 }).then(({ data }) => {
+      if (cancelled) return;
+      const roster = Array.isArray(data?.sewers) ? data.sewers : [];
+      setSewers(roster);
+      const saved = (data?.absences && data.absences[day]) || [];
+      setOut(saved);
+    }).catch((e) => {
+      if (!cancelled) setError(e?.response?.data?.error || e?.message || "Could not load sewers");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [day]);
+
+  const toggle = (name) => {
+    setOut((prev) => (prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await axios.put(`${ROOT}/staff`, { date: day, out }, { timeout: 180000 });
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError(e?.response?.data?.error || e?.message || "Could not save staff");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="ps-modal-overlay" onClick={onClose}>
+      <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
+        <h2>Staff</h2>
+        <p className="ps-help">Mark who is out. Names come from the Sewers tab in Google Sheets.</p>
+        <label>
+          Date
+          <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+        </label>
+        {loading ? <div className="ps-empty small">Loading sewers…</div> : null}
+        {!loading && !sewers.length ? (
+          <div className="ps-empty small">
+            Add names on the Sewers sheet (columns Name, Role, Capacity). Role is Regular or Emergency.
+          </div>
+        ) : null}
+        <div className="ps-staff-list">
+          {sewers.map((sewer) => (
+            <label key={sewer.name} className="ps-staff-row">
+              <input
+                type="checkbox"
+                checked={out.includes(sewer.name)}
+                onChange={() => toggle(sewer.name)}
+              />
+              <span>{sewer.name}</span>
+              <em>{sewer.role === "emergency" ? "Emergency" : "Regular"}</em>
+            </label>
+          ))}
+        </div>
+        {error ? <div className="ps-banner danger">{error}</div> : null}
+        <div className="ps-actions">
+          <button type="button" onClick={onClose} disabled={saving}>Cancel</button>
+          <button type="button" className="ps-primary" onClick={save} disabled={saving || loading}>
+            {saving ? "Saving…" : "Save and rebuild"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SewingCalendar({ tv = false, columns }) {
   const data = useScheduleData({ tv });
   const [showProposal, setShowProposal] = useState(!tv);
   const [busy, setBusy] = useState(false);
+  const [staffDate, setStaffDate] = useState("");
   const active = chooseSchedule(data, !tv && showProposal);
   const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
   const rows = asList(schedule.sewing).filter(
@@ -322,9 +418,20 @@ export function SewingCalendar({ tv = false, columns }) {
         showProposal={showProposal}
         setShowProposal={setShowProposal}
         onRebuild={rebuild}
+        onStaff={tv ? undefined : () => setStaffDate(nextWeekdayIso())}
         busy={busy}
         tv={tv}
       />
+      {staffDate && (
+        <StaffModal
+          date={staffDate}
+          onClose={() => setStaffDate("")}
+          onSaved={async () => {
+            setShowProposal(true);
+            await data.reload();
+          }}
+        />
+      )}
       <Banner error={data.error} proposed={active.proposed} />
       {data.loading && !active.schedule ? <div className="ps-empty">Loading schedule…</div> : null}
       <UnscheduledOrders schedule={schedule} type="sewing" />
@@ -332,10 +439,11 @@ export function SewingCalendar({ tv = false, columns }) {
       <div className="ps-calendar">
         {days.map((day) => {
           const jobs = byDay[day] || [];
-          const regular = Math.max(95, ...jobs.map((j) => Number(j.regularCapacity || 0)));
+          const regular = Math.max(0, ...jobs.map((j) => Number(j.regularCapacity || 0)), jobs.length ? 0 : 95);
           const emergency = Math.max(0, ...jobs.map((j) => Number(j.emergencyCapacity || 0)));
           const scheduled = jobs.reduce((sum, j) => sum + Number(j.capacityUnits || 0) + Number(j.setupUnits || 0), 0);
           const remaining = regular + emergency - scheduled;
+          const outNames = (schedule.settings?.sewerAbsences || {})[day] || [];
           return (
             <section
               className={`ps-day ${remaining < -0.01 ? "over" : ""}`}
@@ -344,11 +452,19 @@ export function SewingCalendar({ tv = false, columns }) {
               onDrop={(e) => lockOnDay(e, day)}
             >
               <header>
-                <strong>{fmtDate(day)}</strong>
+                <button
+                  type="button"
+                  className="ps-day-staff"
+                  onClick={() => !tv && setStaffDate(day)}
+                  disabled={tv}
+                >
+                  <strong>{fmtDate(day)}</strong>
+                </button>
                 <span>{scheduled.toFixed(1)} / {(regular + emergency).toFixed(0)} units</span>
               </header>
               <div className="ps-capacity">
                 Regular {regular.toFixed(0)} · Emergency {emergency.toFixed(0)} · Remaining {remaining.toFixed(1)}
+                {outNames.length ? ` · Out: ${outNames.join(", ")}` : ""}
               </div>
               <div className="ps-cards">
                 {jobs.map((job, index) => (

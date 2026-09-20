@@ -144,6 +144,47 @@
 .ps-settings-grid label { display: grid; gap: 4px; font-size: 12px; font-weight: 700; }
 .ps-settings-grid input { padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; }
 .ps-help { color: #64748b; font-size: 12px; }
+.ps-day-staff {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.ps-day-staff:disabled { cursor: default; }
+.ps-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, .45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 48px 16px;
+  z-index: 40;
+}
+.ps-modal {
+  width: min(420px, 100%);
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, .18);
+}
+.ps-modal h2 { margin: 0 0 6px; font-size: 20px; }
+.ps-modal label { display: grid; gap: 4px; font-size: 12px; font-weight: 700; margin: 10px 0; }
+.ps-modal input[type="date"] { padding: 7px; border: 1px solid #cbd5e1; border-radius: 6px; }
+.ps-staff-list { display: grid; gap: 6px; margin: 8px 0 14px; }
+.ps-staff-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+.ps-staff-row em { color: #64748b; font-style: normal; font-size: 11px; font-weight: 700; }
 .ps-empty { padding: 40px; text-align: center; color: #64748b; }
 .ps-empty.small { padding: 12px; }
 @media (max-width: 1400px) {
