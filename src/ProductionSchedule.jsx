@@ -584,6 +584,7 @@ function SewingCard({ job, draggable, imageHint, tv, split }) {
     imageFileId: job.imageFileId || imageHint?.imageFileId || "",
   }, tv ? "w320" : "w240");
   const transitDays = Number(job.transitBusinessDays) || 0;
+  const shipPlace = [job.shipCity, job.shipState].filter(Boolean).join(", ");
   return (
     <article
       className={classes}
@@ -636,6 +637,7 @@ function SewingCard({ job, draggable, imageHint, tv, split }) {
         <span>Due {fmtCardDate(job.dueDate)}</span>
         <span>
           Ship {fmtCardDate(job.requiredShipDate)}
+          {shipPlace ? ` · ${shipPlace}` : ""}
           {transitDays > 0 ? ` · ${transitDays}-day` : ""}
         </span>
         <span>{hard ? "Hard date" : "Soft date"}</span>
