@@ -310,7 +310,7 @@ function StaffModal({ date, onClose, onSaved }) {
     <div className="ps-modal-overlay" onClick={onClose}>
       <div className="ps-modal" onClick={(e) => e.stopPropagation()}>
         <h2>Staff</h2>
-        <p className="ps-help">Mark who is out. Names come from the Sewers tab in Google Sheets.</p>
+        <p className="ps-help">Mark who is out. Names come from the Sewers tab. The last name on that list is the emergency sewer.</p>
         <label>
           Date
           <input type="date" value={day} onChange={(e) => setDay(e.target.value)} />
@@ -318,7 +318,7 @@ function StaffModal({ date, onClose, onSaved }) {
         {loading ? <div className="ps-empty small">Loading sewers…</div> : null}
         {!loading && !sewers.length ? (
           <div className="ps-empty small">
-            Add names on the Sewers sheet (columns Name, Role, Capacity). Role is Regular or Emergency.
+            Add names on the Sewers sheet, one per row. The last name is always the emergency sewer.
           </div>
         ) : null}
         <div className="ps-staff-list">
