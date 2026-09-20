@@ -14,7 +14,7 @@ function asList(value) {
 function friendlyError(err) {
   const raw = err?.response?.data?.error ?? err?.message ?? err;
   const text = typeof raw === "string" ? raw : JSON.stringify(raw || "");
-  if (/RATE_LIMIT|quota exceeded|429/i.test(text)) {
+  if (/RATE_LIMIT|quota exceeded|429|attribute 'close'|NoneType|BadStatusLine|reentrant|temporarily busy/i.test(text)) {
     return "Google Sheets is temporarily busy. Wait about a minute and refresh.";
   }
   const compact = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -85,10 +85,17 @@ function useScheduleData({ tv = false } = {}) {
     try {
       setError("");
       const pub = await axios.get(`${ROOT}/published`, { timeout: 60000 });
-      setPublished(pub.data || null);
+      if (pub.data?.version || pub.data?.schedule) {
+        setPublished(pub.data);
+      }
+      if (pub.data?.warning) {
+        setError(friendlyError({ message: pub.data.warning }));
+      }
       if (!tv) {
         const prop = await axios.get(`${ROOT}/proposal`, { timeout: 60000 });
-        setProposal(prop.data || null);
+        if (prop.data?.version || prop.data?.schedule) {
+          setProposal(prop.data);
+        }
       }
     } catch (e) {
       setError(friendlyError(e));
@@ -516,7 +523,11 @@ export function SewingCalendar({ tv = false, columns }) {
       </div>
       {!days.length && !data.loading ? (
         <div className="ps-empty">
-          {active.version ? "No sewing work is placed on this schedule yet." : "No published schedule yet. Click Rebuild Schedule to create the first baseline."}
+          {data.error
+            ? "Could not load the sewing calendar. Wait a minute and refresh — do not rebuild yet."
+            : active.version
+              ? "No sewing work is placed on this schedule yet."
+              : "No published schedule yet. Click Rebuild Schedule to create the first baseline."}
         </div>
       ) : null}
     </main>
