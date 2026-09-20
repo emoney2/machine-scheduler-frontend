@@ -28,6 +28,33 @@ function fmtDate(value) {
   return y && m && d ? `${m}/${d}/${y}` : String(value);
 }
 
+function weekdayName(value) {
+  const raw = String(value || "").slice(0, 10);
+  const dt = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" });
+}
+
+function fmtDayHeading(value) {
+  const raw = String(value || "").slice(0, 10);
+  const dt = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(dt.getTime())) return fmtDate(value);
+  return dt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/New_York",
+  });
+}
+
+function outPhrase(names) {
+  const people = (names || []).map((n) => String(n || "").trim()).filter(Boolean);
+  if (!people.length) return "";
+  if (people.length === 1) return `${people[0]} is out`;
+  if (people.length === 2) return `${people[0]} and ${people[1]} are out`;
+  return `${people.slice(0, -1).join(", ")}, and ${people[people.length - 1]} are out`;
+}
+
 function fmtTime(value) {
   if (!value) return "—";
   const dt = new Date(value);
@@ -444,6 +471,7 @@ export function SewingCalendar({ tv = false, columns }) {
           const scheduled = jobs.reduce((sum, j) => sum + Number(j.capacityUnits || 0) + Number(j.setupUnits || 0), 0);
           const remaining = regular + emergency - scheduled;
           const outNames = (schedule.settings?.sewerAbsences || {})[day] || [];
+          const whoIsOut = outPhrase(outNames);
           return (
             <section
               className={`ps-day ${remaining < -0.01 ? "over" : ""}`}
@@ -458,13 +486,16 @@ export function SewingCalendar({ tv = false, columns }) {
                   onClick={() => !tv && setStaffDate(day)}
                   disabled={tv}
                 >
-                  <strong>{fmtDate(day)}</strong>
+                  <div className="ps-day-weekday">
+                    <span>{weekdayName(day)}</span>
+                    {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
+                  </div>
+                  <div className="ps-day-date">{fmtDayHeading(day)}</div>
                 </button>
-                <span>{scheduled.toFixed(1)} / {(regular + emergency).toFixed(0)} units</span>
+                <span className="ps-day-units">{scheduled.toFixed(1)} / {(regular + emergency).toFixed(0)}</span>
               </header>
               <div className="ps-capacity">
                 Regular {regular.toFixed(0)} · Emergency {emergency.toFixed(0)} · Remaining {remaining.toFixed(1)}
-                {outNames.length ? ` · Out: ${outNames.join(", ")}` : ""}
               </div>
               <div className="ps-cards">
                 {jobs.map((job, index) => (
