@@ -3506,6 +3506,9 @@ function col(width, center = false) {
                               ["On hand", `${fmt(mat.physicalYards)} yd`],
                               ["Rolls", fmt(mat.physicalRolls)],
                               ["Committed", `${fmt(mat.committedYards)} yd`],
+                              ...(Number(mat.deferredYards) > 0
+                                ? [["Later", `${fmt(mat.deferredYards)} yd`]]
+                                : []),
                               ["Usable", `${fmt(mat.uncommittedYards)} yd`],
                               ["Inbound", `${fmt(mat.inboundYards)} yd`],
                               ["Position", `${fmt(mat.inventoryPositionYards)} yd`],
@@ -3561,8 +3564,9 @@ function col(width, center = false) {
                     })}
                   </div>
                   <div style={{ marginTop: 8, fontSize: 10, color: "#64748b" }}>
-                    Live from Production Orders, Cut List, and Table PPY. Uncut work is committed;
-                    completed cuts leave inventory. Reorder alerts email info@jrco.us.
+                    Live from Production Orders, Cut List, and Table PPY. Uncut work due within
+                    90 days is committed. Later due dates show as Later and do not trigger a buy.
+                    Completed cuts leave inventory. Reorder alerts email info@jrco.us.
                   </div>
                 </section>
               );
