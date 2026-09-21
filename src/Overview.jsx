@@ -1057,6 +1057,10 @@ function col(width, center = false) {
   const [loadingMagnetStatus, setLoadingMagnetStatus] = useState(true);
   const [magnetStatusError, setMagnetStatusError] = useState("");
   const [updatingMagnetStatus, setUpdatingMagnetStatus] = useState(false);
+  const [materialStatus, setMaterialStatus] = useState(null);
+  const [loadingMaterialStatus, setLoadingMaterialStatus] = useState(true);
+  const [materialStatusError, setMaterialStatusError] = useState("");
+  const [updatingMaterialStatus, setUpdatingMaterialStatus] = useState(false);
 
   const [selections, setSelections] = useState({});
   const [daysWindow, setDaysWindow] = useState("7");
@@ -1604,6 +1608,66 @@ function col(width, center = false) {
     }
   }, [ROOT, magnetStatus]);
 
+  const fetchMaterialStatus = useCallback(
+    async ({ fresh = false, showLoading = true } = {}) => {
+      if (showLoading) setLoadingMaterialStatus(true);
+      setMaterialStatusError("");
+      try {
+        const res = await axios.get(
+          `${ROOT}/kanban/materials/status${fresh ? "?fresh=1" : ""}`,
+          { withCredentials: true, timeout: 45000 }
+        );
+        setMaterialStatus(res.data || null);
+      } catch (e) {
+        setMaterialStatusError(
+          String(e?.response?.data?.error || e?.message || "Could not load material inventory.")
+        );
+      } finally {
+        if (showLoading) setLoadingMaterialStatus(false);
+      }
+    },
+    [ROOT]
+  );
+
+  useEffect(() => {
+    fetchMaterialStatus({ fresh: false, showLoading: true });
+    const id = setInterval(
+      () => fetchMaterialStatus({ fresh: true, showLoading: false }),
+      300000
+    );
+    return () => clearInterval(id);
+  }, [fetchMaterialStatus]);
+
+  const updateMaterialPhysicalCount = useCallback(async (material) => {
+    const currentRolls = material?.physicalRolls ?? "";
+    const rollsRaw = window.prompt(
+      `Current ${material?.name || "material"} rolls on the floor:`,
+      String(currentRolls)
+    );
+    if (rollsRaw == null) return;
+    const rolls = Number(rollsRaw);
+    if (!Number.isFinite(rolls) || rolls < 0) {
+      window.alert("Enter a roll count of zero or greater.");
+      return;
+    }
+    setUpdatingMaterialStatus(true);
+    setMaterialStatusError("");
+    try {
+      const res = await axios.post(
+        `${ROOT}/kanban/materials/count`,
+        { materialId: material.id, rolls },
+        { withCredentials: true, timeout: 45000 }
+      );
+      setMaterialStatus(res.data || null);
+    } catch (e) {
+      setMaterialStatusError(
+        String(e?.response?.data?.error || e?.message || "Could not update material count.")
+      );
+    } finally {
+      setUpdatingMaterialStatus(false);
+    }
+  }, [ROOT]);
+
   const markKanbanOrdered = useCallback(
     async (row) => {
       const eventIdKey = Object.keys(row || {}).find(
@@ -1648,6 +1712,9 @@ function col(width, center = false) {
         if (kanbanId === "MAGNETS-NS") {
           await fetchMagnetStatus({ fresh: true, showLoading: false });
         }
+        if (String(kanbanId).startsWith("MAT-")) {
+          await fetchMaterialStatus({ fresh: true, showLoading: false });
+        }
       } catch (e) {
         const msg =
           e?.response?.data?.error ||
@@ -1659,7 +1726,7 @@ function col(width, center = false) {
         setKanbanMarkingOverlay(null);
       }
     },
-    [ROOT, fetchKanbanQueue, fetchMagnetStatus]
+    [ROOT, fetchKanbanQueue, fetchMagnetStatus, fetchMaterialStatus]
   );
 
   const markKanbanReceived = useCallback(
@@ -1701,6 +1768,9 @@ function col(width, center = false) {
         if (kanbanId === "MAGNETS-NS") {
           await fetchMagnetStatus({ fresh: true, showLoading: false });
         }
+        if (String(kanbanId).startsWith("MAT-")) {
+          await fetchMaterialStatus({ fresh: true, showLoading: false });
+        }
       } catch (e) {
         const msg =
           e?.response?.data?.error ||
@@ -1712,7 +1782,7 @@ function col(width, center = false) {
         setKanbanMarkingOverlay(null);
       }
     },
-    [ROOT, fetchKanbanQueue, fetchMagnetStatus]
+    [ROOT, fetchKanbanQueue, fetchMagnetStatus, fetchMaterialStatus]
   );
 
   // Load vendor directory once
@@ -3295,6 +3365,204 @@ function col(width, center = false) {
                     >
                       Update physical count
                     </button>
+                  </div>
+                </section>
+              );
+            })()}
+
+            {loadingMaterialStatus && !materialStatus && (
+              <div
+                style={{
+                  padding: 12,
+                  border: "1px solid #dbeafe",
+                  borderRadius: 9,
+                  background: "#eff6ff",
+                  fontSize: 12,
+                  color: "#475569",
+                  order: 11,
+                  marginTop: 12,
+                }}
+              >
+                Calculating long-lead material inventory and forecast…
+              </div>
+            )}
+            {materialStatusError && (
+              <div
+                role="alert"
+                style={{
+                  padding: "8px 10px",
+                  border: "1px solid #fecaca",
+                  borderRadius: 8,
+                  background: "#fef2f2",
+                  color: "#991b1b",
+                  fontSize: 12,
+                  order: 11,
+                  marginTop: 10,
+                }}
+              >
+                Material Kanban: {materialStatusError}
+              </div>
+            )}
+            {materialStatus && (() => {
+              const level = String(materialStatus.level || "healthy");
+              const isOrderNow = level === "order_now";
+              const accent = isOrderNow ? "#dc2626" : "#15803d";
+              const pale = isOrderNow ? "#fef2f2" : "#f0fdf4";
+              const fmt = (value) =>
+                Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+              const fmtDate = (value) => {
+                if (!value) return "—";
+                const parsed = new Date(`${value}T12:00:00`);
+                return Number.isNaN(parsed.getTime())
+                  ? String(value)
+                  : parsed.toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+              };
+              return (
+                <section
+                  aria-label="Material electronic Kanban"
+                  style={{
+                    border: `1px solid ${accent}`,
+                    borderRadius: 10,
+                    background: pale,
+                    padding: 12,
+                    marginTop: 14,
+                    order: 11,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: "#111827" }}>
+                        Long-lead Material E-Kanban
+                      </div>
+                      <div style={{ marginTop: 2, fontSize: 11, color: "#64748b" }}>
+                        77.5 m rolls · 90-day Turkey lead + 21-day delay buffer
+                      </div>
+                    </div>
+                    <span
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        background: accent,
+                        color: "white",
+                        fontSize: 10,
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                      }}
+                    >
+                      {isOrderNow ? "ORDER NOW" : "HEALTHY"}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+                    {(materialStatus.materials || []).map((mat) => {
+                      const matOrder = String(mat.level || "") === "order_now";
+                      return (
+                        <div
+                          key={mat.id}
+                          style={{
+                            padding: "8px 9px",
+                            border: "1px solid rgba(148,163,184,0.45)",
+                            borderRadius: 8,
+                            background: "rgba(255,255,255,0.78)",
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>
+                              {mat.name}
+                            </div>
+                            <span style={{ fontSize: 10, fontWeight: 800, color: matOrder ? "#dc2626" : "#15803d" }}>
+                              {matOrder ? "ORDER NOW" : "HEALTHY"}
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(auto-fit, minmax(88px, 1fr))",
+                              gap: 6,
+                              marginTop: 8,
+                            }}
+                          >
+                            {[
+                              ["On hand", `${fmt(mat.physicalYards)} yd`],
+                              ["Rolls", fmt(mat.physicalRolls)],
+                              ["Committed", `${fmt(mat.committedYards)} yd`],
+                              ["Usable", `${fmt(mat.uncommittedYards)} yd`],
+                              ["Inbound", `${fmt(mat.inboundYards)} yd`],
+                              ["Position", `${fmt(mat.inventoryPositionYards)} yd`],
+                            ].map(([label, value]) => (
+                              <div key={`${mat.id}-${label}`}>
+                                <div style={{ fontSize: 9, color: "#64748b", fontWeight: 700 }}>{label}</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{value}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              marginTop: 8,
+                              fontSize: 10,
+                              color: "#334155",
+                            }}
+                          >
+                            <div>
+                              Reorder at <strong>{fmt(mat.reorderPointYards)} yd</strong>
+                              {" · "}
+                              Order <strong>{fmt(mat.recommendedOrderYards)} yd</strong>
+                              {" · "}
+                              Demand <strong>{fmt(mat.weeklyDemandYards)} yd/wk</strong>
+                              {" · "}
+                              Next trigger <strong>{fmtDate(mat.projectedReorderDate)}</strong>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => updateMaterialPhysicalCount(mat)}
+                              disabled={updatingMaterialStatus}
+                              style={{
+                                padding: "5px 8px",
+                                borderRadius: 7,
+                                border: "1px solid #94a3b8",
+                                background: "white",
+                                color: "#334155",
+                                fontSize: 10,
+                                fontWeight: 700,
+                                cursor: updatingMaterialStatus ? "not-allowed" : "pointer",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              Update rolls
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: 8, fontSize: 10, color: "#64748b" }}>
+                    Live from Production Orders, Cut List, and Table PPY. Uncut work is committed;
+                    completed cuts leave inventory. Reorder alerts email info@jrco.us.
                   </div>
                 </section>
               );
