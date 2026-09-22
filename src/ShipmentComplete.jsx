@@ -2,7 +2,11 @@
 import React, { useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
-import { resolveShipmentInvoiceUrl } from "./qboInvoiceOpenUrl";
+import { getBackendOrigin } from "./apiRoot";
+import {
+  buildCreatedInvoiceOpenHref,
+  resolveShipmentInvoiceUrl,
+} from "./qboInvoiceOpenUrl";
 
 export default function ShipmentComplete() {
   const navigate = useNavigate();
@@ -12,7 +16,11 @@ export default function ShipmentComplete() {
   const qi = (searchParams.get("qi") || "").trim();
   const qr = (searchParams.get("qr") || "").trim();
   const qeParam = (searchParams.get("qe") || "").trim().toLowerCase();
-  const invoiceUrl = resolveShipmentInvoiceUrl({ qi, qr, qeParam, state });
+  const invoiceUrl =
+    buildCreatedInvoiceOpenHref(
+      qi || String(state?.qbo_invoice_id || "").trim(),
+      getBackendOrigin()
+    ) || resolveShipmentInvoiceUrl({ qi, qr, qeParam, state });
 
   useEffect(() => {
     postShipQboClientLog([

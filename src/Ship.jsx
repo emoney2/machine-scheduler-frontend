@@ -4,8 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
 import { appendShipmentHistory } from "./shipmentHistoryStorage";
 import {
+  buildCreatedInvoiceOpenHref,
   buildQboInvoiceOpenUrl,
-  normalizeQboInvoiceUrl,
   parseTxnRealmFromInvoiceUrl,
 } from "./qboInvoiceOpenUrl";
 import { getBackendOrigin } from "./apiRoot";
@@ -770,19 +770,12 @@ export default function Ship() {
       typeof data?.invoice === "string" ? data.invoice.trim() : "";
     let invoiceId = String(data?.qbo_invoice_id ?? "").trim();
     let realmId = String(data?.qbo_realm_id ?? "").trim();
-    if ((!invoiceId || !realmId) && rawInvoiceUrl) {
+    if (!invoiceId && rawInvoiceUrl) {
       const parsed = parseTxnRealmFromInvoiceUrl(rawInvoiceUrl);
       if (!invoiceId) invoiceId = parsed.txnId;
       if (!realmId) realmId = parsed.realmId;
     }
-    const invoiceUrl = normalizeQboInvoiceUrl(
-      buildQboInvoiceOpenUrl(
-        invoiceId,
-        realmId,
-        inferQboInvoiceEnv(data, rawInvoiceUrl),
-        rawInvoiceUrl
-      ) || rawInvoiceUrl
-    );
+    const invoiceUrl = buildCreatedInvoiceOpenHref(invoiceId, getBackendOrigin());
 
     const labelHttp = labels.filter(isHttpUrl);
     if (labelRaw.length) {

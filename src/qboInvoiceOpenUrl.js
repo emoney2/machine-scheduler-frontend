@@ -3,6 +3,13 @@
  * Used by ShipmentComplete so "Open Invoice" works on the first shipment (not only after a retry).
  */
 
+export function buildCreatedInvoiceOpenHref(txnId, backendOrigin) {
+  const t = String(txnId || "").trim();
+  const root = String(backendOrigin || "").replace(/\/$/, "");
+  if (!t || !root) return "";
+  return `${root}/api/qbo/open-invoice/${encodeURIComponent(t)}`;
+}
+
 export function buildQboInvoiceOpenUrl(txnId, realmId, qeHint, invoiceUrlHint) {
   const t = String(txnId || "").trim();
   if (!t) return "";
