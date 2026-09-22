@@ -66,6 +66,24 @@ function isOpenForShip(job) {
   return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
 }
 
+function readJobPoNumber(job = {}) {
+  const keys = ["PO #", "PO#", "PO Number", "Customer PO", "poNumber", "PO"];
+  for (const key of keys) {
+    const val = job?.[key];
+    if (val != null && String(val).trim()) return String(val).trim();
+  }
+  return "";
+}
+
+function poNumbersFromJobs(jobList = []) {
+  const seen = [];
+  for (const job of jobList) {
+    const po = readJobPoNumber(job);
+    if (po && !seen.includes(po)) seen.push(po);
+  }
+  return seen.join(", ");
+}
+
 /** Shopify retail rows (sheet + Company Name). */
 function getShopifyOrderId(job) {
   const v = job?.["Shopify Order ID"] ?? job?.["Shopify ID"];
@@ -977,6 +995,7 @@ export default function Ship() {
   });
   const [boxSuggestion, setBoxSuggestion] = useState(null);
   const [boxSuggestionLoading, setBoxSuggestionLoading] = useState(false);
+  const [shipmentPoNumber, setShipmentPoNumber] = useState("");
   const [oneTimeShipAddress, setOneTimeShipAddress] = useState(null);
   const [oneTimeAddressForm, setOneTimeAddressForm] = useState({
     companyName: "",
@@ -1902,15 +1921,20 @@ export default function Ship() {
     // Build recipient from a row using Directory shipping headers
     const buildRecipientFrom = (row) => ({
       Name:          get(row, "Company Name"),
-      AttentionName: `${get(row, "Contact First Name")} ${get(row, "Contact Last Name")}`.trim(),
+      AttentionName:
+        get(row, "Shipping Attention") ||
+        get(row, "Shipping ATTN") ||
+        get(row, "Ship ATTN") ||
+        get(row, "Receiving Attention") ||
+        `${get(row, "Contact First Name")} ${get(row, "Contact Last Name")}`.trim(),
       Phone:         get(row, "Shipping Phone") || get(row, "Phone Number"),
       Address: {
-        AddressLine1:      get(row, "Street Address 1"),
-        AddressLine2:      get(row, "Street Address 2"),
+        AddressLine1:      get(row, "Shipping Street Address 1") || get(row, "Street Address 1"),
+        AddressLine2:      get(row, "Shipping Street Address 2") || get(row, "Street Address 2"),
         AddressLine3:      get(row, "Shipping Address 3"),
-        City:              get(row, "City"),
-        StateProvinceCode: toStateAbbr(get(row, "State")),
-        PostalCode:        toZip5(get(row, "Zip Code")),
+        City:              get(row, "Shipping City") || get(row, "City"),
+        StateProvinceCode: toStateAbbr(get(row, "Shipping State") || get(row, "State")),
+        PostalCode:        toZip5(get(row, "Shipping Zip") || get(row, "Shipping Zip Code") || get(row, "Zip Code")),
         CountryCode:       "US"
       }
     });
@@ -2604,6 +2628,7 @@ export default function Ship() {
     }
     upsFlowCreateInvoiceRef.current = Boolean(createInvoice);
     forceDirectoryShipRef.current = false;
+    setShipmentPoNumber(poNumbersFromJobs(sj));
     setBoxCounts(initialBoxCounts());
     setCustomBoxes([]);
     setShowCustomBoxModal(false);
@@ -2662,6 +2687,10 @@ export default function Ship() {
       !opt.code;
 
     const packingFields = { pieces };
+    const labelFields = {
+      poNumber: String(shipmentPoNumber || "").trim(),
+      ...(forceDirectoryShipRef.current ? { use_directory_address: true } : {}),
+    };
 
     if (isManualRate) {
       await runShipmentCore({
@@ -2680,6 +2709,7 @@ export default function Ship() {
         skip_invoice: skipInv,
         qboEnv: "production",
         ...packingFields,
+        ...labelFields,
         ...(shipToApi ? { ship_to_override: shipToApi } : {}),
       });
       return;
@@ -2703,6 +2733,7 @@ export default function Ship() {
       skip_invoice: skipInv,
       qboEnv: "production",
       ...packingFields,
+      ...labelFields,
       ...(shipToApi ? { ship_to_override: shipToApi } : {}),
     });
   };
@@ -3739,6 +3770,24 @@ export default function Ship() {
                   ? "This order has a specific shipping address on file. Use that address, enter a different one, or use the company default from Directory."
                   : "Use your default address from Directory, or enter a one-time shipping address for this shipment only."}
             </p>
+            <label style={{ display: "block", margin: "0 0 14px", fontSize: 13, color: "#263238" }}>
+              <span style={{ fontWeight: 700, display: "block", marginBottom: 4 }}>
+                Customer PO # (prints on the UPS label)
+              </span>
+              <input
+                value={shipmentPoNumber}
+                onChange={(e) => setShipmentPoNumber(e.target.value)}
+                placeholder="Required for customers like Big Cedar Lodge"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid #b0bec5",
+                  fontSize: 14,
+                }}
+              />
+            </label>
             {hasShipAddressConflict && shipAddressConflictOptions.map((option) => (
               <div
                 key={`${option.orderId}-${shipAddressCompareKey(option.address)}`}
