@@ -16,17 +16,19 @@ export function buildQboInvoiceOpenUrl(txnId, realmId, qeHint, invoiceUrlHint) {
   const qev = String(qeHint || "").trim().toLowerCase();
   let origin;
   if (qev === "sandbox") {
-    origin = "https://sandbox.qbo.intuit.com";
+    origin = "https://app.sandbox.qbo.intuit.com";
   } else if (qev === "production") {
-    origin = "https://qbo.intuit.com";
+    origin = "https://app.qbo.intuit.com";
   } else {
     const hint = String(invoiceUrlHint || "").toLowerCase();
     origin = hint.includes("sandbox")
-      ? "https://sandbox.qbo.intuit.com"
-      : "https://qbo.intuit.com";
+      ? "https://app.sandbox.qbo.intuit.com"
+      : "https://app.qbo.intuit.com";
   }
   const q = new URLSearchParams();
   q.set("txnId", t);
+  const r = String(realmId || "").trim();
+  if (r) q.set("companyId", r);
   return `${origin}/app/invoice?${q.toString()}`;
 }
 
@@ -57,10 +59,16 @@ export function normalizeQboInvoiceUrl(raw) {
     if (!txnId) return "";
     const q = new URLSearchParams();
     q.set("txnId", txnId);
+    const company = (
+      u.searchParams.get("companyId") ||
+      u.searchParams.get("deeplinkcompanyid") ||
+      ""
+    ).trim();
+    if (company) q.set("companyId", company);
     const isSandbox = u.hostname.toLowerCase().includes("sandbox");
     const origin = isSandbox
-      ? "https://sandbox.qbo.intuit.com"
-      : "https://qbo.intuit.com";
+      ? "https://app.sandbox.qbo.intuit.com"
+      : "https://app.qbo.intuit.com";
     return `${origin}/app/invoice?${q.toString()}`;
   } catch {
     return "";
