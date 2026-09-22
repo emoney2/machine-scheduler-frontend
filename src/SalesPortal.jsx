@@ -27,7 +27,7 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle, repView
   if (!rows?.length) {
     return (
       <p style={{ color: "#666", fontSize: "0.88rem", margin: "0.5rem 0" }}>
-        {repView ? "No orders to show." : "No unpaid rep orders. Orders come from Production Orders (Google Sheets) with REP set in column AQ."}
+        {repView ? "No orders to show." : "No unpaid rep invoices. Rows come from Production Orders (Google Sheets) with REP set in column AQ, grouped by invoice."}
       </p>
     );
   }
@@ -37,17 +37,13 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle, repView
         <thead>
           <tr>
             {showCheckboxes ? <th style={thStyle} /> : null}
-            <th style={thStyle}>Order #</th>
             <th style={thStyle}>Company</th>
-            <th style={thStyle}>Design</th>
-            <th style={thStyle}>Product</th>
-            <th style={thStyle}>Qty</th>
-            <th style={thStyle}>Sales</th>
+            <th style={thStyle}>Pieces</th>
+            <th style={thStyle}>Invoice (less shipping)</th>
             <th style={thStyle}>Commission</th>
             <th style={thStyle}>{repView ? "Customer has paid" : "Customer paid"}</th>
             <th style={thStyle}>Rep paid</th>
-            {repView ? <th style={thStyle}>Due date</th> : <th style={thStyle}>Stage</th>}
-            {!repView ? <th style={thStyle}>Invoice #</th> : null}
+            {repView ? <th style={thStyle}>Due date</th> : <th style={thStyle}>Invoice #</th>}
           </tr>
         </thead>
         <tbody>
@@ -58,7 +54,7 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle, repView
             const canSelect = showCheckboxes && id && cust === "Y" && rp !== "Y";
             const orderId = r.orderId || r["Order #"] || r["Order #s"];
             return (
-              <tr key={`${orderId}-${i}`} style={{ borderTop: "1px solid #eee" }}>
+              <tr key={`${id || orderId}-${i}`} style={{ borderTop: "1px solid #eee" }}>
                 {showCheckboxes ? (
                   <td style={{ ...tdStyle, textAlign: "center" }}>
                     {canSelect ? (
@@ -71,10 +67,14 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle, repView
                     ) : null}
                   </td>
                 ) : null}
-                <td style={tdStyle}>{orderId}</td>
-                <td style={tdStyle}>{r.company || "—"}</td>
-                <td style={tdStyle}>{r.design || "—"}</td>
-                <td style={tdStyle}>{r.product || "—"}</td>
+                <td style={tdStyle}>
+                  <div>{r.company || "—"}</div>
+                  {orderId ? (
+                    <div style={{ fontSize: "0.75rem", color: "#888", marginTop: 2 }}>
+                      Orders {orderId}
+                    </div>
+                  ) : null}
+                </td>
                 <td style={tdStyle}>{r.quantity ?? "—"}</td>
                 <td style={tdStyle}>{money(r.salesAmount ?? r.estimatedSubtotal ?? r["Product subtotal"])}</td>
                 <td style={tdStyle}>{money(r.commission ?? r.estimatedCommission ?? r["Commission $"])}</td>
@@ -83,9 +83,8 @@ function OrdersTable({ rows, showCheckboxes, selectedInvoices, onToggle, repView
                 {repView ? (
                   <td style={tdStyle}>{r.dueDate || "—"}</td>
                 ) : (
-                  <td style={tdStyle}>{r.stage || "—"}</td>
+                  <td style={tdStyle}>{r.invoiceNum || r["Invoice #"] || "—"}</td>
                 )}
-                {!repView ? <td style={tdStyle}>{r.invoiceNum || r["Invoice #"] || "—"}</td> : null}
               </tr>
             );
           })}
@@ -121,14 +120,14 @@ function SummaryCards({ owed, unpaidCommission, orderCount, repView = false }) {
         <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase" }}>Unpaid commission</div>
         <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{money(unpaidCommission)}</div>
         {!repView ? (
-          <div style={{ fontSize: "0.8rem", color: "#666" }}>All sheet orders not paid to rep</div>
+          <div style={{ fontSize: "0.8rem", color: "#666" }}>All invoices not paid to rep</div>
         ) : null}
       </div>
       <div style={card}>
-        <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase" }}>Orders</div>
+        <div style={{ fontSize: "0.75rem", color: "#666", textTransform: "uppercase" }}>Invoices</div>
         <div style={{ fontSize: "1.25rem", fontWeight: 600 }}>{orderCount}</div>
         {!repView ? (
-          <div style={{ fontSize: "0.8rem", color: "#666" }}>Production Orders with REP</div>
+          <div style={{ fontSize: "0.8rem", color: "#666" }}>One row per invoice</div>
         ) : null}
       </div>
     </div>
@@ -337,9 +336,9 @@ export default function SalesPortal() {
         </button>
       </div>
       <p style={{ color: "#555", fontSize: "0.9rem" }}>
-        <strong>Owed to reps ({money(totalOwed)}):</strong> commission on sheet orders where QuickBooks
-        shows the customer paid and you have not marked the rep paid. All other unpaid rows are
-        still in progress or awaiting customer payment.
+        <strong>Owed to reps ({money(totalOwed)}):</strong> one line per invoice. Commission is the
+        invoice total less shipping, times the rep&apos;s percentage. Pay when QuickBooks shows the
+        customer paid and you have not marked the rep paid.
       </p>
       {error ? <p style={{ color: "crimson", fontSize: "0.9rem" }}>{error}</p> : null}
       <details style={{ fontSize: "0.82rem", color: "#666", marginBottom: 12 }}>
@@ -385,7 +384,7 @@ export default function SalesPortal() {
               <p style={{ margin: "0 0 0.75rem", color: "#555", fontSize: "0.88rem" }}>
                 <strong>{money(owedAmount(v))}</strong> owed now ·{" "}
                 <strong>{money(unpaidCommission(v))}</strong> total unpaid commission ·{" "}
-                {repOrders.length} order{repOrders.length === 1 ? "" : "s"}
+                {repOrders.length} invoice{repOrders.length === 1 ? "" : "s"}
               </p>
               <OrdersTable
                 rows={repOrders}
