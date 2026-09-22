@@ -3564,9 +3564,10 @@ function col(width, center = false) {
                     })}
                   </div>
                   <div style={{ marginTop: 8, fontSize: 10, color: "#64748b" }}>
-                    Live from Production Orders, Cut List, and Table PPY. Uncut work due within
-                    90 days is committed. Later due dates show as Later and do not trigger a buy.
-                    Completed cuts leave inventory. Reorder alerts email info@jrco.us.
+                    Live from Production Orders, Cut List, Table PPY, and Material Log.
+                    Uncut work due within 90 days is committed. Later due dates show as Later
+                    and do not trigger a buy. Material Log IN + Ordered is inbound; mark
+                    Received there when the rolls arrive. Reorder alerts email info@jrco.us.
                   </div>
                 </section>
               );
