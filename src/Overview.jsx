@@ -388,6 +388,28 @@ function openUrlReturn(url) {
   return null;
 }
 
+function kanbanPurchaseLink(row) {
+  const raw = String(
+    row?.["Order URL"] || row?.orderUrl || row?.["Order Url"] || ""
+  ).trim();
+  if (raw) {
+    if (/^https?:\/\//i.test(raw)) return { href: raw, label: "Order" };
+    if (/^www\./i.test(raw)) return { href: `https://${raw}`, label: "Order" };
+  }
+  const email = String(row?.["Order Email"] || row?.orderEmail || "").trim();
+  if (email.includes("@")) {
+    const name = String(row?.["Item Name"] || "kanban item").trim();
+    const qty = String(
+      row?.["Event Qty"] || row?.["Reorder Qty (basis)"] || "1"
+    ).trim();
+    return {
+      href: `mailto:${email}?subject=${encodeURIComponent(`Order ${name} — qty ${qty}`)}`,
+      label: "Email to order",
+    };
+  }
+  return null;
+}
+
 
 // Work Gmail that should own material-order drafts. Numeric authuser (0/1/…)
 // follows Chrome login order, so 0 is usually a personal account.
@@ -3600,8 +3622,8 @@ function col(width, center = false) {
                         .trim()
                         .toLowerCase();
                       const isOpen = st === "open";
-                      const orderUrl = String(r["Order URL"] || "").trim();
-                      const buyUrl = /^https?:\/\//i.test(orderUrl) ? orderUrl : "";
+                      const purchase = kanbanPurchaseLink(r);
+                      const buyUrl = purchase?.href || "";
                       const name = (r["Item Name"] || "").trim() || "(unnamed)";
                       const photo = (r["Photo URL"] || "").trim();
                       const qtyRaw =
@@ -3694,7 +3716,26 @@ function col(width, center = false) {
                               {qtyLabel}
                             </div>
                             </div>
-                            <div style={{ flexShrink: 0 }}>
+                            <div style={{ flexShrink: 0, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                            {purchase ? (
+                              <a
+                                href={purchase.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  padding: "6px 10px",
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  borderRadius: 8,
+                                  background: "#059669",
+                                  color: "#fff",
+                                  textDecoration: "none",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {purchase.label}
+                              </a>
+                            ) : null}
                             <button
                               type="button"
                               onClick={() => markKanbanOrdered(r)}
@@ -3723,7 +3764,7 @@ function col(width, center = false) {
                                 rel="noopener noreferrer"
                                 style={{
                                   fontWeight: 700,
-                                  color: "#111827",
+                                  color: "#2563eb",
                                   textDecoration: "underline",
                                   fontSize: 13,
                                   display: "block",
@@ -3774,8 +3815,8 @@ function col(width, center = false) {
                     .trim()
                     .toLowerCase();
                   const isOpen = st === "open";
-                  const orderUrl = String(r["Order URL"] || "").trim();
-                  const buyUrl = /^https?:\/\//i.test(orderUrl) ? orderUrl : "";
+                  const purchase = kanbanPurchaseLink(r);
+                  const buyUrl = purchase?.href || "";
                   const name = (r["Item Name"] || "").trim() || "(unnamed)";
                   const photo = (r["Photo URL"] || "").trim();
                   const qtyRaw =
@@ -3868,7 +3909,26 @@ function col(width, center = false) {
                           {qtyLabel}
                         </div>
                         </div>
-                        <div style={{ flexShrink: 0 }}>
+                        <div style={{ flexShrink: 0, display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        {purchase ? (
+                          <a
+                            href={purchase.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              padding: "6px 10px",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              borderRadius: 8,
+                              background: "#059669",
+                              color: "#fff",
+                              textDecoration: "none",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {purchase.label}
+                          </a>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => markKanbanReceived(r)}
@@ -3897,7 +3957,7 @@ function col(width, center = false) {
                             rel="noopener noreferrer"
                             style={{
                               fontWeight: 700,
-                              color: "#111827",
+                              color: "#2563eb",
                               textDecoration: "underline",
                               fontSize: 13,
                               display: "block",
