@@ -299,18 +299,26 @@ export default function MachineJob({ columns }) {
     setBusy(true);
     setError("");
     try {
-      await axios.post(
+      const res = await axios.post(
         `${ROOT}/embroidery/recut`,
         { orderId: oid, machine: meta.title, pieces: n },
         { withCredentials: true, timeout: 25000 }
       );
       setRecutOpen(false);
       setRecutQty("");
-      setFlash("Manager emailed");
+      const texted = res?.data?.texted;
+      const emailed = res?.data?.emailed;
+      setFlash(
+        texted
+          ? "Recut text sent"
+          : emailed
+            ? "Manager emailed"
+            : "Recut sent"
+      );
       setTimeout(() => setFlash(""), 2500);
     } catch (e) {
       setError(
-        e?.response?.data?.error || e?.message || "Could not email the manager"
+        e?.response?.data?.error || e?.message || "Could not send the recut"
       );
     } finally {
       setBusy(false);
@@ -574,9 +582,11 @@ export default function MachineJob({ columns }) {
           gridColumn: 2,
           gridRow: 1,
           display: "grid",
-          gridTemplateRows: showStart
-            ? "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(36px, 0.35fr) minmax(140px, 1.35fr)"
-            : "minmax(0, 1.05fr) minmax(0, 1.05fr) minmax(0, 1.2fr) minmax(72px, 0.8fr)",
+          gridTemplateRows: recutOpen
+            ? "minmax(0, 1fr) minmax(0, 1.15fr) minmax(88px, 0.7fr)"
+            : showStart
+              ? "minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(36px, 0.35fr) minmax(140px, 1.35fr)"
+              : "minmax(0, 1.05fr) minmax(0, 1.05fr) minmax(0, 1.2fr) minmax(72px, 0.8fr)",
           minWidth: 0,
           minHeight: 0,
           background: "#fff",
@@ -630,6 +640,38 @@ export default function MachineJob({ columns }) {
           </div>
         </div>
 
+        {recutOpen ? (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            border: "3px solid #b91c1c",
+            borderRadius: 16,
+            background: "#fef2f2",
+            padding: "6px 8px",
+            minWidth: 0,
+            minHeight: 0,
+          }}
+        >
+          <div style={{ fontSize: 15, fontWeight: 800, color: "#991b1b", textAlign: "center" }}>
+            Pieces to recut — tap 1–6
+          </div>
+          <div
+            aria-live="polite"
+            style={{
+              fontSize: "clamp(36px, 7vh, 80px)",
+              fontWeight: 900,
+              lineHeight: 0.95,
+              letterSpacing: "-0.04em",
+              color: recutQty ? "#111827" : "#9ca3af",
+            }}
+          >
+            {recutQty || "—"}
+          </div>
+        </div>
+        ) : (
         <div
           style={{
             display: "flex",
@@ -672,7 +714,64 @@ export default function MachineJob({ columns }) {
             </div>
           ) : null}
         </div>
+        )}
 
+        {recutOpen ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            minWidth: 0,
+            minHeight: 0,
+            border: "3px solid #d1d5db",
+            borderRadius: 16,
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setRecutOpen(false);
+              setRecutQty("");
+            }}
+            style={{
+              minHeight: 0,
+              height: "100%",
+              border: "none",
+              borderRight: "3px solid #d1d5db",
+              borderRadius: 0,
+              background: "#fff",
+              color: "#111827",
+              fontWeight: 900,
+              fontSize: "clamp(16px, 2.4vh, 22px)",
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy || !recutQty}
+            onClick={sendRecut}
+            style={{
+              minHeight: 0,
+              height: "100%",
+              border: "none",
+              borderRadius: 0,
+              background: recutQty && !busy ? "#b91c1c" : "#d1d5db",
+              color: recutQty && !busy ? "#fff" : "#6b7280",
+              fontSize: "clamp(16px, 2.4vh, 22px)",
+              fontWeight: 900,
+              cursor: recutQty && !busy ? "pointer" : "default",
+            }}
+          >
+            Send
+          </button>
+        </div>
+        ) : (
+        <>
         <div
           style={{
             display: "flex",
@@ -805,6 +904,8 @@ export default function MachineJob({ columns }) {
             Finish
           </button>
         </div>
+        </>
+        )}
       </div>
 
       <div
@@ -830,23 +931,35 @@ export default function MachineJob({ columns }) {
             <button
               key={n}
               type="button"
-              disabled={busy || left <= 0}
-              onClick={() => recordCompleted(n)}
+              disabled={busy || (!recutOpen && left <= 0)}
+              onClick={() => {
+                if (recutOpen) {
+                  setRecutQty(String(n));
+                  return;
+                }
+                recordCompleted(n);
+              }}
               style={{
                 width: "100%",
                 maxWidth: "100%",
                 aspectRatio: "1",
                 maxHeight: "100%",
-                border: "none",
+                border: recutOpen && String(recutQty) === String(n) ? "4px solid #fff" : "none",
                 borderRadius: 16,
-                background: left <= 0 ? "#374151" : "#fbbf24",
-                color: "#111",
+                background: recutOpen
+                  ? String(recutQty) === String(n)
+                    ? "#b91c1c"
+                    : "#f87171"
+                  : left <= 0
+                    ? "#374151"
+                    : "#fbbf24",
+                color: recutOpen ? "#fff" : "#111",
                 fontSize: "clamp(28px, 5vh, 64px)",
                 fontWeight: 900,
-                cursor: left <= 0 || busy ? "default" : "pointer",
+                cursor: busy || (!recutOpen && left <= 0) ? "default" : "pointer",
               }}
             >
-              +{n}
+              {recutOpen ? n : `+${n}`}
             </button>
           ))
         )}
@@ -1085,44 +1198,6 @@ export default function MachineJob({ columns }) {
         </Modal>
       )}
 
-      {recutOpen && (
-        <Modal onClose={() => setRecutOpen(false)}>
-          <h2 style={{ margin: "0 0 12px", fontSize: 22 }}>How many pieces to recut?</h2>
-          <input
-            autoFocus
-            type="number"
-            inputMode="numeric"
-            min={1}
-            value={recutQty}
-            onChange={(e) => setRecutQty(e.target.value)}
-            placeholder="#"
-            style={{
-              width: "100%",
-              fontSize: 32,
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "2px solid #111827",
-              boxSizing: "border-box",
-              textAlign: "center",
-              WebkitUserSelect: "text",
-              userSelect: "text",
-            }}
-          />
-          <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-            <button type="button" onClick={() => setRecutOpen(false)} style={btnGhost}>
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={sendRecut}
-              style={{ ...btnPrimary, background: "#b91c1c" }}
-            >
-              Send
-            </button>
-          </div>
-        </Modal>
-      )}
       <VibrationDot
         vibrating={vibration.vibrating}
         level={vibration.level}
