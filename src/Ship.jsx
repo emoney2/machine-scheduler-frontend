@@ -66,10 +66,26 @@ function isOpenForShip(job) {
   return stage !== "COMPLETE" && stage !== "COMPLETED" && status !== "COMPLETE" && status !== "COMPLETED";
 }
 
+function normalizePoHeaderKey(name) {
+  return String(name || "").trim().toLowerCase().replace(/\s+/g, "");
+}
+
 function readJobPoNumber(job = {}) {
-  const keys = ["PO #", "PO#", "PO Number", "Customer PO", "poNumber", "PO"];
-  for (const key of keys) {
-    const val = job?.[key];
+  if (!job || typeof job !== "object") return "";
+  const keys = [
+    "PO #",
+    "PO#",
+    "P.O. #",
+    "PO Number",
+    "Customer PO",
+    "Customer PO #",
+    "Purchase Order",
+    "poNumber",
+    "PO",
+  ];
+  const wanted = new Set(keys.map(normalizePoHeaderKey));
+  for (const [key, val] of Object.entries(job)) {
+    if (!wanted.has(normalizePoHeaderKey(key))) continue;
     if (val != null && String(val).trim()) return String(val).trim();
   }
   return "";
@@ -995,7 +1011,6 @@ export default function Ship() {
   });
   const [boxSuggestion, setBoxSuggestion] = useState(null);
   const [boxSuggestionLoading, setBoxSuggestionLoading] = useState(false);
-  const [shipmentPoNumber, setShipmentPoNumber] = useState("");
   const [oneTimeShipAddress, setOneTimeShipAddress] = useState(null);
   const [oneTimeAddressForm, setOneTimeAddressForm] = useState({
     companyName: "",
@@ -2628,7 +2643,6 @@ export default function Ship() {
     }
     upsFlowCreateInvoiceRef.current = Boolean(createInvoice);
     forceDirectoryShipRef.current = false;
-    setShipmentPoNumber(poNumbersFromJobs(sj));
     setBoxCounts(initialBoxCounts());
     setCustomBoxes([]);
     setShowCustomBoxModal(false);
@@ -2688,7 +2702,6 @@ export default function Ship() {
 
     const packingFields = { pieces };
     const labelFields = {
-      poNumber: String(shipmentPoNumber || "").trim(),
       ...(forceDirectoryShipRef.current ? { use_directory_address: true } : {}),
     };
 
@@ -2739,6 +2752,7 @@ export default function Ship() {
   };
 
   const storedShipForModal = getStoredShipAddressForSelection();
+  const sheetPoNumber = poNumbersFromJobs(selectedJobsForShip);
   const shipAddressConflictOptions = storedShipForModal?.options || null;
   const hasShipAddressConflict = Boolean(shipAddressConflictOptions?.length);
   const hasOrderShipOnFile = Boolean(
@@ -3770,24 +3784,13 @@ export default function Ship() {
                   ? "This order has a specific shipping address on file. Use that address, enter a different one, or use the company default from Directory."
                   : "Use your default address from Directory, or enter a one-time shipping address for this shipment only."}
             </p>
-            <label style={{ display: "block", margin: "0 0 14px", fontSize: 13, color: "#263238" }}>
-              <span style={{ fontWeight: 700, display: "block", marginBottom: 4 }}>
-                Customer PO # (prints on the UPS label)
-              </span>
-              <input
-                value={shipmentPoNumber}
-                onChange={(e) => setShipmentPoNumber(e.target.value)}
-                placeholder="Required for customers like Big Cedar Lodge"
-                style={{
-                  width: "100%",
-                  boxSizing: "border-box",
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid #b0bec5",
-                  fontSize: 14,
-                }}
-              />
-            </label>
+            {sheetPoNumber ? (
+              <div style={{ margin: "0 0 14px", fontSize: 13, color: "#263238" }}>
+                <span style={{ fontWeight: 700 }}>PO # </span>
+                {sheetPoNumber}
+                <span style={{ color: "#607d8b", fontWeight: 400 }}> (from Production Orders)</span>
+              </div>
+            ) : null}
             {hasShipAddressConflict && shipAddressConflictOptions.map((option) => (
               <div
                 key={`${option.orderId}-${shipAddressCompareKey(option.address)}`}
