@@ -127,8 +127,32 @@ function getJobThumbUrl(job, sz = "w240") {
   return "";
 }
 
-function artFromOverviewRow(row) {
+function parseOverviewDate(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const dt = new Date(Date.UTC(1899, 11, 30) + Math.round(value) * 86400000);
+    return Number.isNaN(dt.getTime()) ? "" : dt.toISOString().slice(0, 10);
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (n > 20000 && n < 80000) return parseOverviewDate(n);
+  }
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
+  if (!m) return "";
+  let [, mm, dd, yy] = m;
+  if (!yy) yy = String(new Date().getFullYear());
+  else if (yy.length === 2) yy = `20${yy}`;
+  return `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
+function liveFromOverviewRow(row) {
   const image = row?.Image || row?.Preview || row?.["Art Link"] || row?.image || "";
+  const qty = Number(String(row?.Quantity ?? row?.quantity ?? "").replace(/,/g, "")) || 0;
   return {
     Image: image,
     Preview: row?.Preview || image,
@@ -138,6 +162,13 @@ function artFromOverviewRow(row) {
     "Art Link": row?.["Art Link"] || image,
     stage: row?.Stage || row?.stage || "",
     sewingSummaryComplete: !!row?.sewingSummaryComplete,
+    customer: row?.["Company Name"] || row?.customer || "",
+    product: row?.Product || row?.product || "",
+    quantity: qty || undefined,
+    dueDate: parseOverviewDate(row?.["Due Date"] || row?.dueDate),
+    requiredShipDate: parseOverviewDate(row?.["Ship Date"] || row?.requiredShipDate),
+    due_type: row?.["Hard Date/Soft Date"] || row?.["Hard/Soft"] || row?.due_type || "",
+    hardDate: /hard/i.test(String(row?.["Hard Date/Soft Date"] || row?.["Hard/Soft"] || "")),
   };
 }
 
@@ -193,10 +224,12 @@ function overlayEmbroidery(job, columns) {
     ? Math.max(0, parsedLeft)
     : Math.max(0, qty ? qty - done : 0);
   const embStatus = String(
-    live.embroidery_status || live.embroideryStatus || job.embroidery_status || ""
+    live.embroidery_status || live.embroideryStatus || job.embroidery_status || job.stage || ""
   ).toUpperCase();
+  const sewingStage = /^(SEWING|COMPLETE|COMPLETED)$/.test(String(job.stage || live.status || "").toUpperCase());
   const ready = (
-    embStatus === "COMPLETE"
+    sewingStage
+    || embStatus === "COMPLETE"
     || embStatus === "COMPLETED"
     || (qty > 0 && done >= qty)
     || (done > 0 && left <= 0)
@@ -222,6 +255,11 @@ function overlayEmbroidery(job, columns) {
     headCount: heads,
     hardDate: !!(job.hardDate || isHardJob(job) || isHardJob(live)),
     due_type: job.due_type || live.due_type || live.dueType || "",
+    dueDate: job.dueDate || live.due_date || "",
+    requiredShipDate: job.requiredShipDate || live.requiredShipDate || live.due_date || "",
+    customer: job.customer || live.company || "",
+    product: job.product || live.product || "",
+    quantity: qty || job.quantity,
     image: job.image || live.imageLink || live.Image || live.image || "",
     imageLink: job.imageLink || live.imageLink || job.image || live.image || "",
     imageFileId: job.imageFileId || live.imageFileId || extractFileId(job.image || live.imageLink || live.image) || "",
@@ -325,12 +363,12 @@ function CarryoverStrip({ carryovers }) {
   );
 }
 
-function SewingJobCard({ job, drag, tv, compact, embMark }) {
+function SewingJobCard({ job, drag, tv, compact }) {
   const hard = isHardJob(job);
   const emb = embroideryStatus(job);
   const embReady = emb.kind === "ready";
-  const thumb = getJobThumbUrl(job, compact ? "w160" : "w240");
-  const qtyLabel = `${Number(job.remainingQuantity || 0)}/${job.quantity ?? "—"}`;
+  const thumb = getJobThumbUrl(job, "w240");
+  const qtyLabel = `${Number(job.remainingQuantity ?? job.quantity ?? 0)}/${job.quantity ?? "—"}`;
   const classes = [
     "sc-card",
     hard ? "hard" : "soft",
@@ -371,34 +409,26 @@ function SewingJobCard({ job, drag, tv, compact, embMark }) {
           <span>No img</span>
         )}
       </button>
-      <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
-      <div className="sc-row sc-row-main">
-        <span className="sc-id">{job.orderNumber}</span>
-        <span className="sc-company">{jobName(job)}</span>
-        {job.overdue ? <span className="sc-late">LATE</span> : null}
-        {!compact && <span className="sc-qty">{qtyLabel}</span>}
-      </div>
-      <span className="sc-bubble due">Due {fmtCardDate(job.dueDate)}</span>
-      <span className="sc-bubble ship">Ship {fmtCardDate(job.requiredShipDate)}</span>
-      {embMark ? (
-        !embReady ? (
-          <span className="sc-e" title={emb.label}>E</span>
-        ) : null
-      ) : (
-        <div className={`sc-emb ${emb.kind}`}>
-          <strong>{emb.label}</strong>
-          {emb.kind === "progress" && etaLabel(job.embroideryEta) ? (
-            <span>{etaLabel(job.embroideryEta)}</span>
-          ) : null}
+      <div className="sc-card-body">
+        <div className="sc-row sc-row-main">
+          <span className="sc-id">{job.orderNumber}</span>
+          <span className="sc-company">{jobName(job)}</span>
+          <span className="sc-qty">{qtyLabel}</span>
+          <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
         </div>
-      )}
+        <div className="sc-meta">
+          <span className="sc-bubble due">{fmtCardDate(job.dueDate)}</span>
+          <span className="sc-bubble ship">{fmtCardDate(job.requiredShipDate)}</span>
+          {job.overdue ? <span className="sc-late">LATE</span> : null}
+          {!embReady ? <span className="sc-e" title={emb.label}>E</span> : null}
+        </div>
+      </div>
     </article>
   );
 }
 
 function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
   const twoCol = droppableId !== QUEUE_ID && ids.length > 5;
-  const embMark = droppableId === QUEUE_ID || twoCol || compact;
   return (
     <Droppable droppableId={droppableId}>
       {(provided, snapshot) => (
@@ -413,7 +443,7 @@ function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
             return (
               <Draggable key={id} draggableId={id} index={index}>
                 {(drag) => (
-                  <SewingJobCard job={job} drag={drag} tv={tv} compact={compact || twoCol} embMark={embMark} />
+                  <SewingJobCard job={job} drag={drag} tv={tv} compact={compact || twoCol} />
                 )}
               </Draggable>
             );
@@ -554,7 +584,7 @@ export function SewingCalendar({ tv = false, columns }) {
       for (const row of asList(data?.upcoming)) {
         const oid = normalizeOrderId(row?.["Order #"] || row?.orderNumber);
         if (!oid) continue;
-        map[oid] = artFromOverviewRow(row);
+        map[oid] = liveFromOverviewRow(row);
       }
       setArtByOrder(map);
     } catch (_) {
@@ -564,18 +594,22 @@ export function SewingCalendar({ tv = false, columns }) {
 
   useEffect(() => {
     loadArt();
-    const artTimer = window.setInterval(loadArt, tv ? 120000 : 180000);
+    const artTimer = window.setInterval(loadArt, 45000);
     return () => window.clearInterval(artTimer);
   }, [loadArt, tv]);
 
   useEffect(() => {
     load();
-    const timer = window.setInterval(load, tv ? 45000 : 120000);
+    const timer = window.setInterval(load, tv ? 45000 : 60000);
     const onBoard = () => {
       if (isWriteGuarded() || syncingRef.current) return;
       load();
+      loadArt();
     };
-    const onJobs = () => load();
+    const onJobs = () => {
+      load();
+      loadArt();
+    };
     socket.on("sewingBoardUpdated", onBoard);
     socket.on("embroideryProgressUpdated", onJobs);
     socket.on("embroideryFinished", onJobs);
@@ -585,36 +619,56 @@ export function SewingCalendar({ tv = false, columns }) {
       socket.off("embroideryProgressUpdated", onJobs);
       socket.off("embroideryFinished", onJobs);
     };
-  }, [load, tv, isWriteGuarded]);
+  }, [load, loadArt, tv, isWriteGuarded]);
 
   const liveJobs = useMemo(() => {
     const next = {};
     const rolled = new Set(carryovers.map((row) => String(row.orderNumber)));
-    Object.entries(jobs).forEach(([id, job]) => {
+    const liveReady = Object.keys(artByOrder).length > 0;
+    const mergeOne = (id, job, live) => {
       const overdue = !!(job.overdue || job.overdueFrom);
-      const art = artByOrder[normalizeOrderId(id)] || artByOrder[id] || {};
+      const qty = Number(live.quantity || job.quantity) || 0;
       const merged = overlayEmbroidery({
         ...job,
-        ...art,
-        image: job.image || art.image || art.Image || "",
-        imageLink: job.imageLink || art.imageLink || art.Image || "",
-        Image: job.Image || art.Image || "",
-        imageFileId: job.imageFileId || art.imageFileId || "",
-        stage: job.stage || art.stage || "",
-        sewingSummaryComplete: !!(job.sewingSummaryComplete || art.sewingSummaryComplete),
+        ...live,
+        orderNumber: job.orderNumber || id,
+        customer: live.customer || job.customer,
+        product: live.product || job.product,
+        quantity: qty || job.quantity,
+        remainingQuantity: live.sewingSummaryComplete ? 0 : (job.remainingQuantity ?? qty),
+        dueDate: live.dueDate || job.dueDate,
+        requiredShipDate: live.requiredShipDate || job.requiredShipDate,
+        due_type: live.due_type || job.due_type,
+        hardDate: live.due_type ? !!live.hardDate : !!(live.hardDate || job.hardDate),
+        image: live.image || job.image,
+        imageLink: live.imageLink || job.imageLink,
+        Image: live.Image || job.Image,
+        imageFileId: live.imageFileId || job.imageFileId,
+        stage: live.stage || job.stage,
+        sewingSummaryComplete: !!(live.sewingSummaryComplete || job.sewingSummaryComplete),
         carriedOver: rolled.has(id),
         overdue,
       }, columns);
       if (isClosedOrBackJob(merged, columns)) return;
       next[id] = merged;
+    };
+    Object.entries(jobs).forEach(([id, job]) => {
+      const live = artByOrder[normalizeOrderId(id)] || artByOrder[id] || {};
+      if (liveReady && !live.stage && !live.dueDate && !live.quantity && !live.customer) return;
+      mergeOne(id, job, live);
+    });
+    Object.entries(artByOrder).forEach(([id, live]) => {
+      if (next[id]) return;
+      mergeOne(id, { orderNumber: id }, live);
     });
     return next;
   }, [jobs, columns, carryovers, artByOrder]);
 
-  const visibleQueue = useMemo(
-    () => sortIdsByShip(queue.filter((id) => liveJobs[id]), liveJobs),
-    [queue, liveJobs]
-  );
+  const visibleQueue = useMemo(() => {
+    const placed = placedIds(queue, board);
+    const extras = Object.keys(liveJobs).filter((id) => !placed.has(id));
+    return sortIdsByShip([...queue.filter((id) => liveJobs[id]), ...extras], liveJobs);
+  }, [queue, board, liveJobs]);
   const visibleBoard = useMemo(() => {
     const next = {};
     Object.entries(board).forEach(([day, ids]) => {
