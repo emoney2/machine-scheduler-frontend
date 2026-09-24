@@ -328,16 +328,16 @@ function liveFromOverviewRow(row) {
   };
 }
 
-function shipTimestamp(job) {
-  const raw = String(job?.requiredShipDate || job?.shipDate || "").slice(0, 10);
+function dueTimestamp(job) {
+  const raw = String(job?.dueDate || "").slice(0, 10);
   if (!raw) return Number.POSITIVE_INFINITY;
   const stamp = new Date(`${raw}T00:00:00`).getTime();
   return Number.isFinite(stamp) ? stamp : Number.POSITIVE_INFINITY;
 }
 
-function sortIdsByShip(ids, jobs) {
+function sortIdsByDue(ids, jobs) {
   return asList(ids).slice().sort((a, b) => {
-    const delta = shipTimestamp(jobs[a]) - shipTimestamp(jobs[b]);
+    const delta = dueTimestamp(jobs[a]) - dueTimestamp(jobs[b]);
     if (delta) return delta;
     return String(a).localeCompare(String(b), undefined, { numeric: true });
   });
@@ -704,17 +704,27 @@ export function SewingCalendar({ tv = false, columns }) {
     if (keepPlacements) {
       setQueue((prev) => {
         const extras = Object.keys(jobsRef.current).filter((id) => !placedIds(prev, placementsRef.current.board).has(id));
-        const next = extras.length ? sortIdsByShip([...prev, ...extras], jobsRef.current) : prev;
+        const next = extras.length ? sortIdsByDue([...prev, ...extras], jobsRef.current) : prev;
         placementsRef.current = { queue: next, board: placementsRef.current.board };
         return next;
       });
       writeLiveCache({ ...data, queue: placementsRef.current.queue, board: placementsRef.current.board });
       return;
     }
-    setQueue(asList(data.queue));
-    setBoard(data.board && typeof data.board === "object" ? data.board : {});
+    const incomingBoard = data.board && typeof data.board === "object" ? data.board : {};
+    const incomingHasDays = Object.values(incomingBoard).some((ids) => asList(ids).length);
+    const currentHasDays = Object.values(placementsRef.current.board || {}).some((ids) => asList(ids).length);
+    if (incomingHasDays || !currentHasDays) {
+      setQueue(asList(data.queue));
+      setBoard(incomingBoard);
+      placementsRef.current = { queue: asList(data.queue), board: incomingBoard };
+    }
     clearSewingBoardDraft();
-    writeLiveCache(data);
+    writeLiveCache({
+      ...data,
+      queue: placementsRef.current.queue,
+      board: placementsRef.current.board,
+    });
   }, []);
 
   const load = useCallback(async () => {
@@ -722,7 +732,8 @@ export function SewingCalendar({ tv = false, columns }) {
     syncingRef.current = true;
     try {
       const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 25000 });
-      const keep = !initialLoadRef.current || isWriteGuarded();
+      const hasDays = Object.values(placementsRef.current.board || {}).some((ids) => asList(ids).length);
+      const keep = !initialLoadRef.current || isWriteGuarded() || hasDays;
       applyPayload(data, { keepPlacements: keep });
       initialLoadRef.current = false;
       setError("");
@@ -864,7 +875,7 @@ export function SewingCalendar({ tv = false, columns }) {
   const visibleQueue = useMemo(() => {
     const placed = placedIds(queue, board);
     const extras = Object.keys(liveJobs).filter((id) => !placed.has(id));
-    return sortIdsByShip([...queue.filter((id) => liveJobs[id]), ...extras], liveJobs);
+    return sortIdsByDue([...queue.filter((id) => liveJobs[id]), ...extras], liveJobs);
   }, [queue, board, liveJobs]);
   const visibleBoard = useMemo(() => {
     const next = {};
@@ -875,7 +886,7 @@ export function SewingCalendar({ tv = false, columns }) {
   }, [board, liveJobs]);
 
   const persistBoard = async (nextQueue, nextBoard) => {
-    const sortedQueue = sortIdsByShip(nextQueue, liveJobs);
+    const sortedQueue = sortIdsByDue(nextQueue, liveJobs);
     placementsRef.current = { queue: sortedQueue, board: nextBoard };
     extendWriteGuard();
     setQueue(sortedQueue);
@@ -902,20 +913,27 @@ export function SewingCalendar({ tv = false, columns }) {
     const { source, destination } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    const fromIds = idsForColumn(source.droppableId, visibleQueue, visibleBoard).slice();
-    const [moved] = fromIds.splice(source.index, 1);
+    const sourceList = idsForColumn(source.droppableId, queue, board);
+    const visibleSource = sourceList.filter((id) => liveJobs[id]);
+    const moved = visibleSource[source.index];
     if (!moved) return;
-    let nextQueue = visibleQueue.slice();
-    const nextBoard = { ...board, ...visibleBoard };
-    if (source.droppableId === QUEUE_ID) nextQueue = fromIds;
-    else nextBoard[source.droppableId] = fromIds;
+    let nextQueue = asList(queue).filter((id) => id !== moved);
+    const nextBoard = {};
+    Object.entries(board || {}).forEach(([day, ids]) => {
+      nextBoard[day] = asList(ids).filter((id) => id !== moved);
+    });
     if (destination.droppableId === QUEUE_ID) {
-      const dest = nextQueue.slice();
-      dest.splice(destination.index, 0, moved);
-      nextQueue = dest;
+      const destVisible = nextQueue.filter((id) => liveJobs[id]);
+      const before = destVisible[destination.index];
+      const at = before != null ? nextQueue.indexOf(before) : nextQueue.length;
+      nextQueue.splice(at < 0 ? nextQueue.length : at, 0, moved);
     } else {
-      const dest = (nextBoard[destination.droppableId] || []).slice();
-      dest.splice(destination.index, 0, moved);
+      const destAll = asList(nextBoard[destination.droppableId]);
+      const destVisible = destAll.filter((id) => liveJobs[id]);
+      const before = destVisible[destination.index];
+      const at = before != null ? destAll.indexOf(before) : destAll.length;
+      const dest = destAll.slice();
+      dest.splice(at < 0 ? dest.length : at, 0, moved);
       nextBoard[destination.droppableId] = dest;
     }
     persistBoard(nextQueue, nextBoard);
