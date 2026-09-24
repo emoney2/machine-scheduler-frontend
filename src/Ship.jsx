@@ -163,7 +163,8 @@ const BOX_DIMENSIONS = {
 
 /** Preset boxes for Ship wizard (dims inches, weight lbs). */
 const SHIP_BOX_PRESETS = [
-  { id: "14x5x7", label: "14×5×7 (5 lbs)", L: 14, W: 5, H: 7, weight: 5 },
+  { id: "9x7x4", label: "9×7×4 (2 lbs)", L: 9, W: 7, H: 4, weight: 2 },
+  { id: "14x9x3", label: "14×9×3 (3 lbs)", L: 14, W: 9, H: 3, weight: 3 },
   { id: "10x10x10", label: "10×10×10 (10 lbs)", L: 10, W: 10, H: 10, weight: 10 },
   { id: "13x13x13", label: "13×13×13 (13 lbs)", L: 13, W: 13, H: 13, weight: 13 },
   { id: "15x15x15", label: "15×15×15 (15 lbs)", L: 15, W: 15, H: 15, weight: 15 },
