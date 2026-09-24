@@ -567,6 +567,8 @@ export function SewingCalendar({ tv = false, columns }) {
   const syncingRef = useRef(false);
   const saveInFlightRef = useRef(false);
   const writeGuardUntilRef = useRef(0);
+  const initialLoadRef = useRef(true);
+  const jobsRef = useRef({});
   const placementsRef = useRef({ queue: asList(draft?.queue), board: draft?.board || {} });
   const rootRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -587,7 +589,12 @@ export function SewingCalendar({ tv = false, columns }) {
   const applyPayload = useCallback((data, { keepPlacements = false } = {}) => {
     if (!data || typeof data !== "object") return;
     const nextJobs = data.jobs && typeof data.jobs === "object" ? data.jobs : {};
-    setJobs(nextJobs);
+    const incomingCount = Object.keys(nextJobs).length;
+    const currentCount = Object.keys(jobsRef.current).length;
+    if (incomingCount > 0 || currentCount === 0) {
+      jobsRef.current = nextJobs;
+      setJobs(nextJobs);
+    }
     setDays(asList(data.days));
     const rolled = asList(data.carryovers);
     setCarryovers(rolled);
@@ -600,8 +607,8 @@ export function SewingCalendar({ tv = false, columns }) {
     });
     if (keepPlacements) {
       setQueue((prev) => {
-        const extras = Object.keys(nextJobs).filter((id) => !placedIds(prev, placementsRef.current.board).has(id));
-        const next = extras.length ? sortIdsByShip([...prev, ...extras], nextJobs) : prev;
+        const extras = Object.keys(jobsRef.current).filter((id) => !placedIds(prev, placementsRef.current.board).has(id));
+        const next = extras.length ? sortIdsByShip([...prev, ...extras], jobsRef.current) : prev;
         placementsRef.current = { queue: next, board: placementsRef.current.board };
         return next;
       });
@@ -618,7 +625,9 @@ export function SewingCalendar({ tv = false, columns }) {
     try {
       setError("");
       const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 60000 });
-      applyPayload(data, { keepPlacements: isWriteGuarded() });
+      const keep = !initialLoadRef.current || isWriteGuarded();
+      applyPayload(data, { keepPlacements: keep });
+      initialLoadRef.current = false;
     } catch (e) {
       setError(friendlyError(e));
     } finally {
@@ -658,6 +667,7 @@ export function SewingCalendar({ tv = false, columns }) {
         if (!oid) continue;
         map[oid] = liveFromOverviewRow(row);
       }
+      if (!Object.keys(map).length) return;
       setArtByOrder(map);
     } catch (_) {
       /* board still works without artwork */
@@ -696,7 +706,6 @@ export function SewingCalendar({ tv = false, columns }) {
   const liveJobs = useMemo(() => {
     const next = {};
     const rolled = new Set(carryovers.map((row) => String(row.orderNumber)));
-    const liveReady = Object.keys(artByOrder).length > 0;
     const mergeOne = (id, job, live) => {
       const overdue = !!(job.overdue || job.overdueFrom);
       const qty = Number(live.quantity || job.quantity) || 0;
@@ -736,12 +745,7 @@ export function SewingCalendar({ tv = false, columns }) {
     };
     Object.entries(jobs).forEach(([id, job]) => {
       const live = artByOrder[normalizeOrderId(id)] || artByOrder[id] || {};
-      if (liveReady && !live.stage && !live.dueDate && !live.quantity && !live.customer) return;
       mergeOne(id, job, live);
-    });
-    Object.entries(artByOrder).forEach(([id, live]) => {
-      if (next[id]) return;
-      mergeOne(id, { orderNumber: id }, live);
     });
     return next;
   }, [jobs, columns, carryovers, artByOrder]);
