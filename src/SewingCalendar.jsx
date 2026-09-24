@@ -427,15 +427,25 @@ function SewingJobCard({ job, drag, tv, compact }) {
   );
 }
 
-function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
-  const twoCol = droppableId !== QUEUE_ID && ids.length > 5;
+function dayDensity(count) {
+  if (count > 6) {
+    return { name: "density-12", rows: Math.max(6, Math.ceil(count / 2)), cols: 2 };
+  }
+  if (count > 3) return { name: "density-6", rows: 6, cols: 1 };
+  return { name: "density-3", rows: 3, cols: 1 };
+}
+
+function ColumnCards({ droppableId, ids, jobs, tv, compact, density }) {
+  const isQueue = droppableId === QUEUE_ID;
+  const twoCol = !isQueue && (density?.cols || 1) > 1;
   return (
     <Droppable droppableId={droppableId}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`sc-drop ${droppableId === QUEUE_ID ? "sc-queue-drop" : ""} ${twoCol ? "two-col" : ""} ${snapshot.isDraggingOver ? "over" : ""}`}
+          className={`sc-drop ${isQueue ? "sc-queue-drop" : "sc-day-drop"} ${density?.name || ""} ${twoCol ? "two-col" : ""} ${snapshot.isDraggingOver ? "over" : ""}`}
+          style={!isQueue && density ? { "--rows": density.rows, "--cols": density.cols } : undefined}
         >
           {ids.map((id, index) => {
             const job = jobs[id];
@@ -825,8 +835,9 @@ export function SewingCalendar({ tv = false, columns }) {
                 {week.map((day) => {
                   const ids = asList(visibleBoard[day]);
                   const whoIsOut = outPhrase(absences[day] || []);
+                  const density = dayDensity(ids.length);
                   return (
-                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${ids.length > 5 ? "packed" : "sparse"}`} key={day}>
+                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${density.name}`} key={day}>
                       <header>
                         <button
                           type="button"
@@ -838,7 +849,13 @@ export function SewingCalendar({ tv = false, columns }) {
                           {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
                         </button>
                       </header>
-                      <ColumnCards droppableId={day} ids={ids} jobs={liveJobs} tv={tv} compact={ids.length > 5} />
+                      <ColumnCards
+                        droppableId={day}
+                        ids={ids}
+                        jobs={liveJobs}
+                        tv={tv}
+                        density={density}
+                      />
                     </section>
                   );
                 })}
