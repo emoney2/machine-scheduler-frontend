@@ -580,8 +580,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sc-bubble.due { background: #ffe0b2; }
-.sc-bubble.ship { background: #c8e6c9; }
+.sc-bubble.due { background: #ffe0b2; color: #8a4b08; }
+.sc-bubble.ship { background: #c8e6c9; color: #1b5e20; }
 .sc-e {
   width: 16px;
   height: 16px;
@@ -604,7 +604,7 @@
   font-size: 10px;
   font-weight: 700;
 }
-.sc-emb.ready { background: #dcfce7; color: #166534; }
+.sc-emb.ready { background: #dcfce7; color: #166534; padding: 0 4px; line-height: 16px; }
 .sc-emb.not-started { background: #fee2e2; color: #991b1b; }
 .sc-emb.progress { background: #ffedd5; color: #9a3412; }
 .sc-card.compact {
@@ -652,6 +652,8 @@
 .sc-day.density-12 .sc-hs,
 .sc-day.density-6 .sc-e,
 .sc-day.density-12 .sc-e { width: 13px; height: 13px; font-size: 8px; }
+.sc-day.density-6 .sc-emb,
+.sc-day.density-12 .sc-emb { font-size: 8px; padding: 0 3px; line-height: 13px; }
 .sc-day-drop .sc-empty-col {
   grid-column: 1 / -1;
   grid-row: 1 / -1;

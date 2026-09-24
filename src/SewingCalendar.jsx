@@ -127,6 +127,57 @@ function getJobThumbUrl(job, sz = "w240") {
   return "";
 }
 
+function isLocalDelivery(method) {
+  return /local/i.test(String(method || ""));
+}
+
+function estimateTransitDays(method, zip, state, city) {
+  if (isLocalDelivery(method)) return 1;
+  const raw = String(method || "").toUpperCase();
+  if (/NEXT DAY/.test(raw)) return 1;
+  if (/2ND DAY|SECOND DAY/.test(raw)) return 2;
+  if (/3 DAY/.test(raw)) return 3;
+  const digits = String(zip || "").replace(/\D/g, "");
+  const prefix = digits.slice(0, 3);
+  const lead = prefix.slice(0, 1);
+  const st = String(state || "").trim().toUpperCase().slice(0, 2);
+  const cityKey = String(city || "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
+  if (st === "GA" || prefix.startsWith("30") || prefix.startsWith("31")) return 1;
+  if (["SC", "AL", "TN", "FL", "NC"].includes(st) || lead === "3") return 2;
+  if (["VA", "WV", "KY", "MS", "LA", "MD", "DC", "DE", "PA", "NJ", "NY", "CT", "RI", "MA", "NH", "VT", "ME", "OH", "IN", "MI", "IL", "WI", "MO", "AR"].includes(st) || ["1", "2", "4"].includes(lead)) return 3;
+  if (["CA", "OR", "WA", "HI", "AK"].includes(st) || ["8", "9"].includes(lead)) return 5;
+  if (["TX", "OK", "KS", "NE", "SD", "ND", "MN", "IA", "AZ", "NM", "NV", "UT", "CO", "ID", "MT", "WY"].includes(st) || ["5", "6", "7"].includes(lead)) return 4;
+  if (/(carlsbad|san diego|los angeles|la jolla|irvine|newport|orange county|san francisco|oakland|seattle|portland)/.test(cityKey)) return 5;
+  return 3;
+}
+
+function subtractWorkdaysIso(iso, days) {
+  const raw = String(iso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || days < 0) return "";
+  const dt = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(dt.getTime())) return "";
+  let left = days;
+  while (left > 0) {
+    dt.setDate(dt.getDate() - 1);
+    const dow = dt.getDay();
+    if (dow !== 0 && dow !== 6) left -= 1;
+  }
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function requiredShipFromDue(dueIso, method, zip, state, city) {
+  const due = String(dueIso || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return "";
+  const hasHint = String(method || zip || state || city || "").trim();
+  if (!hasHint) return "";
+  const transit = estimateTransitDays(method, zip, state, city);
+  const extra = isLocalDelivery(method) || transit <= 0 ? 0 : 1;
+  return subtractWorkdaysIso(due, transit + extra);
+}
+
 function parseOverviewDate(value) {
   if (value == null || value === "") return "";
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -166,7 +217,11 @@ function liveFromOverviewRow(row) {
     product: row?.Product || row?.product || "",
     quantity: qty || undefined,
     dueDate: parseOverviewDate(row?.["Due Date"] || row?.dueDate),
-    requiredShipDate: parseOverviewDate(row?.["Ship Date"] || row?.requiredShipDate),
+    shippingMethod: row?.["Shipping Method"] || row?.shippingMethod || row?.["Ship Via"] || "",
+    shipCity: row?.["Shipping City"] || row?.["Ship To City"] || row?.shipCity || "",
+    shipState: row?.["Shipping State"] || row?.["Ship To State"] || row?.shipState || "",
+    shipZip: row?.["Shipping Zip"] || row?.["Ship To Zip"] || row?.shipZip || "",
+    requiredShipDate: "",
     due_type: row?.["Hard Date/Soft Date"] || row?.["Hard/Soft"] || row?.due_type || "",
     hardDate: /hard/i.test(String(row?.["Hard Date/Soft Date"] || row?.["Hard/Soft"] || "")),
   };
@@ -256,7 +311,11 @@ function overlayEmbroidery(job, columns) {
     hardDate: !!(job.hardDate || isHardJob(job) || isHardJob(live)),
     due_type: job.due_type || live.due_type || live.dueType || "",
     dueDate: job.dueDate || live.due_date || "",
-    requiredShipDate: job.requiredShipDate || live.requiredShipDate || live.due_date || "",
+    requiredShipDate: job.requiredShipDate || live.requiredShipDate || "",
+    shippingMethod: job.shippingMethod || live.shippingMethod || "",
+    shipCity: job.shipCity || live.shipCity || "",
+    shipState: job.shipState || live.shipState || "",
+    shipZip: job.shipZip || live.shipZip || "",
     customer: job.customer || live.company || "",
     product: job.product || live.product || "",
     quantity: qty || job.quantity,
@@ -368,7 +427,7 @@ function SewingJobCard({ job, drag, tv, compact }) {
   const emb = embroideryStatus(job);
   const embReady = emb.kind === "ready";
   const thumb = getJobThumbUrl(job, "w240");
-  const qtyLabel = `${Number(job.remainingQuantity ?? job.quantity ?? 0)}/${job.quantity ?? "—"}`;
+  const qtyLabel = String(Number(job.quantity ?? job.remainingQuantity ?? 0) || job.quantity || "—");
   const classes = [
     "sc-card",
     hard ? "hard" : "soft",
@@ -417,10 +476,14 @@ function SewingJobCard({ job, drag, tv, compact }) {
           <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
         </div>
         <div className="sc-meta">
-          <span className="sc-bubble due">{fmtCardDate(job.dueDate)}</span>
-          <span className="sc-bubble ship">{fmtCardDate(job.requiredShipDate)}</span>
+          <span className="sc-bubble due" title="Due date">Due {fmtCardDate(job.dueDate)}</span>
+          <span className="sc-bubble ship" title="Ship date">Ship {fmtCardDate(job.requiredShipDate)}</span>
           {job.overdue ? <span className="sc-late">LATE</span> : null}
-          {!embReady ? <span className="sc-e" title={emb.label}>E</span> : null}
+          {embReady ? (
+            <span className="sc-emb ready" title="Embroidery done">Done</span>
+          ) : (
+            <span className="sc-e" title={emb.label}>E</span>
+          )}
         </div>
       </div>
     </article>
@@ -637,6 +700,12 @@ export function SewingCalendar({ tv = false, columns }) {
     const mergeOne = (id, job, live) => {
       const overdue = !!(job.overdue || job.overdueFrom);
       const qty = Number(live.quantity || job.quantity) || 0;
+      const dueDate = live.dueDate || job.dueDate;
+      const shippingMethod = live.shippingMethod || job.shippingMethod;
+      const shipCity = live.shipCity || job.shipCity;
+      const shipState = live.shipState || job.shipState;
+      const shipZip = live.shipZip || job.shipZip;
+      const computedShip = requiredShipFromDue(dueDate, shippingMethod, shipZip, shipState, shipCity);
       const merged = overlayEmbroidery({
         ...job,
         ...live,
@@ -645,8 +714,12 @@ export function SewingCalendar({ tv = false, columns }) {
         product: live.product || job.product,
         quantity: qty || job.quantity,
         remainingQuantity: live.sewingSummaryComplete ? 0 : (job.remainingQuantity ?? qty),
-        dueDate: live.dueDate || job.dueDate,
-        requiredShipDate: live.requiredShipDate || job.requiredShipDate,
+        dueDate,
+        shippingMethod,
+        shipCity,
+        shipState,
+        shipZip,
+        requiredShipDate: computedShip || job.requiredShipDate,
         due_type: live.due_type || job.due_type,
         hardDate: live.due_type ? !!live.hardDate : !!(live.hardDate || job.hardDate),
         image: live.image || job.image,
