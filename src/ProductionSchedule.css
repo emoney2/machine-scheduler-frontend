@@ -291,10 +291,12 @@
 .sc-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 .sc-page.queue-collapsed .sc-layout { grid-template-columns: 44px minmax(0, 1fr); }
 .sc-queue {
@@ -360,14 +362,19 @@
   color: #64748b;
 }
 .sc-queue-rail.over, .sc-drop.over { background: #e0f2fe; }
+.sc-queue-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior: contain;
+}
 .sc-queue .sc-drop,
 .sc-queue-drop {
   gap: 6px;
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  flex: 0 0 auto;
+  min-height: min-content;
+  overflow: visible;
 }
 .sc-weeks {
   display: grid;

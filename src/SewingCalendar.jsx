@@ -77,6 +77,12 @@ function findColumnJob(columns, orderNumber) {
   return null;
 }
 
+function isHardJob(job) {
+  if (!job) return false;
+  if (job.hardDate === true) return true;
+  return /hard/i.test(String(job.due_type || job.dueType || job.hardDate || ""));
+}
+
 function overlayEmbroidery(job, columns) {
   if (!job) return job;
   const found = findColumnJob(columns, job.orderNumber);
@@ -110,6 +116,8 @@ function overlayEmbroidery(job, columns) {
     embroideryEta: ready ? "" : eta,
     avgCycleMs: avg,
     headCount: heads,
+    hardDate: !!(job.hardDate || isHardJob(job) || isHardJob(live)),
+    due_type: job.due_type || live.due_type || live.dueType || "",
     image: job.image || live.imageLink || live.Image || live.image || "",
     imageFileId: job.imageFileId || live.imageFileId || "",
   };
@@ -193,7 +201,7 @@ function CarryoverStrip({ carryovers }) {
 }
 
 function SewingJobCard({ job, drag, tv, compact }) {
-  const hard = !!job.hardDate;
+  const hard = isHardJob(job);
   const embReady = !!job.embroideryReady;
   const thumb = jobImageUrl({
     image: job.image,
@@ -291,6 +299,26 @@ function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
         </div>
       )}
     </Droppable>
+  );
+}
+
+function QueuePane({ ids, jobs, tv }) {
+  const scrollRef = useRef(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onWheel = (event) => {
+      el.scrollTop += event.deltaY;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false, capture: true });
+    return () => el.removeEventListener("wheel", onWheel, { capture: true });
+  }, []);
+  return (
+    <div className="sc-queue-scroll" ref={scrollRef}>
+      <ColumnCards droppableId={QUEUE_ID} ids={ids} jobs={jobs} tv={tv} compact={false} />
+    </div>
   );
 }
 
@@ -580,7 +608,7 @@ export function SewingCalendar({ tv = false, columns }) {
               <h2>Queue <span>{visibleQueue.length}</span></h2>
             </div>
             {queueOpen && (
-              <ColumnCards droppableId={QUEUE_ID} ids={visibleQueue} jobs={liveJobs} tv={tv} compact={false} />
+              <QueuePane ids={visibleQueue} jobs={liveJobs} tv={tv} />
             )}
             {!queueOpen && (
               <Droppable droppableId={QUEUE_ID}>
