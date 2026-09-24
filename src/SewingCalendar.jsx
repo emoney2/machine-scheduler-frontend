@@ -11,6 +11,34 @@ import "./ProductionSchedule.css";
 
 const ROOT = `${API_ROOT}/schedule`;
 const QUEUE_ID = "queue";
+const LIVE_CACHE_KEY = "sewingBoardSnapshot";
+
+function readLiveCache() {
+  try {
+    const raw = sessionStorage.getItem(LIVE_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLiveCache(data) {
+  if (!data || typeof data !== "object") return;
+  try {
+    sessionStorage.setItem(LIVE_CACHE_KEY, JSON.stringify({
+      jobs: data.jobs || {},
+      days: data.days || [],
+      queue: data.queue || [],
+      board: data.board || {},
+      carryovers: data.carryovers || [],
+      absences: data.absences || {},
+      today: data.today || "",
+      updatedAt: data.updatedAt || "",
+    }));
+  } catch (_) {
+    /* quota */
+  }
+}
 
 function asList(value) {
   return Array.isArray(value) ? value : [];
@@ -625,7 +653,6 @@ export function SewingCalendar({ tv = false, columns }) {
   const [days, setDays] = useState([]);
   const [carryovers, setCarryovers] = useState([]);
   const [absences, setAbsences] = useState({});
-  const [artByOrder, setArtByOrder] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [staffDate, setStaffDate] = useState("");
@@ -681,24 +708,26 @@ export function SewingCalendar({ tv = false, columns }) {
         placementsRef.current = { queue: next, board: placementsRef.current.board };
         return next;
       });
+      writeLiveCache({ ...data, queue: placementsRef.current.queue, board: placementsRef.current.board });
       return;
     }
     setQueue(asList(data.queue));
     setBoard(data.board && typeof data.board === "object" ? data.board : {});
     clearSewingBoardDraft();
+    writeLiveCache(data);
   }, []);
 
   const load = useCallback(async () => {
     if (syncingRef.current || saveInFlightRef.current) return;
     syncingRef.current = true;
     try {
-      setError("");
-      const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 60000 });
+      const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 25000 });
       const keep = !initialLoadRef.current || isWriteGuarded();
       applyPayload(data, { keepPlacements: keep });
       initialLoadRef.current = false;
+      setError("");
     } catch (e) {
-      setError(friendlyError(e));
+      if (!Object.keys(jobsRef.current).length) setError(friendlyError(e));
     } finally {
       syncingRef.current = false;
       setLoading(false);
@@ -727,50 +756,63 @@ export function SewingCalendar({ tv = false, columns }) {
     }
   };
 
-  const loadArt = useCallback(async () => {
-    try {
-      const { data } = await axios.get(`${API_ROOT}/overview`, { timeout: 45000 });
-      const map = {};
-      for (const row of asList(data?.upcoming)) {
-        const oid = normalizeOrderId(row?.["Order #"] || row?.orderNumber);
-        if (!oid) continue;
-        map[oid] = liveFromOverviewRow(row);
-      }
-      if (!Object.keys(map).length) return;
-      setArtByOrder(map);
-    } catch (_) {
-      /* board still works without artwork */
+  useEffect(() => {
+    const cached = readLiveCache();
+    if (cached?.jobs && Object.keys(cached.jobs).length) {
+      applyPayload(cached, { keepPlacements: !!(draft?.queue || draft?.board) });
+      setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    loadArt();
-    const artTimer = window.setInterval(loadArt, 45000);
-    return () => window.clearInterval(artTimer);
-  }, [loadArt, tv]);
-
-  useEffect(() => {
     load();
-    const timer = window.setInterval(load, tv ? 45000 : 60000);
+    const hashesRef = { current: {} };
+    let canceled = false;
+
+    async function pollChanges() {
+      if (canceled || isWriteGuarded() || syncingRef.current) return;
+      try {
+        const res = await fetch(`${API_ROOT}/changes`, { credentials: "include", cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const serverHashes = data?.hashes || {};
+        const prev = hashesRef.current || {};
+        let changed = false;
+        for (const [oid, h] of Object.entries(serverHashes)) {
+          if (prev[oid] !== h) { changed = true; break; }
+        }
+        if (!changed) {
+          for (const oid of Object.keys(prev)) {
+            if (!(oid in serverHashes)) { changed = true; break; }
+          }
+        }
+        hashesRef.current = serverHashes;
+        if (changed && Object.keys(prev).length) load();
+      } catch (_) {
+        /* same as Overview / App: skip a missed tick */
+      }
+    }
+
+    const timer = window.setInterval(pollChanges, 30000);
     const onBoard = () => {
       if (isWriteGuarded() || syncingRef.current) return;
       load();
-      loadArt();
-    };
-    const onJobs = () => {
-      load();
-      loadArt();
     };
     socket.on("sewingBoardUpdated", onBoard);
-    socket.on("embroideryProgressUpdated", onJobs);
-    socket.on("embroideryFinished", onJobs);
+    socket.on("ordersUpdated", onBoard);
+    socket.on("orderUpdated", onBoard);
+    const onWake = () => { if (document.visibilityState === "visible") pollChanges(); };
+    window.addEventListener("online", onWake);
+    window.addEventListener("focus", onWake);
+    document.addEventListener("visibilitychange", onWake);
     return () => {
+      canceled = true;
       window.clearInterval(timer);
       socket.off("sewingBoardUpdated", onBoard);
-      socket.off("embroideryProgressUpdated", onJobs);
-      socket.off("embroideryFinished", onJobs);
+      socket.off("ordersUpdated", onBoard);
+      socket.off("orderUpdated", onBoard);
+      window.removeEventListener("online", onWake);
+      window.removeEventListener("focus", onWake);
+      document.removeEventListener("visibilitychange", onWake);
     };
-  }, [load, loadArt, tv, isWriteGuarded]);
+  }, [applyPayload, draft, load, isWriteGuarded]);
 
   const liveJobs = useMemo(() => {
     const next = {};
@@ -814,11 +856,10 @@ export function SewingCalendar({ tv = false, columns }) {
       next[id] = merged;
     };
     Object.entries(jobs).forEach(([id, job]) => {
-      const live = artByOrder[normalizeOrderId(id)] || artByOrder[id] || {};
-      mergeOne(id, job, live);
+      mergeOne(id, job, {});
     });
     return next;
-  }, [jobs, columns, carryovers, artByOrder]);
+  }, [jobs, columns, carryovers]);
 
   const visibleQueue = useMemo(() => {
     const placed = placedIds(queue, board);
