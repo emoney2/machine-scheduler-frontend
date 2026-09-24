@@ -432,19 +432,6 @@ export function SewingCalendar({ tv = false, columns }) {
   }, [applyPayload]);
 
   useEffect(() => {
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtml = html.style.overflow;
-    const prevBody = body.style.overflow;
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-    return () => {
-      html.style.overflow = prevHtml;
-      body.style.overflow = prevBody;
-    };
-  }, []);
-
-  useEffect(() => {
     const syncFs = () => {
       const el = rootRef.current;
       setIsFullscreen(!!(document.fullscreenElement && el && document.fullscreenElement === el));
@@ -570,8 +557,18 @@ export function SewingCalendar({ tv = false, columns }) {
   const week2 = days.slice(5, 10);
 
   return (
-    <main
+    <div
       ref={rootRef}
+      className={`sc-fs-root ${isFullscreen ? "fs" : ""} ${tv ? "tv" : ""}`}
+      style={{
+        background: "#fff",
+        minHeight: isFullscreen ? "100vh" : undefined,
+        height: isFullscreen ? "100vh" : undefined,
+        boxSizing: "border-box",
+        overflow: isFullscreen ? "auto" : undefined,
+      }}
+    >
+    <main
       className={`ps-page sc-page ${tv ? "tv" : ""} ${queueOpen ? "" : "queue-collapsed"} ${isFullscreen ? "fs" : ""}`}
     >
       <div className="ps-header">
@@ -588,9 +585,21 @@ export function SewingCalendar({ tv = false, columns }) {
           )}
           <button
             type="button"
-            className={`sc-fs-btn ${isFullscreen ? "on" : ""}`}
             onClick={toggleFullscreen}
             title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+            style={{
+              padding: "2px 8px",
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1,
+              border: "1px solid #d1d5db",
+              borderRadius: 6,
+              background: isFullscreen ? "#111827" : "#fff",
+              color: isFullscreen ? "#fff" : "#111827",
+              cursor: "pointer",
+              flexShrink: 0,
+              marginLeft: "auto",
+            }}
           >
             {isFullscreen ? "Exit" : "Full"}
           </button>
@@ -671,6 +680,7 @@ export function SewingCalendar({ tv = false, columns }) {
         </div>
       </DragDropContext>
     </main>
+    </div>
   );
 }
 
