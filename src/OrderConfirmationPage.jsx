@@ -14,6 +14,11 @@ function orderIdStr(job) {
   return String(job.orderId ?? job["Order #"] ?? "").trim();
 }
 
+function isCompletedJob(job) {
+  const stage = String(job?.Stage || "").trim().toUpperCase();
+  return stage === "COMPLETE" || stage === "COMPLETED";
+}
+
 export default function OrderConfirmationPage() {
   const [companyList, setCompanyList] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
@@ -24,8 +29,11 @@ export default function OrderConfirmationPage() {
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingCustomersText, setLoadingCustomersText] = useState("Loading customers…");
   const [pdfLoading, setPdfLoading] = useState(false);
+  const [showArchive, setShowArchive] = useState(false);
+  const [jobFilter, setJobFilter] = useState("");
   const jobsRequestRef = useRef(null);
   const companyListRef = useRef([]);
+  const showArchiveRef = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -66,7 +74,7 @@ export default function OrderConfirmationPage() {
     };
   }, []);
 
-  const loadOutstandingJobs = useCallback(async (companyName) => {
+  const loadJobs = useCallback(async (companyName, includeCompleted = showArchiveRef.current) => {
     const value = String(companyName || "").trim();
     if (!value) return;
     if (!companyListRef.current.includes(value)) {
@@ -84,16 +92,18 @@ export default function OrderConfirmationPage() {
     setLoading(true);
     setSelectedCompany(value);
     setSelected([]);
+    setJobFilter("");
     try {
+      const includeQs = includeCompleted ? "&include_completed=1" : "";
       const res = await axios.get(
-        `${API_ROOT}/outstanding-orders-for-company?company=${encodeURIComponent(value)}`,
+        `${API_ROOT}/outstanding-orders-for-company?company=${encodeURIComponent(value)}${includeQs}`,
         { cancelToken: cancelTokenSource.token }
       );
       setJobs(res.data.jobs || []);
     } catch (err) {
       if (axios.isCancel(err)) return;
-      console.error("Failed to load outstanding jobs:", value, err);
-      alert("Failed to load outstanding orders.");
+      console.error("Failed to load jobs:", value, err);
+      alert(includeCompleted ? "Failed to load archived orders." : "Failed to load outstanding orders.");
     } finally {
       if (jobsRequestRef.current === cancelTokenSource) {
         jobsRequestRef.current = null;
@@ -104,7 +114,17 @@ export default function OrderConfirmationPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    loadOutstandingJobs(companyInput);
+    loadJobs(companyInput);
+  };
+
+  const handleToggleArchive = () => {
+    const next = !showArchive;
+    setShowArchive(next);
+    showArchiveRef.current = next;
+    const company = selectedCompany || companyInput;
+    if (company.trim()) {
+      loadJobs(company, next);
+    }
   };
 
   const toggleSelect = (orderId) => {
@@ -114,18 +134,35 @@ export default function OrderConfirmationPage() {
     );
   };
 
-  const handleSelectAll = () => {
-    setSelected(jobs.map((job) => orderIdStr(job)).filter(Boolean));
-  };
-
   const handleClearSelection = () => {
     setSelected([]);
   };
+
+  const visibleJobs = useMemo(() => {
+    const q = jobFilter.trim().toLowerCase();
+    if (!q) return jobs;
+    return jobs.filter((job) => {
+      const hay = [
+        job.Design,
+        job.Product,
+        job["Order #"],
+        job["PO #"],
+        job.Stage,
+      ]
+        .map((v) => String(v || "").toLowerCase())
+        .join(" ");
+      return hay.includes(q);
+    });
+  }, [jobs, jobFilter]);
 
   const selectedJobs = useMemo(
     () => jobs.filter((job) => selected.includes(orderIdStr(job))),
     [jobs, selected]
   );
+
+  const handleSelectAll = () => {
+    setSelected(visibleJobs.map((job) => orderIdStr(job)).filter(Boolean));
+  };
 
   const sharedPo = useMemo(() => {
     const pos = [
@@ -149,8 +186,9 @@ export default function OrderConfirmationPage() {
     }
     setPdfLoading(true);
     try {
+      const includeQs = showArchive ? "&include_completed=1" : "";
       const res = await axios.get(
-        `${API_ROOT}/order-confirmation-pdf?company=${encodeURIComponent(selectedCompany)}&order_ids=${encodeURIComponent(selected.join(","))}`,
+        `${API_ROOT}/order-confirmation-pdf?company=${encodeURIComponent(selectedCompany)}&order_ids=${encodeURIComponent(selected.join(","))}${includeQs}`,
         { responseType: "blob" }
       );
       const blob = new Blob([res.data], { type: "application/pdf" });
@@ -190,10 +228,12 @@ export default function OrderConfirmationPage() {
       </div>
 
       <p style={{ color: "#4b5563", marginTop: 0 }}>
-        Select a customer, then click the jobs you want on the order confirmation. Back jobs are excluded.
+        {showArchive
+          ? "Archive shows every job for this customer, including completed ones, so you can resend a confirmation after they received everything. Back jobs are excluded."
+          : "Select a customer, then click the jobs you want on the order confirmation. Back jobs are excluded. Use Archive to pull completed jobs."}
       </p>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: "1rem" }}>
+      <form onSubmit={handleSubmit} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: "1rem", flexWrap: "wrap" }}>
         <input
           list="order-conf-company-options"
           value={companyInput}
@@ -221,6 +261,23 @@ export default function OrderConfirmationPage() {
         >
           Submit
         </button>
+        <button
+          type="button"
+          onClick={handleToggleArchive}
+          disabled={loading}
+          style={{
+            padding: "0.5rem 1rem",
+            background: showArchive ? "#334155" : "#fff",
+            color: showArchive ? "#fff" : "#334155",
+            border: "1px solid #334155",
+            borderRadius: 6,
+            cursor: loading ? "not-allowed" : "pointer",
+            fontWeight: 600,
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {showArchive ? "Archive On" : "Archive"}
+        </button>
       </form>
 
       {companyList.length > 0 && (
@@ -244,7 +301,7 @@ export default function OrderConfirmationPage() {
                 type="button"
                 onClick={() => {
                   setCompanyInput(name);
-                  loadOutstandingJobs(name);
+                  loadJobs(name);
                 }}
                 style={{
                   padding: "0.45rem 0.6rem",
@@ -267,14 +324,17 @@ export default function OrderConfirmationPage() {
         </div>
       )}
 
-      {loading && <p>Loading outstanding orders…</p>}
+      {loading && <p>{showArchive ? "Loading all jobs…" : "Loading outstanding orders…"}</p>}
 
       {selectedCompany && !loading && jobs.length > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 12, flexWrap: "wrap" }}>
           <div>
             <strong>{selectedCompany}</strong>
             <span style={{ color: "#6b7280", marginLeft: 8 }}>
-              {selected.length} of {jobs.length} selected
+              {showArchive ? "All jobs" : "Outstanding"} · {selected.length} selected
+              {visibleJobs.length !== jobs.length
+                ? ` · ${visibleJobs.length} shown (${jobs.length} total)`
+                : ` of ${jobs.length}`}
             </span>
             {sharedPo ? (
               <span style={{ marginLeft: 8, fontWeight: 600 }}>PO #: {sharedPo}</span>
@@ -331,15 +391,29 @@ export default function OrderConfirmationPage() {
       )}
 
       {selectedCompany && !loading && jobs.length > 0 && (
-        <p style={{ color: "#6b7280", fontSize: "0.85rem", marginTop: 0, marginBottom: 12 }}>
-          Click a job to select or deselect it for the confirmation.
-        </p>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+          <input
+            type="search"
+            value={jobFilter}
+            onChange={(e) => setJobFilter(e.target.value)}
+            placeholder="Filter by design, order #, or PO…"
+            style={{ width: 280, padding: "0.45rem 0.6rem", fontSize: "0.9rem" }}
+          />
+          <p style={{ color: "#6b7280", fontSize: "0.85rem", margin: 0 }}>
+            Click a job to select or deselect it for the confirmation.
+          </p>
+        </div>
+      )}
+
+      {selectedCompany && !loading && jobs.length > 0 && visibleJobs.length === 0 && (
+        <p style={{ color: "#6b7280" }}>No jobs match that filter.</p>
       )}
 
       <div style={{ marginTop: "0.5rem" }}>
-        {jobs.map((job, idx) => {
+        {visibleJobs.map((job, idx) => {
           const id = orderIdStr(job);
           const isSelected = selected.includes(id);
+          const completed = isCompletedJob(job);
           return (
             <div
               key={`${id}-${idx}`}
@@ -416,8 +490,24 @@ export default function OrderConfirmationPage() {
                 )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: 4 }}>
-                  {job.Design || "(No Design)"}
+                <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: 4, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span>{job.Design || "(No Design)"}</span>
+                  {completed ? (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: 0.3,
+                        textTransform: "uppercase",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        background: isSelected ? "rgba(255,255,255,0.22)" : "#e2e8f0",
+                        color: isSelected ? "#fff" : "#334155",
+                      }}
+                    >
+                      Completed
+                    </span>
+                  ) : null}
                 </div>
                 <div style={{ marginBottom: 4, opacity: isSelected ? 0.95 : 1 }}>
                   {job.Product || "?"}
@@ -451,7 +541,11 @@ export default function OrderConfirmationPage() {
       )}
 
       {selectedCompany && !loading && jobs.length === 0 && (
-        <p style={{ color: "#6b7280" }}>No outstanding orders for this customer.</p>
+        <p style={{ color: "#6b7280" }}>
+          {showArchive
+            ? "No jobs found for this customer."
+            : "No outstanding orders for this customer. Click Archive to see completed jobs."}
+        </p>
       )}
 
       {loadingCustomers && (
