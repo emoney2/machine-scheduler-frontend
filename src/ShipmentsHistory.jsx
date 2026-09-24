@@ -105,6 +105,7 @@ export default function ShipmentsHistory() {
   const [upsPayload, setUpsPayload] = useState(null);
   const [serverRows, setServerRows] = useState([]);
   const [serverError, setServerError] = useState(null);
+  const [archiveDays, setArchiveDays] = useState(30);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const API_BASE = API_ROOT.replace(/\/api$/, "");
@@ -131,6 +132,8 @@ export default function ShipmentsHistory() {
         setServerRows([]);
       } else {
         setServerRows(Array.isArray(serverData.rows) ? serverData.rows : []);
+        const days = Number(serverData.label_archive_days);
+        if (Number.isFinite(days) && days > 0) setArchiveDays(days);
       }
 
       const data = await upsRes.json().catch(() => ({}));
@@ -251,8 +254,9 @@ export default function ShipmentsHistory() {
         Shipments created from the Ship tab are saved on the server (and mirrored to the Packing History
         sheet), so you can open this page from any computer. UPS Quantum View is optional extra history for
         the last 7 days when that subscription is active. Rows that only exist in this browser (not yet
-        synced) show as <strong>Browser</strong>. Tracking opens UPS; Reprint sends the label to your Label
-        Printer folder again.
+        synced) show as <strong>Browser</strong>. Tracking opens UPS. Reprint copies the saved label back
+        into your Label Printer folder from a Google Drive <strong>Label Archive</strong> (kept for{" "}
+        {archiveDays} days, then the oldest files rotate out).
       </p>
 
       {upsPayload && !upsPayload.error && upsPayload.subscriptionNamesTried && upsPayload.subscriptionNamesTried.length > 0 && (
