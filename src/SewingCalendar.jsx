@@ -19,7 +19,7 @@ function asList(value) {
 function friendlyError(err) {
   const raw = err?.response?.data?.error ?? err?.message ?? err;
   const text = typeof raw === "string" ? raw : JSON.stringify(raw || "");
-  if (/RATE_LIMIT|quota exceeded|429|attribute 'close'|NoneType|BadStatusLine|reentrant|temporarily busy/i.test(text)) {
+  if (/timeout|RATE_LIMIT|quota exceeded|429|attribute 'close'|NoneType|BadStatusLine|reentrant|temporarily busy/i.test(text)) {
     return "Google Sheets is temporarily busy. Wait about a minute and refresh.";
   }
   const compact = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
