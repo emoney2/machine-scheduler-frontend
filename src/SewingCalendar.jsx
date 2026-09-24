@@ -274,7 +274,7 @@ function todayIsoEt() {
 function requiredShipFromDue(dueIso, method, zip, state, city) {
   const due = parseOverviewDate(dueIso);
   if (!due) return "";
-  if (isLocalDelivery(method)) return due;
+  if (isLocalDelivery(method)) return subtractWorkdaysIso(due, 1);
   const hasHint = String(method || zip || state || city || "").trim();
   if (!hasHint) return "";
   const transit = estimateTransitDays(method, zip, state, city);
@@ -425,7 +425,7 @@ function overlayEmbroidery(job, columns) {
     due_type: job.due_type || live.due_type || live.dueType || "",
     dueDate: job.dueDate || live.due_date || "",
     requiredShipDate: isLocalDelivery(job.shippingMethod || live.shippingMethod)
-      ? (job.dueDate || job.requiredShipDate || live.requiredShipDate || "")
+      ? (requiredShipFromDue(job.dueDate || live.due_date, "Local Delivery") || job.requiredShipDate || live.requiredShipDate || "")
       : (job.requiredShipDate || live.requiredShipDate || ""),
     shippingMethod: job.shippingMethod || live.shippingMethod || "",
     shipCity: job.shipCity || live.shipCity || "",
@@ -853,7 +853,7 @@ export function SewingCalendar({ tv = false, columns }) {
       const storedFollowsDue = !!(storedShip && dueDate && storedShip <= dueDate
         && storedShip >= (subtractWorkdaysIso(dueDate, 10) || storedShip));
       const shipDate = isLocalDelivery(shippingMethod)
-        ? dueDate
+        ? (computedShip || subtractWorkdaysIso(dueDate, 1))
         : (computedShip || (storedFollowsDue ? storedShip : ""));
       const merged = overlayEmbroidery({
         ...job,

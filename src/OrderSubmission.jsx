@@ -3039,7 +3039,7 @@ const handleSaveNewCompany = async () => {
                 </select>
               </label>
               <div style={{ marginTop: "0.25rem", color: "#6b7280", maxWidth: "80%" }}>
-                Local delivery can go out the same day as the due date.
+                Local delivery ships the workday before the due date.
               </div>
             </div>
             <div>
