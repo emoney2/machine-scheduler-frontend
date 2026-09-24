@@ -379,7 +379,7 @@ export default function App() {
   const location = useLocation();
   const isScheduler = location.pathname === "/";
   const path = (location.pathname || "/").toLowerCase();
-  const isCompactNav = isScheduler || path === "/sewing-priority" || path.startsWith("/sewing-priority/") || path.startsWith("/sewing-calendar");
+  const isCompactNav = true;
   const isMachineFloor = path.startsWith("/machine/");
   const isSensorTest = path.startsWith("/machine-sensor");
   const isSewingTv = path === "/sewing-calendar/tv";

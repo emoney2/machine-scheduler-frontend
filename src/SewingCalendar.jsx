@@ -314,6 +314,8 @@ export function SewingCalendar({ tv = false, columns }) {
   const dirtyRef = useRef(!!draft?.dirty);
   const syncingRef = useRef(false);
   const placementsRef = useRef({ queue: asList(draft?.queue), board: draft?.board || {} });
+  const rootRef = useRef(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     dirtyRef.current = dirty;
@@ -396,6 +398,28 @@ export function SewingCalendar({ tv = false, columns }) {
       body.style.overflow = prevBody;
     };
   }, []);
+
+  useEffect(() => {
+    const syncFs = () => {
+      const el = rootRef.current;
+      setIsFullscreen(!!(document.fullscreenElement && el && document.fullscreenElement === el));
+    };
+    document.addEventListener("fullscreenchange", syncFs);
+    return () => document.removeEventListener("fullscreenchange", syncFs);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      const el = rootRef.current;
+      if (el?.requestFullscreen) await el.requestFullscreen();
+    } catch (e) {
+      console.warn("Fullscreen failed:", e);
+    }
+  };
 
   useEffect(() => {
     load();
@@ -501,22 +525,32 @@ export function SewingCalendar({ tv = false, columns }) {
   const week2 = days.slice(5, 10);
 
   return (
-    <main className={`ps-page sc-page ${tv ? "tv" : ""} ${queueOpen ? "" : "queue-collapsed"}`}>
-      {!tv && (
-        <div className="ps-header">
-          <div className="ps-actions">
-            <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
-            <button type="button" onClick={() => load({ publish: dirty })}>Refresh</button>
-            {dirty ? <span className="sc-draft-hint">Saved here — Refresh to share</span> : null}
-            <button type="button" className="ps-danger-button" onClick={clearSchedule} disabled={clearing}>
-              {clearing ? "Clearing…" : "Clear schedule"}
-            </button>
-            <a className="ps-primary sc-tv-link" href="/sewing-calendar/tv" target="_blank" rel="noreferrer">
-              Full screen TV
-            </a>
-          </div>
+    <main
+      ref={rootRef}
+      className={`ps-page sc-page ${tv ? "tv" : ""} ${queueOpen ? "" : "queue-collapsed"} ${isFullscreen ? "fs" : ""}`}
+    >
+      <div className="ps-header">
+        <div className="ps-actions">
+          {!tv && (
+            <>
+              <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
+              <button type="button" onClick={() => load({ publish: dirty })}>Refresh</button>
+              {dirty ? <span className="sc-draft-hint">Saved here — Refresh to share</span> : null}
+              <button type="button" className="ps-danger-button" onClick={clearSchedule} disabled={clearing}>
+                {clearing ? "Clearing…" : "Clear schedule"}
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            className={`sc-fs-btn ${isFullscreen ? "on" : ""}`}
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
+          >
+            {isFullscreen ? "Exit" : "Full"}
+          </button>
         </div>
-      )}
+      </div>
       {staffDate && (
         <StaffModal
           date={staffDate}

@@ -261,8 +261,33 @@
   box-sizing: border-box;
 }
 .sc-page .ps-header { justify-content: flex-end; margin-bottom: 6px; flex: 0 0 auto; }
+.sc-page .ps-actions { gap: 6px; flex-wrap: nowrap; }
+.sc-page .ps-actions button,
+.sc-page .ps-actions .ps-danger-button {
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 6px;
+}
+.sc-fs-btn {
+  margin-left: auto;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sc-fs-btn.on { background: #111827; color: #fff; border-color: #111827; }
 .sc-draft-hint { color: #92400e; font-size: 12px; font-weight: 700; }
-.sc-tv-link { display: inline-flex; align-items: center; text-decoration: none; }
+.sc-page.fs,
+.sc-page:fullscreen,
+.sc-page:-webkit-full-screen {
+  height: 100vh;
+  max-height: 100vh;
+  padding: 10px;
+  background: #fff;
+}
 .sc-layout {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
