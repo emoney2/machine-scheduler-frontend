@@ -136,6 +136,8 @@ function artFromOverviewRow(row) {
     imageLink: image,
     imageFileId: extractFileIdFromFormulaOrUrl(image) || "",
     "Art Link": row?.["Art Link"] || image,
+    stage: row?.Stage || row?.stage || "",
+    sewingSummaryComplete: !!row?.sewingSummaryComplete,
   };
 }
 
@@ -261,15 +263,22 @@ function embroideryStatus(job) {
   return { kind: "progress", label: `${percent}% complete` };
 }
 
+function isClosedStage(value) {
+  const stage = String(value || "").trim().toUpperCase();
+  return ["SHIPPED", "COMPLETE", "COMPLETED", "CANCELED", "CANCELLED", "SEWN"].includes(stage);
+}
+
 function isClosedOrBackJob(job, columns) {
   if (!job) return true;
-  const stage = String(job.stage || job.status || "").toUpperCase();
-  if (["SHIPPED", "COMPLETE", "COMPLETED", "CANCELED", "CANCELLED"].includes(stage)) return true;
+  if (job.sewingSummaryComplete || job.sewingComplete) return true;
+  if (isClosedStage(job.stage || job.status || job.Stage)) return true;
+  const qty = Number(job.quantity) || 0;
+  const sewn = Number(job.sewingFinishedQty) || 0;
+  if (qty > 0 && sewn >= qty) return true;
   const product = String(job.product || "").toLowerCase();
   if (product.includes("back")) return true;
   const found = findColumnJob(columns, job.orderNumber);
-  const liveStage = String(found?.job?.status || found?.job?.Stage || found?.job?.stage || "").toUpperCase();
-  if (["SHIPPED", "COMPLETE", "COMPLETED"].includes(liveStage)) return true;
+  if (isClosedStage(found?.job?.status || found?.job?.Stage || found?.job?.stage)) return true;
   const liveProduct = String(found?.job?.product || found?.job?.Product || "").toLowerCase();
   return liveProduct.includes("back");
 }
@@ -583,6 +592,8 @@ export function SewingCalendar({ tv = false, columns }) {
         imageLink: job.imageLink || art.imageLink || art.Image || "",
         Image: job.Image || art.Image || "",
         imageFileId: job.imageFileId || art.imageFileId || "",
+        stage: job.stage || art.stage || "",
+        sewingSummaryComplete: !!(job.sewingSummaryComplete || art.sewingSummaryComplete),
         carriedOver: rolled.has(id),
         overdue,
       }, columns);
