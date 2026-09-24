@@ -155,7 +155,7 @@ function idsForColumn(columnId, queue, board) {
 }
 
 function CarryoverStrip({ carryovers }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const count = carryovers.length;
   if (!count) return null;
   return (
@@ -198,7 +198,8 @@ function SewingJobCard({ job, drag, tv, compact }) {
     hard ? "hard" : "soft",
     compact ? "compact" : "",
     !embReady ? "emb-wait" : "",
-    job.carriedOver ? "carried" : "",
+    job.overdue ? "overdue" : "",
+    job.carriedOver && !job.overdue ? "carried" : "",
   ].filter(Boolean).join(" ");
   return (
     <article
@@ -236,6 +237,7 @@ function SewingJobCard({ job, drag, tv, compact }) {
       <div className="sc-row sc-row-main">
         <span className="sc-id">{job.orderNumber}</span>
         <span className="sc-company">{jobName(job)}</span>
+        {job.overdue ? <span className="sc-late">LATE</span> : null}
         {!compact && <span className="sc-qty">{qtyLabel}</span>}
       </div>
       {!compact && (
@@ -262,7 +264,7 @@ function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`sc-drop ${snapshot.isDraggingOver ? "over" : ""}`}
+          className={`sc-drop ${droppableId === QUEUE_ID ? "sc-queue-drop" : ""} ${snapshot.isDraggingOver ? "over" : ""}`}
         >
           {ids.map((id, index) => {
             const job = jobs[id];
@@ -292,6 +294,7 @@ export function SewingCalendar({ tv = false, columns }) {
   const [absences, setAbsences] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [clearing, setClearing] = useState(false);
   const [staffDate, setStaffDate] = useState("");
   const [queueOpen, setQueueOpen] = useState(() => {
     if (tv) return false;
@@ -328,6 +331,19 @@ export function SewingCalendar({ tv = false, columns }) {
   }, [applyPayload]);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+    };
+  }, []);
+
+  useEffect(() => {
     load();
     const timer = window.setInterval(load, tv ? 45000 : 120000);
     const onBoard = () => load();
@@ -346,7 +362,12 @@ export function SewingCalendar({ tv = false, columns }) {
     const next = {};
     const rolled = new Set(carryovers.map((row) => String(row.orderNumber)));
     Object.entries(jobs).forEach(([id, job]) => {
-      const merged = overlayEmbroidery({ ...job, carriedOver: rolled.has(id) }, columns);
+      const overdue = !!(job.overdue || job.overdueFrom);
+      const merged = overlayEmbroidery({
+        ...job,
+        carriedOver: rolled.has(id),
+        overdue,
+      }, columns);
       if (isClosedOrBackJob(merged, columns)) return;
       next[id] = merged;
     });
@@ -404,6 +425,22 @@ export function SewingCalendar({ tv = false, columns }) {
     persistBoard(nextQueue, nextBoard);
   };
 
+  const clearSchedule = async () => {
+    if (!window.confirm("Clear the sewing calendar? Every job goes back to the queue so you can start from scratch.")) {
+      return;
+    }
+    setClearing(true);
+    try {
+      setError("");
+      const { data } = await axios.post(`${ROOT}/sewing-board/clear`, {}, { timeout: 60000 });
+      applyPayload(data);
+    } catch (e) {
+      setError(friendlyError(e) || "Could not clear sewing board");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   useEffect(() => {
     try { localStorage.setItem("sewingQueueOpen", queueOpen ? "1" : "0"); } catch (_) {}
   }, [queueOpen]);
@@ -418,6 +455,9 @@ export function SewingCalendar({ tv = false, columns }) {
           <div className="ps-actions">
             <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
             <button type="button" onClick={load}>Refresh</button>
+            <button type="button" className="ps-danger-button" onClick={clearSchedule} disabled={clearing}>
+              {clearing ? "Clearing…" : "Clear schedule"}
+            </button>
             <a className="ps-primary sc-tv-link" href="/sewing-calendar/tv" target="_blank" rel="noreferrer">
               Full screen TV
             </a>
@@ -436,7 +476,10 @@ export function SewingCalendar({ tv = false, columns }) {
       {loading && !days.length ? <div className="ps-empty">Loading sewing board…</div> : null}
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="sc-layout">
-          <aside className={`sc-queue ${queueOpen ? "" : "collapsed"}`}>
+          <aside
+            className={`sc-queue ${queueOpen ? "" : "collapsed"}`}
+            onWheel={(e) => e.stopPropagation()}
+          >
             <div className="sc-queue-head">
               <button
                 type="button"
@@ -474,7 +517,7 @@ export function SewingCalendar({ tv = false, columns }) {
                   const ids = asList(visibleBoard[day]);
                   const whoIsOut = outPhrase(absences[day] || []);
                   return (
-                    <section className={`sc-day ${day === days[0] ? "today" : ""}`} key={day}>
+                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${ids.length >= 5 ? "packed" : "sparse"}`} key={day}>
                       <header>
                         <button
                           type="button"
@@ -486,7 +529,7 @@ export function SewingCalendar({ tv = false, columns }) {
                           {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
                         </button>
                       </header>
-                      <ColumnCards droppableId={day} ids={ids} jobs={liveJobs} tv={tv} compact />
+                      <ColumnCards droppableId={day} ids={ids} jobs={liveJobs} tv={tv} compact={ids.length >= 5} />
                     </section>
                   );
                 })}
