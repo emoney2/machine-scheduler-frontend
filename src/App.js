@@ -44,8 +44,8 @@ import MachineSensorTest from "./MachineSensorTest";
 import { API_ROOT, getBackendOrigin, getLoginOrigin } from "./apiRoot";
 import { FullscreenToggle, useMachineFullscreen } from "./useMachineFullscreen";
 import { estimateRemainingMs, isPlaceholder, normalizeOrderId } from "./machineFloorUtils";
+import { SewingCalendar } from "./SewingCalendar";
 import {
-  SewingCalendar,
   EmbroideryCalendar,
   ScheduleApprovals,
   ScheduleConflicts,

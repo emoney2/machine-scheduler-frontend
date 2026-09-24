@@ -1,0 +1,478 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
+import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
+import { API_ROOT } from "./apiRoot";
+import { socket } from "./socketClient";
+import { extractFileId, estimateRemainingMs, formatClockET, jobImageUrl, normalizeOrderId } from "./machineFloorUtils";
+import { persistSewingCarryover } from "./utils/sewingCarryover";
+import { StaffModal, nextWeekdayIso } from "./ProductionSchedule";
+import "./ProductionSchedule.css";
+
+const ROOT = `${API_ROOT}/schedule`;
+const QUEUE_ID = "queue";
+
+function asList(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function friendlyError(err) {
+  const raw = err?.response?.data?.error ?? err?.message ?? err;
+  const text = typeof raw === "string" ? raw : JSON.stringify(raw || "");
+  if (/RATE_LIMIT|quota exceeded|429|attribute 'close'|NoneType|BadStatusLine|reentrant|temporarily busy/i.test(text)) {
+    return "Google Sheets is temporarily busy. Wait about a minute and refresh.";
+  }
+  const compact = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return compact.length > 220 ? `${compact.slice(0, 220)}…` : compact || "Could not load sewing board";
+}
+
+function fmtCardDate(value) {
+  if (!value) return "—";
+  const raw = String(value).slice(0, 10);
+  const [y, m, d] = raw.split("-");
+  return y && m && d ? `${Number(m)}/${Number(d)}` : String(value);
+}
+
+function dayHeading(value) {
+  const raw = String(value || "").slice(0, 10);
+  const dt = new Date(`${raw}T12:00:00`);
+  if (Number.isNaN(dt.getTime())) return raw;
+  const weekday = dt.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" });
+  const md = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric", timeZone: "America/New_York" });
+  return `${weekday} - ${md}`;
+}
+
+function outPhrase(names) {
+  const people = (names || []).map((n) => String(n || "").trim()).filter(Boolean);
+  if (!people.length) return "";
+  if (people.length === 1) return `${people[0]} is out`;
+  if (people.length === 2) return `${people[0]} and ${people[1]} are out`;
+  return `${people.slice(0, -1).join(", ")}, and ${people[people.length - 1]} are out`;
+}
+
+function openJobImage(raw) {
+  const id = extractFileId(raw);
+  if (id) {
+    window.open(`https://drive.google.com/file/d/${id}/view`, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (/^https?:\/\//i.test(String(raw || ""))) {
+    window.open(raw, "_blank", "noopener,noreferrer");
+  }
+}
+
+function machineHeadCount(key, columns) {
+  const title = String(columns?.[key]?.title || key || "");
+  if (/machine 1|single/i.test(title) || key === "machine1") return 1;
+  return Number(columns?.[key]?.headCount) || 6;
+}
+
+function findColumnJob(columns, orderNumber) {
+  const want = normalizeOrderId(orderNumber);
+  if (!want || !columns) return null;
+  for (const key of ["machine1", "machine2", "machine3", "machine4", "queue"]) {
+    const hit = (columns[key]?.jobs || []).find((j) => normalizeOrderId(j.id) === want);
+    if (hit) return { job: hit, machineKey: key, headCount: machineHeadCount(key, columns) };
+  }
+  return null;
+}
+
+function overlayEmbroidery(job, columns) {
+  if (!job) return job;
+  const found = findColumnJob(columns, job.orderNumber);
+  const live = found?.job || {};
+  const qty = Number(live.quantity ?? job.quantity) || 0;
+  const done = Math.max(Number(live.completedQty ?? job.embroideryCompletedQty) || 0, 0);
+  const stitch = Number(live.stitch_count ?? job.stitchCount) || 0;
+  const heads = found?.headCount || Number(job.headCount) || 6;
+  const avg = Number(live.avgCycleMs ?? job.avgCycleMs) || 0;
+  const remainingFromJob = Number(
+    live.embroideryRemaining ?? job.embroideryRemaining ?? (qty ? qty - done : 0)
+  );
+  const left = Math.max(0, Number.isFinite(remainingFromJob) ? remainingFromJob : Math.max(0, qty - done));
+  const ready = left <= 0;
+  const percent = qty > 0 ? Math.min(100, Math.round((Math.min(done, qty) / qty) * 1000) / 10) : (ready ? 100 : 0);
+  const remainingMs = left > 0 ? estimateRemainingMs(stitch, left, heads, avg) : 0;
+  let eta = job.embroideryEta || "";
+  if (!ready && remainingMs > 0) {
+    const last = live.lastRunAt ? new Date(live.lastRunAt).getTime() : Date.now();
+    const start = Number.isFinite(last) ? last : Date.now();
+    eta = new Date(start + remainingMs).toISOString();
+  }
+  return {
+    ...job,
+    quantity: qty || job.quantity,
+    stitchCount: stitch || job.stitchCount,
+    embroideryCompletedQty: done,
+    embroideryRemaining: left,
+    embroideryPercent: ready ? 100 : percent,
+    embroideryReady: ready,
+    embroideryEta: ready ? "" : eta,
+    avgCycleMs: avg,
+    headCount: heads,
+    image: job.image || live.imageLink || live.Image || live.image || "",
+    imageFileId: job.imageFileId || live.imageFileId || "",
+  };
+}
+
+function etaLabel(iso) {
+  if (!iso) return "";
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return "";
+  const now = new Date();
+  const sameDay = dt.toLocaleDateString("en-US", { timeZone: "America/New_York" })
+    === now.toLocaleDateString("en-US", { timeZone: "America/New_York" });
+  const clock = formatClockET(iso);
+  if (sameDay) return `Est. done ${clock}`;
+  const day = dt.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "numeric",
+    day: "numeric",
+    timeZone: "America/New_York",
+  });
+  return `Est. done ${day} ${clock}`;
+}
+
+function jobName(job) {
+  return [job.product, job.design].filter(Boolean).join(" · ") || "Untitled job";
+}
+
+function idsForColumn(columnId, queue, board) {
+  if (columnId === QUEUE_ID) return asList(queue);
+  return asList(board[columnId]);
+}
+
+function CarryoverStrip({ carryovers }) {
+  const [open, setOpen] = useState(true);
+  const count = carryovers.length;
+  if (!count) return null;
+  return (
+    <div className="sc-carry-strip">
+      <button type="button" className="sc-carry-toggle" onClick={() => setOpen((v) => !v)}>
+        <span className="sc-carry-count">{count}</span>
+        <span className="sc-carry-title">
+          {count === 1 ? "Unfinished job rolled to today" : "Unfinished jobs rolled to today"}
+        </span>
+        <span className="sc-carry-hint">Yesterday’s leftover work is at the top of today</span>
+        <span className="sc-carry-more">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div className="sc-carry-list">
+          {carryovers.map((row) => (
+            <div key={`${row.orderNumber}-${row.fromDate}`} className="sc-carry-row">
+              <strong>#{row.orderNumber}</strong>
+              <span>{[row.customer, row.product].filter(Boolean).join(" · ") || "Sewing job"}</span>
+              <em>from {fmtCardDate(row.fromDate)}</em>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SewingJobCard({ job, drag, tv, compact }) {
+  const hard = !!job.hardDate;
+  const embReady = !!job.embroideryReady;
+  const thumb = jobImageUrl({
+    image: job.image,
+    imageLink: job.image,
+    Image: job.image,
+    imageFileId: job.imageFileId || extractFileId(job.image) || "",
+  }, tv ? "w640" : "w400");
+  const classes = [
+    "sc-card",
+    hard ? "hard" : "soft",
+    compact ? "compact" : "",
+    !embReady ? "emb-wait" : "",
+    job.carriedOver ? "carried" : "",
+  ].filter(Boolean).join(" ");
+  return (
+    <article
+      className={classes}
+      ref={drag.innerRef}
+      {...drag.draggableProps}
+      {...drag.dragHandleProps}
+      style={drag.draggableProps.style}
+    >
+      <button
+        type="button"
+        className={`sc-thumb ${thumb ? "" : "missing"}`}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (job.image) openJobImage(job.image);
+        }}
+        disabled={!job.image}
+        title={job.image ? "Open artwork" : "No image"}
+      >
+        {thumb ? (
+          <img
+            src={thumb}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+        ) : (
+          <span>No img</span>
+        )}
+      </button>
+      <div className="sc-card-body">
+        <div className="sc-card-id">#{job.orderNumber}</div>
+        <div className="sc-card-company">{job.customer || "No company"}</div>
+        <div className="sc-card-job">{jobName(job)}</div>
+        <div className="sc-card-dates">
+          <span>Due {fmtCardDate(job.dueDate)}</span>
+          <span>Ship {fmtCardDate(job.requiredShipDate)}</span>
+        </div>
+        {!embReady && (
+          <div className="sc-emb">
+            <strong>Embroidery not ready</strong>
+            <span>{job.embroideryPercent || 0}% done</span>
+            {etaLabel(job.embroideryEta) ? <span>{etaLabel(job.embroideryEta)}</span> : <span>Waiting on machine time</span>}
+          </div>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
+  return (
+    <Droppable droppableId={droppableId}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+          className={`sc-drop ${snapshot.isDraggingOver ? "over" : ""}`}
+        >
+          {ids.map((id, index) => {
+            const job = jobs[id];
+            if (!job) return null;
+            return (
+              <Draggable key={id} draggableId={id} index={index}>
+                {(drag) => (
+                  <SewingJobCard job={job} drag={drag} tv={tv} compact={compact} />
+                )}
+              </Draggable>
+            );
+          })}
+          {provided.placeholder}
+          {!ids.length && <div className="sc-empty-col">Drop jobs here</div>}
+        </div>
+      )}
+    </Droppable>
+  );
+}
+
+export function SewingCalendar({ tv = false, columns }) {
+  const [queue, setQueue] = useState([]);
+  const [board, setBoard] = useState({});
+  const [jobs, setJobs] = useState({});
+  const [days, setDays] = useState([]);
+  const [carryovers, setCarryovers] = useState([]);
+  const [absences, setAbsences] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [staffDate, setStaffDate] = useState("");
+  const [queueOpen, setQueueOpen] = useState(() => {
+    if (tv) return false;
+    try { return localStorage.getItem("sewingQueueOpen") !== "0"; } catch { return true; }
+  });
+
+  const applyPayload = useCallback((data) => {
+    if (!data || typeof data !== "object") return;
+    setQueue(asList(data.queue));
+    setBoard(data.board && typeof data.board === "object" ? data.board : {});
+    setJobs(data.jobs && typeof data.jobs === "object" ? data.jobs : {});
+    setDays(asList(data.days));
+    const rolled = asList(data.carryovers);
+    setCarryovers(rolled);
+    setAbsences(data.absences && typeof data.absences === "object" ? data.absences : {});
+    persistSewingCarryover({
+      carryovers: rolled,
+      today: data.today,
+      updatedAt: data.updatedAt,
+      summary: { count: rolled.length },
+    });
+  }, []);
+
+  const load = useCallback(async () => {
+    try {
+      setError("");
+      const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 60000 });
+      applyPayload(data);
+    } catch (e) {
+      setError(friendlyError(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [applyPayload]);
+
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, tv ? 45000 : 120000);
+    const onBoard = () => load();
+    socket.on("sewingBoardUpdated", onBoard);
+    socket.on("embroideryProgressUpdated", onBoard);
+    socket.on("embroideryFinished", onBoard);
+    return () => {
+      window.clearInterval(timer);
+      socket.off("sewingBoardUpdated", onBoard);
+      socket.off("embroideryProgressUpdated", onBoard);
+      socket.off("embroideryFinished", onBoard);
+    };
+  }, [load, tv]);
+
+  const liveJobs = useMemo(() => {
+    const next = {};
+    const rolled = new Set(carryovers.map((row) => String(row.orderNumber)));
+    Object.entries(jobs).forEach(([id, job]) => {
+      next[id] = overlayEmbroidery({ ...job, carriedOver: rolled.has(id) }, columns);
+    });
+    return next;
+  }, [jobs, columns, carryovers]);
+
+  const persistBoard = async (nextQueue, nextBoard) => {
+    setQueue(nextQueue);
+    setBoard(nextBoard);
+    try {
+      const { data } = await axios.put(
+        `${ROOT}/sewing-board`,
+        { queue: nextQueue, days: nextBoard },
+        { timeout: 60000 }
+      );
+      applyPayload(data);
+    } catch (e) {
+      window.alert(friendlyError(e) || "Could not save sewing board");
+      load();
+    }
+  };
+
+  const onDragEnd = (result) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    const fromIds = idsForColumn(source.droppableId, queue, board).slice();
+    const [moved] = fromIds.splice(source.index, 1);
+    if (!moved) return;
+    let nextQueue = queue.slice();
+    const nextBoard = { ...board };
+    if (source.droppableId === QUEUE_ID) nextQueue = fromIds;
+    else nextBoard[source.droppableId] = fromIds;
+    if (destination.droppableId === QUEUE_ID) {
+      const dest = nextQueue.slice();
+      dest.splice(destination.index, 0, moved);
+      nextQueue = dest;
+    } else {
+      const dest = (nextBoard[destination.droppableId] || []).slice();
+      dest.splice(destination.index, 0, moved);
+      nextBoard[destination.droppableId] = dest;
+    }
+    persistBoard(nextQueue, nextBoard);
+  };
+
+  useEffect(() => {
+    try { localStorage.setItem("sewingQueueOpen", queueOpen ? "1" : "0"); } catch (_) {}
+  }, [queueOpen]);
+
+  const week1 = days.slice(0, 5);
+  const week2 = days.slice(5, 10);
+
+  return (
+    <main className={`ps-page sc-page ${tv ? "tv" : ""} ${queueOpen ? "" : "queue-collapsed"}`}>
+      <div className="ps-header">
+        <div>
+          <h1>{tv ? "Sewing Calendar" : "Sewing Calendar"}</h1>
+          <div className="ps-subtitle">
+            Rolling two weeks · left column is today · unfinished work rolls to the top of today
+            {tv ? " · Shop TV · Auto-refreshes" : ""}
+          </div>
+        </div>
+        {!tv && (
+          <div className="ps-actions">
+            <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
+            <button type="button" onClick={load}>Refresh</button>
+            <a className="ps-primary sc-tv-link" href="/sewing-calendar/tv" target="_blank" rel="noreferrer">
+              Full screen TV
+            </a>
+          </div>
+        )}
+      </div>
+      {staffDate && (
+        <StaffModal
+          date={staffDate}
+          onClose={() => setStaffDate("")}
+          onSaved={async () => { await load(); }}
+        />
+      )}
+      {error ? <div className="ps-banner danger">{error}</div> : null}
+      <CarryoverStrip carryovers={carryovers} />
+      {loading && !days.length ? <div className="ps-empty">Loading sewing board…</div> : null}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="sc-layout">
+          <aside className={`sc-queue ${queueOpen ? "" : "collapsed"}`}>
+            <div className="sc-queue-head">
+              <button
+                type="button"
+                className="sc-queue-toggle"
+                onClick={() => setQueueOpen((v) => !v)}
+                title={queueOpen ? "Minimize queue" : "Maximize queue"}
+                aria-label={queueOpen ? "Minimize queue" : "Maximize queue"}
+              >
+                <span className={`sc-arrow ${queueOpen ? "open" : ""}`} aria-hidden="true" />
+              </button>
+              <h2>Queue <span>{queue.length}</span></h2>
+            </div>
+            {queueOpen && (
+              <ColumnCards droppableId={QUEUE_ID} ids={queue} jobs={liveJobs} tv={tv} compact={false} />
+            )}
+            {!queueOpen && (
+              <Droppable droppableId={QUEUE_ID}>
+                {(provided, snapshot) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className={`sc-queue-rail ${snapshot.isDraggingOver ? "over" : ""}`}
+                  >
+                    {provided.placeholder}
+                    <span>{queue.length}</span>
+                  </div>
+                )}
+              </Droppable>
+            )}
+          </aside>
+          <div className="sc-weeks">
+            {[week1, week2].map((week, weekIndex) => (
+              <div className="sc-week" key={weekIndex}>
+                {week.map((day) => {
+                  const ids = asList(board[day]);
+                  const whoIsOut = outPhrase(absences[day] || []);
+                  return (
+                    <section className={`sc-day ${day === days[0] ? "today" : ""}`} key={day}>
+                      <header>
+                        <button
+                          type="button"
+                          className="ps-day-staff"
+                          onClick={() => !tv && setStaffDate(day)}
+                          disabled={tv}
+                        >
+                          <span className="sc-day-title">{dayHeading(day)}</span>
+                          {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
+                        </button>
+                      </header>
+                      <ColumnCards droppableId={day} ids={ids} jobs={liveJobs} tv={tv} compact />
+                    </section>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </DragDropContext>
+    </main>
+  );
+}
+
+export default SewingCalendar;

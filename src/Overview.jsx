@@ -10,6 +10,11 @@ import {
   applyInventoryToConflicts,
 } from "./utils/threadConflicts";
 import {
+  loadPersistedSewingCarryover,
+  persistSewingCarryover,
+  sewingCarryoverCount,
+} from "./utils/sewingCarryover";
+import {
   computeDepartmentStatus,
   DEPT_ORDER,
   DEPT_PLANNING_DAYS,
@@ -1171,6 +1176,49 @@ function col(width, center = false) {
   }, [refreshThreadConflicts, loadLocalThreadConflicts]);
 
   const threadConflictCount = threadConflictSnapshot?.summary?.conflictCount || 0;
+
+  const [sewingCarryoverSnapshot, setSewingCarryoverSnapshot] = useState(() =>
+    loadPersistedSewingCarryover()
+  );
+  const refreshSewingCarryover = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${ROOT}/schedule/sewing-board`, { timeout: 60000 });
+      const next = {
+        carryovers: Array.isArray(data?.carryovers) ? data.carryovers : [],
+        today: data?.today,
+        updatedAt: data?.updatedAt,
+        summary: { count: Array.isArray(data?.carryovers) ? data.carryovers.length : 0 },
+      };
+      persistSewingCarryover(next);
+      setSewingCarryoverSnapshot(next);
+    } catch (_) {
+      setSewingCarryoverSnapshot(loadPersistedSewingCarryover());
+    }
+  }, []);
+  useEffect(() => {
+    refreshSewingCarryover();
+    const onFocus = () => refreshSewingCarryover();
+    const onStorage = (e) => {
+      if (!e.key || e.key === "sewingCarryover.v1") {
+        setSewingCarryoverSnapshot(loadPersistedSewingCarryover());
+      }
+    };
+    const onCustom = () => setSewingCarryoverSnapshot(loadPersistedSewingCarryover());
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("sewingCarryoverUpdated", onCustom);
+    socket.on("sewingBoardUpdated", refreshSewingCarryover);
+    const interval = window.setInterval(refreshSewingCarryover, 60000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("sewingCarryoverUpdated", onCustom);
+      socket.off("sewingBoardUpdated", refreshSewingCarryover);
+      window.clearInterval(interval);
+    };
+  }, [refreshSewingCarryover]);
+  const sewingCarryoverRows = sewingCarryoverSnapshot?.carryovers || [];
+  const sewingCarryCount = sewingCarryoverCount(sewingCarryoverSnapshot);
 
   const departmentStatus = useMemo(
     () => computeDepartmentStatus(deptPlanningJobs),
@@ -2655,6 +2703,73 @@ function col(width, center = false) {
                   </div>
                 );
               })}
+            </div>
+          </div>
+          )}
+
+          {sewingCarryCount > 0 && (
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #facc15",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Unfinished Sewing</span>
+              <span style={subtleUpdatedStyle}>
+                {sewingCarryoverSnapshot?.persistedAt || sewingCarryoverSnapshot?.updatedAt
+                  ? `From Sewing Calendar · ${formatClock(
+                      new Date(sewingCarryoverSnapshot.persistedAt || sewingCarryoverSnapshot.updatedAt)
+                    )}`
+                  : "From Sewing Calendar"}
+              </span>
+              <a
+                href="/sewing-calendar"
+                style={{
+                  marginLeft: "auto",
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  background: "#fff",
+                  color: "#111827",
+                  textDecoration: "none",
+                }}
+              >
+                Open calendar
+              </a>
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
+              Jobs not finished yesterday rolled to the top of today. Nothing else moved.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {sewingCarryoverRows.map((row) => (
+                <div
+                  key={`${row.orderNumber}-${row.fromDate}`}
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "baseline",
+                    border: "1px solid #fde68a",
+                    background: "#fffef5",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                  }}
+                >
+                  <strong>#{row.orderNumber}</strong>
+                  <span>{[row.customer, row.product].filter(Boolean).join(" · ")}</span>
+                  <em style={{ marginLeft: "auto", color: "#854d0e", fontStyle: "normal", fontWeight: 700 }}>
+                    from {String(row.fromDate || "").slice(5).replace("-", "/")}
+                  </em>
+                </div>
+              ))}
             </div>
           </div>
           )}

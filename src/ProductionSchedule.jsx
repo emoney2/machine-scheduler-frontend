@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
-import { extractFileId, jobImageUrl } from "./machineFloorUtils";
 import "./ProductionSchedule.css";
 
 const ROOT = `${API_ROOT}/schedule`;
-const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
 function asList(value) {
   return Array.isArray(value) ? value : [];
@@ -26,43 +24,6 @@ function fmtDate(value) {
   const raw = String(value).slice(0, 10);
   const [y, m, d] = raw.split("-");
   return y && m && d ? `${m}/${d}/${y}` : String(value);
-}
-
-function fmtCardDate(value) {
-  if (!value) return "—";
-  const raw = String(value).slice(0, 10);
-  const [y, m, d] = raw.split("-");
-  return y && m && d ? `${Number(m)}/${Number(d)}` : String(value);
-}
-
-function weekdayName(value) {
-  const raw = String(value || "").slice(0, 10);
-  const dt = new Date(`${raw}T12:00:00`);
-  if (Number.isNaN(dt.getTime())) return "";
-  return dt.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" });
-}
-
-function fmtDayHeading(value) {
-  const raw = String(value || "").slice(0, 10);
-  const dt = new Date(`${raw}T12:00:00`);
-  if (Number.isNaN(dt.getTime())) return fmtDate(value);
-  return dt.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "America/New_York",
-  });
-}
-
-function wholeQty(value) {
-  return Math.round(Number(value) || 0);
-}
-
-function outPhrase(names) {
-  const people = (names || []).map((n) => String(n || "").trim()).filter(Boolean);
-  if (!people.length) return "";
-  if (people.length === 1) return `${people[0]} is out`;
-  if (people.length === 2) return `${people[0]} and ${people[1]} are out`;
-  return `${people.slice(0, -1).join(", ")}, and ${people[people.length - 1]} are out`;
 }
 
 function fmtTime(value) {
@@ -186,59 +147,6 @@ function Banner({ error, proposed }) {
   return null;
 }
 
-function dateRange(schedule, field = "date") {
-  const dates = asList(schedule).map((r) => String(r[field] || r.start || "").slice(0, 10)).filter(Boolean).sort();
-  if (!dates.length) return [];
-  const start = new Date(`${dates[0]}T12:00:00`);
-  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-  const finish = new Date(`${dates[dates.length - 1]}T12:00:00`);
-  const days = [];
-  const cursor = new Date(start);
-  while (cursor <= finish && days.length < 371) {
-    if (cursor.getDay() !== 0 && cursor.getDay() !== 6) {
-      days.push(cursor.toISOString().slice(0, 10));
-    }
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return days;
-}
-
-function orderKey(value) {
-  return String(value || "").replace(/^#/, "").trim();
-}
-
-function collectJobImages(columns, orders) {
-  const map = {};
-  asList(orders).forEach((order) => {
-    const id = orderKey(order.order_number || order.orderNumber);
-    const image = order.image || order.Image || order.Preview || "";
-    if (id && image) map[id] = { imageLink: image, imageFileId: extractFileId(image) || "" };
-  });
-  Object.values(columns || {}).forEach((col) => {
-    asList(col?.jobs).forEach((job) => {
-      const id = orderKey(job.id || job.orderNumber);
-      const image = job.imageLink || job.Image || job.image || "";
-      if (!id || !(image || job.imageFileId)) return;
-      map[id] = {
-        imageLink: image || map[id]?.imageLink || "",
-        imageFileId: job.imageFileId || extractFileId(image) || map[id]?.imageFileId || "",
-      };
-    });
-  });
-  return map;
-}
-
-function openJobImage(raw) {
-  const id = extractFileId(raw);
-  if (id) {
-    window.open(`https://drive.google.com/file/d/${id}/view`, "_blank", "noopener,noreferrer");
-    return;
-  }
-  if (/^https?:\/\//i.test(String(raw || ""))) {
-    window.open(raw, "_blank", "noopener,noreferrer");
-  }
-}
-
 function isBackProduct(product) {
   return /(?:^|\s)backs?$/i.test(String(product || "").trim());
 }
@@ -253,14 +161,6 @@ function needsSewing(order) {
   if (order.needs_sewing === false || order.needsSewing === false) return false;
   if (isBackProduct(order.product) || isTowelOrNeedlepoint(order.product)) return false;
   return Number(order.remaining_quantity || order.remainingQuantity || 0) > 0;
-}
-
-function dayPieces(job) {
-  const explicit = Number(job.dayQuantity);
-  if (Number.isFinite(explicit) && explicit > 0) return Math.round(explicit);
-  const units = Number(job.capacityUnits);
-  if (Number.isFinite(units) && units > 0) return Math.round(units);
-  return Number(job.remainingQuantity || 0);
 }
 
 function needsEmbroidery(order) {
@@ -300,14 +200,14 @@ function UnscheduledOrders({ schedule, type }) {
   );
 }
 
-function nextWeekdayIso(from = new Date()) {
+export function nextWeekdayIso(from = new Date()) {
   const d = new Date(from);
   d.setHours(12, 0, 0, 0);
   while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
   return d.toISOString().slice(0, 10);
 }
 
-function StaffModal({ date, onClose, onSaved }) {
+export function StaffModal({ date, onClose, onSaved }) {
   const [day, setDay] = useState(date || nextWeekdayIso());
   const [sewers, setSewers] = useState([]);
   const [out, setOut] = useState([]);
@@ -387,266 +287,6 @@ function StaffModal({ date, onClose, onSaved }) {
         </div>
       </div>
     </div>
-  );
-}
-
-export function SewingCalendar({ tv = false, columns }) {
-  const data = useScheduleData({ tv });
-  const [showProposal, setShowProposal] = useState(!tv);
-  const [busy, setBusy] = useState(false);
-  const [staffDate, setStaffDate] = useState("");
-  const active = chooseSchedule(data, !tv && showProposal);
-  const schedule = active.schedule && typeof active.schedule === "object" ? active.schedule : {};
-  const rows = asList(schedule.sewing).filter(
-    (row) => !isBackProduct(row.product) && !isTowelOrNeedlepoint(row.product)
-  );
-  const splitCounts = useMemo(() => {
-    const counts = {};
-    rows.forEach((row) => {
-      const id = String(row.orderNumber || "");
-      if (id) counts[id] = (counts[id] || 0) + 1;
-    });
-    return counts;
-  }, [rows]);
-  const images = useMemo(
-    () => collectJobImages(columns, schedule.orders),
-    [columns, schedule.orders]
-  );
-  const days = useMemo(() => dateRange(rows), [rows]);
-  const byDay = useMemo(() => {
-    const map = {};
-    rows.forEach((row) => {
-      const key = String(row.date || row.start || "").slice(0, 10);
-      if (!map[key]) map[key] = [];
-      map[key].push(row);
-    });
-    Object.values(map).forEach((list) => {
-      list.sort((a, b) => {
-        const hardA = a.hardDate ? 0 : 1;
-        const hardB = b.hardDate ? 0 : 1;
-        if (hardA !== hardB) return hardA - hardB;
-        return String(a.start || "").localeCompare(String(b.start || ""))
-          || String(a.orderNumber || "").localeCompare(String(b.orderNumber || ""));
-      });
-    });
-    return map;
-  }, [rows]);
-
-  const rebuild = async () => {
-    setBusy(true);
-    try {
-      await axios.post(`${ROOT}/rebuild`, { reason: "administrator requested rebuild" }, { timeout: 180000 });
-      setShowProposal(true);
-      await data.reload();
-    } catch (e) {
-      window.alert(friendlyError(e) || "Schedule rebuild failed");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const lockOnDay = async (event, day) => {
-    if (tv || !active.proposed) return;
-    event.preventDefault();
-    const payload = JSON.parse(event.dataTransfer.getData("application/json") || "{}");
-    if (!payload.orderNumber) return;
-    try {
-      await axios.put(
-        `${ROOT}/locks/SEW-${encodeURIComponent(payload.orderNumber)}`,
-        { orderNumber: payload.orderNumber, date: day, capacityUnits: payload.capacityUnits, active: true },
-        { timeout: 120000 }
-      );
-      await data.reload();
-    } catch (e) {
-      window.alert(e?.response?.data?.error || e?.message || "Could not lock sewing job");
-    }
-  };
-
-  return (
-    <main className={`ps-page ${tv ? "tv" : ""}`}>
-      <ScheduleHeader
-        title={tv ? "Published Sewing Schedule" : "Sewing Calendar"}
-        active={active}
-        canPropose={!!data.proposal?.schedule}
-        showProposal={showProposal}
-        setShowProposal={setShowProposal}
-        onRebuild={rebuild}
-        onStaff={tv ? undefined : () => setStaffDate(nextWeekdayIso())}
-        busy={busy}
-        tv={tv}
-      />
-      {staffDate && (
-        <StaffModal
-          date={staffDate}
-          onClose={() => setStaffDate("")}
-          onSaved={async () => {
-            setShowProposal(true);
-            await data.reload();
-          }}
-        />
-      )}
-      <Banner error={data.error} proposed={active.proposed} />
-      {data.loading && !active.schedule ? <div className="ps-empty">Loading schedule…</div> : null}
-      <UnscheduledOrders schedule={schedule} type="sewing" />
-      <div className="ps-week-labels">{DOW.map((d) => <div key={d}>{d}</div>)}</div>
-      <div className="ps-calendar">
-        {days.map((day) => {
-          const jobs = byDay[day] || [];
-          const regular = Math.max(0, ...jobs.map((j) => Number(j.regularCapacity || 0)), jobs.length ? 0 : 95);
-          const emergency = Math.max(0, ...jobs.map((j) => Number(j.emergencyCapacity || 0)));
-          const scheduled = jobs.reduce((sum, j) => sum + Number(j.capacityUnits || 0) + Number(j.setupUnits || 0), 0);
-          const remaining = regular + emergency - scheduled;
-          const outNames = (schedule.settings?.sewerAbsences || {})[day] || [];
-          const whoIsOut = outPhrase(outNames);
-          return (
-            <section
-              className={`ps-day ${remaining < -0.01 ? "over" : ""}`}
-              key={day}
-              onDragOver={(e) => active.proposed && e.preventDefault()}
-              onDrop={(e) => lockOnDay(e, day)}
-            >
-              <header>
-                <button
-                  type="button"
-                  className="ps-day-staff"
-                  onClick={() => !tv && setStaffDate(day)}
-                  disabled={tv}
-                >
-                  <span className="ps-day-weekday">{weekdayName(day)}</span>
-                  {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
-                  <span className="ps-day-date">{fmtDayHeading(day)}</span>
-                </button>
-                <span className="ps-day-units">{wholeQty(scheduled)} / {wholeQty(regular + emergency)}</span>
-              </header>
-              <div className="ps-capacity">
-                Regular {wholeQty(regular)} · Emergency {wholeQty(emergency)} · Remaining {wholeQty(remaining)}
-              </div>
-              <div className="ps-cards">
-                {jobs.map((job, index) => (
-                  <SewingCard
-                    key={`${job.orderNumber}-${job.start}-${index}`}
-                    job={job}
-                    split={!!job.split || (splitCounts[String(job.orderNumber)] || 0) > 1}
-                    imageHint={images[orderKey(job.orderNumber)]}
-                    tv={tv}
-                    draggable={!tv && active.proposed && !job.locked}
-                  />
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-      {!days.length && !data.loading ? (
-        <div className="ps-empty">
-          {data.error
-            ? "Could not load the sewing calendar. Wait a minute and refresh — do not rebuild yet."
-            : active.version
-              ? "No sewing work is placed on this schedule yet."
-              : "No published schedule yet. Click Rebuild Schedule to create the first baseline."}
-        </div>
-      ) : null}
-    </main>
-  );
-}
-
-function SewingCard({ job, draggable, imageHint, tv, split }) {
-  const hard = !!job.hardDate;
-  const sample = Number(job.quantity) === 1;
-  const late = !hard && (!!job.late || !!job.conflict);
-  const todayQty = dayPieces(job);
-  const totalQty = Number(job.remainingQuantity ?? job.quantity ?? 0);
-  const qtyLabel = split
-    ? `${todayQty}/${totalQty || "—"}`
-    : `${totalQty || 0}/${job.quantity ?? "—"}`;
-  const classes = [
-    "ps-sched-card",
-    hard ? "hard" : "soft",
-    sample ? "sample" : "",
-    late ? "late" : "",
-    job.locked ? "locked" : "",
-  ].filter(Boolean).join(" ");
-  const title = [
-    `#${job.orderNumber}`,
-    job.customer,
-    job.product,
-    job.design,
-    split ? `${todayQty} pieces today of ${totalQty || "—"}` : `qty ${job.remainingQuantity ?? "—"}/${job.quantity ?? "—"}`,
-    `due ${fmtDate(job.dueDate)}`,
-    `ship ${fmtDate(job.requiredShipDate)}`,
-    job.shippingGroupId && job.shippingGroupId.startsWith("ORDER-") ? "" : job.shippingGroupId,
-  ].filter(Boolean).join(" · ");
-  const rawImage = job.image || job.imageLink || imageHint?.imageLink || "";
-  const thumb = jobImageUrl({
-    image: rawImage,
-    imageLink: rawImage,
-    Image: rawImage,
-    imageFileId: job.imageFileId || imageHint?.imageFileId || "",
-  }, tv ? "w320" : "w240");
-  const transitDays = Number(job.transitBusinessDays) || 0;
-  const shipPlace = [job.shipCity, job.shipState].filter(Boolean).join(", ");
-  return (
-    <article
-      className={classes}
-      title={title}
-      draggable={draggable}
-      onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("application/json", JSON.stringify({
-          orderNumber: job.orderNumber,
-          capacityUnits: Number(job.capacityUnits || job.remainingQuantity || 1),
-        }));
-      }}
-    >
-      <button
-        type="button"
-        className={`ps-sched-thumb ${thumb ? "" : "missing"}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (rawImage) openJobImage(rawImage);
-        }}
-        disabled={!rawImage}
-        title={rawImage ? "Open artwork" : "No image"}
-      >
-        {thumb ? (
-          <img
-            src={thumb}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
-        ) : (
-          <span>No img</span>
-        )}
-      </button>
-      <div className="ps-sched-body">
-        <div className="ps-sched-top">
-          <span className="ps-sched-id">{job.orderNumber}</span>
-          <span className={`ps-sched-qty ${split ? "split" : ""}`}>{qtyLabel}</span>
-        </div>
-        <span className="ps-sched-name">
-          {job.customer || "No customer"}
-          {job.product ? ` - ${job.product}` : ""}
-        </span>
-      </div>
-      <div className="ps-sched-facts">
-        <span>Due {fmtCardDate(job.dueDate)}</span>
-        <span>
-          Ship {fmtCardDate(job.requiredShipDate)}
-          {shipPlace ? ` · ${shipPlace}` : ""}
-          {transitDays > 0 ? ` · ${transitDays}-day` : ""}
-        </span>
-        <span>{hard ? "Hard date" : "Soft date"}</span>
-        {(job.emergencyUsed || Number(job.emergencyCapacity) > 0) && (
-          <span className="warning">Emergency</span>
-        )}
-        {!job.embroideryReady && <span className="danger">Emb not ready</span>}
-      </div>
-    </article>
   );
 }
 
