@@ -50,8 +50,11 @@ function outPhrase(names) {
   return `${people.slice(0, -1).join(", ")}, and ${people[people.length - 1]} are out`;
 }
 
-function openJobImage(raw) {
-  const id = extractFileId(raw);
+function openJobImage(jobOrRaw) {
+  const raw = typeof jobOrRaw === "object" && jobOrRaw
+    ? (jobOrRaw.image || jobOrRaw.imageLink || jobOrRaw.Image || jobOrRaw.imageFileId || "")
+    : jobOrRaw;
+  const id = (typeof jobOrRaw === "object" && jobOrRaw?.imageFileId) || extractFileId(raw);
   if (id) {
     window.open(`https://drive.google.com/file/d/${id}/view`, "_blank", "noopener,noreferrer");
     return;
@@ -59,6 +62,72 @@ function openJobImage(raw) {
   if (/^https?:\/\//i.test(String(raw || ""))) {
     window.open(raw, "_blank", "noopener,noreferrer");
   }
+}
+
+function sewingImageId(job) {
+  return (
+    job?.imageFileId
+    || extractFileId(job?.imageLink)
+    || extractFileId(job?.Image)
+    || extractFileId(job?.image)
+    || extractFileId(job?.artworkUrl)
+    || ""
+  );
+}
+
+function sewingThumbCandidates(job, sz = "w240") {
+  const id = sewingImageId(job);
+  const root = String(API_ROOT || "").replace(/\/$/, "");
+  const list = [];
+  if (id) {
+    list.push(`https://drive.google.com/thumbnail?id=${id}&sz=${sz}`);
+    if (root) list.push(`${root}/drive/proxy/${id}?thumb=1&sz=${sz}`);
+    const proxied = jobImageUrl({
+      imageFileId: id,
+      imageLink: job?.imageLink || job?.image || "",
+      Image: job?.Image || job?.image || "",
+    }, sz);
+    if (proxied) list.push(proxied);
+  }
+  const raw = job?.imageLink || job?.image || job?.artworkUrl || "";
+  if (/^https?:\/\//i.test(raw) && !list.includes(raw)) list.push(raw);
+  return list.filter(Boolean);
+}
+
+function SewingThumb({ job, compact }) {
+  const [idx, setIdx] = useState(0);
+  const sz = compact ? "w160" : "w240";
+  const id = sewingImageId(job);
+  const raw = job?.image || job?.imageLink || job?.Image || "";
+  const candidates = useMemo(() => sewingThumbCandidates(job, sz), [id, raw, sz]);
+  useEffect(() => { setIdx(0); }, [id, raw, sz]);
+  const src = candidates[idx] || "";
+  if (!src) return <span>No img</span>;
+  return (
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setIdx((i) => i + 1)}
+    />
+  );
+}
+
+function shipTimestamp(job) {
+  const raw = String(job?.requiredShipDate || job?.shipDate || "").slice(0, 10);
+  if (!raw) return Number.POSITIVE_INFINITY;
+  const stamp = new Date(`${raw}T00:00:00`).getTime();
+  return Number.isFinite(stamp) ? stamp : Number.POSITIVE_INFINITY;
+}
+
+function sortIdsByShip(ids, jobs) {
+  return asList(ids).slice().sort((a, b) => {
+    const delta = shipTimestamp(jobs[a]) - shipTimestamp(jobs[b]);
+    if (delta) return delta;
+    return String(a).localeCompare(String(b), undefined, { numeric: true });
+  });
 }
 
 function machineHeadCount(key, columns) {
@@ -128,7 +197,9 @@ function overlayEmbroidery(job, columns) {
     hardDate: !!(job.hardDate || isHardJob(job) || isHardJob(live)),
     due_type: job.due_type || live.due_type || live.dueType || "",
     image: job.image || live.imageLink || live.Image || live.image || "",
-    imageFileId: job.imageFileId || live.imageFileId || "",
+    imageLink: job.imageLink || live.imageLink || job.image || live.image || "",
+    imageFileId: job.imageFileId || live.imageFileId || extractFileId(job.image || live.imageLink || live.image) || "",
+    artworkUrl: job.artworkUrl || live.artworkUrl || "",
   };
 }
 
@@ -225,12 +296,7 @@ function SewingJobCard({ job, drag, tv, compact }) {
   const hard = isHardJob(job);
   const emb = embroideryStatus(job);
   const embReady = emb.kind === "ready";
-  const thumb = jobImageUrl({
-    image: job.image,
-    imageLink: job.image,
-    Image: job.image,
-    imageFileId: job.imageFileId || extractFileId(job.image) || "",
-  }, compact ? "w160" : "w240");
+  const thumb = sewingImageId(job) || job.image || job.imageLink || "";
   const qtyLabel = `${Number(job.remainingQuantity || 0)}/${job.quantity ?? "—"}`;
   const classes = [
     "sc-card",
@@ -254,23 +320,12 @@ function SewingJobCard({ job, drag, tv, compact }) {
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
-          if (job.image) openJobImage(job.image);
+          if (thumb) openJobImage(job);
         }}
-        disabled={!job.image}
-        title={job.image ? "Open artwork" : "No image"}
+        disabled={!thumb}
+        title={thumb ? "Open artwork" : "No image"}
       >
-        {thumb ? (
-          <img
-            src={thumb}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
-          />
-        ) : (
-          <span>No img</span>
-        )}
+        <SewingThumb job={job} compact={compact} />
       </button>
       <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
       <div className="sc-row sc-row-main">
@@ -489,7 +544,7 @@ export function SewingCalendar({ tv = false, columns }) {
   }, [jobs, columns, carryovers]);
 
   const visibleQueue = useMemo(
-    () => queue.filter((id) => liveJobs[id]),
+    () => sortIdsByShip(queue.filter((id) => liveJobs[id]), liveJobs),
     [queue, liveJobs]
   );
   const visibleBoard = useMemo(() => {
@@ -501,12 +556,13 @@ export function SewingCalendar({ tv = false, columns }) {
   }, [board, liveJobs]);
 
   const persistBoard = (nextQueue, nextBoard) => {
-    placementsRef.current = { queue: nextQueue, board: nextBoard };
+    const sortedQueue = sortIdsByShip(nextQueue, liveJobs);
+    placementsRef.current = { queue: sortedQueue, board: nextBoard };
     dirtyRef.current = true;
-    setQueue(nextQueue);
+    setQueue(sortedQueue);
     setBoard(nextBoard);
     setDirty(true);
-    saveSewingBoardDraft(nextQueue, nextBoard);
+    saveSewingBoardDraft(sortedQueue, nextBoard);
   };
 
   const onDragEnd = (result) => {
