@@ -131,6 +131,27 @@ function isLocalDelivery(method) {
   return /local/i.test(String(method || ""));
 }
 
+function rowShippingMethod(row) {
+  if (!row || typeof row !== "object") return "";
+  const norm = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const isPlanning = (key) => {
+    const n = norm(key);
+    return n === "shippingmethod" || n === "shipmethod" || n === "shippingtype"
+      || n === "shippingservice" || n === "upsorlocal" || n === "upslocal"
+      || n.includes("shippingmethod") || n.endsWith("shipmethod");
+  };
+  let planning = "";
+  let via = "";
+  Object.entries(row).forEach(([key, val]) => {
+    const text = String(val || "").trim();
+    if (!text) return;
+    const n = norm(key);
+    if (isPlanning(key) && !planning) planning = text;
+    else if ((n === "shipvia" || n === "upsservice") && !via) via = text;
+  });
+  return planning || via || String(row.shippingMethod || "").trim();
+}
+
 function estimateTransitDays(method, zip, state, city) {
   if (isLocalDelivery(method)) return 0;
   const raw = String(method || "").toUpperCase();
@@ -218,7 +239,7 @@ function liveFromOverviewRow(row) {
     product: row?.Product || row?.product || "",
     quantity: qty || undefined,
     dueDate: parseOverviewDate(row?.["Due Date"] || row?.dueDate),
-    shippingMethod: row?.["Shipping Method"] || row?.shippingMethod || row?.["Ship Via"] || "",
+    shippingMethod: rowShippingMethod(row),
     shipCity: row?.["Shipping City"] || row?.["Ship To City"] || row?.shipCity || "",
     shipState: row?.["Shipping State"] || row?.["Ship To State"] || row?.shipState || "",
     shipZip: row?.["Shipping Zip"] || row?.["Ship To Zip"] || row?.shipZip || "",
