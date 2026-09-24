@@ -4,6 +4,7 @@ import { API_ROOT } from "./apiRoot";
 import {
   flattenShipmentRows,
   loadShipmentHistory,
+  postShipmentHistoryToServer,
   upsTrackingUrl,
 } from "./shipmentHistoryStorage";
 
@@ -34,9 +35,10 @@ function formatUpsYyyymmdd(ymd) {
 
 /**
  * @param {Array<{ tracking_number?: string, company?: string, ship_date?: string }>} upsRows
+ * @param {Array<{ tracking_number?: string, company?: string, shipped_at?: string }>} serverRows
  * @param {Array<{ trackingNumber: string, company: string, shippedAt: string, groupId?: string }>} localRows
  */
-function mergeShippingRows(upsRows, localRows) {
+function mergeShippingRows(upsRows, serverRows, localRows) {
   const byTrk = new Map();
 
   for (const u of upsRows || []) {
@@ -53,6 +55,18 @@ function mergeShippingRows(upsRows, localRows) {
       shippedAt,
       upsYyyymmdd: ymd.length === 8 ? ymd : "",
       source: "UPS",
+    });
+  }
+
+  for (const s of serverRows || []) {
+    const trk = String(s.tracking_number || s.trackingNumber || "").trim();
+    if (!trk || byTrk.has(trk)) continue;
+    byTrk.set(trk, {
+      trackingNumber: trk,
+      company: String(s.company || "—").trim() || "—",
+      shippedAt: s.shipped_at || s.shippedAt || "",
+      upsYyyymmdd: "",
+      source: "Server",
     });
   }
 
@@ -89,36 +103,56 @@ export default function ShipmentsHistory() {
   const [toast, setToast] = useState(null);
   const [loading, setLoading] = useState(true);
   const [upsPayload, setUpsPayload] = useState(null);
+  const [serverRows, setServerRows] = useState([]);
+  const [serverError, setServerError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const API_BASE = API_ROOT.replace(/\/api$/, "");
 
-  const loadUps = useCallback(async () => {
+  const loadHistory = useCallback(async () => {
     setLoading(true);
     setUpsPayload(null);
+    setServerError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/shipping-history-ups?days=7`, {
-        credentials: "include",
-      });
-      const data = await res.json().catch(() => ({}));
+      try {
+        await postShipmentHistoryToServer(API_BASE);
+      } catch (syncErr) {
+        console.warn("Could not sync browser shipment history:", syncErr);
+      }
+
+      const [serverRes, upsRes] = await Promise.all([
+        fetch(`${API_BASE}/api/shipping-history`, { credentials: "include" }),
+        fetch(`${API_BASE}/api/shipping-history-ups?days=7`, { credentials: "include" }),
+      ]);
+
+      const serverData = await serverRes.json().catch(() => ({}));
+      if (!serverRes.ok) {
+        setServerError(serverData.error || `HTTP ${serverRes.status}`);
+        setServerRows([]);
+      } else {
+        setServerRows(Array.isArray(serverData.rows) ? serverData.rows : []);
+      }
+
+      const data = await upsRes.json().catch(() => ({}));
       setUpsPayload({
-        ok: res.ok,
+        ok: upsRes.ok && !data.error,
         configured: data.configured !== false,
         rows: Array.isArray(data.rows) ? data.rows : [],
         message: data.message || null,
-        error: data.error || (res.ok ? null : data.error || `HTTP ${res.status}`),
+        error: data.error || (upsRes.ok ? null : data.error || `HTTP ${upsRes.status}`),
         subscriptionNamesTried: Array.isArray(data.subscription_names_tried)
           ? data.subscription_names_tried
           : [],
         usedDefaultSubscriptionName: Boolean(data.used_default_subscription_name),
       });
     } catch (e) {
+      setServerError(e?.message || "Failed to load shipment history");
       setUpsPayload({
         ok: false,
         configured: true,
         rows: [],
         message: null,
-        error: e?.message || "Failed to load UPS history",
+        error: null,
         subscriptionNamesTried: [],
         usedDefaultSubscriptionName: false,
       });
@@ -128,12 +162,12 @@ export default function ShipmentsHistory() {
   }, [API_BASE]);
 
   useEffect(() => {
-    loadUps();
-  }, [loadUps, refreshKey]);
+    loadHistory();
+  }, [loadHistory, refreshKey]);
 
   const localFlat = flattenShipmentRows(loadShipmentHistory());
   const upsApiRows = upsPayload?.rows || [];
-  const mergedRows = mergeShippingRows(upsApiRows, localFlat);
+  const mergedRows = mergeShippingRows(upsApiRows, serverRows, localFlat);
 
   async function handleReprint(tracking) {
     const trk = String(tracking || "").trim();
@@ -214,15 +248,14 @@ export default function ShipmentsHistory() {
       </div>
 
       <p style={{ color: "#64748b", marginTop: 0, marginBottom: "0.75rem", fontSize: "0.95rem" }}>
-        Shipment rows come from UPS Quantum View (last 7 days). If you do not set{" "}
-        <code style={{ fontSize: "0.85em" }}>UPS_QUANTUM_VIEW_SUBSCRIPTION_NAME</code> on the server, the API
-        uses UPS&apos;s documented default name <strong>OutboundXML</strong> (outbound + XML). You can set one
-        or more comma-separated names if your UPS subscription uses different names. Rows that only exist in
-        this browser show as <strong>Browser</strong>. Tracking opens UPS; Reprint sends the label to your
-        Label Printer folder again.
+        Shipments created from the Ship tab are saved on the server (and mirrored to the Packing History
+        sheet), so you can open this page from any computer. UPS Quantum View is optional extra history for
+        the last 7 days when that subscription is active. Rows that only exist in this browser (not yet
+        synced) show as <strong>Browser</strong>. Tracking opens UPS; Reprint sends the label to your Label
+        Printer folder again.
       </p>
 
-      {upsPayload && upsPayload.subscriptionNamesTried && upsPayload.subscriptionNamesTried.length > 0 && (
+      {upsPayload && !upsPayload.error && upsPayload.subscriptionNamesTried && upsPayload.subscriptionNamesTried.length > 0 && (
         <p style={{ color: "#64748b", marginTop: 0, marginBottom: "0.75rem", fontSize: "0.85rem" }}>
           Subscription name(s) queried:{" "}
           <code style={{ fontSize: "0.9em" }}>{upsPayload.subscriptionNamesTried.join(", ")}</code>
@@ -247,7 +280,7 @@ export default function ShipmentsHistory() {
         </div>
       )}
 
-      {upsPayload && upsPayload.error && (
+      {serverError && (
         <div
           role="alert"
           style={{
@@ -259,11 +292,30 @@ export default function ShipmentsHistory() {
             color: "#991b1b",
             fontSize: "0.9rem",
             lineHeight: 1.45,
+          }}
+        >
+          <strong>Could not load server history.</strong> {serverError}
+        </div>
+      )}
+
+      {upsPayload && upsPayload.error && (
+        <div
+          role="note"
+          style={{
+            marginBottom: "1rem",
+            padding: "0.75rem 1rem",
+            borderRadius: 8,
+            background: "#fffbeb",
+            border: "1px solid #fde68a",
+            color: "#92400e",
+            fontSize: "0.9rem",
+            lineHeight: 1.45,
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
           }}
         >
-          <strong>Could not load from UPS.</strong> {upsPayload.error}
+          <strong>UPS Quantum View is optional and unavailable right now.</strong>{" "}
+          Server-saved shipments still appear below. {upsPayload.error}
         </div>
       )}
 
@@ -296,11 +348,8 @@ export default function ShipmentsHistory() {
             borderRadius: 12,
           }}
         >
-          No shipments found for the last 7 days. If you expect UPS rows here, confirm Quantum View is active on
-          your UPS account and that <code style={{ fontSize: "0.85em" }}>UPS_QUANTUM_VIEW_SUBSCRIPTION_NAME</code> on
-          the server matches your subscription name (often <code style={{ fontSize: "0.85em" }}>OutboundXML</code>).
-          You can still ship from the Ship tab; labels created on this computer may appear as Browser-only until UPS
-          publishes manifest data.
+          No shipments saved on the server yet. After you ship from any computer, tracking rows show up here.
+          Opening this page also uploads any Browser-only rows from this computer.
         </div>
       ) : (
         <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 12 }}>

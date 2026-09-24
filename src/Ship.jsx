@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { postShipQboClientLog } from "./shipQboClientLog";
-import { appendShipmentHistory } from "./shipmentHistoryStorage";
+import { appendShipmentHistory, postShipmentHistoryToServer } from "./shipmentHistoryStorage";
 import {
   buildCreatedInvoiceOpenHref,
   buildQboInvoiceOpenUrl,
@@ -22,11 +22,17 @@ function recordShipmentHistoryEntry(shipData, orderIds, jobs, companyHint) {
       (first["Company Name"] || first.companyName || first.company);
     company = (c != null ? String(c) : "").trim();
   }
-  appendShipmentHistory({
-    shippedAt: new Date().toISOString(),
+  const shippedAt = new Date().toISOString();
+  const payload = {
+    shippedAt,
     company: company || "—",
     trackingNumbers: tracking,
+    orderIds: ids,
     labelUrls: Array.isArray(shipData?.labels) ? shipData.labels : [],
+  };
+  appendShipmentHistory(payload);
+  postShipmentHistoryToServer(getBackendOrigin(), [payload]).catch((err) => {
+    console.warn("Could not save shipment history on server:", err);
   });
 }
 

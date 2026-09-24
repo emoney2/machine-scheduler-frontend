@@ -29,7 +29,35 @@ export function loadShipmentHistory() {
 }
 
 /**
- * @param {{ company?: string, trackingNumbers?: string[], labelUrls?: string[], shippedAt?: string }} entry
+ * Push browser-only rows to the shared server store (any computer can then see them).
+ * @param {string} apiBase backend origin (no trailing /api)
+ * @param {ShipmentHistoryEntry[]} [entries]
+ */
+export async function postShipmentHistoryToServer(apiBase, entries) {
+  const rows = (entries || loadShipmentHistory())
+    .map((e) => ({
+      shippedAt: e.shippedAt,
+      company: e.company,
+      trackingNumbers: e.trackingNumbers || [],
+      orderIds: e.orderIds || e.order_ids || [],
+    }))
+    .filter((e) => (e.trackingNumbers || []).length > 0);
+  if (!apiBase || rows.length === 0) return { imported: 0, rows: [] };
+  const res = await fetch(`${apiBase}/api/shipping-history`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ entries: rows }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+/**
+ * @param {{ company?: string, trackingNumbers?: string[], labelUrls?: string[], shippedAt?: string, orderIds?: string[] }} entry
  */
 export function appendShipmentHistory(entry) {
   const trackingNumbers = (entry.trackingNumbers || [])
@@ -44,6 +72,9 @@ export function appendShipmentHistory(entry) {
     shippedAt: entry.shippedAt || new Date().toISOString(),
     company: String(entry.company || "—").trim() || "—",
     trackingNumbers,
+    orderIds: Array.isArray(entry.orderIds)
+      ? entry.orderIds.map((x) => String(x).trim()).filter(Boolean)
+      : [],
     labelUrls: Array.isArray(entry.labelUrls)
       ? entry.labelUrls.map((u) => String(u))
       : [],
