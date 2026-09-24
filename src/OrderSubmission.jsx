@@ -3039,7 +3039,7 @@ const handleSaveNewCompany = async () => {
                 </select>
               </label>
               <div style={{ marginTop: "0.25rem", color: "#6b7280", maxWidth: "80%" }}>
-                Local delivery skips UPS transit. The one-day buffer still applies.
+                Local delivery can go out the same day as the due date.
               </div>
             </div>
             <div>

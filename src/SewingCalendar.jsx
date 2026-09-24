@@ -132,7 +132,7 @@ function isLocalDelivery(method) {
 }
 
 function estimateTransitDays(method, zip, state, city) {
-  if (isLocalDelivery(method)) return 1;
+  if (isLocalDelivery(method)) return 0;
   const raw = String(method || "").toUpperCase();
   if (/NEXT DAY/.test(raw)) return 1;
   if (/2ND DAY|SECOND DAY/.test(raw)) return 2;
