@@ -325,7 +325,7 @@ function CarryoverStrip({ carryovers }) {
   );
 }
 
-function SewingJobCard({ job, drag, tv, compact }) {
+function SewingJobCard({ job, drag, tv, compact, embMark }) {
   const hard = isHardJob(job);
   const emb = embroideryStatus(job);
   const embReady = emb.kind === "ready";
@@ -380,24 +380,32 @@ function SewingJobCard({ job, drag, tv, compact }) {
       </div>
       <span className="sc-bubble due">Due {fmtCardDate(job.dueDate)}</span>
       <span className="sc-bubble ship">Ship {fmtCardDate(job.requiredShipDate)}</span>
-      <div className={`sc-emb ${emb.kind}`}>
-        <strong>{emb.label}</strong>
-        {emb.kind === "progress" && etaLabel(job.embroideryEta) ? (
-          <span>{etaLabel(job.embroideryEta)}</span>
-        ) : null}
-      </div>
+      {embMark ? (
+        !embReady ? (
+          <span className="sc-e" title={emb.label}>E</span>
+        ) : null
+      ) : (
+        <div className={`sc-emb ${emb.kind}`}>
+          <strong>{emb.label}</strong>
+          {emb.kind === "progress" && etaLabel(job.embroideryEta) ? (
+            <span>{etaLabel(job.embroideryEta)}</span>
+          ) : null}
+        </div>
+      )}
     </article>
   );
 }
 
 function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
+  const twoCol = droppableId !== QUEUE_ID && ids.length > 5;
+  const embMark = droppableId === QUEUE_ID || twoCol || compact;
   return (
     <Droppable droppableId={droppableId}>
       {(provided, snapshot) => (
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`sc-drop ${droppableId === QUEUE_ID ? "sc-queue-drop" : ""} ${snapshot.isDraggingOver ? "over" : ""}`}
+          className={`sc-drop ${droppableId === QUEUE_ID ? "sc-queue-drop" : ""} ${twoCol ? "two-col" : ""} ${snapshot.isDraggingOver ? "over" : ""}`}
         >
           {ids.map((id, index) => {
             const job = jobs[id];
@@ -405,7 +413,7 @@ function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
             return (
               <Draggable key={id} draggableId={id} index={index}>
                 {(drag) => (
-                  <SewingJobCard job={job} drag={drag} tv={tv} compact={compact} />
+                  <SewingJobCard job={job} drag={drag} tv={tv} compact={compact || twoCol} embMark={embMark} />
                 )}
               </Draggable>
             );
@@ -764,7 +772,7 @@ export function SewingCalendar({ tv = false, columns }) {
                   const ids = asList(visibleBoard[day]);
                   const whoIsOut = outPhrase(absences[day] || []);
                   return (
-                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${ids.length >= 5 ? "packed" : "sparse"}`} key={day}>
+                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${ids.length > 5 ? "packed" : "sparse"}`} key={day}>
                       <header>
                         <button
                           type="button"
@@ -776,7 +784,7 @@ export function SewingCalendar({ tv = false, columns }) {
                           {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
                         </button>
                       </header>
-                      <ColumnCards droppableId={day} ids={ids} jobs={liveJobs} tv={tv} compact={ids.length >= 5} />
+                      <ColumnCards droppableId={day} ids={ids} jobs={liveJobs} tv={tv} compact={ids.length > 5} />
                     </section>
                   );
                 })}
