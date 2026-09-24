@@ -267,9 +267,13 @@ function subtractWorkdaysIso(iso, days) {
   return `${y}-${m}-${d}`;
 }
 
+function todayIsoEt() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 function requiredShipFromDue(dueIso, method, zip, state, city) {
-  const due = String(dueIso || "").slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return "";
+  const due = parseOverviewDate(dueIso);
+  if (!due) return "";
   if (isLocalDelivery(method)) return due;
   const hasHint = String(method || zip || state || city || "").trim();
   if (!hasHint) return "";
@@ -296,9 +300,17 @@ function parseOverviewDate(value) {
   const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
   if (!m) return "";
   let [, mm, dd, yy] = m;
-  if (!yy) yy = String(new Date().getFullYear());
-  else if (yy.length === 2) yy = `20${yy}`;
-  return `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  const inferredYear = !yy;
+  if (!yy) {
+    yy = new Date().toLocaleString("en-US", { timeZone: "America/New_York", year: "numeric" });
+  } else if (yy.length === 2) {
+    yy = `20${yy}`;
+  }
+  const iso = `${yy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  if (inferredYear && iso < todayIsoEt()) {
+    return `${Number(yy) + 1}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  }
+  return iso;
 }
 
 function liveFromOverviewRow(row) {
@@ -831,13 +843,18 @@ export function SewingCalendar({ tv = false, columns }) {
     const mergeOne = (id, job, live) => {
       const overdue = !!(job.overdue || job.overdueFrom);
       const qty = Number(live.quantity || job.quantity) || 0;
-      const dueDate = live.dueDate || job.dueDate;
+      const dueDate = parseOverviewDate(live.dueDate || job.dueDate);
       const shippingMethod = live.shippingMethod || job.shippingMethod;
       const shipCity = live.shipCity || job.shipCity;
       const shipState = live.shipState || job.shipState;
       const shipZip = live.shipZip || job.shipZip;
       const computedShip = requiredShipFromDue(dueDate, shippingMethod, shipZip, shipState, shipCity);
-      const shipDate = isLocalDelivery(shippingMethod) ? (dueDate || computedShip) : (computedShip || job.requiredShipDate);
+      const storedShip = parseOverviewDate(job.requiredShipDate);
+      const storedFollowsDue = !!(storedShip && dueDate && storedShip <= dueDate
+        && storedShip >= (subtractWorkdaysIso(dueDate, 10) || storedShip));
+      const shipDate = isLocalDelivery(shippingMethod)
+        ? dueDate
+        : (computedShip || (storedFollowsDue ? storedShip : ""));
       const merged = overlayEmbroidery({
         ...job,
         ...live,
