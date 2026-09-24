@@ -133,7 +133,20 @@ function etaLabel(iso) {
 }
 
 function jobName(job) {
-  return [job.product, job.design].filter(Boolean).join(" · ") || "Untitled job";
+  return [job.customer, job.product].filter(Boolean).join(" - ") || "No company";
+}
+
+function isClosedOrBackJob(job, columns) {
+  if (!job) return true;
+  const stage = String(job.stage || job.status || "").toUpperCase();
+  if (["SHIPPED", "COMPLETE", "COMPLETED", "CANCELED", "CANCELLED"].includes(stage)) return true;
+  const product = String(job.product || "").toLowerCase();
+  if (product.includes("back")) return true;
+  const found = findColumnJob(columns, job.orderNumber);
+  const liveStage = String(found?.job?.status || found?.job?.Stage || found?.job?.stage || "").toUpperCase();
+  if (["SHIPPED", "COMPLETE", "COMPLETED"].includes(liveStage)) return true;
+  const liveProduct = String(found?.job?.product || found?.job?.Product || "").toLowerCase();
+  return liveProduct.includes("back");
 }
 
 function idsForColumn(columnId, queue, board) {
@@ -178,7 +191,8 @@ function SewingJobCard({ job, drag, tv, compact }) {
     imageLink: job.image,
     Image: job.image,
     imageFileId: job.imageFileId || extractFileId(job.image) || "",
-  }, tv ? "w640" : "w400");
+  }, compact ? "w160" : "w240");
+  const qtyLabel = `${Number(job.remainingQuantity || 0)}/${job.quantity ?? "—"}`;
   const classes = [
     "sc-card",
     hard ? "hard" : "soft",
@@ -218,22 +232,25 @@ function SewingJobCard({ job, drag, tv, compact }) {
           <span>No img</span>
         )}
       </button>
-      <div className="sc-card-body">
-        <div className="sc-card-id">#{job.orderNumber}</div>
-        <div className="sc-card-company">{job.customer || "No company"}</div>
-        <div className="sc-card-job">{jobName(job)}</div>
-        <div className="sc-card-dates">
-          <span>Due {fmtCardDate(job.dueDate)}</span>
-          <span>Ship {fmtCardDate(job.requiredShipDate)}</span>
-        </div>
-        {!embReady && (
-          <div className="sc-emb">
-            <strong>Embroidery not ready</strong>
-            <span>{job.embroideryPercent || 0}% done</span>
-            {etaLabel(job.embroideryEta) ? <span>{etaLabel(job.embroideryEta)}</span> : <span>Waiting on machine time</span>}
-          </div>
-        )}
+      <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
+      <div className="sc-row sc-row-main">
+        <span className="sc-id">{job.orderNumber}</span>
+        <span className="sc-company">{jobName(job)}</span>
+        {!compact && <span className="sc-qty">{qtyLabel}</span>}
       </div>
+      {!compact && (
+        <>
+          <span className="sc-bubble due">Due {fmtCardDate(job.dueDate)}</span>
+          <span className="sc-bubble ship">Ship {fmtCardDate(job.requiredShipDate)}</span>
+          {!embReady && (
+            <div className="sc-emb">
+              <strong>Emb not ready</strong>
+              <span>{job.embroideryPercent || 0}%</span>
+              <span>{etaLabel(job.embroideryEta) || "Waiting on machine"}</span>
+            </div>
+          )}
+        </>
+      )}
     </article>
   );
 }
@@ -329,10 +346,24 @@ export function SewingCalendar({ tv = false, columns }) {
     const next = {};
     const rolled = new Set(carryovers.map((row) => String(row.orderNumber)));
     Object.entries(jobs).forEach(([id, job]) => {
-      next[id] = overlayEmbroidery({ ...job, carriedOver: rolled.has(id) }, columns);
+      const merged = overlayEmbroidery({ ...job, carriedOver: rolled.has(id) }, columns);
+      if (isClosedOrBackJob(merged, columns)) return;
+      next[id] = merged;
     });
     return next;
   }, [jobs, columns, carryovers]);
+
+  const visibleQueue = useMemo(
+    () => queue.filter((id) => liveJobs[id]),
+    [queue, liveJobs]
+  );
+  const visibleBoard = useMemo(() => {
+    const next = {};
+    Object.entries(board).forEach(([day, ids]) => {
+      next[day] = asList(ids).filter((id) => liveJobs[id]);
+    });
+    return next;
+  }, [board, liveJobs]);
 
   const persistBoard = async (nextQueue, nextBoard) => {
     setQueue(nextQueue);
@@ -354,11 +385,11 @@ export function SewingCalendar({ tv = false, columns }) {
     const { source, destination } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    const fromIds = idsForColumn(source.droppableId, queue, board).slice();
+    const fromIds = idsForColumn(source.droppableId, visibleQueue, visibleBoard).slice();
     const [moved] = fromIds.splice(source.index, 1);
     if (!moved) return;
-    let nextQueue = queue.slice();
-    const nextBoard = { ...board };
+    let nextQueue = visibleQueue.slice();
+    const nextBoard = { ...visibleBoard };
     if (source.droppableId === QUEUE_ID) nextQueue = fromIds;
     else nextBoard[source.droppableId] = fromIds;
     if (destination.droppableId === QUEUE_ID) {
@@ -423,10 +454,10 @@ export function SewingCalendar({ tv = false, columns }) {
               >
                 <span className={`sc-arrow ${queueOpen ? "open" : ""}`} aria-hidden="true" />
               </button>
-              <h2>Queue <span>{queue.length}</span></h2>
+              <h2>Queue <span>{visibleQueue.length}</span></h2>
             </div>
             {queueOpen && (
-              <ColumnCards droppableId={QUEUE_ID} ids={queue} jobs={liveJobs} tv={tv} compact={false} />
+              <ColumnCards droppableId={QUEUE_ID} ids={visibleQueue} jobs={liveJobs} tv={tv} compact={false} />
             )}
             {!queueOpen && (
               <Droppable droppableId={QUEUE_ID}>
@@ -437,7 +468,7 @@ export function SewingCalendar({ tv = false, columns }) {
                     className={`sc-queue-rail ${snapshot.isDraggingOver ? "over" : ""}`}
                   >
                     {provided.placeholder}
-                    <span>{queue.length}</span>
+                    <span>{visibleQueue.length}</span>
                   </div>
                 )}
               </Droppable>
@@ -447,7 +478,7 @@ export function SewingCalendar({ tv = false, columns }) {
             {[week1, week2].map((week, weekIndex) => (
               <div className="sc-week" key={weekIndex}>
                 {week.map((day) => {
-                  const ids = asList(board[day]);
+                  const ids = asList(visibleBoard[day]);
                   const whoIsOut = outPhrase(absences[day] || []);
                   return (
                     <section className={`sc-day ${day === days[0] ? "today" : ""}`} key={day}>
