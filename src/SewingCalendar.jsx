@@ -171,10 +171,11 @@ function subtractWorkdaysIso(iso, days) {
 function requiredShipFromDue(dueIso, method, zip, state, city) {
   const due = String(dueIso || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(due)) return "";
+  if (isLocalDelivery(method)) return due;
   const hasHint = String(method || zip || state || city || "").trim();
   if (!hasHint) return "";
   const transit = estimateTransitDays(method, zip, state, city);
-  const extra = isLocalDelivery(method) || transit <= 0 ? 0 : 1;
+  const extra = transit <= 0 ? 0 : 1;
   return subtractWorkdaysIso(due, transit + extra);
 }
 
@@ -311,14 +312,15 @@ function overlayEmbroidery(job, columns) {
     hardDate: !!(job.hardDate || isHardJob(job) || isHardJob(live)),
     due_type: job.due_type || live.due_type || live.dueType || "",
     dueDate: job.dueDate || live.due_date || "",
-    requiredShipDate: job.requiredShipDate || live.requiredShipDate || "",
+    requiredShipDate: isLocalDelivery(job.shippingMethod || live.shippingMethod)
+      ? (job.dueDate || job.requiredShipDate || live.requiredShipDate || "")
+      : (job.requiredShipDate || live.requiredShipDate || ""),
     shippingMethod: job.shippingMethod || live.shippingMethod || "",
     shipCity: job.shipCity || live.shipCity || "",
     shipState: job.shipState || live.shipState || "",
     shipZip: job.shipZip || live.shipZip || "",
     customer: job.customer || live.company || "",
     product: job.product || live.product || "",
-    quantity: qty || job.quantity,
     image: job.image || live.imageLink || live.Image || live.image || "",
     imageLink: job.imageLink || live.imageLink || job.image || live.image || "",
     imageFileId: job.imageFileId || live.imageFileId || extractFileId(job.image || live.imageLink || live.image) || "",
@@ -350,14 +352,18 @@ function jobName(job) {
 
 function embroideryStatus(job) {
   if (job?.embroideryReady) {
-    return { kind: "ready", label: "Embroidery ready" };
+    return { kind: "ready", label: "EMB DONE" };
   }
-  const done = Number(job?.embroideryCompletedQty) || 0;
-  const percent = Number(job?.embroideryPercent) || 0;
-  if (done <= 0 && percent <= 0) {
-    return { kind: "not-started", label: "Embroidery Not Started" };
-  }
-  return { kind: "progress", label: `${percent}% complete` };
+  const percent = Math.max(0, Math.min(100, Math.round(Number(job?.embroideryPercent) || 0)));
+  return { kind: percent > 0 ? "progress" : "not-started", label: `EMB ${percent}%` };
+}
+
+function dayPieceCount(ids, jobs) {
+  return asList(ids).reduce((sum, id) => {
+    const job = jobs?.[id];
+    const qty = Number(job?.quantity ?? job?.remainingQuantity ?? 0);
+    return sum + (Number.isFinite(qty) ? qty : 0);
+  }, 0);
 }
 
 function isClosedStage(value) {
@@ -426,7 +432,7 @@ function SewingJobCard({ job, drag, tv, compact }) {
   const hard = isHardJob(job);
   const emb = embroideryStatus(job);
   const embReady = emb.kind === "ready";
-  const thumb = getJobThumbUrl(job, "w240");
+  const thumb = getJobThumbUrl(job, "w512");
   const qtyLabel = String(Number(job.quantity ?? job.remainingQuantity ?? 0) || job.quantity || "—");
   const classes = [
     "sc-card",
@@ -469,24 +475,13 @@ function SewingJobCard({ job, drag, tv, compact }) {
         )}
       </button>
       <div className="sc-card-body">
-        <div className="sc-row sc-row-main">
-          <span className="sc-id">{job.orderNumber}</span>
-          <span className="sc-company">{jobName(job)}</span>
-        </div>
-        <div className="sc-row sc-row-stats">
-          <span className="sc-qty">{qtyLabel}</span>
-          <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
-          {embReady ? (
-            <span className="sc-emb ready" title="Embroidery done">Done</span>
-          ) : (
-            <span className="sc-e" title={emb.label}>E</span>
-          )}
-          {job.overdue ? <span className="sc-late">LATE</span> : null}
-        </div>
-        <div className="sc-meta">
-          <span className="sc-bubble due" title="Due date">Due {fmtCardDate(job.dueDate)}</span>
-          <span className="sc-bubble ship" title="Ship date">Ship {fmtCardDate(job.requiredShipDate)}</span>
-        </div>
+        <span className="sc-id">{job.orderNumber}</span>
+        <span className="sc-company">{jobName(job)}</span>
+        <span className="sc-qty">{qtyLabel}</span>
+        <span className="sc-bubble due" title="Due date">Due {fmtCardDate(job.dueDate)}</span>
+        <span className="sc-bubble ship" title="Ship date">Ship {fmtCardDate(job.requiredShipDate)}</span>
+        <span className={`sc-emb ${emb.kind}`} title={emb.label}>{emb.label}</span>
+        {job.overdue ? <span className="sc-late">LATE</span> : null}
       </div>
     </article>
   );
@@ -717,6 +712,7 @@ export function SewingCalendar({ tv = false, columns }) {
       const shipState = live.shipState || job.shipState;
       const shipZip = live.shipZip || job.shipZip;
       const computedShip = requiredShipFromDue(dueDate, shippingMethod, shipZip, shipState, shipCity);
+      const shipDate = isLocalDelivery(shippingMethod) ? (dueDate || computedShip) : (computedShip || job.requiredShipDate);
       const merged = overlayEmbroidery({
         ...job,
         ...live,
@@ -730,7 +726,7 @@ export function SewingCalendar({ tv = false, columns }) {
         shipCity,
         shipState,
         shipZip,
-        requiredShipDate: computedShip || job.requiredShipDate,
+        requiredShipDate: shipDate,
         due_type: live.due_type || job.due_type,
         hardDate: live.due_type ? !!live.hardDate : !!(live.hardDate || job.hardDate),
         image: live.image || job.image,
@@ -836,23 +832,15 @@ export function SewingCalendar({ tv = false, columns }) {
           {!tv && (
             <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
           )}
+          <div className="sc-legend" aria-label="Date type legend">
+            <span className="sc-legend-item hard"><i aria-hidden="true" />Hard date</span>
+            <span className="sc-legend-item soft"><i aria-hidden="true" />Soft date</span>
+          </div>
           <button
             type="button"
+            className="sc-full-btn"
             onClick={toggleFullscreen}
             title={isFullscreen ? "Exit fullscreen (Esc)" : "Fullscreen"}
-            style={{
-              padding: "2px 8px",
-              fontSize: 11,
-              fontWeight: 700,
-              lineHeight: 1,
-              border: "1px solid #d1d5db",
-              borderRadius: 6,
-              background: isFullscreen ? "#111827" : "#fff",
-              color: isFullscreen ? "#fff" : "#111827",
-              cursor: "pointer",
-              flexShrink: 0,
-              marginLeft: "auto",
-            }}
           >
             {isFullscreen ? "Exit" : "Full"}
           </button>
@@ -909,6 +897,7 @@ export function SewingCalendar({ tv = false, columns }) {
               const ids = asList(visibleBoard[day]);
               const whoIsOut = outPhrase(absences[day] || []);
               const density = dayDensity(ids.length);
+              const pieces = dayPieceCount(ids, liveJobs);
               return (
                 <section className={`sc-day ${day === days[0] ? "today" : ""} ${density.name}${density.scroll ? " can-scroll" : ""}`} key={day}>
                   <header>
@@ -919,6 +908,7 @@ export function SewingCalendar({ tv = false, columns }) {
                       disabled={tv}
                     >
                       <span className="sc-day-title">{dayHeading(day)}</span>
+                      <span className="sc-day-pcs">{pieces} pcs</span>
                       {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
                     </button>
                   </header>
