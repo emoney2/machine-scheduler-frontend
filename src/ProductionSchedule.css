@@ -421,8 +421,8 @@
   padding: 2px;
   overflow: hidden;
 }
-.sc-day.sparse .sc-drop { overflow-y: auto; overscroll-behavior: contain; }
-.sc-day.packed .sc-drop { overflow: hidden; }
+.sc-day.sparse .sc-drop,
+.sc-day.packed .sc-drop { overflow-y: auto; overscroll-behavior: contain; }
 .sc-empty-col {
   color: #94a3b8;
   font-size: 12px;
@@ -567,22 +567,25 @@
   font-weight: 700;
   text-align: right;
   line-height: 1.2;
-  max-width: 120px;
+  max-width: 130px;
 }
+.sc-emb.ready { background: #dcfce7; color: #166534; }
+.sc-emb.not-started { background: #fee2e2; color: #991b1b; }
+.sc-emb.progress { background: #ffedd5; color: #9a3412; }
 .sc-card.compact {
-  flex: 1 1 0;
-  min-height: 36px;
-  max-height: 72px;
+  flex: 1 1 auto;
+  min-height: 62px;
+  max-height: none;
   padding: 4px 22px 4px 48px;
-  grid-template-rows: 1fr;
-  row-gap: 0;
+  grid-template-rows: auto auto auto;
+  row-gap: 2px;
   overflow: hidden;
 }
 .sc-card.compact .sc-thumb {
   width: 36px;
   height: 36px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 6px;
+  transform: none;
 }
 .sc-card.compact .sc-id {
   width: 22px;
@@ -591,6 +594,9 @@
 }
 .sc-card.compact .sc-company { font-size: 12px; }
 .sc-card.compact .sc-hs { width: 14px; height: 14px; font-size: 9px; }
+.sc-card.compact .sc-bubble { font-size: 11px; }
+.sc-card.compact .sc-emb { font-size: 9px; max-width: 110px; }
+.sc-day.packed .sc-drop { overflow-y: auto; overscroll-behavior: contain; }
 .sc-carry-strip {
   flex: 0 0 auto;
   margin: 0 0 8px;

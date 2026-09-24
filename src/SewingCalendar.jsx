@@ -92,11 +92,20 @@ function overlayEmbroidery(job, columns) {
   const stitch = Number(live.stitch_count ?? job.stitchCount) || 0;
   const heads = found?.headCount || Number(job.headCount) || 6;
   const avg = Number(live.avgCycleMs ?? job.avgCycleMs) || 0;
-  const remainingFromJob = Number(
-    live.embroideryRemaining ?? job.embroideryRemaining ?? (qty ? qty - done : 0)
+  const rawLeft = live.embroideryRemaining ?? job.embroideryRemaining;
+  const parsedLeft = Number(rawLeft);
+  const left = rawLeft != null && rawLeft !== "" && Number.isFinite(parsedLeft)
+    ? Math.max(0, parsedLeft)
+    : Math.max(0, qty ? qty - done : 0);
+  const embStatus = String(
+    live.embroidery_status || live.embroideryStatus || job.embroidery_status || ""
+  ).toUpperCase();
+  const ready = (
+    embStatus === "COMPLETE"
+    || embStatus === "COMPLETED"
+    || (qty > 0 && done >= qty)
+    || (done > 0 && left <= 0)
   );
-  const left = Math.max(0, Number.isFinite(remainingFromJob) ? remainingFromJob : Math.max(0, qty - done));
-  const ready = left <= 0;
   const percent = qty > 0 ? Math.min(100, Math.round((Math.min(done, qty) / qty) * 1000) / 10) : (ready ? 100 : 0);
   const remainingMs = left > 0 ? estimateRemainingMs(stitch, left, heads, avg) : 0;
   let eta = job.embroideryEta || "";
@@ -143,6 +152,18 @@ function etaLabel(iso) {
 
 function jobName(job) {
   return [job.customer, job.product].filter(Boolean).join(" - ") || "No company";
+}
+
+function embroideryStatus(job) {
+  if (job?.embroideryReady) {
+    return { kind: "ready", label: "Embroidery ready" };
+  }
+  const done = Number(job?.embroideryCompletedQty) || 0;
+  const percent = Number(job?.embroideryPercent) || 0;
+  if (done <= 0 && percent <= 0) {
+    return { kind: "not-started", label: "Embroidery Not Started" };
+  }
+  return { kind: "progress", label: `${percent}% complete` };
 }
 
 function isClosedOrBackJob(job, columns) {
@@ -202,7 +223,8 @@ function CarryoverStrip({ carryovers }) {
 
 function SewingJobCard({ job, drag, tv, compact }) {
   const hard = isHardJob(job);
-  const embReady = !!job.embroideryReady;
+  const emb = embroideryStatus(job);
+  const embReady = emb.kind === "ready";
   const thumb = jobImageUrl({
     image: job.image,
     imageLink: job.image,
@@ -257,19 +279,14 @@ function SewingJobCard({ job, drag, tv, compact }) {
         {job.overdue ? <span className="sc-late">LATE</span> : null}
         {!compact && <span className="sc-qty">{qtyLabel}</span>}
       </div>
-      {!compact && (
-        <>
-          <span className="sc-bubble due">Due {fmtCardDate(job.dueDate)}</span>
-          <span className="sc-bubble ship">Ship {fmtCardDate(job.requiredShipDate)}</span>
-          {!embReady && (
-            <div className="sc-emb">
-              <strong>Emb not ready</strong>
-              <span>{job.embroideryPercent || 0}%</span>
-              <span>{etaLabel(job.embroideryEta) || "Waiting on machine"}</span>
-            </div>
-          )}
-        </>
-      )}
+      <span className="sc-bubble due">Due {fmtCardDate(job.dueDate)}</span>
+      <span className="sc-bubble ship">Ship {fmtCardDate(job.requiredShipDate)}</span>
+      <div className={`sc-emb ${emb.kind}`}>
+        <strong>{emb.label}</strong>
+        {emb.kind === "progress" && etaLabel(job.embroideryEta) ? (
+          <span>{etaLabel(job.embroideryEta)}</span>
+        ) : null}
+      </div>
     </article>
   );
 }
