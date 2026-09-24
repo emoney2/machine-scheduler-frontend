@@ -252,6 +252,7 @@
 }
 
 .sc-page { padding: 10px 12px 16px; }
+.sc-page .ps-header { justify-content: flex-end; margin-bottom: 8px; }
 .sc-tv-link { display: inline-flex; align-items: center; text-decoration: none; }
 .sc-layout {
   display: grid;

@@ -413,15 +413,8 @@ export function SewingCalendar({ tv = false, columns }) {
 
   return (
     <main className={`ps-page sc-page ${tv ? "tv" : ""} ${queueOpen ? "" : "queue-collapsed"}`}>
-      <div className="ps-header">
-        <div>
-          <h1>{tv ? "Sewing Calendar" : "Sewing Calendar"}</h1>
-          <div className="ps-subtitle">
-            Rolling two weeks · left column is today · unfinished work rolls to the top of today
-            {tv ? " · Shop TV · Auto-refreshes" : ""}
-          </div>
-        </div>
-        {!tv && (
+      {!tv && (
+        <div className="ps-header">
           <div className="ps-actions">
             <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
             <button type="button" onClick={load}>Refresh</button>
@@ -429,8 +422,8 @@ export function SewingCalendar({ tv = false, columns }) {
               Full screen TV
             </a>
           </div>
-        )}
-      </div>
+        </div>
+      )}
       {staffDate && (
         <StaffModal
           date={staffDate}
