@@ -440,32 +440,30 @@ export function SewingCalendar({ tv = false, columns }) {
   const [artByOrder, setArtByOrder] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [clearing, setClearing] = useState(false);
-  const [dirty, setDirty] = useState(() => !!draft?.dirty);
   const [staffDate, setStaffDate] = useState("");
   const [queueOpen, setQueueOpen] = useState(() => {
     if (tv) return false;
     try { return localStorage.getItem("sewingQueueOpen") !== "0"; } catch { return true; }
   });
-  const dirtyRef = useRef(!!draft?.dirty);
   const syncingRef = useRef(false);
+  const saveInFlightRef = useRef(false);
+  const writeGuardUntilRef = useRef(0);
   const placementsRef = useRef({ queue: asList(draft?.queue), board: draft?.board || {} });
   const rootRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
-    dirtyRef.current = dirty;
-  }, [dirty]);
-
-  useEffect(() => {
     placementsRef.current = { queue, board };
   }, [queue, board]);
 
-  const markClean = useCallback(() => {
-    dirtyRef.current = false;
-    setDirty(false);
-    clearSewingBoardDraft();
+  const extendWriteGuard = useCallback((ms = 8000) => {
+    writeGuardUntilRef.current = Math.max(writeGuardUntilRef.current, Date.now() + ms);
   }, []);
+
+  const isWriteGuarded = useCallback(
+    () => saveInFlightRef.current || Date.now() < writeGuardUntilRef.current,
+    []
+  );
 
   const applyPayload = useCallback((data, { keepPlacements = false } = {}) => {
     if (!data || typeof data !== "object") return;
@@ -484,43 +482,31 @@ export function SewingCalendar({ tv = false, columns }) {
     if (keepPlacements) {
       setQueue((prev) => {
         const extras = Object.keys(nextJobs).filter((id) => !placedIds(prev, placementsRef.current.board).has(id));
-        const next = extras.length ? [...prev, ...extras] : prev;
+        const next = extras.length ? sortIdsByShip([...prev, ...extras], nextJobs) : prev;
         placementsRef.current = { queue: next, board: placementsRef.current.board };
-        if (dirtyRef.current) saveSewingBoardDraft(next, placementsRef.current.board);
         return next;
       });
       return;
     }
     setQueue(asList(data.queue));
     setBoard(data.board && typeof data.board === "object" ? data.board : {});
-    markClean();
-  }, [markClean]);
+    clearSewingBoardDraft();
+  }, []);
 
-  const load = useCallback(async ({ publish = false } = {}) => {
-    if (syncingRef.current) return;
+  const load = useCallback(async () => {
+    if (syncingRef.current || saveInFlightRef.current) return;
     syncingRef.current = true;
     try {
       setError("");
-      const shouldPublish = publish && dirtyRef.current;
-      if (shouldPublish) {
-        const { queue: nextQueue, board: nextBoard } = placementsRef.current;
-        const { data } = await axios.put(
-          `${ROOT}/sewing-board`,
-          { queue: nextQueue, days: nextBoard },
-          { timeout: 60000 }
-        );
-        applyPayload(data);
-      } else {
-        const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 60000 });
-        applyPayload(data, { keepPlacements: dirtyRef.current });
-      }
+      const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 60000 });
+      applyPayload(data, { keepPlacements: isWriteGuarded() });
     } catch (e) {
       setError(friendlyError(e));
     } finally {
       syncingRef.current = false;
       setLoading(false);
     }
-  }, [applyPayload]);
+  }, [applyPayload, isWriteGuarded]);
 
   useEffect(() => {
     const syncFs = () => {
@@ -567,12 +553,12 @@ export function SewingCalendar({ tv = false, columns }) {
 
   useEffect(() => {
     load();
-    const timer = window.setInterval(() => load({ publish: dirtyRef.current }), tv ? 45000 : 120000);
+    const timer = window.setInterval(load, tv ? 45000 : 120000);
     const onBoard = () => {
-      if (dirtyRef.current || syncingRef.current) return;
+      if (isWriteGuarded() || syncingRef.current) return;
       load();
     };
-    const onJobs = () => load({ publish: false });
+    const onJobs = () => load();
     socket.on("sewingBoardUpdated", onBoard);
     socket.on("embroideryProgressUpdated", onJobs);
     socket.on("embroideryFinished", onJobs);
@@ -582,7 +568,7 @@ export function SewingCalendar({ tv = false, columns }) {
       socket.off("embroideryProgressUpdated", onJobs);
       socket.off("embroideryFinished", onJobs);
     };
-  }, [load, tv]);
+  }, [load, tv, isWriteGuarded]);
 
   const liveJobs = useMemo(() => {
     const next = {};
@@ -618,14 +604,28 @@ export function SewingCalendar({ tv = false, columns }) {
     return next;
   }, [board, liveJobs]);
 
-  const persistBoard = (nextQueue, nextBoard) => {
+  const persistBoard = async (nextQueue, nextBoard) => {
     const sortedQueue = sortIdsByShip(nextQueue, liveJobs);
     placementsRef.current = { queue: sortedQueue, board: nextBoard };
-    dirtyRef.current = true;
+    extendWriteGuard();
     setQueue(sortedQueue);
     setBoard(nextBoard);
-    setDirty(true);
     saveSewingBoardDraft(sortedQueue, nextBoard);
+    try {
+      saveInFlightRef.current = true;
+      const { data } = await axios.put(
+        `${ROOT}/sewing-board`,
+        { queue: sortedQueue, days: nextBoard },
+        { timeout: 60000 }
+      );
+      applyPayload(data, { keepPlacements: true });
+      extendWriteGuard();
+      clearSewingBoardDraft();
+    } catch (e) {
+      setError(friendlyError(e) || "Could not save sewing board");
+    } finally {
+      saveInFlightRef.current = false;
+    }
   };
 
   const onDragEnd = (result) => {
@@ -636,7 +636,7 @@ export function SewingCalendar({ tv = false, columns }) {
     const [moved] = fromIds.splice(source.index, 1);
     if (!moved) return;
     let nextQueue = visibleQueue.slice();
-    const nextBoard = { ...visibleBoard };
+    const nextBoard = { ...board, ...visibleBoard };
     if (source.droppableId === QUEUE_ID) nextQueue = fromIds;
     else nextBoard[source.droppableId] = fromIds;
     if (destination.droppableId === QUEUE_ID) {
@@ -649,23 +649,6 @@ export function SewingCalendar({ tv = false, columns }) {
       nextBoard[destination.droppableId] = dest;
     }
     persistBoard(nextQueue, nextBoard);
-  };
-
-  const clearSchedule = async () => {
-    if (!window.confirm("Clear the sewing calendar? Every job goes back to the queue so you can start from scratch.")) {
-      return;
-    }
-    setClearing(true);
-    try {
-      setError("");
-      markClean();
-      const { data } = await axios.post(`${ROOT}/sewing-board/clear`, {}, { timeout: 60000 });
-      applyPayload(data);
-    } catch (e) {
-      setError(friendlyError(e) || "Could not clear sewing board");
-    } finally {
-      setClearing(false);
-    }
   };
 
   useEffect(() => {
@@ -693,14 +676,7 @@ export function SewingCalendar({ tv = false, columns }) {
       <div className="ps-header">
         <div className="ps-actions">
           {!tv && (
-            <>
-              <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
-              <button type="button" onClick={() => load({ publish: dirty })}>Refresh</button>
-              {dirty ? <span className="sc-draft-hint">Saved here — Refresh to share</span> : null}
-              <button type="button" className="ps-danger-button" onClick={clearSchedule} disabled={clearing}>
-                {clearing ? "Clearing…" : "Clear schedule"}
-              </button>
-            </>
+            <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
           )}
           <button
             type="button"
