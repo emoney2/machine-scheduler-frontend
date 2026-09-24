@@ -428,9 +428,8 @@ function SewingJobCard({ job, drag, tv, compact }) {
 }
 
 function dayDensity(count) {
-  if (count > 6) {
-    return { name: "density-12", rows: Math.max(6, Math.ceil(count / 2)), cols: 2 };
-  }
+  if (count > 12) return { name: "density-12", rows: 6, cols: 2, scroll: true };
+  if (count > 6) return { name: "density-12", rows: 6, cols: 2 };
   if (count > 3) return { name: "density-6", rows: 6, cols: 1 };
   return { name: "density-3", rows: 3, cols: 1 };
 }
@@ -444,7 +443,7 @@ function ColumnCards({ droppableId, ids, jobs, tv, compact, density }) {
         <div
           ref={provided.innerRef}
           {...provided.droppableProps}
-          className={`sc-drop ${isQueue ? "sc-queue-drop" : "sc-day-drop"} ${density?.name || ""} ${twoCol ? "two-col" : ""} ${snapshot.isDraggingOver ? "over" : ""}`}
+          className={`sc-drop ${isQueue ? "sc-queue-drop" : "sc-day-drop"} ${density?.name || ""} ${density?.scroll ? "can-scroll" : ""} ${twoCol ? "two-col" : ""} ${snapshot.isDraggingOver ? "over" : ""}`}
           style={!isQueue && density ? { "--rows": density.rows, "--cols": density.cols } : undefined}
         >
           {ids.map((id, index) => {
@@ -837,7 +836,7 @@ export function SewingCalendar({ tv = false, columns }) {
                   const whoIsOut = outPhrase(absences[day] || []);
                   const density = dayDensity(ids.length);
                   return (
-                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${density.name}`} key={day}>
+                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${density.name}${density.scroll ? " can-scroll" : ""}`} key={day}>
                       <header>
                         <button
                           type="button"

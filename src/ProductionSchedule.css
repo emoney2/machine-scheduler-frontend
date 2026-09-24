@@ -438,6 +438,13 @@
   overflow: hidden;
   overscroll-behavior: none;
 }
+.sc-day-drop.can-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  grid-template-rows: none;
+  grid-auto-rows: calc((100% - 15px) / 6);
+  align-content: start;
+}
 .sc-drop.two-col .sc-empty-col { grid-column: 1 / -1; }
 .sc-empty-col {
   color: #94a3b8;
