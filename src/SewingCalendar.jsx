@@ -37,9 +37,9 @@ function dayHeading(value) {
   const raw = String(value || "").slice(0, 10);
   const dt = new Date(`${raw}T12:00:00`);
   if (Number.isNaN(dt.getTime())) return raw;
-  const weekday = dt.toLocaleDateString("en-US", { weekday: "long", timeZone: "America/New_York" });
+  const weekday = dt.toLocaleDateString("en-US", { weekday: "short", timeZone: "America/New_York" });
   const md = dt.toLocaleDateString("en-US", { month: "numeric", day: "numeric", timeZone: "America/New_York" });
-  return `${weekday} - ${md}`;
+  return `${weekday} ${md}`;
 }
 
 function outPhrase(names) {
@@ -472,18 +472,20 @@ function SewingJobCard({ job, drag, tv, compact }) {
         <div className="sc-row sc-row-main">
           <span className="sc-id">{job.orderNumber}</span>
           <span className="sc-company">{jobName(job)}</span>
+        </div>
+        <div className="sc-row sc-row-stats">
           <span className="sc-qty">{qtyLabel}</span>
           <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
-        </div>
-        <div className="sc-meta">
-          <span className="sc-bubble due" title="Due date">Due {fmtCardDate(job.dueDate)}</span>
-          <span className="sc-bubble ship" title="Ship date">Ship {fmtCardDate(job.requiredShipDate)}</span>
-          {job.overdue ? <span className="sc-late">LATE</span> : null}
           {embReady ? (
             <span className="sc-emb ready" title="Embroidery done">Done</span>
           ) : (
             <span className="sc-e" title={emb.label}>E</span>
           )}
+          {job.overdue ? <span className="sc-late">LATE</span> : null}
+        </div>
+        <div className="sc-meta">
+          <span className="sc-bubble due" title="Due date">Due {fmtCardDate(job.dueDate)}</span>
+          <span className="sc-bubble ship" title="Ship date">Ship {fmtCardDate(job.requiredShipDate)}</span>
         </div>
       </div>
     </article>
@@ -491,8 +493,8 @@ function SewingJobCard({ job, drag, tv, compact }) {
 }
 
 function dayDensity(count) {
-  if (count > 12) return { name: "density-12", rows: 6, cols: 2, scroll: true };
-  if (count > 6) return { name: "density-12", rows: 6, cols: 2 };
+  if (count > 10) return { name: "density-10", rows: 10, cols: 1, scroll: true };
+  if (count > 6) return { name: "density-10", rows: 10, cols: 1 };
   if (count > 3) return { name: "density-6", rows: 6, cols: 1 };
   return { name: "density-3", rows: 3, cols: 1 };
 }
@@ -814,9 +816,6 @@ export function SewingCalendar({ tv = false, columns }) {
     try { localStorage.setItem("sewingQueueOpen", queueOpen ? "1" : "0"); } catch (_) {}
   }, [queueOpen]);
 
-  const week1 = days.slice(0, 5);
-  const week2 = days.slice(5, 10);
-
   return (
     <div
       ref={rootRef}
@@ -906,37 +905,33 @@ export function SewingCalendar({ tv = false, columns }) {
             )}
           </aside>
           <div className="sc-weeks">
-            {[week1, week2].map((week, weekIndex) => (
-              <div className="sc-week" key={weekIndex}>
-                {week.map((day) => {
-                  const ids = asList(visibleBoard[day]);
-                  const whoIsOut = outPhrase(absences[day] || []);
-                  const density = dayDensity(ids.length);
-                  return (
-                    <section className={`sc-day ${day === days[0] ? "today" : ""} ${density.name}${density.scroll ? " can-scroll" : ""}`} key={day}>
-                      <header>
-                        <button
-                          type="button"
-                          className="ps-day-staff"
-                          onClick={() => !tv && setStaffDate(day)}
-                          disabled={tv}
-                        >
-                          <span className="sc-day-title">{dayHeading(day)}</span>
-                          {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
-                        </button>
-                      </header>
-                      <ColumnCards
-                        droppableId={day}
-                        ids={ids}
-                        jobs={liveJobs}
-                        tv={tv}
-                        density={density}
-                      />
-                    </section>
-                  );
-                })}
-              </div>
-            ))}
+            {days.map((day) => {
+              const ids = asList(visibleBoard[day]);
+              const whoIsOut = outPhrase(absences[day] || []);
+              const density = dayDensity(ids.length);
+              return (
+                <section className={`sc-day ${day === days[0] ? "today" : ""} ${density.name}${density.scroll ? " can-scroll" : ""}`} key={day}>
+                  <header>
+                    <button
+                      type="button"
+                      className="ps-day-staff"
+                      onClick={() => !tv && setStaffDate(day)}
+                      disabled={tv}
+                    >
+                      <span className="sc-day-title">{dayHeading(day)}</span>
+                      {whoIsOut ? <span className="ps-day-out">{whoIsOut}</span> : null}
+                    </button>
+                  </header>
+                  <ColumnCards
+                    droppableId={day}
+                    ids={ids}
+                    jobs={liveJobs}
+                    tv={tv}
+                    density={density}
+                  />
+                </section>
+              );
+            })}
           </div>
         </div>
       </DragDropContext>

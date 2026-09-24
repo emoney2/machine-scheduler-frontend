@@ -297,7 +297,7 @@
 }
 .sc-layout {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
@@ -385,22 +385,19 @@
 }
 .sc-weeks {
   display: grid;
+  grid-template-columns: repeat(10, minmax(120px, 1fr));
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   min-width: 0;
   min-height: 0;
   height: 100%;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-}
-.sc-week {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   border: 1px solid #d1d5db;
   background: #fff;
-  min-height: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
-.sc-week + .sc-week { border-top: 0; }
 .sc-day {
+  min-width: 0;
   min-height: 0;
   height: 100%;
   padding: 6px;
@@ -411,10 +408,16 @@
   box-sizing: border-box;
   overflow: hidden;
 }
-.sc-week .sc-day:last-child { border-right: 0; }
+.sc-weeks .sc-day:last-child { border-right: 0; }
+.sc-day .ps-day-staff {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.sc-day .ps-day-out { font-size: 11px; }
 .sc-day.today { background: #f0f9ff; box-shadow: inset 0 0 0 2px #38bdf8; }
 .sc-day-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 800;
   color: #111827;
   line-height: 1.2;
@@ -442,7 +445,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   grid-template-rows: none;
-  grid-auto-rows: calc((100% - 15px) / 6);
+  grid-auto-rows: calc((100% - 27px) / 10);
   align-content: start;
 }
 .sc-drop.two-col .sc-empty-col { grid-column: 1 / -1; }
@@ -514,6 +517,12 @@
   justify-content: center;
   gap: 2px;
 }
+.sc-row-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
 .sc-hs {
   position: static;
   width: 16px;
@@ -539,7 +548,8 @@
 .sc-meta {
   display: flex;
   align-items: center;
-  gap: 4px;
+  flex-wrap: wrap;
+  gap: 3px;
   min-width: 0;
 }
 .sc-id {
@@ -622,38 +632,40 @@
   height: 100%;
   max-height: 100%;
   padding: 3px;
-  gap: 4px;
+  gap: 5px;
   overflow: hidden;
+  align-items: flex-start;
 }
 .sc-day .sc-thumb,
 .sc-day .sc-thumb img,
 .sc-day .sc-card.compact .sc-thumb,
 .sc-day .sc-card.compact .sc-thumb img {
-  flex: 0 0 auto;
-  width: auto;
-  min-width: 0;
-  max-width: 46%;
-  height: 100%;
-  aspect-ratio: 1 / 1;
+  flex: 0 0 56px;
+  width: 56px;
+  min-width: 56px;
+  max-width: 56px;
+  height: 56px;
+  aspect-ratio: auto;
 }
 .sc-day .sc-thumb img {
   width: 100%;
+  height: 100%;
   max-width: none;
 }
 .sc-day.density-6 .sc-company,
-.sc-day.density-12 .sc-company { font-size: 10px; }
+.sc-day.density-10 .sc-company { font-size: 10px; }
 .sc-day.density-6 .sc-qty,
-.sc-day.density-12 .sc-qty { font-size: 10px; }
+.sc-day.density-10 .sc-qty { font-size: 10px; }
 .sc-day.density-6 .sc-bubble,
-.sc-day.density-12 .sc-bubble { font-size: 9px; padding: 0 3px; }
+.sc-day.density-10 .sc-bubble { font-size: 9px; padding: 0 3px; }
 .sc-day.density-6 .sc-id,
-.sc-day.density-12 .sc-id { width: 16px; height: 16px; font-size: 7px; }
+.sc-day.density-10 .sc-id { width: 16px; height: 16px; font-size: 7px; }
 .sc-day.density-6 .sc-hs,
-.sc-day.density-12 .sc-hs,
+.sc-day.density-10 .sc-hs,
 .sc-day.density-6 .sc-e,
-.sc-day.density-12 .sc-e { width: 13px; height: 13px; font-size: 8px; }
+.sc-day.density-10 .sc-e { width: 13px; height: 13px; font-size: 8px; }
 .sc-day.density-6 .sc-emb,
-.sc-day.density-12 .sc-emb { font-size: 8px; padding: 0 3px; line-height: 13px; }
+.sc-day.density-10 .sc-emb { font-size: 8px; padding: 0 3px; line-height: 13px; }
 .sc-day-drop .sc-empty-col {
   grid-column: 1 / -1;
   grid-row: 1 / -1;
@@ -700,10 +712,8 @@
 .sc-carry-row { display: flex; gap: 8px; font-size: 12px; }
 .sc-carry-row em { margin-left: auto; color: #854d0e; font-style: normal; }
 .sc-page.tv { padding: 10px; }
-.sc-page.tv .sc-day-title { font-size: 18px; }
+.sc-page.tv .sc-day-title { font-size: 15px; }
 .sc-page.tv .sc-company { font-size: 14px; }
-@media (max-width: 1200px) {
-  .sc-layout { grid-template-columns: 220px minmax(0, 1fr); }
-  .sc-week { min-width: 860px; }
-  .sc-weeks { overflow-x: auto; }
+@media (max-width: 1400px) {
+  .sc-layout { grid-template-columns: 200px minmax(0, 1fr); }
 }
