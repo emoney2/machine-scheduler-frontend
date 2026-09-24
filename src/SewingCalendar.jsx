@@ -3,7 +3,7 @@ import axios from "axios";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import { API_ROOT } from "./apiRoot";
 import { socket } from "./socketClient";
-import { extractFileId, estimateRemainingMs, formatClockET, jobImageUrl, normalizeOrderId } from "./machineFloorUtils";
+import { extractFileId, estimateRemainingMs, formatClockET, normalizeOrderId } from "./machineFloorUtils";
 import { persistSewingCarryover } from "./utils/sewingCarryover";
 import { clearSewingBoardDraft, loadSewingBoardDraft, saveSewingBoardDraft } from "./utils/sewingBoardDraft";
 import { StaffModal, nextWeekdayIso } from "./ProductionSchedule";
@@ -64,55 +64,79 @@ function openJobImage(jobOrRaw) {
   }
 }
 
-function sewingImageId(job) {
-  return (
-    job?.imageFileId
-    || extractFileId(job?.imageLink)
-    || extractFileId(job?.Image)
-    || extractFileId(job?.image)
-    || extractFileId(job?.artworkUrl)
-    || ""
-  );
+function extractFileIdFromFormulaOrUrl(input) {
+  if (!input) return null;
+  const s = String(input);
+  let m = s.match(/IMAGE\("([^"]+)"/i);
+  if (m) return extractFileIdFromFormulaOrUrl(m[1]);
+  if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return s;
+  m = s.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = s.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = s.match(/\/(?:open|uc)[^?]*\?[^#]*\bid=([A-Za-z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = s.match(/"id":"([A-Za-z0-9_-]{10,})"/);
+  if (m) return m[1];
+  return extractFileId(s);
 }
 
-function sewingThumbCandidates(job, sz = "w240") {
-  const id = sewingImageId(job);
-  const root = String(API_ROOT || "").replace(/\/$/, "");
-  const list = [];
-  if (id) {
-    list.push(`https://drive.google.com/thumbnail?id=${id}&sz=${sz}`);
-    if (root) list.push(`${root}/drive/proxy/${id}?thumb=1&sz=${sz}`);
-    const proxied = jobImageUrl({
-      imageFileId: id,
-      imageLink: job?.imageLink || job?.image || "",
-      Image: job?.Image || job?.image || "",
-    }, sz);
-    if (proxied) list.push(proxied);
+function getJobThumbUrl(job, sz = "w240") {
+  const proxyBase = String(API_ROOT || "").replace(/\/api$/, "") + "/api/drive/thumbnail";
+  const proxyForId = (id) => (id ? `${proxyBase}?${new URLSearchParams({ fileId: id, sz })}` : "");
+  const toThumb = (idOrUrl) => {
+    if (!idOrUrl) return "";
+    const id = extractFileIdFromFormulaOrUrl(idOrUrl);
+    if (id) return proxyForId(id);
+    const s = String(idOrUrl);
+    if (/^https?:\/\//i.test(s)) return s;
+    return "";
+  };
+  const fromAny = (val) => {
+    if (!val) return "";
+    if (Array.isArray(val)) {
+      for (const item of val) {
+        const hit = fromAny(item);
+        if (hit) return hit;
+      }
+      return "";
+    }
+    if (typeof val === "object") {
+      for (const key of ["imageUrl", "src", "url", "href", "link", "image", "thumbnail", "preview", "Image"]) {
+        const hit = fromAny(val[key]);
+        if (hit) return hit;
+      }
+      return "";
+    }
+    return toThumb(val);
+  };
+  for (const field of [
+    job?.imageFileId,
+    job?.imageUrl,
+    job?.image,
+    job?.imageLink,
+    job?.artworkUrl,
+    job?.thumbnailUrl,
+    job?.Image,
+    job?.Preview,
+    job?.["Art Link"],
+  ]) {
+    const hit = fromAny(field);
+    if (hit) return hit;
   }
-  const raw = job?.imageLink || job?.image || job?.artworkUrl || "";
-  if (/^https?:\/\//i.test(raw) && !list.includes(raw)) list.push(raw);
-  return list.filter(Boolean);
+  return "";
 }
 
-function SewingThumb({ job, compact }) {
-  const [idx, setIdx] = useState(0);
-  const sz = compact ? "w160" : "w240";
-  const id = sewingImageId(job);
-  const raw = job?.image || job?.imageLink || job?.Image || "";
-  const candidates = useMemo(() => sewingThumbCandidates(job, sz), [id, raw, sz]);
-  useEffect(() => { setIdx(0); }, [id, raw, sz]);
-  const src = candidates[idx] || "";
-  if (!src) return <span>No img</span>;
-  return (
-    <img
-      src={src}
-      alt=""
-      loading="lazy"
-      decoding="async"
-      referrerPolicy="no-referrer"
-      onError={() => setIdx((i) => i + 1)}
-    />
-  );
+function artFromOverviewRow(row) {
+  const image = row?.Image || row?.Preview || row?.["Art Link"] || row?.image || "";
+  return {
+    Image: image,
+    Preview: row?.Preview || image,
+    image,
+    imageLink: image,
+    imageFileId: extractFileIdFromFormulaOrUrl(image) || "",
+    "Art Link": row?.["Art Link"] || image,
+  };
 }
 
 function shipTimestamp(job) {
@@ -296,7 +320,7 @@ function SewingJobCard({ job, drag, tv, compact }) {
   const hard = isHardJob(job);
   const emb = embroideryStatus(job);
   const embReady = emb.kind === "ready";
-  const thumb = sewingImageId(job) || job.image || job.imageLink || "";
+  const thumb = getJobThumbUrl(job, compact ? "w160" : "w240");
   const qtyLabel = `${Number(job.remainingQuantity || 0)}/${job.quantity ?? "—"}`;
   const classes = [
     "sc-card",
@@ -325,7 +349,18 @@ function SewingJobCard({ job, drag, tv, compact }) {
         disabled={!thumb}
         title={thumb ? "Open artwork" : "No image"}
       >
-        <SewingThumb job={job} compact={compact} />
+        {thumb ? (
+          <img
+            src={thumb}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+        ) : (
+          <span>No img</span>
+        )}
       </button>
       <span className="sc-hs" title={hard ? "Hard date" : "Soft date"}>{hard ? "H" : "S"}</span>
       <div className="sc-row sc-row-main">
@@ -402,6 +437,7 @@ export function SewingCalendar({ tv = false, columns }) {
   const [days, setDays] = useState([]);
   const [carryovers, setCarryovers] = useState([]);
   const [absences, setAbsences] = useState({});
+  const [artByOrder, setArtByOrder] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [clearing, setClearing] = useState(false);
@@ -508,6 +544,27 @@ export function SewingCalendar({ tv = false, columns }) {
     }
   };
 
+  const loadArt = useCallback(async () => {
+    try {
+      const { data } = await axios.get(`${API_ROOT}/overview`, { timeout: 45000 });
+      const map = {};
+      for (const row of asList(data?.upcoming)) {
+        const oid = normalizeOrderId(row?.["Order #"] || row?.orderNumber);
+        if (!oid) continue;
+        map[oid] = artFromOverviewRow(row);
+      }
+      setArtByOrder(map);
+    } catch (_) {
+      /* board still works without artwork */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadArt();
+    const artTimer = window.setInterval(loadArt, tv ? 120000 : 180000);
+    return () => window.clearInterval(artTimer);
+  }, [loadArt, tv]);
+
   useEffect(() => {
     load();
     const timer = window.setInterval(() => load({ publish: dirtyRef.current }), tv ? 45000 : 120000);
@@ -532,8 +589,14 @@ export function SewingCalendar({ tv = false, columns }) {
     const rolled = new Set(carryovers.map((row) => String(row.orderNumber)));
     Object.entries(jobs).forEach(([id, job]) => {
       const overdue = !!(job.overdue || job.overdueFrom);
+      const art = artByOrder[normalizeOrderId(id)] || artByOrder[id] || {};
       const merged = overlayEmbroidery({
         ...job,
+        ...art,
+        image: job.image || art.image || art.Image || "",
+        imageLink: job.imageLink || art.imageLink || art.Image || "",
+        Image: job.Image || art.Image || "",
+        imageFileId: job.imageFileId || art.imageFileId || "",
         carriedOver: rolled.has(id),
         overdue,
       }, columns);
@@ -541,7 +604,7 @@ export function SewingCalendar({ tv = false, columns }) {
       next[id] = merged;
     });
     return next;
-  }, [jobs, columns, carryovers]);
+  }, [jobs, columns, carryovers, artByOrder]);
 
   const visibleQueue = useMemo(
     () => sortIdsByShip(queue.filter((id) => liveJobs[id]), liveJobs),
