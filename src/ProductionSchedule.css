@@ -261,6 +261,7 @@
   box-sizing: border-box;
 }
 .sc-page .ps-header { justify-content: flex-end; margin-bottom: 6px; flex: 0 0 auto; }
+.sc-draft-hint { color: #92400e; font-size: 12px; font-weight: 700; }
 .sc-tv-link { display: inline-flex; align-items: center; text-decoration: none; }
 .sc-layout {
   display: grid;

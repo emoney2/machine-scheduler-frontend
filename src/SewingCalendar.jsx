@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import { API_ROOT } from "./apiRoot";
 import { socket } from "./socketClient";
 import { extractFileId, estimateRemainingMs, formatClockET, jobImageUrl, normalizeOrderId } from "./machineFloorUtils";
 import { persistSewingCarryover } from "./utils/sewingCarryover";
+import { clearSewingBoardDraft, loadSewingBoardDraft, saveSewingBoardDraft } from "./utils/sewingBoardDraft";
 import { StaffModal, nextWeekdayIso } from "./ProductionSchedule";
 import "./ProductionSchedule.css";
 
@@ -154,6 +155,14 @@ function idsForColumn(columnId, queue, board) {
   return asList(board[columnId]);
 }
 
+function placedIds(queue, board) {
+  const seen = new Set(asList(queue));
+  Object.values(board || {}).forEach((ids) => {
+    asList(ids).forEach((id) => seen.add(id));
+  });
+  return seen;
+}
+
 function CarryoverStrip({ carryovers }) {
   const [open, setOpen] = useState(false);
   const count = carryovers.length;
@@ -286,8 +295,9 @@ function ColumnCards({ droppableId, ids, jobs, tv, compact }) {
 }
 
 export function SewingCalendar({ tv = false, columns }) {
-  const [queue, setQueue] = useState([]);
-  const [board, setBoard] = useState({});
+  const draft = useMemo(() => (tv ? null : loadSewingBoardDraft()), [tv]);
+  const [queue, setQueue] = useState(() => asList(draft?.queue));
+  const [board, setBoard] = useState(() => (draft?.board && typeof draft.board === "object" ? draft.board : {}));
   const [jobs, setJobs] = useState({});
   const [days, setDays] = useState([]);
   const [carryovers, setCarryovers] = useState([]);
@@ -295,17 +305,34 @@ export function SewingCalendar({ tv = false, columns }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [clearing, setClearing] = useState(false);
+  const [dirty, setDirty] = useState(() => !!draft?.dirty);
   const [staffDate, setStaffDate] = useState("");
   const [queueOpen, setQueueOpen] = useState(() => {
     if (tv) return false;
     try { return localStorage.getItem("sewingQueueOpen") !== "0"; } catch { return true; }
   });
+  const dirtyRef = useRef(!!draft?.dirty);
+  const syncingRef = useRef(false);
+  const placementsRef = useRef({ queue: asList(draft?.queue), board: draft?.board || {} });
 
-  const applyPayload = useCallback((data) => {
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+
+  useEffect(() => {
+    placementsRef.current = { queue, board };
+  }, [queue, board]);
+
+  const markClean = useCallback(() => {
+    dirtyRef.current = false;
+    setDirty(false);
+    clearSewingBoardDraft();
+  }, []);
+
+  const applyPayload = useCallback((data, { keepPlacements = false } = {}) => {
     if (!data || typeof data !== "object") return;
-    setQueue(asList(data.queue));
-    setBoard(data.board && typeof data.board === "object" ? data.board : {});
-    setJobs(data.jobs && typeof data.jobs === "object" ? data.jobs : {});
+    const nextJobs = data.jobs && typeof data.jobs === "object" ? data.jobs : {};
+    setJobs(nextJobs);
     setDays(asList(data.days));
     const rolled = asList(data.carryovers);
     setCarryovers(rolled);
@@ -316,16 +343,43 @@ export function SewingCalendar({ tv = false, columns }) {
       updatedAt: data.updatedAt,
       summary: { count: rolled.length },
     });
-  }, []);
+    if (keepPlacements) {
+      setQueue((prev) => {
+        const extras = Object.keys(nextJobs).filter((id) => !placedIds(prev, placementsRef.current.board).has(id));
+        const next = extras.length ? [...prev, ...extras] : prev;
+        placementsRef.current = { queue: next, board: placementsRef.current.board };
+        if (dirtyRef.current) saveSewingBoardDraft(next, placementsRef.current.board);
+        return next;
+      });
+      return;
+    }
+    setQueue(asList(data.queue));
+    setBoard(data.board && typeof data.board === "object" ? data.board : {});
+    markClean();
+  }, [markClean]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ publish = false } = {}) => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     try {
       setError("");
-      const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 60000 });
-      applyPayload(data);
+      const shouldPublish = publish && dirtyRef.current;
+      if (shouldPublish) {
+        const { queue: nextQueue, board: nextBoard } = placementsRef.current;
+        const { data } = await axios.put(
+          `${ROOT}/sewing-board`,
+          { queue: nextQueue, days: nextBoard },
+          { timeout: 60000 }
+        );
+        applyPayload(data);
+      } else {
+        const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 60000 });
+        applyPayload(data, { keepPlacements: dirtyRef.current });
+      }
     } catch (e) {
       setError(friendlyError(e));
     } finally {
+      syncingRef.current = false;
       setLoading(false);
     }
   }, [applyPayload]);
@@ -345,16 +399,20 @@ export function SewingCalendar({ tv = false, columns }) {
 
   useEffect(() => {
     load();
-    const timer = window.setInterval(load, tv ? 45000 : 120000);
-    const onBoard = () => load();
+    const timer = window.setInterval(() => load({ publish: dirtyRef.current }), tv ? 45000 : 120000);
+    const onBoard = () => {
+      if (dirtyRef.current || syncingRef.current) return;
+      load();
+    };
+    const onJobs = () => load({ publish: false });
     socket.on("sewingBoardUpdated", onBoard);
-    socket.on("embroideryProgressUpdated", onBoard);
-    socket.on("embroideryFinished", onBoard);
+    socket.on("embroideryProgressUpdated", onJobs);
+    socket.on("embroideryFinished", onJobs);
     return () => {
       window.clearInterval(timer);
       socket.off("sewingBoardUpdated", onBoard);
-      socket.off("embroideryProgressUpdated", onBoard);
-      socket.off("embroideryFinished", onBoard);
+      socket.off("embroideryProgressUpdated", onJobs);
+      socket.off("embroideryFinished", onJobs);
     };
   }, [load, tv]);
 
@@ -386,20 +444,13 @@ export function SewingCalendar({ tv = false, columns }) {
     return next;
   }, [board, liveJobs]);
 
-  const persistBoard = async (nextQueue, nextBoard) => {
+  const persistBoard = (nextQueue, nextBoard) => {
+    placementsRef.current = { queue: nextQueue, board: nextBoard };
+    dirtyRef.current = true;
     setQueue(nextQueue);
     setBoard(nextBoard);
-    try {
-      const { data } = await axios.put(
-        `${ROOT}/sewing-board`,
-        { queue: nextQueue, days: nextBoard },
-        { timeout: 60000 }
-      );
-      applyPayload(data);
-    } catch (e) {
-      window.alert(friendlyError(e) || "Could not save sewing board");
-      load();
-    }
+    setDirty(true);
+    saveSewingBoardDraft(nextQueue, nextBoard);
   };
 
   const onDragEnd = (result) => {
@@ -432,6 +483,7 @@ export function SewingCalendar({ tv = false, columns }) {
     setClearing(true);
     try {
       setError("");
+      markClean();
       const { data } = await axios.post(`${ROOT}/sewing-board/clear`, {}, { timeout: 60000 });
       applyPayload(data);
     } catch (e) {
@@ -454,7 +506,8 @@ export function SewingCalendar({ tv = false, columns }) {
         <div className="ps-header">
           <div className="ps-actions">
             <button type="button" onClick={() => setStaffDate(nextWeekdayIso())}>Staff</button>
-            <button type="button" onClick={load}>Refresh</button>
+            <button type="button" onClick={() => load({ publish: dirty })}>Refresh</button>
+            {dirty ? <span className="sc-draft-hint">Saved here — Refresh to share</span> : null}
             <button type="button" className="ps-danger-button" onClick={clearSchedule} disabled={clearing}>
               {clearing ? "Clearing…" : "Clear schedule"}
             </button>
