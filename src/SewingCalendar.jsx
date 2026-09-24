@@ -152,6 +152,56 @@ function rowShippingMethod(row) {
   return planning || via || String(row.shippingMethod || "").trim();
 }
 
+const US_STATE_NAMES = {
+  alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA",
+  colorado: "CO", connecticut: "CT", delaware: "DE", "district of columbia": "DC",
+  florida: "FL", georgia: "GA", hawaii: "HI", idaho: "ID", illinois: "IL",
+  indiana: "IN", iowa: "IA", kansas: "KS", kentucky: "KY", louisiana: "LA",
+  maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN",
+  mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV",
+  "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY",
+  "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK",
+  oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC",
+  "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT",
+  virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY",
+};
+
+function normalizeState(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const named = US_STATE_NAMES[raw.toLowerCase().replace(/[^a-z]+/g, " ").trim()];
+  if (named) return named;
+  const letters = raw.replace(/[^A-Za-z]/g, "").toUpperCase();
+  return letters.length === 2 ? letters : "";
+}
+
+function rowShipAddress(row) {
+  if (!row || typeof row !== "object") return { city: "", state: "", zip: "" };
+  const norm = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const found = { zip_ship: "", zip: "", state_ship: "", state: "", city_ship: "", city: "" };
+  Object.entries(row).forEach(([key, val]) => {
+    const text = String(val || "").trim();
+    if (!text) return;
+    const n = norm(key);
+    const ship = /ship|shipping|shipto|ordership/.test(n);
+    if (n.includes("zip")) {
+      if (ship && !found.zip_ship) found.zip_ship = text;
+      else if (!ship && !found.zip) found.zip = text;
+    } else if (n.endsWith("state") || n === "st" || n === "shipstate") {
+      if (ship && !found.state_ship) found.state_ship = text;
+      else if (!ship && !found.state) found.state = text;
+    } else if (n.endsWith("city")) {
+      if (ship && !found.city_ship) found.city_ship = text;
+      else if (!ship && !found.city) found.city = text;
+    }
+  });
+  return {
+    zip: found.zip_ship || found.zip || "",
+    state: found.state_ship || found.state || "",
+    city: found.city_ship || found.city || "",
+  };
+}
+
 function estimateTransitDays(method, zip, state, city) {
   if (isLocalDelivery(method)) return 0;
   const raw = String(method || "").toUpperCase();
@@ -161,7 +211,7 @@ function estimateTransitDays(method, zip, state, city) {
   const digits = String(zip || "").replace(/\D/g, "");
   const prefix = digits.slice(0, 3);
   const lead = prefix.slice(0, 1);
-  const st = String(state || "").trim().toUpperCase().slice(0, 2);
+  const st = normalizeState(state);
   const cityKey = String(city || "").toLowerCase().replace(/[^a-z]+/g, " ").trim();
   if (st === "GA" || prefix.startsWith("30") || prefix.startsWith("31")) return 1;
   if (["SC", "AL", "TN", "FL", "NC"].includes(st) || lead === "3") return 2;
@@ -226,6 +276,7 @@ function parseOverviewDate(value) {
 function liveFromOverviewRow(row) {
   const image = row?.Image || row?.Preview || row?.["Art Link"] || row?.image || "";
   const qty = Number(String(row?.Quantity ?? row?.quantity ?? "").replace(/,/g, "")) || 0;
+  const addr = rowShipAddress(row);
   return {
     Image: image,
     Preview: row?.Preview || image,
@@ -240,9 +291,9 @@ function liveFromOverviewRow(row) {
     quantity: qty || undefined,
     dueDate: parseOverviewDate(row?.["Due Date"] || row?.dueDate),
     shippingMethod: rowShippingMethod(row),
-    shipCity: row?.["Shipping City"] || row?.["Ship To City"] || row?.shipCity || "",
-    shipState: row?.["Shipping State"] || row?.["Ship To State"] || row?.shipState || "",
-    shipZip: row?.["Shipping Zip"] || row?.["Ship To Zip"] || row?.shipZip || "",
+    shipCity: addr.city || row?.shipCity || "",
+    shipState: addr.state || row?.shipState || "",
+    shipZip: addr.zip || row?.shipZip || "",
     requiredShipDate: "",
     due_type: row?.["Hard Date/Soft Date"] || row?.["Hard/Soft"] || row?.due_type || "",
     hardDate: /hard/i.test(String(row?.["Hard Date/Soft Date"] || row?.["Hard/Soft"] || "")),
