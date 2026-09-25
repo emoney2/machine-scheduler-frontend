@@ -498,6 +498,36 @@ function isClosedOrBackJob(job, columns) {
   return liveProduct.includes("back");
 }
 
+function isUnfinishedJob(job) {
+  if (!job) return false;
+  if (job.sewingSummaryComplete || job.sewingComplete) return false;
+  const remaining = job.remainingQuantity;
+  if (remaining == null || remaining === "") return true;
+  return Number(remaining) > 0;
+}
+
+function rollBoardForward(board, jobs, today) {
+  const source = board && typeof board === "object" ? board : {};
+  if (!today || !jobs || !Object.keys(jobs).length) return { ...source };
+  const next = {};
+  const rolled = [];
+  Object.entries(source).forEach(([day, ids]) => {
+    const liveIds = asList(ids).filter((id) => jobs[id]);
+    if (day && day < today) {
+      liveIds.forEach((id) => {
+        if (isUnfinishedJob(jobs[id])) rolled.push(id);
+      });
+      return;
+    }
+    next[day] = liveIds;
+  });
+  if (rolled.length) {
+    const kept = asList(next[today]).filter((id) => !rolled.includes(id));
+    next[today] = [...rolled, ...kept];
+  }
+  return next;
+}
+
 function idsForColumn(columnId, queue, board) {
   if (columnId === QUEUE_ID) return asList(queue);
   return asList(board[columnId]);
@@ -713,17 +743,24 @@ export function SewingCalendar({ tv = false, columns }) {
       updatedAt: data.updatedAt,
       summary: { count: rolled.length },
     });
+    const today = asList(data.days)[0] || "";
     if (keepPlacements) {
       setQueue((prev) => {
         const extras = Object.keys(jobsRef.current).filter((id) => !placedIds(prev, placementsRef.current.board).has(id));
         const next = extras.length ? sortIdsByDue([...prev, ...extras], jobsRef.current) : prev;
-        placementsRef.current = { queue: next, board: placementsRef.current.board };
+        const rolled = rollBoardForward(placementsRef.current.board, jobsRef.current, today);
+        placementsRef.current = { queue: next, board: rolled };
+        setBoard(rolled);
         return next;
       });
       writeLiveCache({ ...data, queue: placementsRef.current.queue, board: placementsRef.current.board });
       return;
     }
-    const incomingBoard = data.board && typeof data.board === "object" ? data.board : {};
+    const incomingBoard = rollBoardForward(
+      data.board && typeof data.board === "object" ? data.board : {},
+      jobsRef.current,
+      today
+    );
     const incomingHasDays = Object.values(incomingBoard).some((ids) => asList(ids).length);
     const currentHasDays = Object.values(placementsRef.current.board || {}).some((ids) => asList(ids).length);
     if (incomingHasDays || !currentHasDays) {
@@ -744,9 +781,7 @@ export function SewingCalendar({ tv = false, columns }) {
     syncingRef.current = true;
     try {
       const { data } = await axios.get(`${ROOT}/sewing-board`, { timeout: 25000 });
-      const hasDays = Object.values(placementsRef.current.board || {}).some((ids) => asList(ids).length);
-      const keep = !initialLoadRef.current || isWriteGuarded() || hasDays;
-      applyPayload(data, { keepPlacements: keep });
+      applyPayload(data, { keepPlacements: isWriteGuarded() });
       initialLoadRef.current = false;
       setError("");
     } catch (e) {
@@ -895,25 +930,27 @@ export function SewingCalendar({ tv = false, columns }) {
     return sortIdsByDue([...queue.filter((id) => liveJobs[id]), ...extras], liveJobs);
   }, [queue, board, liveJobs]);
   const visibleBoard = useMemo(() => {
+    const rolled = rollBoardForward(board, liveJobs, days[0]);
     const next = {};
-    Object.entries(board).forEach(([day, ids]) => {
+    Object.entries(rolled).forEach(([day, ids]) => {
       next[day] = asList(ids).filter((id) => liveJobs[id]);
     });
     return next;
-  }, [board, liveJobs]);
+  }, [board, liveJobs, days]);
 
   const persistBoard = async (nextQueue, nextBoard) => {
     const sortedQueue = sortIdsByDue(nextQueue, liveJobs);
-    placementsRef.current = { queue: sortedQueue, board: nextBoard };
+    const rolledBoard = rollBoardForward(nextBoard, liveJobs, days[0]);
+    placementsRef.current = { queue: sortedQueue, board: rolledBoard };
     extendWriteGuard();
     setQueue(sortedQueue);
-    setBoard(nextBoard);
-    saveSewingBoardDraft(sortedQueue, nextBoard);
+    setBoard(rolledBoard);
+    saveSewingBoardDraft(sortedQueue, rolledBoard);
     try {
       saveInFlightRef.current = true;
       const { data } = await axios.put(
         `${ROOT}/sewing-board`,
-        { queue: sortedQueue, days: nextBoard },
+        { queue: sortedQueue, days: rolledBoard },
         { timeout: 60000 }
       );
       applyPayload(data, { keepPlacements: true });
@@ -930,13 +967,14 @@ export function SewingCalendar({ tv = false, columns }) {
     const { source, destination } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-    const sourceList = idsForColumn(source.droppableId, queue, board);
+    const baseBoard = rollBoardForward(board, liveJobs, days[0]);
+    const sourceList = idsForColumn(source.droppableId, queue, baseBoard);
     const visibleSource = sourceList.filter((id) => liveJobs[id]);
     const moved = visibleSource[source.index];
     if (!moved) return;
     let nextQueue = asList(queue).filter((id) => id !== moved);
     const nextBoard = {};
-    Object.entries(board || {}).forEach(([day, ids]) => {
+    Object.entries(baseBoard || {}).forEach(([day, ids]) => {
       nextBoard[day] = asList(ids).filter((id) => id !== moved);
     });
     if (destination.droppableId === QUEUE_ID) {
