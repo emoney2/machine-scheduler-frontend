@@ -1,12 +1,29 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { API_ROOT } from "./apiRoot";
+import { writeActiveReorderBatch } from "./reorderBatchStore";
+
+function orderIdStr(job) {
+  return String(job.orderId ?? job["Order #"] ?? "").trim();
+}
+
+function dueDateWeeksFromNow(weeks) {
+  const d = new Date();
+  d.setDate(d.getDate() + weeks * 7);
+  return d.toISOString().split("T")[0];
+}
 
 export default function ReorderPage() {
   const [companyList, setCompanyList] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
   const [jobs, setJobs] = useState([]);
+  const [selected, setSelected] = useState([]);
+  const [dueDate, setDueDate] = useState("");
+  const [dateType, setDateType] = useState("Hard Date");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingCustomersText, setLoadingCustomersText] = useState("Loading customers…");
@@ -19,27 +36,25 @@ export default function ReorderPage() {
   useEffect(() => {
     let isMounted = true;
     const cancelTokenSource = axios.CancelToken.source();
-    
-    console.log("🔄 Fetching company list...");
+
     setLoadingCustomers(true);
     setLoadingCustomersText("Loading customers…");
-    
+
     axios
       .get(`${API_ROOT}/directory`, {
-        cancelToken: cancelTokenSource.token
+        cancelToken: cancelTokenSource.token,
       })
       .then((res) => {
         if (!isMounted) return;
         const names = (res.data || [])
           .map((name) => name)
           .filter((name) => typeof name === "string" && name.trim());
-        console.log("✅ Company list loaded:", names);
         setCompanyList(names);
         companyListRef.current = names;
       })
       .catch((err) => {
         if (!isMounted || axios.isCancel(err)) return;
-        console.error("❌ Failed to load company names", err);
+        console.error("Failed to load company names", err);
       })
       .finally(() => {
         if (isMounted) {
@@ -47,16 +62,14 @@ export default function ReorderPage() {
           setLoadingCustomersText("");
         }
       });
-    
+
     return () => {
       isMounted = false;
       cancelTokenSource.cancel("Component unmounted");
-      // Also cancel any jobs request if component unmounts
       if (jobsRequestRef.current) {
         jobsRequestRef.current.cancel("Component unmounted");
         jobsRequestRef.current = null;
       }
-      // Clear debounce timer
       if (inputDebounceRef.current) {
         clearTimeout(inputDebounceRef.current);
         inputDebounceRef.current = null;
@@ -65,16 +78,9 @@ export default function ReorderPage() {
   }, []);
 
   const handleCompanySelect = useCallback(async (value) => {
-    console.log("🏢 Company selected:", value);
     setCompanyInput(value);
-    
-    // Use ref to avoid stale closure
-    if (!companyListRef.current.includes(value)) {
-      console.log("⚠️ Company not in list:", value);
-      return;
-    }
+    if (!companyListRef.current.includes(value)) return;
 
-    // Cancel any in-flight request
     if (jobsRequestRef.current) {
       jobsRequestRef.current.cancel("New company selected");
     }
@@ -83,19 +89,17 @@ export default function ReorderPage() {
     jobsRequestRef.current = cancelTokenSource;
 
     setLoading(true);
+    setSelected([]);
+    setSubmitMessage("");
     try {
       const res = await axios.get(
         `${API_ROOT}/jobs-for-company?company=${encodeURIComponent(value)}`,
         { cancelToken: cancelTokenSource.token }
       );
-      console.log("📦 Jobs loaded:", res.data.jobs);
       setJobs(res.data.jobs || []);
     } catch (err) {
-      if (axios.isCancel(err)) {
-        console.log("⏹️ Jobs request cancelled");
-        return;
-      }
-      console.error("❌ Failed to load jobs for company:", value, err);
+      if (axios.isCancel(err)) return;
+      console.error("Failed to load jobs for company:", value, err);
       alert("Failed to load jobs.");
     } finally {
       if (jobsRequestRef.current === cancelTokenSource) {
@@ -105,36 +109,88 @@ export default function ReorderPage() {
     }
   }, []);
 
-  const handleInputChange = useCallback((e) => {
-    const val = e.target.value;
-    console.log("⌨️ Typing:", val);
-    setCompanyInput(val);
-    
-    // Clear any existing debounce timer
-    if (inputDebounceRef.current) {
-      clearTimeout(inputDebounceRef.current);
-    }
-    
-    // Debounce the company selection to avoid rapid-fire requests
-    inputDebounceRef.current = setTimeout(() => {
-      // Use ref to avoid stale closure
-      if (companyListRef.current.includes(val)) {
-        console.log("✅ Match found in companyList, fetching jobs...");
-        handleCompanySelect(val);
-      } else {
-        console.log("🔍 No exact match yet.");
+  const handleInputChange = useCallback(
+    (e) => {
+      const val = e.target.value;
+      setCompanyInput(val);
+      if (inputDebounceRef.current) {
+        clearTimeout(inputDebounceRef.current);
       }
-    }, 300); // 300ms debounce
-  }, [handleCompanySelect]);
+      inputDebounceRef.current = setTimeout(() => {
+        if (companyListRef.current.includes(val)) {
+          handleCompanySelect(val);
+        }
+      }, 300);
+    },
+    [handleCompanySelect]
+  );
 
-  const handleReorder = (job) => {
-    console.log("🔁 Reordering job:", job);
+  const toggleSelect = (orderId) => {
+    const idStr = String(orderId).trim();
+    if (!idStr) return;
+    setSelected((prev) =>
+      prev.includes(idStr) ? prev.filter((id) => id !== idStr) : [...prev, idStr]
+    );
+  };
+
+  const selectedJobs = useMemo(
+    () => jobs.filter((job) => selected.includes(orderIdStr(job))),
+    [jobs, selected]
+  );
+
+  const handleEditOne = (job, e) => {
+    e.stopPropagation();
     navigate("/order", { state: { reorderJob: job } });
   };
 
+  const handleReorderSelected = async () => {
+    if (!companyInput || !companyListRef.current.includes(companyInput)) {
+      alert("Select a customer first.");
+      return;
+    }
+    if (selected.length === 0) {
+      alert("Click the jobs you want to reorder.");
+      return;
+    }
+    if (!dueDate) {
+      alert("Pick a due date for the new jobs.");
+      return;
+    }
+    setSubmitting(true);
+    setSubmitMessage("");
+    try {
+      const res = await axios.post(`${API_ROOT}/reorder-batch`, {
+        company: companyInput,
+        orderIds: selected,
+        dueDate,
+        dateType,
+        notes,
+      });
+      writeActiveReorderBatch({
+        batchId: res.data.batchId,
+        company: companyInput,
+        startedAt: new Date().toISOString(),
+      });
+      setSubmitMessage(
+        `Started ${selected.length} reorder${selected.length === 1 ? "" : "s"} in the background. You can leave this page or open another tab — each job still gets its own new folder.`
+      );
+      setSelected([]);
+    } catch (err) {
+      console.error("Batch reorder failed:", err);
+      alert(err.response?.data?.error || "Failed to start the reorders.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div style={{ padding: "2rem" }}>
-      <h2>🔁 Reorder a Previous Job</h2>
+    <div style={{ padding: "2rem", maxWidth: 1100, margin: "0 auto", paddingBottom: 180 }}>
+      <h2 style={{ marginTop: 0 }}>Reorder Previous Jobs</h2>
+      <p style={{ color: "#4b5563", marginTop: 0 }}>
+        Pick a customer, click every past job you want, set one due date, and submit once.
+        Each job is copied into its own new folder on the server. After you hit submit you
+        can leave this page or use another tab — you do not need to wait here.
+      </p>
 
       <input
         list="company-options"
@@ -142,7 +198,7 @@ export default function ReorderPage() {
         onChange={handleInputChange}
         placeholder="Start typing a company..."
         ref={inputRef}
-        style={{ width: "300px", padding: "0.5rem", fontSize: "1rem" }}
+        style={{ width: "320px", padding: "0.5rem", fontSize: "1rem" }}
       />
       <datalist id="company-options">
         {companyList.map((name) => (
@@ -152,52 +208,235 @@ export default function ReorderPage() {
 
       {loading && <p>Loading jobs…</p>}
 
-      {/* 🌕 Page Overlay for loading customers */}
-      {loadingCustomers && (
-        <div style={{
-          position: "fixed",
-          top: 0, left: 0,
-          width: "100vw", height: "100vh",
-          backgroundColor: "rgba(255, 247, 194, 0.65)", // transparent yellow
-          zIndex: 9998,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          fontSize: "1.25rem",
-          fontWeight: "bold"
-        }}>
-          {loadingCustomersText || "Loading…"}
+      {submitMessage && (
+        <div
+          style={{
+            marginTop: "1rem",
+            padding: "0.85rem 1rem",
+            borderRadius: 8,
+            background: "#ecfdf5",
+            border: "1px solid #6ee7b7",
+            color: "#065f46",
+            fontWeight: 600,
+          }}
+        >
+          {submitMessage}
         </div>
       )}
 
-      <div style={{ marginTop: "2rem" }}>
-        {jobs.map((job, idx) => (
+      {jobs.length > 0 && (
+        <div style={{ display: "flex", gap: 8, marginTop: "1rem", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => setSelected(jobs.map(orderIdStr).filter(Boolean))}
+            style={{ padding: "0.4rem 0.8rem", cursor: "pointer" }}
+          >
+            Select all
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelected([])}
+            style={{ padding: "0.4rem 0.8rem", cursor: "pointer" }}
+          >
+            Clear
+          </button>
+          <span style={{ alignSelf: "center", color: "#6b7280", fontSize: 14 }}>
+            {selected.length} selected
+          </span>
+        </div>
+      )}
+
+      <div style={{ marginTop: "1.25rem" }}>
+        {jobs.map((job, idx) => {
+          const id = orderIdStr(job);
+          const isSelected = selected.includes(id);
+          return (
+            <div
+              key={`${id}-${idx}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => toggleSelect(id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleSelect(id);
+                }
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                border: isSelected ? "2px solid #16a34a" : "1px solid #d1d5db",
+                padding: "0.75rem",
+                borderRadius: 8,
+                marginBottom: "0.85rem",
+                gap: "1rem",
+                background: isSelected ? "#4CAF50" : "#fff",
+                color: isSelected ? "#fff" : "#000",
+                cursor: "pointer",
+              }}
+            >
+              <div
+                style={{
+                  width: 28,
+                  height: 28,
+                  flexShrink: 0,
+                  borderRadius: "50%",
+                  border: isSelected ? "2px solid #fff" : "2px solid #9ca3af",
+                  background: isSelected ? "#fff" : "transparent",
+                  display: "grid",
+                  placeItems: "center",
+                  fontWeight: 700,
+                  color: isSelected ? "#16a34a" : "transparent",
+                }}
+                aria-hidden="true"
+              >
+                ✓
+              </div>
+              <img
+                src={job.image || ""}
+                alt=""
+                style={{
+                  width: 60,
+                  height: 60,
+                  objectFit: "cover",
+                  borderRadius: 6,
+                  background: "#f3f4f6",
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <strong>{job.Design || "(No Design)"}</strong> — {job.Product || "?"} ({job.Quantity || "?"})
+                <br />
+                Order #{job["Order #"] || "?"} | Due: {job["Due Date"] || "?"}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => handleEditOne(job, e)}
+                title="Open the order form to change this one job before submitting"
+                style={{
+                  flexShrink: 0,
+                  padding: "0.4rem 0.7rem",
+                  borderRadius: 6,
+                  border: isSelected ? "1px solid #fff" : "1px solid #64748b",
+                  background: isSelected ? "rgba(255,255,255,0.15)" : "#fff",
+                  color: isSelected ? "#fff" : "#334155",
+                  cursor: "pointer",
+                }}
+              >
+                Edit one
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      {jobs.length > 0 && selectedJobs.length > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "#fff",
+            borderTop: "1px solid #d1d5db",
+            padding: "0.85rem 1.25rem 1rem",
+            boxShadow: "0 -6px 20px rgba(0,0,0,0.08)",
+            zIndex: 10900,
+          }}
+        >
           <div
-            key={idx}
             style={{
+              maxWidth: 1100,
+              margin: "0 auto",
               display: "flex",
-              alignItems: "center",
-              border: "1px solid #ccc",
-              padding: "0.75rem",
-              borderRadius: "8px",
-              marginBottom: "1rem",
-              gap: "1rem",
+              gap: 12,
+              flexWrap: "wrap",
+              alignItems: "flex-end",
             }}
           >
-            <img
-              src={job.image || ""}
-              alt=""
-              style={{ width: 60, height: 60, objectFit: "cover" }}
-            />
-            <div style={{ flex: 1 }}>
-              <strong>{job.Design || "(No Design)"}</strong> — {job.Product || "?"} ({job.Quantity || "?"})
-              <br />
-              Order #{job["Order #"] || "?"} | Due: {job["Due Date"] || "?"}
+            <label style={{ fontSize: 14 }}>
+              Due date for all
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                style={{ display: "block", marginTop: 4, padding: "0.35rem" }}
+              />
+            </label>
+            <div style={{ display: "flex", gap: 6 }}>
+              {[6, 7, 8].map((weeks) => (
+                <button
+                  key={weeks}
+                  type="button"
+                  onClick={() => setDueDate(dueDateWeeksFromNow(weeks))}
+                  style={{ padding: "0.4rem 0.6rem", cursor: "pointer" }}
+                >
+                  {weeks} Weeks
+                </button>
+              ))}
             </div>
-            <button onClick={() => handleReorder(job)}>Reorder</button>
+            <label style={{ fontSize: 14 }}>
+              Date type
+              <select
+                value={dateType}
+                onChange={(e) => setDateType(e.target.value)}
+                style={{ display: "block", marginTop: 4, padding: "0.35rem" }}
+              >
+                <option value="Hard Date">Hard Date</option>
+                <option value="Soft Date">Soft Date</option>
+              </select>
+            </label>
+            <label style={{ fontSize: 14, flex: "1 1 180px" }}>
+              Extra note (optional)
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Added to each job's original notes"
+                style={{ display: "block", marginTop: 4, width: "100%", padding: "0.35rem" }}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleReorderSelected}
+              disabled={submitting}
+              style={{
+                padding: "0.65rem 1.1rem",
+                background: submitting ? "#93c5fd" : "#007bff",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                fontWeight: 700,
+                cursor: submitting ? "wait" : "pointer",
+              }}
+            >
+              {submitting
+                ? "Starting…"
+                : `Reorder ${selectedJobs.length} job${selectedJobs.length === 1 ? "" : "s"}`}
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
+
+      {loadingCustomers && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            backgroundColor: "rgba(255, 247, 194, 0.65)",
+            zIndex: 9998,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: "1.25rem",
+            fontWeight: "bold",
+          }}
+        >
+          {loadingCustomersText || "Loading…"}
+        </div>
+      )}
     </div>
   );
 }

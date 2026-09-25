@@ -21,6 +21,7 @@ import OrderSubmission from './OrderSubmission';
 import { subWorkDays, fmtMMDD } from './helpers';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import ReorderPage from "./ReorderPage";
+import ReorderBatchBanner from "./ReorderBatchBanner";
 import OrderConfirmationPage from "./OrderConfirmationPage";
 import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
@@ -2225,6 +2226,8 @@ useEffect(() => {
           Logout
         </button>
       </nav>}
+
+      {!hideChrome && <ReorderBatchBanner />}
 
       {/* ─── Route Outlet ─────────────────────────────────────────────────────── */}
       <Routes>
