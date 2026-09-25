@@ -3546,7 +3546,7 @@ function col(width, center = false) {
               const accent = isOrderNow ? "#dc2626" : "#15803d";
               const pale = isOrderNow ? "#fef2f2" : "#f0fdf4";
               const fmt = (value) =>
-                Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+                Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 });
               const fmtDate = (value) => {
                 if (!value) return "—";
                 const parsed = new Date(`${value}T12:00:00`);
@@ -3701,10 +3701,10 @@ function col(width, center = false) {
                     })}
                   </div>
                   <div style={{ marginTop: 8, fontSize: 10, color: "#64748b" }}>
-                    Live from Production Orders, Cut List, Table PPY, and Material Log.
-                    Uncut work due within 90 days is committed. Later due dates show as Later
-                    and do not trigger a buy. Material Log IN + Ordered is inbound; mark
-                    Received there when the rolls arrive. Reorder alerts email info@jrco.us.
+                    On hand and inbound come from Material Inventory. Uncut work due
+                    within 90 days is shown as committed (already deducted from inventory).
+                    Later due dates show as Later and do not trigger a buy. Reorder
+                    alerts email info@jrco.us.
                   </div>
                 </section>
               );
