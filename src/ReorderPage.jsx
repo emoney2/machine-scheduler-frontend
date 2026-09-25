@@ -14,11 +14,16 @@ function dueDateWeeksFromNow(weeks) {
   return d.toISOString().split("T")[0];
 }
 
+function jobQuantity(job) {
+  return String(job?.Quantity ?? job?.quantity ?? "").trim();
+}
+
 export default function ReorderPage() {
   const [companyList, setCompanyList] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
   const [jobs, setJobs] = useState([]);
   const [selected, setSelected] = useState([]);
+  const [overrides, setOverrides] = useState({});
   const [dueDate, setDueDate] = useState("");
   const [dateType, setDateType] = useState("Hard Date");
   const [notes, setNotes] = useState("");
@@ -90,6 +95,7 @@ export default function ReorderPage() {
 
     setLoading(true);
     setSelected([]);
+    setOverrides({});
     setSubmitMessage("");
     try {
       const res = await axios.get(
@@ -125,12 +131,45 @@ export default function ReorderPage() {
     [handleCompanySelect]
   );
 
-  const toggleSelect = (orderId) => {
-    const idStr = String(orderId).trim();
+  const toggleSelect = (job) => {
+    const idStr = orderIdStr(job);
     if (!idStr) return;
     setSelected((prev) =>
       prev.includes(idStr) ? prev.filter((id) => id !== idStr) : [...prev, idStr]
     );
+    setOverrides((prev) => {
+      if (prev[idStr]) return prev;
+      return {
+        ...prev,
+        [idStr]: { quantity: jobQuantity(job), dueDate: dueDate || "" },
+      };
+    });
+  };
+
+  const updateOverride = (id, field, value) => {
+    setOverrides((prev) => ({
+      ...prev,
+      [id]: {
+        quantity: prev[id]?.quantity ?? "",
+        dueDate: prev[id]?.dueDate ?? "",
+        [field]: value,
+      },
+    }));
+  };
+
+  const applyDueToSelected = (value) => {
+    setDueDate(value);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      selected.forEach((id) => {
+        const job = jobs.find((row) => orderIdStr(row) === id);
+        next[id] = {
+          quantity: next[id]?.quantity ?? jobQuantity(job),
+          dueDate: value,
+        };
+      });
+      return next;
+    });
   };
 
   const selectedJobs = useMemo(
@@ -152,8 +191,17 @@ export default function ReorderPage() {
       alert("Click the jobs you want to reorder.");
       return;
     }
-    if (!dueDate) {
-      alert("Pick a due date for the new jobs.");
+    const jobsPayload = selectedJobs.map((job) => {
+      const id = orderIdStr(job);
+      const ov = overrides[id] || {};
+      return {
+        orderId: id,
+        quantity: ov.quantity || jobQuantity(job),
+        dueDate: ov.dueDate || dueDate,
+      };
+    });
+    if (jobsPayload.some((job) => !job.dueDate)) {
+      alert("Each selected job needs a due date. Set one for all, or a date on that job.");
       return;
     }
     setSubmitting(true);
@@ -161,7 +209,7 @@ export default function ReorderPage() {
     try {
       const res = await axios.post(`${API_ROOT}/reorder-batch`, {
         company: companyInput,
-        orderIds: selected,
+        jobs: jobsPayload,
         dueDate,
         dateType,
         notes,
@@ -187,9 +235,9 @@ export default function ReorderPage() {
     <div style={{ padding: "2rem", maxWidth: 1100, margin: "0 auto", paddingBottom: 180 }}>
       <h2 style={{ marginTop: 0 }}>Reorder Previous Jobs</h2>
       <p style={{ color: "#4b5563", marginTop: 0 }}>
-        Pick a customer, click every past job you want, set one due date, and submit once.
-        Each job is copied into its own new folder on the server. After you hit submit you
-        can leave this page or use another tab — you do not need to wait here.
+        Pick a customer and click every past job you want. Change quantity or due date on
+        each selected job, or use Due date for all to fill them at once. Submit once —
+        each job still gets its own new folder, and you can leave this page afterward.
       </p>
 
       <input
@@ -228,7 +276,19 @@ export default function ReorderPage() {
         <div style={{ display: "flex", gap: 8, marginTop: "1rem", flexWrap: "wrap" }}>
           <button
             type="button"
-            onClick={() => setSelected(jobs.map(orderIdStr).filter(Boolean))}
+            onClick={() => {
+              const ids = jobs.map(orderIdStr).filter(Boolean);
+              setSelected(ids);
+              setOverrides((prev) => {
+                const next = { ...prev };
+                jobs.forEach((job) => {
+                  const id = orderIdStr(job);
+                  if (!id || next[id]) return;
+                  next[id] = { quantity: jobQuantity(job), dueDate: dueDate || "" };
+                });
+                return next;
+              });
+            }}
             style={{ padding: "0.4rem 0.8rem", cursor: "pointer" }}
           >
             Select all
@@ -255,11 +315,11 @@ export default function ReorderPage() {
               key={`${id}-${idx}`}
               role="button"
               tabIndex={0}
-              onClick={() => toggleSelect(id)}
+              onClick={() => toggleSelect(job)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  toggleSelect(id);
+                  toggleSelect(job);
                 }
               }}
               style={{
@@ -304,10 +364,38 @@ export default function ReorderPage() {
                 }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <strong>{job.Design || "(No Design)"}</strong> — {job.Product || "?"} ({job.Quantity || "?"})
+                <strong>{job.Design || "(No Design)"}</strong> — {job.Product || "?"}
                 <br />
-                Order #{job["Order #"] || "?"} | Due: {job["Due Date"] || "?"}
+                Order #{job["Order #"] || "?"} | Was qty {job.Quantity || "?"} | Due {job["Due Date"] || "?"}
               </div>
+              {isSelected && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  style={{ display: "flex", gap: 8, alignItems: "flex-end", flexShrink: 0 }}
+                >
+                  <label style={{ fontSize: 12 }}>
+                    Qty
+                    <input
+                      type="number"
+                      min="1"
+                      value={overrides[id]?.quantity ?? jobQuantity(job)}
+                      onChange={(e) => updateOverride(id, "quantity", e.target.value)}
+                      style={{ display: "block", width: 72, marginTop: 4, padding: "0.3rem" }}
+                    />
+                  </label>
+                  <label style={{ fontSize: 12 }}>
+                    Due
+                    <input
+                      type="date"
+                      value={overrides[id]?.dueDate || ""}
+                      onChange={(e) => updateOverride(id, "dueDate", e.target.value)}
+                      style={{ display: "block", width: 140, marginTop: 4, padding: "0.3rem" }}
+                    />
+                  </label>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={(e) => handleEditOne(job, e)}
@@ -358,7 +446,7 @@ export default function ReorderPage() {
               <input
                 type="date"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                onChange={(e) => applyDueToSelected(e.target.value)}
                 style={{ display: "block", marginTop: 4, padding: "0.35rem" }}
               />
             </label>
@@ -367,7 +455,7 @@ export default function ReorderPage() {
                 <button
                   key={weeks}
                   type="button"
-                  onClick={() => setDueDate(dueDateWeeksFromNow(weeks))}
+                  onClick={() => applyDueToSelected(dueDateWeeksFromNow(weeks))}
                   style={{ padding: "0.4rem 0.6rem", cursor: "pointer" }}
                 >
                   {weeks} Weeks
