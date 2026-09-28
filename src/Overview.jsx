@@ -3640,21 +3640,27 @@ function col(width, center = false) {
                             }}
                           >
                             {[
-                              ["On hand", `${fmt(mat.physicalYards)} yd`],
-                              ["Rolls", fmt(mat.physicalRolls)],
-                              ["Committed", `${fmt(mat.committedYards)} yd`],
+                              ["On hand", mat.physicalYards],
+                              ["Rolls", mat.physicalRolls],
+                              ["Committed", mat.committedYards],
                               ...(Number(mat.deferredYards) > 0
-                                ? [["Later", `${fmt(mat.deferredYards)} yd`]]
+                                ? [["Later", mat.deferredYards]]
                                 : []),
-                              ["Usable", `${fmt(mat.uncommittedYards)} yd`],
-                              ["Inbound", `${fmt(mat.inboundYards)} yd`],
-                              ["Position", `${fmt(mat.inventoryPositionYards)} yd`],
-                            ].map(([label, value]) => (
+                              ["Usable", mat.uncommittedYards],
+                              ["Inbound", mat.inboundYards],
+                              ["Position", mat.inventoryPositionYards],
+                            ].map(([label, raw]) => {
+                              const negative = Number(raw) < 0;
+                              const suffix = label === "Rolls" ? "" : " yd";
+                              return (
                               <div key={`${mat.id}-${label}`}>
                                 <div style={{ fontSize: 9, color: "#64748b", fontWeight: 700 }}>{label}</div>
-                                <div style={{ fontSize: 13, fontWeight: 800, color: "#111827" }}>{value}</div>
+                                <div style={{ fontSize: 13, fontWeight: 800, color: negative ? "#dc2626" : "#111827" }}>
+                                  {fmt(raw)}{suffix}
+                                </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                           <div
                             style={{
