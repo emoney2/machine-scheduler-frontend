@@ -1237,30 +1237,37 @@ const fetchOrdersEmbroLinksCore = async () => {
     // 1) Fetch everything in a single round-trip (long timeout for Render cold start)
     let combinedRes;
     try {
-      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
+      combinedRes = await axios.get(API_ROOT + '/combined', {
+        timeout: 90000,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
     } catch (firstErr) {
       console.warn("🟡 /combined first attempt failed, retrying in 5s…", firstErr?.message || firstErr);
       await new Promise(r => setTimeout(r, 5000));
-      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
+      combinedRes = await axios.get(API_ROOT + '/combined', {
+        timeout: 90000,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
     }
     const payload = combinedRes?.data;
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
       throw new Error("combined returned non-JSON (check the API proxy)");
     }
+    if (payload.error && !(payload.orders || []).length) {
+      throw new Error(String(payload.error));
+    }
     const ordersRes   = { data: payload.orders || [] };
     const embRes      = { data: payload.embroideryList || [] };
     const linksRes    = { data: payload.links || {} };
 
-    // drop Sewing and Complete — also drop when the floor already finished
-    // embroidery even if Production Orders Stage has not recalculated yet
+    // Drop sewing/complete. Quantity Made on Embroidery List is often the
+    // planned job size, so do not hide cards just because completed qty
+    // matches Quantity. Status COMPLETE is the sheet's real done signal.
     let orders = (ordersRes.data || []).filter(o => {
       const stage = String(o['Stage'] || '').toLowerCase();
       if (stage === 'sewing' || stage === 'complete' || stage === 'completed') return false;
       const embSt = String(o['Embroidery List Status'] || '').trim().toUpperCase();
       if (embSt === 'COMPLETE') return false;
-      const qty = Number(o['Quantity']) || 0;
-      const done = Number(o['Embroidery Completed Qty']) || 0;
-      if (qty > 0 && done >= qty) return false;
       return true;
     });
     const embList = embRes.data || [];

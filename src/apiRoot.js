@@ -1,10 +1,10 @@
 /**
  * API base URL.
  *
- * Production talks to Render directly. Forcing same-origin `/api` on Netlify
- * served index.html instead of JSON (the /api rewrite never took effect),
- * which emptied the scheduler. Phone login still uses Render /login with a
- * 200 HTML response so the session cookie can stick.
+ * On Netlify, use same-origin `/api` so the login cookie is sent. netlify.toml
+ * proxies that to Render. A baked-in REACT_APP_API_ROOT pointing at Render
+ * would skip the cookie and empty the scheduler for kiosk/desktop sessions.
+ * Phone login still uses same-host /login.
  */
 const RENDER_API = "https://machine-scheduler-backend.onrender.com/api";
 
@@ -14,6 +14,9 @@ export function getApiRoot() {
     if (host === "localhost" || host === "127.0.0.1") {
       const env = String(process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
       return env || "/api";
+    }
+    if (host.endsWith(".netlify.app") || host.endsWith(".netlify.com")) {
+      return "/api";
     }
   } catch (_) {}
   const env = String(process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
