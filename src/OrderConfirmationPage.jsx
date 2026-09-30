@@ -14,6 +14,21 @@ function orderIdStr(job) {
   return String(job.orderId ?? job["Order #"] ?? "").trim();
 }
 
+function jobSelectKey(job) {
+  return String(job?.jobKey || "").trim();
+}
+
+function withUniqueJobKeys(jobs) {
+  return (jobs || []).map((job, i) => {
+    const fromServer = String(job.jobKey || "").trim();
+    if (fromServer) return { ...job, jobKey: fromServer };
+    const oid = orderIdStr(job) || "none";
+    const product = String(job.ProductRaw || job.Product || "").trim() || "item";
+    const design = String(job.Design || "").trim() || "design";
+    return { ...job, jobKey: `local-${i}-${oid}-${product}-${design}` };
+  });
+}
+
 function isCompletedJob(job) {
   const stage = String(job?.Stage || "").trim().toUpperCase();
   return stage === "COMPLETE" || stage === "COMPLETED";
@@ -99,7 +114,7 @@ export default function OrderConfirmationPage() {
         `${API_ROOT}/outstanding-orders-for-company?company=${encodeURIComponent(value)}${includeQs}`,
         { cancelToken: cancelTokenSource.token }
       );
-      setJobs(res.data.jobs || []);
+      setJobs(withUniqueJobKeys(res.data.jobs || []));
     } catch (err) {
       if (axios.isCancel(err)) return;
       console.error("Failed to load jobs:", value, err);
@@ -127,8 +142,9 @@ export default function OrderConfirmationPage() {
     }
   };
 
-  const toggleSelect = (orderId) => {
-    const idStr = String(orderId).trim();
+  const toggleSelect = (jobKey) => {
+    const idStr = String(jobKey || "").trim();
+    if (!idStr) return;
     setSelected((prev) =>
       prev.includes(idStr) ? prev.filter((id) => id !== idStr) : [...prev, idStr]
     );
@@ -156,12 +172,12 @@ export default function OrderConfirmationPage() {
   }, [jobs, jobFilter]);
 
   const selectedJobs = useMemo(
-    () => jobs.filter((job) => selected.includes(orderIdStr(job))),
+    () => jobs.filter((job) => selected.includes(jobSelectKey(job))),
     [jobs, selected]
   );
 
   const handleSelectAll = () => {
-    setSelected(visibleJobs.map((job) => orderIdStr(job)).filter(Boolean));
+    setSelected(visibleJobs.map((job) => jobSelectKey(job)).filter(Boolean));
   };
 
   const sharedPo = useMemo(() => {
@@ -186,9 +202,11 @@ export default function OrderConfirmationPage() {
     }
     setPdfLoading(true);
     try {
+      const jobKeys = selected.filter(Boolean);
+      const orderIds = selectedJobs.map((job) => orderIdStr(job)).filter(Boolean);
       const includeQs = showArchive ? "&include_completed=1" : "";
       const res = await axios.get(
-        `${API_ROOT}/order-confirmation-pdf?company=${encodeURIComponent(selectedCompany)}&order_ids=${encodeURIComponent(selected.join(","))}${includeQs}`,
+        `${API_ROOT}/order-confirmation-pdf?company=${encodeURIComponent(selectedCompany)}&job_keys=${encodeURIComponent(jobKeys.join(","))}&order_ids=${encodeURIComponent(orderIds.join(","))}${includeQs}`,
         { responseType: "blob" }
       );
       const blob = new Blob([res.data], { type: "application/pdf" });
@@ -411,12 +429,12 @@ export default function OrderConfirmationPage() {
 
       <div style={{ marginTop: "0.5rem" }}>
         {visibleJobs.map((job, idx) => {
-          const id = orderIdStr(job);
+          const id = jobSelectKey(job);
           const isSelected = selected.includes(id);
           const completed = isCompletedJob(job);
           return (
             <div
-              key={`${id}-${idx}`}
+              key={id || `${orderIdStr(job)}-${idx}`}
               role="button"
               tabIndex={0}
               onClick={() => toggleSelect(id)}
