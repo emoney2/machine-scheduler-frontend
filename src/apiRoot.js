@@ -1,10 +1,10 @@
 /**
  * API base URL.
  *
- * On Netlify, use same-origin `/api` so the login cookie is sent. netlify.toml
- * proxies that to Render. A baked-in REACT_APP_API_ROOT pointing at Render
- * would skip the cookie and empty the scheduler for kiosk/desktop sessions.
- * Phone login still uses same-host /login.
+ * Production talks to Render directly. Netlify's /api proxy dies on the
+ * Google Sheets /combined read (often >10s), which looks like the app
+ * "isn't connected to the sheet." Login still uses same-host /login, and
+ * axios-setup sends the #ms= Bearer token so phones don't need cookies.
  */
 const RENDER_API = "https://machine-scheduler-backend.onrender.com/api";
 
@@ -14,9 +14,6 @@ export function getApiRoot() {
     if (host === "localhost" || host === "127.0.0.1") {
       const env = String(process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
       return env || "/api";
-    }
-    if (host.endsWith(".netlify.app") || host.endsWith(".netlify.com")) {
-      return "/api";
     }
   } catch (_) {}
   const env = String(process.env.REACT_APP_API_ROOT || "").replace(/\/$/, "");
