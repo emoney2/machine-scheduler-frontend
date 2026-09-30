@@ -1237,17 +1237,11 @@ const fetchOrdersEmbroLinksCore = async () => {
     // 1) Fetch everything in a single round-trip (long timeout for Render cold start)
     let combinedRes;
     try {
-      combinedRes = await axios.get(API_ROOT + '/combined', {
-        timeout: 90000,
-        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-      });
+      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
     } catch (firstErr) {
       console.warn("🟡 /combined first attempt failed, retrying in 5s…", firstErr?.message || firstErr);
       await new Promise(r => setTimeout(r, 5000));
-      combinedRes = await axios.get(API_ROOT + '/combined', {
-        timeout: 90000,
-        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-      });
+      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
     }
     const payload = combinedRes?.data;
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
