@@ -101,7 +101,7 @@ function prefillNewMaterialData(name, meta = {}) {
   };
 }
 
-const NEEDLEPOINT_BELT_SIZES = ["28", "30", "32", "34", "36", "38", "40", "42", "44", "46", "48", "50", "52"];
+const NEEDLEPOINT_BELT_SIZES = Array.from({ length: 54 - 28 + 1 }, (_, i) => String(28 + i));
 
 function isNeedlepointProduct(product) {
   return String(product || "")
@@ -3166,9 +3166,8 @@ const handleSaveNewCompany = async () => {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: `repeat(${NEEDLEPOINT_BELT_SIZES.length}, minmax(44px, 1fr))`,
+                gridTemplateColumns: "repeat(auto-fill, minmax(48px, 1fr))",
                 gap: 6,
-                overflowX: "auto",
               }}
             >
               {NEEDLEPOINT_BELT_SIZES.map((size) => (
