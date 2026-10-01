@@ -101,6 +101,26 @@ function prefillNewMaterialData(name, meta = {}) {
   };
 }
 
+const NEEDLEPOINT_BELT_SIZES = ["28", "30", "32", "34", "36", "38", "40", "42", "44", "46", "48", "50", "52"];
+
+function isNeedlepointProduct(product) {
+  return String(product || "")
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .includes("needlepoint");
+}
+
+function emptyNeedlepointSizes() {
+  return Object.fromEntries(NEEDLEPOINT_BELT_SIZES.map((size) => [size, ""]));
+}
+
+function needlepointTotalQty(sizes) {
+  return NEEDLEPOINT_BELT_SIZES.reduce((sum, size) => {
+    const n = parseInt(String(sizes?.[size] ?? "").trim(), 10);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+}
+
 function isUnknownInventoryName(name, materialsInv, incompleteNames) {
   const n = String(name || "").trim();
   if (!n) return false;
@@ -374,6 +394,18 @@ export default function OrderSubmission() {
     state: "",
     zip: "",
   });
+  const [needlepointSizes, setNeedlepointSizes] = useState(() => emptyNeedlepointSizes());
+  const isNeedlepoint = isNeedlepointProduct(form.product);
+
+  useEffect(() => {
+    if (!isNeedlepoint) return;
+    const total = needlepointTotalQty(needlepointSizes);
+    setForm((prev) => {
+      const next = total > 0 ? String(total) : "";
+      if (String(prev.quantity || "") === next) return prev;
+      return { ...prev, quantity: next };
+    });
+  }, [isNeedlepoint, needlepointSizes]);
 
   const normalizeOrderShipAddress = (raw = {}) => {
     const toStateAbbr = (v = "") => String(v || "").trim().toUpperCase().slice(0, 2);
@@ -535,16 +567,18 @@ export default function OrderSubmission() {
     .map(p => p.toLowerCase())
     .includes(form.product.trim().toLowerCase());
   const materialsInvalid =
-    form.materials.filter(m => m.trim()).some(m =>
-      isUnknownInventoryName(m, materialsInv, incompleteMaterials)
-    )
-    || (
-      form.backMaterial.trim() &&
-      isUnknownInventoryName(form.backMaterial, materialsInv, incompleteMaterials)
-    )
-    || (
-      form.furColor.trim() &&
-      isUnknownInventoryName(form.furColor, materialsInv, incompleteMaterials)
+    !isNeedlepoint && (
+      form.materials.filter(m => m.trim()).some(m =>
+        isUnknownInventoryName(m, materialsInv, incompleteMaterials)
+      )
+      || (
+        form.backMaterial.trim() &&
+        isUnknownInventoryName(form.backMaterial, materialsInv, incompleteMaterials)
+      )
+      || (
+        form.furColor.trim() &&
+        isUnknownInventoryName(form.furColor, materialsInv, incompleteMaterials)
+      )
     );
   // Fur color is not needed for yardage book holders, scorecard holders,
   // or any needlepoint product.
@@ -1092,17 +1126,24 @@ const handleSubmit = async (e) => {
   console.log("🛎️ isReorder:", form.isReorder);
   e.preventDefault();
 
-  // Unknown materials first — never cover the Add New Material modal
-  // with the yellow "Submitting…" overlay (including reorders).
-  const missingMat = findMissingMaterial(form, materialsInv, incompleteMaterials);
-  if (missingMat) {
-    setModalMaterialField({
-      type: missingMat.type,
-      index: missingMat.index,
-    });
-    setNewMaterialData(prefillNewMaterialData(missingMat.name, materialInvMeta));
-    setIsNewMaterialModalOpen(true);
-    return;
+  if (isNeedlepoint) {
+    if (needlepointTotalQty(needlepointSizes) < 1) {
+      alert("Enter at least one belt size quantity.");
+      return;
+    }
+  } else {
+    // Unknown materials first — never cover the Add New Material modal
+    // with the yellow "Submitting…" overlay (including reorders).
+    const missingMat = findMissingMaterial(form, materialsInv, incompleteMaterials);
+    if (missingMat) {
+      setModalMaterialField({
+        type: missingMat.type,
+        index: missingMat.index,
+      });
+      setNewMaterialData(prefillNewMaterialData(missingMat.name, materialInvMeta));
+      setIsNewMaterialModalOpen(true);
+      return;
+    }
   }
 
   // Show overlay only after the order is actually ready to send
@@ -1145,14 +1186,16 @@ const handleSubmit = async (e) => {
     }
   }
 
-  // ── New: ensure any non‑empty Material[i] has form.materialPercents[i] filled ──
-  for (let i = 0; i < form.materials.length; i++) {
-    const mat = form.materials[i].trim();
-    const pct = (form.materialPercents[i] || "").toString().trim();
-    if (mat && !pct) {
-      setIsSubmittingOverlay(false);  // Hide overlay on validation failure
-      alert(`Please enter a percentage for Material ${i+1}.`);
-      return;  // stop here and keep the form visible
+  if (!isNeedlepoint) {
+    // ── New: ensure any non‑empty Material[i] has form.materialPercents[i] filled ──
+    for (let i = 0; i < form.materials.length; i++) {
+      const mat = form.materials[i].trim();
+      const pct = (form.materialPercents[i] || "").toString().trim();
+      if (mat && !pct) {
+        setIsSubmittingOverlay(false);  // Hide overlay on validation failure
+        alert(`Please enter a percentage for Material ${i+1}.`);
+        return;  // stop here and keep the form visible
+      }
     }
   }
 
@@ -1192,13 +1235,23 @@ const submitForm = async () => {
   const fd = new FormData();
   Object.entries(form).forEach(([key, value]) => {
     if (key === "materials") {
-      value.forEach(m => fd.append("materials", m));
+      value.forEach(m => fd.append("materials", isNeedlepoint ? "" : m));
     } else if (key === "materialPercents") {
-      value.forEach(p => fd.append("materialPercents", p));
+      value.forEach(p => fd.append("materialPercents", isNeedlepoint ? "" : p));
+    } else if (key === "quantity" && isNeedlepoint) {
+      fd.append("quantity", String(needlepointTotalQty(needlepointSizes)));
     } else {
       fd.append(key, value);
     }
   });
+  if (isNeedlepoint) {
+    const sizesPayload = {};
+    NEEDLEPOINT_BELT_SIZES.forEach((size) => {
+      const n = parseInt(String(needlepointSizes[size] || "").trim(), 10);
+      if (Number.isFinite(n) && n > 0) sizesPayload[size] = n;
+    });
+    fd.append("needlepointSizes", JSON.stringify(sizesPayload));
+  }
 
   // 🧵 Add reorderFrom if this is a reorder
   if (reorderJob && reorderJob["Order #"]) {
@@ -1396,6 +1449,7 @@ const submitForm = async () => {
       furColor: "",
       notes: "",
     });
+    setNeedlepointSizes(emptyNeedlepointSizes());
     // Clean up blob URLs before clearing arrays to prevent memory leaks
     prodPreviews.forEach((preview) => {
       if (preview?.url) {
@@ -1627,6 +1681,25 @@ const handleSaveNewCompany = async () => {
         furColor: reorderJob["Fur Color"] || "",
         isReorder: true,
       }));
+
+      const reorderNum = reorderJob["Order #"] || reorderJob.orderNumber;
+      if (isNeedlepointProduct(reorderJob["Product"]) && reorderNum) {
+        axios
+          .get(`${API_ROOT}/needlepoint/order/${encodeURIComponent(reorderNum)}`, {
+            withCredentials: true,
+          })
+          .then((res) => {
+            const sizes = res.data?.order?.sizes || {};
+            setNeedlepointSizes((prev) => {
+              const next = { ...emptyNeedlepointSizes(), ...prev };
+              NEEDLEPOINT_BELT_SIZES.forEach((size) => {
+                if (sizes[size]) next[size] = String(sizes[size]);
+              });
+              return next;
+            });
+          })
+          .catch(() => {});
+      }
 
       if (reorderJob["Image"] && reorderJob["Image"].includes("/folders/")) {
         const prodFolderMatch = reorderJob["Image"].match(/\/folders\/([a-zA-Z0-9_-]+)/);
@@ -2941,14 +3014,18 @@ const handleSaveNewCompany = async () => {
             </div>
             <div>
               <label>
-                Quantity*<br />
+                Quantity*{isNeedlepoint ? " (from size chart)" : ""}<br />
                 <input
                   name="quantity"
                   type="number"
                   value={form.quantity}
                   onChange={handleChange}
-                  required
-                  style={{ width: "80%" }}
+                  required={!isNeedlepoint}
+                  readOnly={isNeedlepoint}
+                  style={{
+                    width: "80%",
+                    background: isNeedlepoint ? "#f3f4f6" : undefined,
+                  }}
                 />
               </label>
             </div>
@@ -3077,7 +3154,62 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
 
-        {/* Materials */}
+        {/* Needlepoint belt sizes — no materials */}
+        {isNeedlepoint ? (
+          <fieldset style={{ padding: "1rem", marginBottom: "2rem" }}>
+            <legend style={{ marginBottom: "1rem", fontSize: "1.1rem", fontWeight: 600 }}>
+              Belt sizes
+            </legend>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 10 }}>
+              Needlepoint does not use materials. Enter quantities for each waist size.
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${NEEDLEPOINT_BELT_SIZES.length}, minmax(44px, 1fr))`,
+                gap: 6,
+                overflowX: "auto",
+              }}
+            >
+              {NEEDLEPOINT_BELT_SIZES.map((size) => (
+                <label
+                  key={size}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                >
+                  {size}
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={needlepointSizes[size] || ""}
+                    onChange={(e) =>
+                      setNeedlepointSizes((prev) => ({ ...prev, [size]: e.target.value }))
+                    }
+                    style={{
+                      width: "100%",
+                      minWidth: 40,
+                      padding: "6px 4px",
+                      textAlign: "center",
+                      border: "1px solid #ccc",
+                      borderRadius: 4,
+                    }}
+                    aria-label={`Quantity for size ${size}`}
+                  />
+                </label>
+              ))}
+            </div>
+            <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700 }}>
+              Total qty: {needlepointTotalQty(needlepointSizes) || 0}
+            </div>
+          </fieldset>
+        ) : (
         <fieldset style={{ padding: "1rem", marginBottom: "2rem" }}>
           <legend style={{ marginBottom: "1rem", fontSize: "1.1rem", fontWeight: 600 }}>
             Materials
@@ -3276,6 +3408,7 @@ const handleSaveNewCompany = async () => {
           </div>
 
         </fieldset>
+        )}
         {/* Additional Info + Files */}
         <fieldset style={{ padding: "0.5rem" }}>
           <legend>Additional Info</legend>
@@ -3407,7 +3540,7 @@ const handleSaveNewCompany = async () => {
                   f &&
                   (String(f.type || "").startsWith("image/") ||
                     /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(f.name || "")))
-              ) && (
+              ) && !isNeedlepoint && (
                 <button
                   type="button"
                   onClick={suggestMaterialsFromArtwork}

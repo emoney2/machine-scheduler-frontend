@@ -1121,6 +1121,14 @@ function col(width, center = false) {
 
   const [gmailPopup, setGmailPopup] = useState(null);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
+  const [needlepointOrders, setNeedlepointOrders] = useState([]);
+  const [loadingNeedlepoint, setLoadingNeedlepoint] = useState(true);
+  const [needlepointSupplierEmail, setNeedlepointSupplierEmail] = useState("");
+  const [needlepointSelected, setNeedlepointSelected] = useState({});
+  const [needlepointOrderModal, setNeedlepointOrderModal] = useState(false);
+  const [needlepointThreadColors, setNeedlepointThreadColors] = useState({});
+  const [needlepointOrderNotes, setNeedlepointOrderNotes] = useState("");
+  const [needlepointSubmitting, setNeedlepointSubmitting] = useState(false);
 
   // ⬇️ Inside export default function Overview() { ... } with your other useState hooks
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -1587,6 +1595,115 @@ function col(width, center = false) {
     const id = setInterval(() => fetchKanbanQueue({ showLoading: false }), 300000);
     return () => clearInterval(id);
   }, [fetchKanbanQueue]);
+
+  const fetchNeedlepointOrders = useCallback(
+    async ({ showLoading = true } = {}) => {
+      if (showLoading) setLoadingNeedlepoint(true);
+      try {
+        const res = await axios.get(`${ROOT}/needlepoint/pending`, {
+          withCredentials: true,
+          timeout: 20000,
+        });
+        setNeedlepointOrders(Array.isArray(res.data?.orders) ? res.data.orders : []);
+        if (res.data?.supplierEmail) {
+          setNeedlepointSupplierEmail(String(res.data.supplierEmail));
+        }
+      } catch (e) {
+        console.warn("Overview needlepoint fetch failed:", e);
+        setNeedlepointOrders([]);
+      } finally {
+        if (showLoading) setLoadingNeedlepoint(false);
+      }
+    },
+    [ROOT]
+  );
+
+  useEffect(() => {
+    fetchNeedlepointOrders({ showLoading: true });
+    const id = setInterval(() => fetchNeedlepointOrders({ showLoading: false }), 300000);
+    return () => clearInterval(id);
+  }, [fetchNeedlepointOrders]);
+
+  const selectedNeedlepointOrders = useMemo(
+    () => (needlepointOrders || []).filter((o) => needlepointSelected[o.orderNumber]),
+    [needlepointOrders, needlepointSelected]
+  );
+
+  const openNeedlepointOrderModal = () => {
+    if (!selectedNeedlepointOrders.length) {
+      alert("Select one or more needlepoint belts to order.");
+      return;
+    }
+    const colors = {};
+    selectedNeedlepointOrders.forEach((o) => {
+      colors[o.orderNumber] = needlepointThreadColors[o.orderNumber] || o.threadColors || "";
+    });
+    setNeedlepointThreadColors((prev) => ({ ...prev, ...colors }));
+    setNeedlepointOrderModal(true);
+  };
+
+  const submitNeedlepointBeltOrder = async () => {
+    const rows = selectedNeedlepointOrders;
+    if (!rows.length) {
+      alert("Select one or more needlepoint belts to order.");
+      return;
+    }
+    const missing = rows.filter((o) => !String(needlepointThreadColors[o.orderNumber] || "").trim());
+    if (missing.length) {
+      alert(`Enter thread colors for order ${missing[0].orderNumber} before creating the email.`);
+      return;
+    }
+    const to = String(needlepointSupplierEmail || "").trim();
+    if (!to.includes("@")) {
+      alert("Enter the supplier email address.");
+      return;
+    }
+    setNeedlepointSubmitting(true);
+    try {
+      const payload = {
+        to,
+        notes: needlepointOrderNotes,
+        orders: rows.map((o) => ({
+          orderNumber: o.orderNumber,
+          company: o.company,
+          design: o.design,
+          sizes: o.sizes,
+          sizeSummary: o.sizeSummary,
+          qty: o.qty,
+          threadColors: String(needlepointThreadColors[o.orderNumber] || "").trim(),
+        })),
+      };
+      const res = await axios.post(`${ROOT}/needlepoint/order-belts`, payload, {
+        withCredentials: true,
+        timeout: 120000,
+      });
+      const data = res.data || {};
+      const openUrl = data.draftUrl || data.composeUrl;
+      if (openUrl) {
+        const popup = openUrlReturn(openUrl);
+        if (popup) setGmailPopup(popup);
+      }
+      const method = data.method || "";
+      const missingDesigns = Array.isArray(data.missingDesigns) ? data.missingDesigns : [];
+      let msg = "Belt order email is ready.";
+      if (method === "gmail_draft") msg = "Gmail draft created with designs attached (named by order number).";
+      else if (method === "smtp") msg = "Email sent to the supplier with designs attached (named by order number).";
+      else if (method === "compose_url") msg = "Gmail compose opened. If attachments are missing, the designs are linked in the email body.";
+      if (missingDesigns.length) {
+        msg += ` Could not find a design file for order(s): ${missingDesigns.join(", ")}.`;
+      }
+      alert(msg);
+      setNeedlepointOrderModal(false);
+      setNeedlepointSelected({});
+      setNeedlepointOrderNotes("");
+      fetchNeedlepointOrders({ showLoading: false });
+    } catch (e) {
+      console.error("Needlepoint belt order failed:", e);
+      alert(e?.response?.data?.error || e?.message || "Failed to create belt order email.");
+    } finally {
+      setNeedlepointSubmitting(false);
+    }
+  };
 
   const fetchMagnetStatus = useCallback(
     async ({ fresh = false, showLoading = true } = {}) => {
@@ -3195,6 +3312,124 @@ function col(width, center = false) {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Needlepoint belts to order from supplier */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Needlepoint belts</span>
+              <span style={subtleUpdatedStyle}>
+                {loadingNeedlepoint ? "Loading…" : `${needlepointOrders.length} waiting to order`}
+              </span>
+              <button
+                type="button"
+                onClick={openNeedlepointOrderModal}
+                disabled={!selectedNeedlepointOrders.length}
+                style={{
+                  marginLeft: "auto",
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: "1px solid #0a7",
+                  background: selectedNeedlepointOrders.length ? "#0a7" : "#f3f4f6",
+                  color: selectedNeedlepointOrders.length ? "#fff" : "#9ca3af",
+                  cursor: selectedNeedlepointOrders.length ? "pointer" : "not-allowed",
+                }}
+              >
+                Order selected ({selectedNeedlepointOrders.length})
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+              Select one or more belts. You will enter thread colors, then we create one supplier email with the designs attached (renamed to the order number).
+            </div>
+            {loadingNeedlepoint ? (
+              <div style={{ fontSize: 13, color: "#6b7280" }}>Loading needlepoint orders…</div>
+            ) : !needlepointOrders.length ? (
+              <div style={{ fontSize: 12, color: "#9ca3af" }}>No needlepoint belts waiting to order.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {needlepointOrders.map((row) => {
+                  const checked = !!needlepointSelected[row.orderNumber];
+                  const thumb = row.previewFileId
+                    ? `${ROOT}/drive/thumbnail?fileId=${encodeURIComponent(row.previewFileId)}&sz=w120`
+                    : null;
+                  return (
+                    <label
+                      key={row.orderNumber}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "22px 56px 1fr auto",
+                        gap: 8,
+                        alignItems: "center",
+                        border: checked ? "1px solid #0a7" : "1px solid #e5e7eb",
+                        background: checked ? "#f0fdf4" : "#fff",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) =>
+                          setNeedlepointSelected((prev) => ({
+                            ...prev,
+                            [row.orderNumber]: e.target.checked,
+                          }))
+                        }
+                      />
+                      <div
+                        style={{
+                          width: 56,
+                          height: 32,
+                          borderRadius: 6,
+                          overflow: "hidden",
+                          background: "#fafafa",
+                          border: "1px solid #e5e7eb",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 10, color: "#9ca3af" }}>No art</span>
+                        )}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          #{row.orderNumber} {row.company ? `· ${row.company}` : ""}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#4b5563" }}>
+                          {[row.design, row.sizeSummary || `qty ${row.qty || 0}`]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>
+                        {row.qty || 0}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Kanban queue — same items as Kanban Queue tab (photo, qty, name, buy link, mark ordered) */}
@@ -4813,6 +5048,140 @@ function col(width, center = false) {
                 }}
               >
                 Order & Log
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {needlepointOrderModal && (
+        <div
+          className="ms-dialog-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            zIndex: 1600,
+            padding: "40px 16px",
+            overflow: "auto",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 12,
+              padding: 16,
+              width: "min(640px, 100%)",
+              boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h3 style={{ margin: "0 0 8px" }}>Order needlepoint belts</h3>
+            <div style={{ fontSize: 13, color: "#4b5563", marginBottom: 12 }}>
+              Enter thread colors for each design, then we create one email with the designs attached and renamed to the order number.
+            </div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
+              Supplier email
+              <input
+                type="email"
+                value={needlepointSupplierEmail}
+                onChange={(e) => setNeedlepointSupplierEmail(e.target.value)}
+                placeholder="supplier@example.com"
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginTop: 4,
+                  padding: 8,
+                  border: "1px solid #ccc",
+                  borderRadius: 8,
+                  fontWeight: 400,
+                }}
+              />
+            </label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 360, overflow: "auto" }}>
+              {selectedNeedlepointOrders.map((row) => (
+                <div
+                  key={row.orderNumber}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                    padding: 10,
+                  }}
+                >
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>
+                    #{row.orderNumber} {row.company ? `· ${row.company}` : ""}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6 }}>
+                    {[row.design, row.sizeSummary].filter(Boolean).join(" · ")}
+                  </div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600 }}>
+                    Thread colors*
+                    <textarea
+                      rows={2}
+                      value={needlepointThreadColors[row.orderNumber] || ""}
+                      onChange={(e) =>
+                        setNeedlepointThreadColors((prev) => ({
+                          ...prev,
+                          [row.orderNumber]: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g. 1801 Navy, 1637 Red, White"
+                      style={{
+                        display: "block",
+                        width: "100%",
+                        marginTop: 4,
+                        padding: 8,
+                        border: "1px solid #ccc",
+                        borderRadius: 8,
+                        fontWeight: 400,
+                        resize: "vertical",
+                      }}
+                    />
+                  </label>
+                </div>
+              ))}
+            </div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginTop: 12 }}>
+              Notes for this email
+              <textarea
+                rows={2}
+                value={needlepointOrderNotes}
+                onChange={(e) => setNeedlepointOrderNotes(e.target.value)}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  marginTop: 4,
+                  padding: 8,
+                  border: "1px solid #ccc",
+                  borderRadius: 8,
+                  fontWeight: 400,
+                }}
+              />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
+              <button
+                type="button"
+                onClick={() => setNeedlepointOrderModal(false)}
+                disabled={needlepointSubmitting}
+                style={{ padding: "8px 12px", border: "1px solid #ccc", borderRadius: 8 }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitNeedlepointBeltOrder}
+                disabled={needlepointSubmitting}
+                style={{
+                  padding: "8px 12px",
+                  border: "1px solid #0a7",
+                  background: "#0a7",
+                  color: "#fff",
+                  borderRadius: 8,
+                }}
+              >
+                {needlepointSubmitting ? "Creating email…" : "Create email"}
               </button>
             </div>
           </div>
