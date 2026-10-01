@@ -31,13 +31,13 @@
   force = true
 
 [[redirects]]
-  from = "/submit"
-  to = "https://machine-scheduler-backend.onrender.com/submit"
-  status = 200
-  force = true
-
-[[redirects]]
   from = "/thread-images/*"
   to = "https://machine-scheduler-backend.onrender.com/thread-images/:splat"
   status = 200
   force = true
+
+# SPA fallback. Do not proxy GET /submit — that path is the Order Submission page.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

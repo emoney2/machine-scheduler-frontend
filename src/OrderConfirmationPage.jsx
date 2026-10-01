@@ -232,7 +232,7 @@ export default function OrderConfirmationPage() {
         <h2 style={{ margin: 0 }}>Order Confirmation</h2>
         <button
           type="button"
-          onClick={() => navigate("/submit")}
+          onClick={() => navigate("/order")}
           style={{
             padding: "0.4rem 0.8rem",
             borderRadius: 6,

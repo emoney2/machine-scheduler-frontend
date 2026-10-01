@@ -2132,7 +2132,7 @@ useEffect(() => {
         {[
          { to: "/Overview",          label: "Overview" },
          { to: "/",                  label: "Scheduler" },
-         { to: "/submit",            label: "Order Submission" },
+         { to: "/order",            label: "Order Submission" },
          { to: "/inventory",         label: "Inventory" },
          { to: "/inventory-ordered", label: "Inventory Ordered" },
          { to: "/digitizing",        label: "Digitizing" }, 
@@ -2270,7 +2270,7 @@ useEffect(() => {
           }
         />
           <Route path="/overview" element={<Overview />} />
-          <Route path="/submit" element={<OrderSubmission />} />
+          <Route path="/submit" element={<Navigate to="/order" replace />} />
           <Route path="/sewing-priority" element={<SewingPriority />} />
           <Route path="/sewing-calendar" element={<SewingCalendar columns={columns} />} />
           <Route path="/sewing-calendar/tv" element={<SewingCalendar tv columns={columns} />} />
