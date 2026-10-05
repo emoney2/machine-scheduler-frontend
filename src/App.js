@@ -23,6 +23,7 @@ import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom'
 import ReorderPage from "./ReorderPage";
 import ReorderBatchBanner from "./ReorderBatchBanner";
 import OrderConfirmationPage from "./OrderConfirmationPage";
+import EditCustomer from "./EditCustomer";
 import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
@@ -2133,6 +2134,7 @@ useEffect(() => {
          { to: "/Overview",          label: "Overview" },
          { to: "/",                  label: "Scheduler" },
          { to: "/order",            label: "Order Submission" },
+         { to: "/customers",        label: "Customers" },
          { to: "/inventory",         label: "Inventory" },
          { to: "/inventory-ordered", label: "Inventory Ordered" },
          { to: "/digitizing",        label: "Digitizing" }, 
@@ -2312,6 +2314,7 @@ useEffect(() => {
           <Route path="/reorder" element={<ReorderPage />} />
           <Route path="/order-confirmation" element={<OrderConfirmationPage />} />
           <Route path="/order" element={<OrderSubmission />} />
+          <Route path="/customers" element={<EditCustomer />} />
           <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
           <Route path="/shipment-complete" element={<ShipmentComplete />} />
           <Route path="/sales" element={<SalesPortal />} />
