@@ -1875,12 +1875,8 @@ export default function Ship() {
   // 1) State for live UPS rates
   const [shippingOptions, setShippingOptions] = useState([]);
 
-  // 2) Static fallback package payloads (Customer Supplied = 02)
-  const packagesPayload = [
-    { PackagingType: "02", Weight: 7,  Dimensions: { Length: 10, Width: 10, Height: 10 } },
-    { PackagingType: "02", Weight: 24, Dimensions: { Length: 15, Width: 15, Height: 15 } },
-    { PackagingType: "02", Weight: 55, Dimensions: { Length: 20, Width: 20, Height: 20 } },
-  ];
+  // Never rate a hidden 3-box sample set — that quotes several large packages and
+  // looks like "double" (or worse) vs a single box on UPS.com.
 
   // 3) Static shipper
   const shipper = {
@@ -2088,7 +2084,9 @@ export default function Ship() {
         };
       });
     } else {
-      boxesToUse = packagesPayload;
+      notify("Add at least one box before requesting UPS rates.");
+      setShippingOptions([{ method: "Manual Shipping", rate: "N/A", delivery: "TBD" }]);
+      return;
     }
 
     // 5) Optional manual path
@@ -4126,7 +4124,21 @@ export default function Ship() {
                       <span style={{ fontSize: 11, fontWeight: 800, color: "#212121", lineHeight: 1.15, display: "block" }}>
                         {(opt.method || "Rate").replace(/\s+/g, " ").trim().slice(0, 36) || "Rate"}
                       </span>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: "#0d47a1", marginTop: 6 }}>{priceStr}</span>
+                      {opt.list_rate != null &&
+                      Number(opt.list_rate) > Number(opt.rate) + 0.009 ? (
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: "#90a4ae",
+                            textDecoration: "line-through",
+                            marginTop: 4,
+                          }}
+                        >
+                          ${Number(opt.list_rate).toFixed(2)}
+                        </span>
+                      ) : null}
+                      <span style={{ fontSize: 15, fontWeight: 800, color: "#0d47a1", marginTop: 4 }}>{priceStr}</span>
                       <span style={{ fontSize: 10, fontWeight: 600, color: "#37474f", marginTop: 6, lineHeight: 1.2 }}>
                         {eta ? (
                           <>
