@@ -167,14 +167,15 @@ const BOX_DIMENSIONS = {
   Large:  "20×20×20"
 };
 
-/** Preset boxes for Ship wizard (dims inches, weight lbs). */
+/** Preset boxes for Ship wizard (dims inches, weight lbs). Cube actuals are
+ * light — UPS still bills max(actual, DIM = L×W×H÷139), shown on the tiles. */
 const SHIP_BOX_PRESETS = [
   { id: "9x7x4", label: "9×7×4 (2 lbs)", L: 9, W: 7, H: 4, weight: 2 },
   { id: "14x9x3", label: "14×9×3 (3 lbs)", L: 14, W: 9, H: 3, weight: 3 },
-  { id: "10x10x10", label: "10×10×10 (10 lbs)", L: 10, W: 10, H: 10, weight: 10 },
-  { id: "13x13x13", label: "13×13×13 (13 lbs)", L: 13, W: 13, H: 13, weight: 13 },
-  { id: "15x15x15", label: "15×15×15 (15 lbs)", L: 15, W: 15, H: 15, weight: 15 },
-  { id: "20x20x20", label: "20×20×20 (20 lbs)", L: 20, W: 20, H: 20, weight: 20 },
+  { id: "10x10x10", label: "10×10×10 (3 lbs)", L: 10, W: 10, H: 10, weight: 3 },
+  { id: "13x13x13", label: "13×13×13 (4 lbs)", L: 13, W: 13, H: 13, weight: 4 },
+  { id: "15x15x15", label: "15×15×15 (6 lbs)", L: 15, W: 15, H: 15, weight: 6 },
+  { id: "20x20x20", label: "20×20×20 (8 lbs)", L: 20, W: 20, H: 20, weight: 8 },
 ];
 
 /** Public-folder logos for ship actions (CRA/Vite: files in public/ship-icons/). */
@@ -265,26 +266,55 @@ function initialBoxCounts() {
   return o;
 }
 
-function expandPackagesFromCounts(counts) {
+function initialBoxWeights() {
+  const o = {};
+  SHIP_BOX_PRESETS.forEach((p) => {
+    o[p.id] = p.weight;
+  });
+  return o;
+}
+
+function presetWeight(id, weights) {
+  const preset = SHIP_BOX_PRESETS.find((p) => p.id === id);
+  const raw = weights && weights[id] != null ? weights[id] : preset?.weight;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : (preset?.weight || 1);
+}
+
+function expandPackagesFromCounts(counts, weights) {
   const out = [];
   SHIP_BOX_PRESETS.forEach((p) => {
     const n = Math.max(0, Math.floor(Number(counts[p.id]) || 0));
+    const w = presetWeight(p.id, weights);
     for (let i = 0; i < n; i++) {
-      out.push({ L: p.L, W: p.W, H: p.H, weight: p.weight });
+      out.push({ L: p.L, W: p.W, H: p.H, weight: w });
     }
   });
   return out;
 }
 
-function boxesSummaryFromCounts(counts) {
+function boxesSummaryFromCounts(counts, weights) {
   return SHIP_BOX_PRESETS.filter((p) => (counts[p.id] || 0) > 0).map((p) => ({
     label: p.label,
     qty: counts[p.id] || 0,
     L: p.L,
     W: p.W,
     H: p.H,
-    weight: p.weight,
+    weight: presetWeight(p.id, weights),
   }));
+}
+
+/** UPS daily-pickup DIM divisor. Billed weight is max(actual, this). */
+function upsDimWeightLb(L, W, H) {
+  const d = orderUpsBoxDims(L, W, H);
+  const raw = (d.L * d.W * d.H) / 139;
+  return Math.max(1, Math.ceil(raw - 1e-9));
+}
+
+function upsBilledWeightLb(L, W, H, weight) {
+  const actual = Number(weight);
+  const dim = upsDimWeightLb(L, W, H);
+  return Math.max(Number.isFinite(actual) && actual > 0 ? actual : 1, dim);
 }
 
 /** UPS wants Length = longest side, whole inches. */
@@ -308,8 +338,8 @@ function upsSmallPackageLimitNotes(L, W, H, weight) {
   return notes;
 }
 
-function buildShipmentPackages(counts, customBoxes) {
-  const fromPresets = expandPackagesFromCounts(counts);
+function buildShipmentPackages(counts, customBoxes, weights) {
+  const fromPresets = expandPackagesFromCounts(counts, weights);
   const fromCustom = (customBoxes || []).map((c) => {
     const d = orderUpsBoxDims(c.L, c.W, c.H);
     return { L: d.L, W: d.W, H: d.H, weight: c.weight };
@@ -317,8 +347,8 @@ function buildShipmentPackages(counts, customBoxes) {
   return [...fromPresets, ...fromCustom];
 }
 
-function buildBoxesSummary(counts, customBoxes) {
-  const presetPart = boxesSummaryFromCounts(counts);
+function buildBoxesSummary(counts, customBoxes, weights) {
+  const presetPart = boxesSummaryFromCounts(counts, weights);
   const customPart = (customBoxes || []).map((c) => ({
     label: `${c.L}×${c.W}×${c.H} (${c.weight} lb) custom`,
     qty: 1,
@@ -1007,6 +1037,7 @@ export default function Ship() {
   const [showOneTimeAddressModal, setShowOneTimeAddressModal] = useState(false);
   const [ratesLoading, setRatesLoading] = useState(false);
   const [boxCounts, setBoxCounts] = useState(() => initialBoxCounts());
+  const [boxWeights, setBoxWeights] = useState(() => initialBoxWeights());
   /** @type {Array<{ id: string, L: number, W: number, H: number, weight: number }>} */
   const [customBoxes, setCustomBoxes] = useState([]);
   const [showCustomBoxModal, setShowCustomBoxModal] = useState(false);
@@ -1648,6 +1679,7 @@ export default function Ship() {
       setShowBoxModal(false);
       setShowRateModal(false);
       setBoxCounts(initialBoxCounts());
+      setBoxWeights(initialBoxWeights());
 
       const invoiceUrl =
         shipData.invoice && typeof shipData.invoice === "string"
@@ -2575,7 +2607,7 @@ export default function Ship() {
   };
 
   const beginRatesFlowWithAddressChoice = () => {
-    const flat = buildShipmentPackages(boxCounts, customBoxes);
+    const flat = buildShipmentPackages(boxCounts, customBoxes, boxWeights);
     if (flat.length === 0) {
       alert("Add at least one box.");
       return;
@@ -2588,7 +2620,7 @@ export default function Ship() {
     useOrderAddress = false,
     orderAddressOverride = null
   ) => {
-    const flat = buildShipmentPackages(boxCounts, customBoxes);
+    const flat = buildShipmentPackages(boxCounts, customBoxes, boxWeights);
     if (flat.length === 0) {
       alert("Add at least one box.");
       return;
@@ -2649,6 +2681,7 @@ export default function Ship() {
     upsFlowCreateInvoiceRef.current = Boolean(createInvoice);
     forceDirectoryShipRef.current = false;
     setBoxCounts(initialBoxCounts());
+    setBoxWeights(initialBoxWeights());
     setCustomBoxes([]);
     setShowCustomBoxModal(false);
     setCustomBoxForm({ L: "", W: "", H: "", weight: "" });
@@ -2678,13 +2711,13 @@ export default function Ship() {
   };
 
   const onShipWithSelectedRate = async (opt) => {
-    const flat = buildShipmentPackages(boxCounts, customBoxes);
+    const flat = buildShipmentPackages(boxCounts, customBoxes, boxWeights);
     if (flat.length === 0) {
       alert("No packages.");
       return;
     }
     const summary = summaryForShipmentApi(
-      buildBoxesSummary(boxCounts, customBoxes)
+      buildBoxesSummary(boxCounts, customBoxes, boxWeights)
     );
     const pieces = buildShipmentPieces(
       jobs.filter((j) => selected.includes(j.orderId.toString()))
@@ -3499,8 +3532,13 @@ export default function Ship() {
                     {p.L}×{p.W}×{p.H}
                   </span>
                   <span style={{ fontSize: 10, fontWeight: 600, color: "#546e7a", marginTop: 4 }}>
-                    {p.weight} lb
+                    {presetWeight(p.id, boxWeights)} lb
                   </span>
+                  {upsDimWeightLb(p.L, p.W, p.H) > presetWeight(p.id, boxWeights) && (
+                    <span style={{ fontSize: 9, fontWeight: 700, color: "#c62828", marginTop: 2, textAlign: "center", lineHeight: 1.15 }}>
+                      UPS bills {upsDimWeightLb(p.L, p.W, p.H)} lb
+                    </span>
+                  )}
                 </button>
               ))}
               <button
@@ -3555,7 +3593,28 @@ export default function Ship() {
                       }}
                     >
                       <span style={{ fontWeight: 600, color: "#37474f" }}>
-                        {p.L}×{p.W}×{p.H} <span style={{ color: "#78909c", fontWeight: 500 }}>× {boxCounts[p.id] || 0}</span>
+                        {p.L}×{p.W}×{p.H}{" "}
+                        <span style={{ color: "#78909c", fontWeight: 500 }}>× {boxCounts[p.id] || 0}</span>
+                        <label style={{ marginLeft: 8, fontWeight: 500, color: "#546e7a" }}>
+                          <input
+                            type="number"
+                            min={0.1}
+                            step={0.1}
+                            value={presetWeight(p.id, boxWeights)}
+                            onChange={(e) => {
+                              const n = parseFloat(e.target.value);
+                              setBoxWeights((w) => ({
+                                ...w,
+                                [p.id]: Number.isFinite(n) && n > 0 ? n : p.weight,
+                              }));
+                            }}
+                            style={{ width: 56, height: 28, marginRight: 4, textAlign: "center", borderRadius: 6, border: "1px solid #90a4ae", fontSize: 12 }}
+                          />
+                          lb
+                          {upsDimWeightLb(p.L, p.W, p.H) > presetWeight(p.id, boxWeights)
+                            ? ` · UPS bills ${upsDimWeightLb(p.L, p.W, p.H)} lb DIM`
+                            : ""}
+                        </label>
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                         <button
@@ -4074,6 +4133,29 @@ export default function Ship() {
                 <> · <strong>{hardSoftSummarySelected}</strong></>
               ) : null}
             </p>
+            {(() => {
+              const rows = buildBoxesSummary(boxCounts, customBoxes, boxWeights);
+              if (!rows.length) return null;
+              const billedFromUps = shippingOptions
+                .map((o) => Number(o.billed_weight))
+                .find((n) => Number.isFinite(n) && n > 0);
+              const pkgCount = rows.reduce((s, r) => s + (Number(r.qty) || 0), 0);
+              return (
+                <p style={{ margin: "0 0 8px", fontSize: 12, color: "#37474f", lineHeight: 1.35 }}>
+                  Rating <strong>{pkgCount}</strong> package{pkgCount === 1 ? "" : "s"}:{" "}
+                  {rows
+                    .map((r) => {
+                      const dim = upsDimWeightLb(r.L, r.W, r.H);
+                      const billed = upsBilledWeightLb(r.L, r.W, r.H, r.weight);
+                      return `${r.qty}× ${r.L}×${r.W}×${r.H} (${r.weight} lb${
+                        dim > Number(r.weight) ? `, UPS bills ${billed} lb` : ""
+                      })`;
+                    })
+                    .join("; ")}
+                  {billedFromUps ? ` · UPS billed weight ${billedFromUps} lb` : ""}
+                </p>
+              );
+            })()}
             {ratesLoading && (
               <div style={{ padding: 24, textAlign: "center", color: "#546e7a", fontWeight: 600 }}>Loading rates…</div>
             )}
