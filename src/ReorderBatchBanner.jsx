@@ -108,8 +108,12 @@ export default function ReorderBatchBanner() {
         </div>
         <div style={{ fontSize: 13, opacity: 0.9, marginTop: 2 }}>
           {finished
-            ? "You can dismiss this. New jobs are already in their own folders."
-            : "You can use other tabs. Closing this page is fine — the server keeps working."}
+            ? status.trueReorder
+              ? "You can dismiss this. New jobs are in their folders; production sheets stamp in the background on the shop PC."
+              : "You can dismiss this. New jobs are already in their own folders."
+            : status.trueReorder
+              ? "True 100% reorder: copies first, then the shop PC stamps each sheet in the background."
+              : "You can use other tabs. Closing this page is fine — the server keeps working."}
         </div>
         {failedItems.length > 0 && (
           <div style={{ fontSize: 12, marginTop: 6, opacity: 0.95 }}>

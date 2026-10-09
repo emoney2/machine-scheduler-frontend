@@ -29,6 +29,7 @@ export default function ReorderPage() {
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
+  const [trueReorder, setTrueReorder] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingCustomers, setLoadingCustomers] = useState(true);
   const [loadingCustomersText, setLoadingCustomersText] = useState("Loading customers…");
@@ -213,6 +214,7 @@ export default function ReorderPage() {
         dueDate,
         dateType,
         notes,
+        trueReorder,
       });
       writeActiveReorderBatch({
         batchId: res.data.batchId,
@@ -220,7 +222,9 @@ export default function ReorderPage() {
         startedAt: new Date().toISOString(),
       });
       setSubmitMessage(
-        `Started ${selected.length} reorder${selected.length === 1 ? "" : "s"} in the background. You can leave this page or open another tab — each job still gets its own new folder.`
+        trueReorder
+          ? `Started ${selected.length} true 100% reorder${selected.length === 1 ? "" : "s"} in the background. Each job gets its own folder, then the shop PC stamps the production sheets without taking over Wilcom.`
+          : `Started ${selected.length} reorder${selected.length === 1 ? "" : "s"} in the background. You can leave this page or open another tab — each job still gets its own new folder.`
       );
       setSelected([]);
     } catch (err) {
@@ -232,12 +236,13 @@ export default function ReorderPage() {
   };
 
   return (
-    <div style={{ padding: "2rem", maxWidth: 1100, margin: "0 auto", paddingBottom: 180 }}>
+    <div style={{ padding: "2rem", maxWidth: 1100, margin: "0 auto", paddingBottom: 240 }}>
       <h2 style={{ marginTop: 0 }}>Reorder Previous Jobs</h2>
       <p style={{ color: "#4b5563", marginTop: 0 }}>
         Pick a customer and click every past job you want. Change quantity or due date on
         each selected job, or use Due date for all to fill them at once. Submit once —
         each job still gets its own new folder, and you can leave this page afterward.
+        Check True 100% reorder to stamp every selected job in the background.
       </p>
 
       <input
@@ -482,6 +487,28 @@ export default function ReorderPage() {
                 placeholder="Added to each job's original notes"
                 style={{ display: "block", marginTop: 4, width: "100%", padding: "0.35rem" }}
               />
+            </label>
+            <label
+              style={{
+                fontSize: 14,
+                flex: "1 1 240px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+                cursor: "pointer",
+                lineHeight: 1.35,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={trueReorder}
+                onChange={(e) => setTrueReorder(e.target.checked)}
+                style={{ marginTop: 3 }}
+              />
+              <span>
+                <strong>True 100% reorder</strong> for the whole group — same designs.
+                Copies files, then stamps each production sheet in the background.
+              </span>
             </label>
             <button
               type="button"
