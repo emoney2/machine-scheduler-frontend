@@ -3526,8 +3526,8 @@ const handleSaveNewCompany = async () => {
                   />
                   <span>
                     <strong>True 100% reorder</strong> — same design, product, and materials.
-                    Copies the usual reorder files, then reprints and stamps the production sheet
-                    using the original stop selection.
+                    Copies the usual reorder files, then stamps a new production sheet in the
+                    background on the shop PC (same stop marks, no Wilcom takeover).
                   </span>
                 </label>
                 {!isTrueReorderEligible(form, reorderJob) && (
