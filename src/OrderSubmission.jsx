@@ -78,6 +78,36 @@ function extractDriveIdFromAny(link) {
   return m ? m[1] : null;
 }
 
+function sameText(a, b) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+}
+
+/** True 100% reorder = same design/product/materials as the original job. */
+function isTrueReorderEligible(form, reorderJob) {
+  if (!form?.isReorder || !reorderJob) return false;
+  if (!sameText(form.designName, reorderJob["Design"])) return false;
+  if (!sameText(form.product, reorderJob["Product"])) return false;
+  if (!sameText(form.backMaterial, reorderJob["Back Material"])) return false;
+  if (!sameText(form.furColor, reorderJob["Fur Color"])) return false;
+  if (!sameText(form.embBacking, reorderJob["EMB Backing"])) return false;
+  for (let i = 0; i < 5; i += 1) {
+    if (!sameText(form.materials?.[i], reorderJob[`Material${i + 1}`])) return false;
+  }
+  return true;
+}
+
+function pingLocalTrueReorderStamp({ order, sourceOrder, backOrder }) {
+  if (!order || !sourceOrder) return;
+  const qs = new URLSearchParams({
+    order: String(order),
+    from: String(sourceOrder),
+  });
+  if (backOrder) qs.set("back", String(backOrder));
+  fetch(`http://127.0.0.1:5001/true-reorder?${qs.toString()}`, {
+    mode: "no-cors",
+  }).catch(() => {});
+}
+
 const blankNewMaterialData = (name = "") => ({
   materialName: name || "",
   unit: "",
@@ -254,6 +284,7 @@ export default function OrderSubmission() {
   );
   const [lastJobThumbFailed, setLastJobThumbFailed] = useState(false);
   const [reorderingLastJob, setReorderingLastJob] = useState(false);
+  const [trueReorder, setTrueReorder] = useState(false);
 
   useEffect(() => {
     setLastJobThumbFailed(false);
@@ -1257,6 +1288,9 @@ const submitForm = async () => {
   if (reorderJob && reorderJob["Order #"]) {
     fd.append("reorderFrom", reorderJob["Order #"]);
   }
+  const stampTrueReorder =
+    !!(form.isReorder && trueReorder && isTrueReorderEligible(form, reorderJob));
+  fd.append("trueReorder", stampTrueReorder ? "true" : "false");
 
   console.log("🧪 prodFiles right before check:", prodFiles);
 
@@ -1369,6 +1403,13 @@ const submitForm = async () => {
     }
 
     const { primary: ordPrimary, back: ordBack } = extractOrderNumbersFromSubmitResponse(data);
+    if (stampTrueReorder && ordPrimary && reorderJob?.["Order #"]) {
+      pingLocalTrueReorderStamp({
+        order: ordPrimary,
+        sourceOrder: reorderJob["Order #"],
+        backOrder: ordBack,
+      });
+    }
     if (!ordPrimary) {
       console.warn(
         "[OrderSubmission] Submit succeeded but no order # parsed from response; check backend JSON keys.",
@@ -1470,6 +1511,7 @@ const submitForm = async () => {
     setProdPreviews([]);
     setPrintPreviews([]);
     setOrderHasPrint(false);
+    setTrueReorder(false);
   } catch (err) {
     console.error(err);
     alert(err.response?.data?.error || "Submission failed");
@@ -3460,6 +3502,42 @@ const handleSaveNewCompany = async () => {
                 />
               </label>
             </div>
+            {form.isReorder && (
+              <div>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "0.5rem",
+                    cursor: isTrueReorderEligible(form, reorderJob)
+                      ? "pointer"
+                      : "not-allowed",
+                    opacity: isTrueReorderEligible(form, reorderJob) ? 1 : 0.7,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={
+                      trueReorder &&
+                      isTrueReorderEligible(form, reorderJob)
+                    }
+                    disabled={!isTrueReorderEligible(form, reorderJob)}
+                    onChange={(e) => setTrueReorder(e.target.checked)}
+                  />
+                  <span>
+                    <strong>True 100% reorder</strong> — same design, product, and materials.
+                    Copies the usual reorder files, then reprints and stamps the production sheet
+                    using the original stop selection.
+                  </span>
+                </label>
+                {!isTrueReorderEligible(form, reorderJob) && (
+                  <div style={{ fontSize: "0.85rem", color: "#666", marginTop: "0.25rem" }}>
+                    Design, product, or materials changed, so this will stay a normal reorder
+                    (no stamp).
+                  </div>
+                )}
+              </div>
+            )}
             <div
               style={{
                 textAlign: "center",
