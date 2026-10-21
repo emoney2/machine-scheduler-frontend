@@ -5062,10 +5062,10 @@ function col(width, center = false) {
             inset: 0,
             background: "rgba(0,0,0,0.45)",
             display: "flex",
-            alignItems: "flex-start",
+            alignItems: "center",
             justifyContent: "center",
             zIndex: 1600,
-            padding: "40px 16px",
+            padding: "24px 16px",
             overflow: "auto",
           }}
         >
@@ -5073,9 +5073,12 @@ function col(width, center = false) {
             style={{
               background: "#fff",
               borderRadius: 12,
-              padding: 16,
-              width: "min(640px, 100%)",
+              padding: 24,
+              width: "min(920px, 96vw)",
+              maxHeight: "92vh",
+              overflow: "auto",
               boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+              boxSizing: "border-box",
             }}
           >
             <h3 style={{ margin: "0 0 8px" }}>Order needlepoint belts</h3>
@@ -5085,10 +5088,10 @@ function col(width, center = false) {
             <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
               Supplier email
               <input
-                type="email"
+                type="text"
                 value={needlepointSupplierEmail}
                 onChange={(e) => setNeedlepointSupplierEmail(e.target.value)}
-                placeholder="supplier@example.com"
+                placeholder="sales05@…, lingchoi@…"
                 style={{
                   display: "block",
                   width: "100%",
@@ -5097,29 +5100,39 @@ function col(width, center = false) {
                   border: "1px solid #ccc",
                   borderRadius: 8,
                   fontWeight: 400,
+                  boxSizing: "border-box",
                 }}
               />
             </label>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 360, overflow: "auto" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {selectedNeedlepointOrders.map((row) => (
                 <div
                   key={row.orderNumber}
                   style={{
                     border: "1px solid #e5e7eb",
                     borderRadius: 8,
-                    padding: 10,
+                    padding: 12,
+                    boxSizing: "border-box",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
                     #{row.orderNumber} {row.company ? `· ${row.company}` : ""}
                   </div>
-                  <div style={{ fontSize: 12, color: "#4b5563", marginBottom: 6 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#4b5563",
+                      marginBottom: 8,
+                      whiteSpace: "normal",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
                     {[row.design, row.sizeSummary].filter(Boolean).join(" · ")}
                   </div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600 }}>
                     Thread colors*
                     <textarea
-                      rows={2}
+                      rows={4}
                       value={needlepointThreadColors[row.orderNumber] || ""}
                       onChange={(e) =>
                         setNeedlepointThreadColors((prev) => ({
@@ -5137,6 +5150,7 @@ function col(width, center = false) {
                         borderRadius: 8,
                         fontWeight: 400,
                         resize: "vertical",
+                        boxSizing: "border-box",
                       }}
                     />
                   </label>
@@ -5146,7 +5160,7 @@ function col(width, center = false) {
             <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginTop: 12 }}>
               Notes for this email
               <textarea
-                rows={2}
+                rows={3}
                 value={needlepointOrderNotes}
                 onChange={(e) => setNeedlepointOrderNotes(e.target.value)}
                 style={{
@@ -5157,6 +5171,7 @@ function col(width, center = false) {
                   border: "1px solid #ccc",
                   borderRadius: 8,
                   fontWeight: 400,
+                  boxSizing: "border-box",
                 }}
               />
             </label>
