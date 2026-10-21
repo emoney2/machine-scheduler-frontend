@@ -1678,23 +1678,51 @@ function col(width, center = false) {
         timeout: 120000,
       });
       const data = res.data || {};
-      const openUrl = data.draftUrl || data.composeUrl;
+      const method = data.method || "";
+      const missingDesigns = Array.isArray(data.missingDesigns) ? data.missingDesigns : [];
+      const pdfPayloads = Array.isArray(data.attachmentsBase64) ? data.attachmentsBase64 : [];
+
+      // Gmail compose URLs cannot carry files. If we only got compose, download PDFs locally
+      // so they can be attached with the paperclip.
+      const needsManualAttach = method === "compose_download" || method === "compose_url" || method === "none";
+      if (needsManualAttach && pdfPayloads.length) {
+        for (const file of pdfPayloads) {
+          try {
+            const bin = atob(String(file.contentBase64 || ""));
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+            const blob = new Blob([bytes], { type: file.mime || "application/pdf" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = file.filename || "design.pdf";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          } catch (dlErr) {
+            console.error("PDF download failed:", dlErr);
+          }
+        }
+      }
+
+      const openUrl = data.draftUrl || (needsManualAttach ? data.composeUrl : "");
       if (openUrl) {
         const popup = openUrlReturn(openUrl);
         if (popup) setGmailPopup(popup);
       }
-      const method = data.method || "";
-      const missingDesigns = Array.isArray(data.missingDesigns) ? data.missingDesigns : [];
+
       let msg = "Belt order email is ready.";
-      if (method === "gmail_draft") {
-        msg = "Gmail draft created with design PDF(s) attached (named by order number).";
+      if (method === "gmail_draft" || method === "imap_draft") {
+        msg = "Gmail draft created with design PDF(s) attached. Review the draft, then Send.";
       } else if (method === "smtp") {
-        msg = "Email sent to the supplier with design PDF(s) attached (named by order number).";
-      } else if (method === "compose_url") {
-        msg =
-          data.ok === false
-            ? "Gmail compose opened, but PDFs could not be auto-attached. Attach the order PDF(s) manually before sending — do not use Drive links."
-            : "Gmail compose opened.";
+        msg = "Email sent to the supplier with design PDF(s) attached.";
+      } else if (needsManualAttach) {
+        msg = pdfPayloads.length
+          ? `Downloaded ${pdfPayloads.map((f) => f.filename).join(", ")}. Attach ${
+              pdfPayloads.length === 1 ? "that PDF" : "those PDFs"
+            } with the paperclip in Gmail before sending (Drive links will not work for the vendor).`
+          : data.error || "No design PDF was found to attach.";
       }
       if (missingDesigns.length) {
         msg += ` Could not find a design PDF for order(s): ${missingDesigns.join(", ")}.`;
