@@ -1686,11 +1686,18 @@ function col(width, center = false) {
       const method = data.method || "";
       const missingDesigns = Array.isArray(data.missingDesigns) ? data.missingDesigns : [];
       let msg = "Belt order email is ready.";
-      if (method === "gmail_draft") msg = "Gmail draft created with designs attached (named by order number).";
-      else if (method === "smtp") msg = "Email sent to the supplier with designs attached (named by order number).";
-      else if (method === "compose_url") msg = "Gmail compose opened. If attachments are missing, the designs are linked in the email body.";
+      if (method === "gmail_draft") {
+        msg = "Gmail draft created with design PDF(s) attached (named by order number).";
+      } else if (method === "smtp") {
+        msg = "Email sent to the supplier with design PDF(s) attached (named by order number).";
+      } else if (method === "compose_url") {
+        msg =
+          data.ok === false
+            ? "Gmail compose opened, but PDFs could not be auto-attached. Attach the order PDF(s) manually before sending — do not use Drive links."
+            : "Gmail compose opened.";
+      }
       if (missingDesigns.length) {
-        msg += ` Could not find a design file for order(s): ${missingDesigns.join(", ")}.`;
+        msg += ` Could not find a design PDF for order(s): ${missingDesigns.join(", ")}.`;
       }
       alert(msg);
       setNeedlepointOrderModal(false);
