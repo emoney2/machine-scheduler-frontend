@@ -1182,7 +1182,8 @@ const companyNames = companies.map((opt) => opt.value);
         return next;
       });
     }
-    e.target.value = "";
+    // Do not clear e.target.value — that breaks HTML required validation on submit
+    // even when prodFiles state already has the selected files.
   };
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
@@ -3599,14 +3600,18 @@ const handleSaveNewCompany = async () => {
           <input
             type="file"
             multiple
-            accept="image/*,.pdf,.json,.jrneedlepoint.json,application/json"
+            {...(isNeedlepoint
+              ? { accept: "image/*,.pdf,.json,.jrneedlepoint.json,application/json" }
+              : {})}
             required={!form.isReorder}
             onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews, prodPreviewUrlsRef)}
             style={{ marginBottom: "0.5rem" }}
           />
-          <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
-            Needlepoint Studio: attach the saved <code>.jrneedlepoint.json</code> to see a belt thumbnail.
-          </div>
+          {isNeedlepoint && (
+            <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
+              Needlepoint Studio: attach the saved <code>.jrneedlepoint.json</code> to see a belt thumbnail.
+            </div>
+          )}
           <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
             {prodFiles.map((f) => f.name).join(", ")}
           </div>
