@@ -1713,10 +1713,17 @@ function col(width, center = false) {
       }
 
       let msg = "Belt order email is ready.";
-      if (method === "gmail_draft" || method === "imap_draft") {
+      if (method === "gmail_draft") {
         msg = "Gmail draft created with design PDF(s) attached. Review the draft, then Send.";
       } else if (method === "smtp") {
         msg = "Email sent to the supplier with design PDF(s) attached.";
+      } else if (data.needsGmailAuth) {
+        msg =
+          "Google login needs Gmail permission (one-time browser sign-in — no password stored). " +
+          "On the server PC run: python generate_token.py — then update GOOGLE_TOKEN_JSON. " +
+          (pdfPayloads.length
+            ? `For now, downloaded ${pdfPayloads.map((f) => f.filename).join(", ")} — paperclip them before sending.`
+            : "");
       } else if (needsManualAttach) {
         msg = pdfPayloads.length
           ? `Downloaded ${pdfPayloads.map((f) => f.filename).join(", ")}. Attach ${
