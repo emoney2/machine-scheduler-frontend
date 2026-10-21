@@ -4,6 +4,7 @@ import "./FileInput.css";
 import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { API_ROOT } from "./apiRoot";
+import { parseStudioPackageFile } from "./jrNeedlepointPackage";
 
 
 const LS_LAST_ACCEPTED_CUSTOMER_JOB_KEY = "jrco.last_accepted_customer_job.v1";
@@ -957,11 +958,12 @@ const companyNames = companies.map((opt) => opt.value);
 
   // remove the production file + its preview at index i
   const removeProdFile = (i) => {
-    // Revoke the blob URL before removing to prevent memory leaks
+    // Revoke blob URLs only (Studio package previews use data: URLs — do not revoke).
     setProdPreviews((prev) => {
-      if (prev[i]?.url) {
-        URL.revokeObjectURL(prev[i].url);
-        prodPreviewUrlsRef.current.delete(prev[i].url); // Remove from tracking
+      const url = prev[i]?.url;
+      if (url && String(url).startsWith("blob:")) {
+        URL.revokeObjectURL(url);
+        prodPreviewUrlsRef.current.delete(url);
       }
       return prev.filter((_, idx) => idx !== i);
     });
@@ -1137,18 +1139,50 @@ const companyNames = companies.map((opt) => opt.value);
     }
   };
 
-  const createPreviews = (files, urlsRef) =>
-    files.map((f) => {
-      const url = URL.createObjectURL(f);
-      urlsRef.current.add(url); // Track URL for cleanup
-      return { url, type: f.type, name: f.name };
-    });
+  const createPreviewForFile = async (f, urlsRef) => {
+    // Studio .jrneedlepoint.json embeds a customer-view PNG — show that as the belt thumbnail.
+    const studio = await parseStudioPackageFile(f);
+    if (studio?.customerViewPng) {
+      return {
+        url: studio.customerViewPng,
+        type: "image/png",
+        name: f.name,
+        studioPackage: true,
+        designName: studio.designName,
+        customerName: studio.customerName,
+        leather: studio.leather,
+        buckle: studio.buckle,
+      };
+    }
+    const url = URL.createObjectURL(f);
+    urlsRef.current.add(url);
+    return { url, type: f.type || "", name: f.name };
+  };
 
-  const handleFileChange = (e, setter, previewSetter, urlsRef) => {
-    const files = Array.from(e.target.files);
+  const handleFileChange = async (e, setter, previewSetter, urlsRef) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setter((prev) => [...prev, ...files]);
-    previewSetter((prev) => [...prev, ...createPreviews(files, urlsRef)]);
-    // Do NOT touch form.designName — user will type it manually 
+    const previews = await Promise.all(
+      files.map((f) => createPreviewForFile(f, urlsRef))
+    );
+    previewSetter((prev) => [...prev, ...previews]);
+
+    // Prefill empty design / company from Studio package metadata (never overwrite typed values).
+    const studioMeta = previews.find((p) => p.studioPackage);
+    if (studioMeta) {
+      setForm((prev) => {
+        const next = { ...prev };
+        if (!String(prev.designName || "").trim() && studioMeta.designName) {
+          next.designName = studioMeta.designName;
+        }
+        if (!String(prev.company || "").trim() && studioMeta.customerName) {
+          next.company = studioMeta.customerName;
+        }
+        return next;
+      });
+    }
+    e.target.value = "";
   };
 
 // ─── UPDATED handleSubmit ───────────────────────────────────────
@@ -3565,10 +3599,14 @@ const handleSaveNewCompany = async () => {
           <input
             type="file"
             multiple
+            accept="image/*,.pdf,.json,.jrneedlepoint.json,application/json"
             required={!form.isReorder}
             onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews, prodPreviewUrlsRef)}
             style={{ marginBottom: "0.5rem" }}
           />
+          <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
+            Needlepoint Studio: attach the saved <code>.jrneedlepoint.json</code> to see a belt thumbnail.
+          </div>
           <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
             {prodFiles.map((f) => f.name).join(", ")}
           </div>
@@ -3577,7 +3615,7 @@ const handleSaveNewCompany = async () => {
             <legend>Production Preview</legend>
             <div style={{ overflow: "auto", height: "100%" }}>
               {prodPreviews.map((p, i) => (
-                <div key={i} style={{ position: "relative", marginBottom: "0.25rem" }}>
+                <div key={i} style={{ position: "relative", marginBottom: "0.5rem" }}>
                   <button
                     type="button"
                     onClick={() => removeProdFile(i)}
@@ -3590,17 +3628,36 @@ const handleSaveNewCompany = async () => {
                       cursor: "pointer",
                       fontSize: "1rem",
                       lineHeight: 1,
+                      zIndex: 1,
                     }}
                     aria-label="Remove file"
                   >
                     ×
                   </button>
-                  {p.type.startsWith("image/") ? (
-                    <img
-                      src={p.url}
-                      alt={p.name}
-                      style={{ maxWidth: "100%", maxHeight: 80 }}
-                    />
+                  {String(p.type || "").startsWith("image/") ? (
+                    <div>
+                      <img
+                        src={p.url}
+                        alt={p.name}
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: p.studioPackage ? 140 : 80,
+                          objectFit: "contain",
+                          display: "block",
+                          background: p.studioPackage ? "#f3f4f6" : "transparent",
+                          borderRadius: 4,
+                        }}
+                      />
+                      {p.studioPackage && (
+                        <div style={{ fontSize: "0.75rem", color: "#4b5563", marginTop: 4 }}>
+                          Belt preview
+                          {p.designName ? ` — ${p.designName}` : ""}
+                          {p.leather || p.buckle
+                            ? ` (${[p.leather, p.buckle].filter(Boolean).join(" / ")})`
+                            : ""}
+                        </div>
+                      )}
+                    </div>
                   ) : p.type === "application/pdf" ? (
                     <iframe
                       src={p.url}
