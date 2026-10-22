@@ -2922,7 +2922,7 @@ const handleSaveNewCompany = async () => {
 
               {/* Quick-select buttons */}
               <div style={{ display: "flex", gap: "8px", marginBottom: "8px" }}>
-                {[6, 7, 8].map((weeks) => (
+                {[6, 7, 8, 10].map((weeks) => (
                   <button
                     type="button"
                     key={weeks}
@@ -3156,7 +3156,7 @@ const handleSaveNewCompany = async () => {
                   required
                   style={{ width: "80%" }}
                 />
-                <div style={{ marginTop: "0.25rem", display: "flex", gap: "0.5rem" }}>
+                <div style={{ marginTop: "0.25rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                   <button type="button" onClick={() => setDueDateWeeks(6)}>
                     6 Weeks
                   </button>
@@ -3165,6 +3165,9 @@ const handleSaveNewCompany = async () => {
                   </button>
                   <button type="button" onClick={() => setDueDateWeeks(8)}>
                     8 Weeks
+                  </button>
+                  <button type="button" onClick={() => setDueDateWeeks(10)}>
+                    10 Weeks
                   </button>
                 </div>
               </label>
