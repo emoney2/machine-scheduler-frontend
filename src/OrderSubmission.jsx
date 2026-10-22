@@ -995,7 +995,7 @@ const companyNames = companies.map((opt) => opt.value);
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ─── Quick-pick Due Date (6/7/8 weeks) ────────────────────────
+  // ─── Quick-pick Due Date (6/7/8/10 weeks) ─────────────────────
   const setDueDateWeeks = (weeks) => {
     const d = new Date();
     d.setDate(d.getDate() + weeks * 7);
