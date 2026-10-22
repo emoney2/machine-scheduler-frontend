@@ -1152,6 +1152,8 @@ const companyNames = companies.map((opt) => opt.value);
         customerName: studio.customerName,
         leather: studio.leather,
         buckle: studio.buckle,
+        productType: studio.productType,
+        product: studio.product,
       };
     }
     const url = URL.createObjectURL(f);
@@ -1168,7 +1170,8 @@ const companyNames = companies.map((opt) => opt.value);
     );
     previewSetter((prev) => [...prev, ...previews]);
 
-    // Prefill empty design / company from Studio package metadata (never overwrite typed values).
+    // Prefill empty design / company / product from Studio package metadata
+    // (never overwrite typed values).
     const studioMeta = previews.find((p) => p.studioPackage);
     if (studioMeta) {
       setForm((prev) => {
@@ -1178,6 +1181,9 @@ const companyNames = companies.map((opt) => opt.value);
         }
         if (!String(prev.company || "").trim() && studioMeta.customerName) {
           next.company = studioMeta.customerName;
+        }
+        if (!String(prev.product || "").trim() && studioMeta.product) {
+          next.product = studioMeta.product;
         }
         return next;
       });
