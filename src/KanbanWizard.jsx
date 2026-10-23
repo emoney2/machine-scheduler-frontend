@@ -249,14 +249,13 @@ export default function KanbanWizard() {
         setCostPerPkg(price);
         clearFieldError("costPerPkg");
       }
-      setSupplier((prev) => {
-        if (String(prev || "").trim()) return prev;
-        if (/amazon\./i.test(u)) {
-          clearFieldError("supplier");
+      if (/amazon\./i.test(u)) {
+        setSupplier((prev) => {
+          if (String(prev || "").trim()) return prev;
           return "Amazon";
-        }
-        return prev;
-      });
+        });
+        clearFieldError("supplier");
+      }
 
       const filled = [title && "title", image && "image", price && "price"]
         .filter(Boolean)
@@ -300,7 +299,6 @@ export default function KanbanWizard() {
       scrapeProductUrl(u);
     }, 650);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, orderMethod, phase]);
 
   function applyCrop() {
