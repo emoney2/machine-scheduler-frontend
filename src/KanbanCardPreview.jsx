@@ -28,6 +28,28 @@ function showVal(v) {
   return s.trim() === "" ? "—" : s;
 }
 
+/** Keep printed titles short so the 4×6 card layout stays intact. */
+function shortenProductTitle(raw, maxLen = 60) {
+  let t = String(raw || "").replace(/\s+/g, " ").trim();
+  if (!t) return "—";
+  for (const sep of [" - ", " – ", " — ", " | "]) {
+    if (t.includes(sep)) {
+      const head = t.split(sep)[0].trim();
+      if (head.length >= 6 && head.length <= maxLen) {
+        t = head;
+        break;
+      }
+    }
+  }
+  if (t.length > maxLen) {
+    let cut = t.slice(0, maxLen - 1);
+    const sp = cut.lastIndexOf(" ");
+    if (sp > 20) cut = cut.slice(0, sp);
+    t = `${cut.replace(/[,\-–—|/]+$/g, "")}…`;
+  }
+  return t;
+}
+
 const CODE39_PATTERNS = {
   "0": "nnnwwnwnn", "1": "wnnwnnnnw", "2": "nnwwnnnnw", "3": "wnwwnnnnn",
   "4": "nnnwwnnnw", "5": "wnnwwnnnn", "6": "nnwwwnnnn", "7": "nnnwnnwnw",
@@ -310,12 +332,13 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
             borderRadius: 12,
             background: "white",
             boxSizing: "border-box",
-            padding: "12px 12px 16px",
+            padding: "10px 12px 12px",
             display: "grid",
-            gridTemplateRows: "auto auto 1fr",
-            gap: 8,
+            gridTemplateRows: "auto auto minmax(0, 1fr)",
+            gap: 6,
             position: "relative",
-            overflow: "hidden",          // lock aspect ratio so shape can't stretch
+            overflow: "hidden",
+            minHeight: 0,
           }}
         >
 
@@ -345,34 +368,45 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
         </div>
 
 
-        {/* Body — divided into three equal rows (top/middle/bottom) */}
+        {/* Body — top/middle flex; QR row is auto so labels never clip */}
         <div
                 style={{
                         display: "grid",
-                        gridTemplateRows: "1fr 1fr 1fr",
-                        gap: 12,
+                        gridTemplateRows: "minmax(0, 1.2fr) minmax(0, 0.75fr) auto",
+                        gap: 8,
                         height: "100%",
+                        minHeight: 0,
                         fontSize: "clamp(14px, 1.9vw, 20px)",
                 }}
         >
-                {/* TOP THIRD: image (left) + item name & price (right) */}
+                {/* TOP: image (left) + item name & price (right) */}
                 <div
                         style={{
                                 display: "grid",
                                 gridTemplateColumns: "1fr 1fr",
-                                gap: 12,
+                                gap: 10,
                                 alignItems: "center",
+                                minHeight: 0,
+                                overflow: "hidden",
                         }}
                 >
-                        {/* Left: big product image */}
-                        <div style={{ display: "grid", alignContent: "start" }}>
+                        {/* Left: product image (capped to cell) */}
+                        <div
+                          style={{
+                            display: "grid",
+                            placeItems: "center",
+                            minHeight: 0,
+                            height: "100%",
+                            overflow: "hidden",
+                          }}
+                        >
                                 {item.photoUrl ? (
                                         <img
                                                 src={item.photoUrl}
                                                 alt=""
                                                 style={{
                                                         width: "100%",
-                                                        height: "auto",
+                                                        maxHeight: "100%",
                                                         aspectRatio: "1 / 1",
                                                         objectFit: "contain",
                                                         background: "#f3f4f6",
@@ -384,6 +418,7 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                                         <div
                                                 style={{
                                                         width: "100%",
+                                                        maxHeight: "100%",
                                                         aspectRatio: "1 / 1",
                                                         border: "1px solid #e5e7eb",
                                                         borderRadius: 12,
@@ -402,10 +437,11 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         <div
                           style={{
                             display: "grid",
-                            rowGap: 12,
+                            rowGap: 6,
                             textAlign: "center",
                             justifyItems: "center",
                             minWidth: 0,
+                            minHeight: 0,
                             maxHeight: "100%",
                             overflow: "hidden",
                             alignContent: "center",
@@ -414,19 +450,19 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                           <div
                             style={{
                               fontWeight: 900,
-                              fontSize: "clamp(18px, 2.4vw, 28px)",
+                              fontSize: "clamp(16px, 2.1vw, 24px)",
                               lineHeight: 1.15,
                               overflowWrap: "anywhere",
                               wordBreak: "break-word",
                               maxWidth: "100%",
-                              maxHeight: "3.45em",
+                              maxHeight: "2.4em",
                               overflow: "hidden",
                               display: "-webkit-box",
-                              WebkitLineClamp: 3,
+                              WebkitLineClamp: 2,
                               WebkitBoxOrient: "vertical",
                             }}
                           >
-                            {String(item.itemName || "—")}
+                            {shortenProductTitle(item.itemName || "—")}
                           </div>
 
                           <div
@@ -477,13 +513,15 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         </div>   {/* <-- CLOSES the TOP third wrapper */}
 
 
-                        {/* MIDDLE THIRD: Bin Qty (left) + Reorder Qty (right) */}
+                        {/* MIDDLE: Bin Qty (left) + Reorder Qty (right) */}
                         <div
                           style={{
                             display: "grid",
                             gridTemplateColumns: "1fr 1fr",
                             gap: 16,
                             alignContent: "center",
+                            minHeight: 0,
+                            overflow: "hidden",
                           }}
                         >
 
@@ -526,43 +564,35 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         </div>
                 </div>
 
-                {/* BOTTOM THIRD: QRs — product, reorder, receive */}
+                {/* BOTTOM: QRs — sized to content so labels stay inside the card */}
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1fr 1fr 1fr",
-                    alignItems: "start",
-                    padding: "10px 10px 0",
+                    alignItems: "end",
+                    justifyItems: "center",
+                    padding: "4px 4px 2px",
                     boxSizing: "border-box",
-                    gap: 8,
-                    position: "relative",
-                    top: "-0.625in",   // lift by 5/8"
+                    gap: 6,
                   }}
                 >
-
-
-
-
                         {/* Left QR: Product Link */}
-                        <div style={{ justifySelf: "start", display: "grid", rowGap: 6, justifyItems: "center" }}>
+                        <div style={{ display: "grid", rowGap: 4, justifyItems: "center", width: "100%" }}>
                                 <img
                                   alt="Product Link"
                                   src={makeQr(orderQrUrl, 480)}
                                   style={{
-                                    width: "58%",
-                                    maxWidth: 168,
+                                    width: "52%",
+                                    maxWidth: 140,
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
-                                    marginTop: 2,          // tiny lift
                                   }}
                                 />
-
-
-
                                 <div
                                         style={{
-                                                fontSize: "clamp(12px, 1.4vw, 16px)",
+                                                fontSize: "clamp(11px, 1.25vw, 14px)",
+                                                lineHeight: 1.15,
                                                 fontWeight: 700,
                                                 textAlign: "center",
                                         }}
@@ -572,51 +602,47 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                         </div>
 
                         {/* Middle QR: Reorder Request */}
-                        <div style={{ justifySelf: "center", display: "grid", rowGap: 6, justifyItems: "center" }}>
+                        <div style={{ display: "grid", rowGap: 4, justifyItems: "center", width: "100%" }}>
                                 <img
                                   alt="Reorder Request QR"
                                   src={scanQr}
                                   style={{
-                                    width: "58%",
-                                    maxWidth: 168,
+                                    width: "52%",
+                                    maxWidth: 140,
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
-                                    marginTop: 2,
                                   }}
                                 />
                                 <div
                                         style={{
-                                          fontSize: "clamp(11px, 1.25vw, 15px)",
-                                          lineHeight: 1.1,           // tighter label height
+                                          fontSize: "clamp(10px, 1.15vw, 13px)",
+                                          lineHeight: 1.15,
                                           fontWeight: 700,
                                           textAlign: "center",
                                         }}
-
-
                                 >
                                         Reorder Request QR
                                 </div>
                         </div>
 
                         {/* Right QR: Receive Delivery */}
-                        <div style={{ justifySelf: "end", display: "grid", rowGap: 6, justifyItems: "center" }}>
+                        <div style={{ display: "grid", rowGap: 4, justifyItems: "center", width: "100%" }}>
                                 <img
                                   alt="Receive Delivery QR"
                                   src={receiveQr}
                                   style={{
-                                    width: "58%",
-                                    maxWidth: 168,
+                                    width: "52%",
+                                    maxWidth: 140,
                                     height: "auto",
                                     aspectRatio: "1 / 1",
                                     boxSizing: "border-box",
-                                    marginTop: 2,
                                   }}
                                 />
                                 <div
                                         style={{
-                                          fontSize: "clamp(11px, 1.25vw, 15px)",
-                                          lineHeight: 1.1,
+                                          fontSize: "clamp(10px, 1.15vw, 13px)",
+                                          lineHeight: 1.15,
                                           fontWeight: 700,
                                           textAlign: "center",
                                         }}
