@@ -110,6 +110,8 @@ export default function KanbanWizard() {
   const [notes, setNotes] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const [scrapingUrl, setScrapingUrl] = useState(false);
+  const [scrapeHint, setScrapeHint] = useState("");
   const [cropSrc, setCropSrc] = useState(null);
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [crop, setCrop] = useState({ unit: "%", width: 90, x: 5, y: 5 });
@@ -120,6 +122,8 @@ export default function KanbanWizard() {
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
   const cropImageRef = React.useRef(null);
   const fileInputRef = React.useRef(null);
+  const urlDirtyRef = React.useRef(false);
+  const lastScrapedUrlRef = React.useRef("");
   const [fieldErrors, setFieldErrors] = useState({});
 
   function openCropEditor(src) {
@@ -204,6 +208,80 @@ export default function KanbanWizard() {
       return next;
     });
   }
+
+  async function scrapeProductUrl(rawUrl) {
+    const u = String(rawUrl || "").trim();
+    if (orderMethod !== "Online") return;
+    if (!/^https?:\/\//i.test(u)) return;
+    if (lastScrapedUrlRef.current === u) return;
+
+    setScrapingUrl(true);
+    setScrapeHint("Looking up product…");
+    try {
+      const r = await fetch(
+        `${BACKEND}/api/kanban/scrape?url=${encodeURIComponent(u)}`,
+        { credentials: "include" }
+      );
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setScrapeHint(
+          "Couldn’t auto-fill from that site — add title, price, and photo manually."
+        );
+        return;
+      }
+
+      lastScrapedUrlRef.current = u;
+      const title = String(j.title || "").trim();
+      const image = String(j.image || "").trim();
+      const price = String(j.price || "")
+        .trim()
+        .replace(/^\$/, "");
+
+      if (title) {
+        setItemName(title);
+        clearFieldError("itemName");
+      }
+      if (image) {
+        setPhotoUrl(image);
+        clearFieldError("photoUrl");
+      }
+      if (price) {
+        setCostPerPkg(price);
+        clearFieldError("costPerPkg");
+      }
+      if (!supplier.trim() && /amazon\./i.test(u)) {
+        setSupplier("Amazon");
+        clearFieldError("supplier");
+      }
+
+      const filled = [title && "title", image && "image", price && "price"]
+        .filter(Boolean)
+        .join(", ");
+      setScrapeHint(
+        filled
+          ? `Filled ${filled} from link.`
+          : "No product details found — add them manually."
+      );
+    } catch {
+      setScrapeHint(
+        "Couldn’t auto-fill from that site — add title, price, and photo manually."
+      );
+    } finally {
+      setScrapingUrl(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!urlDirtyRef.current) return;
+    if (orderMethod !== "Online") return;
+    const u = String(url || "").trim();
+    if (!/^https?:\/\//i.test(u)) return;
+    const t = setTimeout(() => {
+      scrapeProductUrl(u);
+    }, 650);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, orderMethod]);
 
   function applyCrop() {
     if (!cropImageRef.current) return;
@@ -817,11 +895,28 @@ export default function KanbanWizard() {
                         }
                         onChange={(v) => {
                           if (orderMethod === "Online") {
+                            urlDirtyRef.current = true;
                             setUrl(v);
                             clearFieldError("url");
+                            setScrapeHint("");
                           } else {
                             setOrderEmail(v);
                             clearFieldError("orderEmail");
+                          }
+                        }}
+                        onPaste={(e) => {
+                          if (orderMethod !== "Online") return;
+                          const pasted = (
+                            e.clipboardData?.getData("text") || ""
+                          ).trim();
+                          if (!/^https?:\/\//i.test(pasted)) return;
+                          urlDirtyRef.current = true;
+                          // Let the textarea update, then scrape immediately.
+                          setTimeout(() => scrapeProductUrl(pasted), 0);
+                        }}
+                        onBlur={() => {
+                          if (orderMethod === "Online" && urlDirtyRef.current) {
+                            scrapeProductUrl(url);
                           }
                         }}
                         placeholder={
@@ -843,6 +938,18 @@ export default function KanbanWizard() {
                           fontSize: "inherit",
                         }}
                       />
+                      {orderMethod === "Online" && (scrapingUrl || scrapeHint) ? (
+                        <div
+                          style={{
+                            marginTop: 4,
+                            fontSize: 11,
+                            opacity: 0.75,
+                            fontWeight: 500,
+                          }}
+                        >
+                          {scrapingUrl ? "Looking up product…" : scrapeHint}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -1184,12 +1291,22 @@ function CardInput({ value, onChange, placeholder, error, style }) {
   );
 }
 
-function CardText({ value, onChange, placeholder, error, style, rows = 2 }) {
+function CardText({
+  value,
+  onChange,
+  placeholder,
+  error,
+  style,
+  rows = 2,
+  onBlur: onBlurProp,
+  onPaste,
+}) {
   return (
     <textarea
       value={value}
       rows={rows}
       onChange={(e) => onChange(e.target.value)}
+      onPaste={onPaste}
       placeholder={placeholder}
       style={{
         border: error ? "1px solid #fca5a5" : "1px solid transparent",
@@ -1221,6 +1338,7 @@ function CardText({ value, onChange, placeholder, error, style, rows = 2 }) {
         e.target.style.border = error
           ? "1px solid #fca5a5"
           : "1px solid transparent";
+        if (typeof onBlurProp === "function") onBlurProp(e);
       }}
     />
   );
