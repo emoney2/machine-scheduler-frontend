@@ -109,15 +109,16 @@ function NeedlepointVendorGridPreview({ orderNumber, previewFileId, root }) {
   return (
     <div
       style={{
-        flex: "1 1 420px",
-        minWidth: 280,
-        minHeight: "min(52vh, 520px)",
+        flex: "1 1 520px",
+        minWidth: 320,
+        minHeight: "60vh",
         border: "1px solid #e5e7eb",
         borderRadius: 10,
         background: "#f8fafc",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        alignSelf: "stretch",
       }}
     >
       <div
@@ -130,11 +131,12 @@ function NeedlepointVendorGridPreview({ orderNumber, previewFileId, root }) {
           padding: "8px 10px",
           borderBottom: "1px solid #e5e7eb",
           background: "#fff",
+          flex: "0 0 auto",
         }}
       >
         Vendor grid (what they receive)
       </div>
-      <div style={{ flex: 1, position: "relative", minHeight: "min(48vh, 480px)" }}>
+      <div style={{ flex: 1, position: "relative", minHeight: "56vh" }}>
         {status === "loading" && (
           <div
             style={{
@@ -155,9 +157,10 @@ function NeedlepointVendorGridPreview({ orderNumber, previewFileId, root }) {
             title={`Vendor grid ${orderNumber}`}
             src={objectUrl}
             style={{
+              position: "absolute",
+              inset: 0,
               width: "100%",
               height: "100%",
-              minHeight: "min(48vh, 480px)",
               border: 0,
               background: "#fff",
             }}
@@ -5266,11 +5269,11 @@ function col(width, center = false) {
 
       {needlepointOrderModal && (
         <div
-          className="ms-dialog-overlay"
+          className="ms-dialog-overlay ms-dialog-overlay--fullscreen"
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15, 23, 42, 0.55)",
+            background: "#fff",
             zIndex: 1600,
             display: "flex",
             flexDirection: "column",
@@ -5411,12 +5414,15 @@ function col(width, center = false) {
                     boxSizing: "border-box",
                     background: "#fff",
                     boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                    flex: selectedNeedlepointOrders.length === 1 ? "1 1 auto" : "0 0 auto",
+                    minHeight: selectedNeedlepointOrders.length === 1 ? "100%" : undefined,
                   }}
                 >
                   <div
                     style={{
-                      flex: "0 1 320px",
+                      flex: "0 1 340px",
                       minWidth: 240,
+                      maxWidth: 420,
                       display: "flex",
                       flexDirection: "column",
                       gap: 8,
