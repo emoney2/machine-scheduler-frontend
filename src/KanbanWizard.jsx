@@ -85,8 +85,9 @@ export default function KanbanWizard() {
     }
   }, []);
 
-  const [phase, setPhase] = useState(editId ? "card" : "method"); // method | card
+  const [phase, setPhase] = useState(editId ? "card" : "method"); // method | link | card
   const [orderMethod, setOrderMethod] = useState("Online");
+  const [linkDraft, setLinkDraft] = useState("");
   const [editingId, setEditingId] = useState(editId || "");
   const [loadingEdit, setLoadingEdit] = useState(!!editId);
 
@@ -209,11 +210,10 @@ export default function KanbanWizard() {
     });
   }
 
-  async function scrapeProductUrl(rawUrl) {
+  async function scrapeProductUrl(rawUrl, { force = false } = {}) {
     const u = String(rawUrl || "").trim();
-    if (orderMethod !== "Online") return;
-    if (!/^https?:\/\//i.test(u)) return;
-    if (lastScrapedUrlRef.current === u) return;
+    if (!/^https?:\/\//i.test(u)) return false;
+    if (!force && lastScrapedUrlRef.current === u) return true;
 
     setScrapingUrl(true);
     setScrapeHint("Looking up product…");
@@ -227,7 +227,7 @@ export default function KanbanWizard() {
         setScrapeHint(
           "Couldn’t auto-fill from that site — add title, price, and photo manually."
         );
-        return;
+        return false;
       }
 
       lastScrapedUrlRef.current = u;
@@ -249,10 +249,14 @@ export default function KanbanWizard() {
         setCostPerPkg(price);
         clearFieldError("costPerPkg");
       }
-      if (!supplier.trim() && /amazon\./i.test(u)) {
-        setSupplier("Amazon");
-        clearFieldError("supplier");
-      }
+      setSupplier((prev) => {
+        if (String(prev || "").trim()) return prev;
+        if (/amazon\./i.test(u)) {
+          clearFieldError("supplier");
+          return "Amazon";
+        }
+        return prev;
+      });
 
       const filled = [title && "title", image && "image", price && "price"]
         .filter(Boolean)
@@ -262,16 +266,32 @@ export default function KanbanWizard() {
           ? `Filled ${filled} from link.`
           : "No product details found — add them manually."
       );
+      return true;
     } catch {
       setScrapeHint(
         "Couldn’t auto-fill from that site — add title, price, and photo manually."
       );
+      return false;
     } finally {
       setScrapingUrl(false);
     }
   }
 
+  async function continueFromLink() {
+    const u = String(linkDraft || "").trim();
+    setOrderMethod("Online");
+    setUrl(u);
+    urlDirtyRef.current = false;
+    if (u && /^https?:\/\//i.test(u)) {
+      await scrapeProductUrl(u, { force: true });
+    } else {
+      setScrapeHint("");
+    }
+    setPhase("card");
+  }
+
   useEffect(() => {
+    if (phase !== "card") return;
     if (!urlDirtyRef.current) return;
     if (orderMethod !== "Online") return;
     const u = String(url || "").trim();
@@ -281,7 +301,7 @@ export default function KanbanWizard() {
     }, 650);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, orderMethod]);
+  }, [url, orderMethod, phase]);
 
   function applyCrop() {
     if (!cropImageRef.current) return;
@@ -487,7 +507,9 @@ export default function KanbanWizard() {
               type="button"
               onClick={() => {
                 setOrderMethod("Online");
-                setPhase("card");
+                setLinkDraft(url || "");
+                setScrapeHint("");
+                setPhase("link");
               }}
               style={{
                 ...choiceBtn,
@@ -511,6 +533,93 @@ export default function KanbanWizard() {
         </div>
       )}
 
+      {phase === "link" && (
+        <div
+          style={{
+            marginTop: 20,
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: 20,
+            maxWidth: 520,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setPhase("method")}
+            style={{
+              ...btnSecondary,
+              padding: "6px 10px",
+              fontSize: 13,
+              marginBottom: 12,
+            }}
+          >
+            ← Back
+          </button>
+          <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 0 }}>
+            Product link
+          </h2>
+          <p style={{ marginTop: 0, marginBottom: 12, color: "#6b7280", fontSize: 14 }}>
+            Paste an Amazon or vendor URL and we’ll fill title, price, and photo
+            when we can. Or continue without a link.
+          </p>
+          <input
+            type="url"
+            value={linkDraft}
+            onChange={(e) => setLinkDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (!scrapingUrl) continueFromLink();
+              }
+            }}
+            placeholder="https://www.amazon.com/dp/…"
+            autoFocus
+            disabled={scrapingUrl}
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid #d1d5db",
+              fontSize: 15,
+              marginBottom: 8,
+            }}
+          />
+          {scrapingUrl || scrapeHint ? (
+            <div
+              style={{
+                fontSize: 13,
+                color: "#6b7280",
+                marginBottom: 12,
+                minHeight: 18,
+              }}
+            >
+              {scrapingUrl ? "Looking up product…" : scrapeHint}
+            </div>
+          ) : (
+            <div style={{ height: 12 }} />
+          )}
+          <button
+            type="button"
+            onClick={continueFromLink}
+            disabled={scrapingUrl}
+            style={{
+              ...choiceBtn,
+              background: "#111827",
+              color: "white",
+              opacity: scrapingUrl ? 0.7 : 1,
+              width: "100%",
+            }}
+          >
+            {scrapingUrl
+              ? "Looking up…"
+              : String(linkDraft || "").trim()
+                ? "Continue"
+                : "Continue without link"}
+          </button>
+        </div>
+      )}
+
       {phase === "card" && (
         <>
           <div
@@ -524,7 +633,14 @@ export default function KanbanWizard() {
           >
             <button
               type="button"
-              onClick={() => setPhase("method")}
+              onClick={() => {
+                if (orderMethod === "Online") {
+                  setLinkDraft(url || "");
+                  setPhase("link");
+                } else {
+                  setPhase("method");
+                }
+              }}
               style={{
                 ...btnSecondary,
                 padding: "6px 10px",
