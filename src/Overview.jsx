@@ -33,6 +33,263 @@ const GOAL_CONFETTI_COLORS = [
   "#ef4444",
 ];
 
+function composeNeedlepointThreadColors(rows, extra) {
+  const parts = (rows || [])
+    .map((r) => [String(r.code || "").trim(), String(r.label || "").trim()].filter(Boolean).join(" "))
+    .filter(Boolean);
+  const extraText = String(extra || "").trim();
+  if (extraText) parts.push(extraText);
+  return parts.join(", ");
+}
+
+function newManualColorRow() {
+  return {
+    key: `manual-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    hex: "#CCCCCC",
+    name: "",
+    stitchCount: 0,
+    source: "manual",
+    code: "",
+    label: "",
+    suggestions: [],
+  };
+}
+
+function rowsFromPaletteColors(colors) {
+  return (colors || []).map((c, i) => ({
+    key: String(c.id || `p${i}`),
+    hex: c.hex || "#CCCCCC",
+    name: c.name || "",
+    stitchCount: c.stitchCount || 0,
+    source: "palette",
+    code: "",
+    label: "",
+    suggestions: Array.isArray(c.suggestions) ? c.suggestions : [],
+  }));
+}
+
+/** Per-design color list: swatches + DMC suggestions + editable numbers. */
+function NeedlepointThreadColorEditor({
+  orderNumber,
+  draft,
+  onChange,
+  loading,
+  error,
+}) {
+  const rows = draft?.rows || [];
+  const extra = draft?.extra || "";
+
+  const updateRow = (key, patch) => {
+    onChange({
+      ...draft,
+      rows: rows.map((r) => (r.key === key ? { ...r, ...patch } : r)),
+    });
+  };
+
+  const removeRow = (key) => {
+    onChange({ ...draft, rows: rows.filter((r) => r.key !== key) });
+  };
+
+  const addRow = () => {
+    onChange({ ...draft, rows: [...rows, newManualColorRow()] });
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+      <div style={{ fontSize: 12, fontWeight: 600 }}>Thread colors*</div>
+      <div style={{ fontSize: 12, color: "#6b7280" }}>
+        Colors from the design are listed below. Click a DMC suggestion or type your own numbers —
+        suggestions only, nothing is locked.
+      </div>
+      {loading && (
+        <div style={{ fontSize: 13, color: "#6b7280" }}>Loading design colors…</div>
+      )}
+      {!!error && !loading && (
+        <div style={{ fontSize: 12, color: "#b45309" }}>{error}</div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {rows.map((row, idx) => (
+          <div
+            key={row.key}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "44px 1fr auto",
+              gap: 10,
+              alignItems: "start",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              padding: 10,
+              background: "#fafafa",
+            }}
+          >
+            <div
+              title={row.hex}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 8,
+                background: row.hex || "#ccc",
+                border: "1px solid #d1d5db",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.35)",
+              }}
+            />
+            <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ fontSize: 12, color: "#4b5563" }}>
+                Color {idx + 1}
+                {row.name ? ` · ${row.name}` : ""}
+                {row.stitchCount ? ` · ${row.stitchCount} stitches` : ""}
+                {row.source === "manual" ? " · manual" : ""}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <input
+                  type="text"
+                  value={row.code}
+                  onChange={(e) => updateRow(row.key, { code: e.target.value })}
+                  placeholder="Number"
+                  aria-label={`Color ${idx + 1} number`}
+                  style={{
+                    width: 88,
+                    padding: "6px 8px",
+                    border: "1px solid #ccc",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    boxSizing: "border-box",
+                  }}
+                />
+                <input
+                  type="text"
+                  value={row.label}
+                  onChange={(e) => updateRow(row.key, { label: e.target.value })}
+                  placeholder="Name (optional)"
+                  aria-label={`Color ${idx + 1} name`}
+                  style={{
+                    flex: "1 1 120px",
+                    minWidth: 100,
+                    padding: "6px 8px",
+                    border: "1px solid #ccc",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              {!!(row.suggestions || []).length && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {(row.suggestions || []).map((sug) => {
+                    const active =
+                      String(row.code || "").trim() === String(sug.code || "").trim();
+                    return (
+                      <button
+                        key={`${row.key}-${sug.code}`}
+                        type="button"
+                        onClick={() =>
+                          updateRow(row.key, {
+                            code: sug.code || "",
+                            label: sug.name || "",
+                          })
+                        }
+                        title={`Suggest ${sug.label || sug.code}`}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "4px 8px",
+                          borderRadius: 999,
+                          border: active ? "1px solid #0a7" : "1px solid #d1d5db",
+                          background: active ? "#ecfdf5" : "#fff",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          color: "#111827",
+                        }}
+                      >
+                        <span
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: 3,
+                            background: sug.hex || "#ccc",
+                            border: "1px solid #9ca3af",
+                            flex: "0 0 auto",
+                          }}
+                        />
+                        DMC {sug.code}
+                        {sug.name ? ` ${sug.name}` : ""}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => removeRow(row.key)}
+              title="Remove color"
+              style={{
+                border: "1px solid #e5e7eb",
+                background: "#fff",
+                borderRadius: 8,
+                padding: "4px 8px",
+                fontSize: 12,
+                color: "#6b7280",
+                cursor: "pointer",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button
+          type="button"
+          onClick={addRow}
+          style={{
+            padding: "6px 10px",
+            border: "1px solid #ccc",
+            borderRadius: 8,
+            background: "#fff",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          + Add color
+        </button>
+      </div>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600 }}>
+        Extra / freeform (optional)
+        <textarea
+          rows={2}
+          value={extra}
+          onChange={(e) => onChange({ ...draft, extra: e.target.value })}
+          placeholder="Anything else to include in the email…"
+          style={{
+            display: "block",
+            width: "100%",
+            marginTop: 4,
+            padding: 8,
+            border: "1px solid #ccc",
+            borderRadius: 8,
+            fontWeight: 400,
+            resize: "vertical",
+            boxSizing: "border-box",
+            fontFamily: "inherit",
+            fontSize: 13,
+          }}
+        />
+      </label>
+      <div style={{ fontSize: 12, color: "#374151" }}>
+        <span style={{ fontWeight: 600 }}>Email will list: </span>
+        {composeNeedlepointThreadColors(rows, extra) || (
+          <span style={{ color: "#9ca3af" }}>enter numbers above</span>
+        )}
+      </div>
+      {/* keep orderNumber referenced for future debugging / keys */}
+      <span style={{ display: "none" }}>{orderNumber}</span>
+    </div>
+  );
+}
+
 /** Loads the same stitch-grid PDF the supplier email attaches, for color reference. */
 function NeedlepointVendorGridPreview({ orderNumber, previewFileId, root }) {
   const [objectUrl, setObjectUrl] = React.useState(null);
@@ -1298,6 +1555,10 @@ function col(width, center = false) {
   const [needlepointSelected, setNeedlepointSelected] = useState({});
   const [needlepointOrderModal, setNeedlepointOrderModal] = useState(false);
   const [needlepointThreadColors, setNeedlepointThreadColors] = useState({});
+  /** Per-order draft: { rows: [...], extra: string } for structured color picking. */
+  const [needlepointColorDrafts, setNeedlepointColorDrafts] = useState({});
+  const [needlepointColorLoading, setNeedlepointColorLoading] = useState({});
+  const [needlepointColorErrors, setNeedlepointColorErrors] = useState({});
   const [needlepointOrderNotes, setNeedlepointOrderNotes] = useState("");
   const [needlepointSubmitting, setNeedlepointSubmitting] = useState(false);
 
@@ -1800,17 +2061,74 @@ function col(width, center = false) {
     [needlepointOrders, needlepointSelected]
   );
 
+  const syncNeedlepointDraftToThreadColors = useCallback((orderNumber, draft) => {
+    const composed = composeNeedlepointThreadColors(draft?.rows, draft?.extra);
+    setNeedlepointThreadColors((prev) => ({ ...prev, [orderNumber]: composed }));
+  }, []);
+
+  const updateNeedlepointColorDraft = useCallback(
+    (orderNumber, draft) => {
+      setNeedlepointColorDrafts((prev) => ({ ...prev, [orderNumber]: draft }));
+      syncNeedlepointDraftToThreadColors(orderNumber, draft);
+    },
+    [syncNeedlepointDraftToThreadColors]
+  );
+
+  const loadNeedlepointDesignColors = useCallback(
+    async (orderNumber, existingText) => {
+      setNeedlepointColorLoading((prev) => ({ ...prev, [orderNumber]: true }));
+      setNeedlepointColorErrors((prev) => ({ ...prev, [orderNumber]: "" }));
+      try {
+        const res = await axios.get(
+          `${ROOT}/needlepoint/order/${encodeURIComponent(orderNumber)}/colors`,
+          { withCredentials: true, timeout: 90000 }
+        );
+        const palette = Array.isArray(res.data?.colors) ? res.data.colors : [];
+        const rows = rowsFromPaletteColors(palette);
+        const draft = {
+          rows: rows.length ? rows : [newManualColorRow()],
+          extra: String(existingText || "").trim(),
+        };
+        setNeedlepointColorDrafts((prev) => ({ ...prev, [orderNumber]: draft }));
+        syncNeedlepointDraftToThreadColors(orderNumber, draft);
+        if (!palette.length) {
+          setNeedlepointColorErrors((prev) => ({
+            ...prev,
+            [orderNumber]: "No palette found in the Studio package — add colors manually.",
+          }));
+        }
+      } catch (e) {
+        const msg =
+          e?.response?.data?.error || e?.message || "Could not load design colors";
+        setNeedlepointColorErrors((prev) => ({ ...prev, [orderNumber]: msg }));
+        const draft = {
+          rows: [newManualColorRow()],
+          extra: String(existingText || "").trim(),
+        };
+        setNeedlepointColorDrafts((prev) => ({ ...prev, [orderNumber]: draft }));
+        syncNeedlepointDraftToThreadColors(orderNumber, draft);
+      } finally {
+        setNeedlepointColorLoading((prev) => ({ ...prev, [orderNumber]: false }));
+      }
+    },
+    [ROOT, syncNeedlepointDraftToThreadColors]
+  );
+
   const openNeedlepointOrderModal = () => {
     if (!selectedNeedlepointOrders.length) {
       alert("Select one or more needlepoint belts to order.");
       return;
     }
-    const colors = {};
-    selectedNeedlepointOrders.forEach((o) => {
-      colors[o.orderNumber] = needlepointThreadColors[o.orderNumber] || o.threadColors || "";
-    });
-    setNeedlepointThreadColors((prev) => ({ ...prev, ...colors }));
     setNeedlepointOrderModal(true);
+    selectedNeedlepointOrders.forEach((o) => {
+      const existingDraft = needlepointColorDrafts[o.orderNumber];
+      if (existingDraft?.rows?.length) {
+        syncNeedlepointDraftToThreadColors(o.orderNumber, existingDraft);
+        return;
+      }
+      // Prefer sheet-saved colors as freeform seed; session drafts win above.
+      loadNeedlepointDesignColors(o.orderNumber, o.threadColors || "");
+    });
   };
 
   const submitNeedlepointBeltOrder = async () => {
@@ -5420,9 +5738,9 @@ function col(width, center = false) {
                 >
                   <div
                     style={{
-                      flex: "0 1 340px",
-                      minWidth: 240,
-                      maxWidth: 420,
+                      flex: "0 1 420px",
+                      minWidth: 280,
+                      maxWidth: 520,
                       display: "flex",
                       flexDirection: "column",
                       gap: 8,
@@ -5441,44 +5759,20 @@ function col(width, center = false) {
                     >
                       {[row.design, row.sizeSummary].filter(Boolean).join(" · ")}
                     </div>
-                    <label
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        flex: 1,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        marginTop: 4,
-                      }}
-                    >
-                      Thread colors*
-                      <textarea
-                        rows={8}
-                        value={needlepointThreadColors[row.orderNumber] || ""}
-                        onChange={(e) =>
-                          setNeedlepointThreadColors((prev) => ({
-                            ...prev,
-                            [row.orderNumber]: e.target.value,
-                          }))
+                    <NeedlepointThreadColorEditor
+                      orderNumber={row.orderNumber}
+                      draft={
+                        needlepointColorDrafts[row.orderNumber] || {
+                          rows: [],
+                          extra: needlepointThreadColors[row.orderNumber] || "",
                         }
-                        placeholder="e.g. 1801 Navy, 1637 Red, White"
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          flex: 1,
-                          minHeight: 160,
-                          marginTop: 4,
-                          padding: 10,
-                          border: "1px solid #ccc",
-                          borderRadius: 8,
-                          fontWeight: 400,
-                          resize: "vertical",
-                          boxSizing: "border-box",
-                          fontFamily: "inherit",
-                          fontSize: 14,
-                        }}
-                      />
-                    </label>
+                      }
+                      onChange={(draft) =>
+                        updateNeedlepointColorDraft(row.orderNumber, draft)
+                      }
+                      loading={!!needlepointColorLoading[row.orderNumber]}
+                      error={needlepointColorErrors[row.orderNumber] || ""}
+                    />
                   </div>
                   <NeedlepointVendorGridPreview
                     orderNumber={row.orderNumber}
