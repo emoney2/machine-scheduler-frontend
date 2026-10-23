@@ -405,16 +405,25 @@ export default function KanbanCardPreview({ printOnly = false, idOverride }) {
                             rowGap: 12,
                             textAlign: "center",
                             justifyItems: "center",
+                            minWidth: 0,
+                            maxHeight: "100%",
+                            overflow: "hidden",
+                            alignContent: "center",
                           }}
                         >
                           <div
                             style={{
                               fontWeight: 900,
-                              fontSize: "clamp(22px, 3vw, 36px)",
+                              fontSize: "clamp(18px, 2.4vw, 28px)",
                               lineHeight: 1.15,
                               overflowWrap: "anywhere",
                               wordBreak: "break-word",
                               maxWidth: "100%",
+                              maxHeight: "3.45em",
+                              overflow: "hidden",
+                              display: "-webkit-box",
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: "vertical",
                             }}
                           >
                             {String(item.itemName || "—")}

@@ -14,6 +14,28 @@ const LOCATIONS = [
   "Shipping",
 ];
 
+/** Keep card titles short so the 4×6 layout doesn't blow out. */
+function shortenProductTitle(raw, maxLen = 60) {
+  let t = String(raw || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  for (const sep of [" - ", " – ", " — ", " | "]) {
+    if (t.includes(sep)) {
+      const head = t.split(sep)[0].trim();
+      if (head.length >= 6 && head.length <= maxLen) {
+        t = head;
+        break;
+      }
+    }
+  }
+  if (t.length > maxLen) {
+    let cut = t.slice(0, maxLen - 1);
+    const sp = cut.lastIndexOf(" ");
+    if (sp > 20) cut = cut.slice(0, sp);
+    t = `${cut.replace(/[,\-–—|/]+$/g, "")}…`;
+  }
+  return t;
+}
+
 async function findNextKanbanId(dept, category, sku) {
   const base = (() => {
     const d = (dept || "GEN").toUpperCase().replace(/[^A-Z0-9]+/g, "").slice(0, 3);
@@ -231,7 +253,7 @@ export default function KanbanWizard() {
       }
 
       lastScrapedUrlRef.current = u;
-      const title = String(j.title || "").trim();
+      const title = shortenProductTitle(j.title || "");
       const image = String(j.image || "").trim();
       const price = String(j.price || "")
         .trim()
@@ -929,17 +951,20 @@ export default function KanbanWizard() {
                     <CardText
                       value={itemName}
                       onChange={(v) => {
-                        setItemName(v);
+                        setItemName(v.slice(0, 80));
                         clearFieldError("itemName");
                       }}
                       placeholder="Item name"
                       error={!!fieldErrors.itemName}
-                      rows={2}
+                      rows={3}
                       style={{
                         fontWeight: 900,
                         fontSize: "clamp(15px, 3vw, 22px)",
                         lineHeight: 1.15,
                         textAlign: "center",
+                        maxHeight: "4.2em",
+                        overflow: "hidden",
+                        resize: "none",
                       }}
                     />
 
