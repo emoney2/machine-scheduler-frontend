@@ -33,6 +33,174 @@ const GOAL_CONFETTI_COLORS = [
   "#ef4444",
 ];
 
+/** Loads the same stitch-grid PDF the supplier email attaches, for color reference. */
+function NeedlepointVendorGridPreview({ orderNumber, previewFileId, root }) {
+  const [objectUrl, setObjectUrl] = React.useState(null);
+  const [status, setStatus] = React.useState("loading"); // loading | ready | error
+  const [error, setError] = React.useState("");
+
+  React.useEffect(() => {
+    let cancelled = false;
+    let createdUrl = null;
+    setStatus("loading");
+    setError("");
+    setObjectUrl(null);
+
+    (async () => {
+      try {
+        const res = await axios.get(
+          `${root}/needlepoint/order/${encodeURIComponent(orderNumber)}/grid`,
+          { withCredentials: true, responseType: "blob", timeout: 90000 }
+        );
+        if (cancelled) return;
+        const blob = res.data;
+        if (!(blob instanceof Blob) || blob.size < 8) {
+          throw new Error("Empty grid PDF");
+        }
+        const head = new Uint8Array(await blob.slice(0, 5).arrayBuffer());
+        const isPdf =
+          head.length >= 4 &&
+          head[0] === 0x25 &&
+          head[1] === 0x50 &&
+          head[2] === 0x44 &&
+          head[3] === 0x46; // %PDF
+        if (!isPdf || (blob.type || "").includes("json")) {
+          const text = await blob.text();
+          let msg = "No vendor grid PDF found";
+          try {
+            msg = JSON.parse(text)?.error || msg;
+          } catch {
+            /* ignore */
+          }
+          throw new Error(msg);
+        }
+        createdUrl = URL.createObjectURL(blob);
+        setObjectUrl(createdUrl);
+        setStatus("ready");
+      } catch (e) {
+        if (cancelled) return;
+        let msg = e?.message || "Could not load grid";
+        const data = e?.response?.data;
+        if (data instanceof Blob) {
+          try {
+            const parsed = JSON.parse(await data.text());
+            if (parsed?.error) msg = parsed.error;
+          } catch {
+            /* ignore */
+          }
+        } else if (data?.error) {
+          msg = data.error;
+        }
+        setStatus("error");
+        setError(msg);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (createdUrl) URL.revokeObjectURL(createdUrl);
+    };
+  }, [orderNumber, root]);
+
+  const beltThumb = previewFileId
+    ? `${root}/drive/thumbnail?fileId=${encodeURIComponent(previewFileId)}&sz=w640`
+    : null;
+
+  return (
+    <div
+      style={{
+        flex: "1 1 420px",
+        minWidth: 280,
+        minHeight: "min(52vh, 520px)",
+        border: "1px solid #e5e7eb",
+        borderRadius: 10,
+        background: "#f8fafc",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          color: "#64748b",
+          padding: "8px 10px",
+          borderBottom: "1px solid #e5e7eb",
+          background: "#fff",
+        }}
+      >
+        Vendor grid (what they receive)
+      </div>
+      <div style={{ flex: 1, position: "relative", minHeight: "min(48vh, 480px)" }}>
+        {status === "loading" && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 13,
+              color: "#6b7280",
+            }}
+          >
+            Loading grid…
+          </div>
+        )}
+        {status === "ready" && objectUrl && (
+          <iframe
+            title={`Vendor grid ${orderNumber}`}
+            src={objectUrl}
+            style={{
+              width: "100%",
+              height: "100%",
+              minHeight: "min(48vh, 480px)",
+              border: 0,
+              background: "#fff",
+            }}
+          />
+        )}
+        {status === "error" && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              padding: 16,
+              textAlign: "center",
+            }}
+          >
+            {beltThumb ? (
+              <img
+                src={beltThumb}
+                alt=""
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: 200,
+                  objectFit: "contain",
+                  borderRadius: 8,
+                  border: "1px solid #e5e7eb",
+                  background: "#fff",
+                }}
+              />
+            ) : null}
+            <div style={{ fontSize: 12, color: "#b45309" }}>
+              {error || "Grid PDF unavailable"} — showing belt preview if available.
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function makeGoalConfettiPieces(burstId) {
   const count = 42;
   const pieces = [];
@@ -5102,144 +5270,217 @@ function col(width, center = false) {
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            background: "rgba(15, 23, 42, 0.55)",
             zIndex: 1600,
-            padding: "24px 16px",
-            overflow: "auto",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <div
             style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
               background: "#fff",
-              borderRadius: 12,
-              padding: 24,
-              width: "min(920px, 96vw)",
-              maxHeight: "92vh",
-              overflow: "auto",
-              boxShadow: "0 10px 40px rgba(0,0,0,0.2)",
+              width: "100%",
+              height: "100%",
+              overflow: "hidden",
               boxSizing: "border-box",
             }}
           >
-            <h3 style={{ margin: "0 0 8px" }}>Order needlepoint belts</h3>
-            <div style={{ fontSize: 13, color: "#4b5563", marginBottom: 12 }}>
-              Enter thread colors for each design, then we create one email with the designs attached and renamed to the order number.
-            </div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 10 }}>
-              Supplier email
-              <input
-                type="text"
-                value={needlepointSupplierEmail}
-                onChange={(e) => setNeedlepointSupplierEmail(e.target.value)}
-                placeholder="sales05@…, lingchoi@…"
+            <div
+              style={{
+                flex: "0 0 auto",
+                padding: "16px 20px 12px",
+                borderBottom: "1px solid #e5e7eb",
+                background: "#fff",
+              }}
+            >
+              <div
                 style={{
-                  display: "block",
-                  width: "100%",
-                  marginTop: 4,
-                  padding: 8,
-                  border: "1px solid #ccc",
-                  borderRadius: 8,
-                  fontWeight: 400,
-                  boxSizing: "border-box",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  marginBottom: 10,
                 }}
-              />
-            </label>
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              >
+                <div style={{ flex: "1 1 280px", minWidth: 0 }}>
+                  <h3 style={{ margin: "0 0 4px", fontSize: 20 }}>Order needlepoint belts</h3>
+                  <div style={{ fontSize: 13, color: "#4b5563" }}>
+                    Use each vendor grid as color reference, enter thread colors, then we create one
+                    email with the grids attached and renamed to the order number.
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setNeedlepointOrderModal(false)}
+                    disabled={needlepointSubmitting}
+                    style={{ padding: "8px 14px", border: "1px solid #ccc", borderRadius: 8 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submitNeedlepointBeltOrder}
+                    disabled={needlepointSubmitting}
+                    style={{
+                      padding: "8px 14px",
+                      border: "1px solid #0a7",
+                      background: "#0a7",
+                      color: "#fff",
+                      borderRadius: 8,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {needlepointSubmitting ? "Creating email…" : "Create email"}
+                  </button>
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(240px, 1.2fr) minmax(200px, 1fr)",
+                  gap: 12,
+                }}
+              >
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600 }}>
+                  Supplier email
+                  <input
+                    type="text"
+                    value={needlepointSupplierEmail}
+                    onChange={(e) => setNeedlepointSupplierEmail(e.target.value)}
+                    placeholder="sales05@…, lingchoi@…"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginTop: 4,
+                      padding: 8,
+                      border: "1px solid #ccc",
+                      borderRadius: 8,
+                      fontWeight: 400,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </label>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600 }}>
+                  Notes for this email
+                  <input
+                    type="text"
+                    value={needlepointOrderNotes}
+                    onChange={(e) => setNeedlepointOrderNotes(e.target.value)}
+                    placeholder="Optional notes…"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginTop: 4,
+                      padding: 8,
+                      border: "1px solid #ccc",
+                      borderRadius: 8,
+                      fontWeight: 400,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                overflow: "auto",
+                padding: "16px 20px 24px",
+                background: "#f1f5f9",
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
               {selectedNeedlepointOrders.map((row) => (
                 <div
                   key={row.orderNumber}
                   style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 16,
+                    alignItems: "stretch",
                     border: "1px solid #e5e7eb",
-                    borderRadius: 8,
-                    padding: 12,
+                    borderRadius: 12,
+                    padding: 16,
                     boxSizing: "border-box",
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
                   }}
                 >
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
-                    #{row.orderNumber} {row.company ? `· ${row.company}` : ""}
-                  </div>
                   <div
                     style={{
-                      fontSize: 13,
-                      color: "#4b5563",
-                      marginBottom: 8,
-                      whiteSpace: "normal",
-                      overflowWrap: "anywhere",
+                      flex: "0 1 320px",
+                      minWidth: 240,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
                     }}
                   >
-                    {[row.design, row.sizeSummary].filter(Boolean).join(" · ")}
-                  </div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600 }}>
-                    Thread colors*
-                    <textarea
-                      rows={4}
-                      value={needlepointThreadColors[row.orderNumber] || ""}
-                      onChange={(e) =>
-                        setNeedlepointThreadColors((prev) => ({
-                          ...prev,
-                          [row.orderNumber]: e.target.value,
-                        }))
-                      }
-                      placeholder="e.g. 1801 Navy, 1637 Red, White"
+                    <div style={{ fontWeight: 700, fontSize: 16 }}>
+                      #{row.orderNumber} {row.company ? `· ${row.company}` : ""}
+                    </div>
+                    <div
                       style={{
-                        display: "block",
-                        width: "100%",
-                        marginTop: 4,
-                        padding: 8,
-                        border: "1px solid #ccc",
-                        borderRadius: 8,
-                        fontWeight: 400,
-                        resize: "vertical",
-                        boxSizing: "border-box",
+                        fontSize: 13,
+                        color: "#4b5563",
+                        whiteSpace: "normal",
+                        overflowWrap: "anywhere",
                       }}
-                    />
-                  </label>
+                    >
+                      {[row.design, row.sizeSummary].filter(Boolean).join(" · ")}
+                    </div>
+                    <label
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        flex: 1,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        marginTop: 4,
+                      }}
+                    >
+                      Thread colors*
+                      <textarea
+                        rows={8}
+                        value={needlepointThreadColors[row.orderNumber] || ""}
+                        onChange={(e) =>
+                          setNeedlepointThreadColors((prev) => ({
+                            ...prev,
+                            [row.orderNumber]: e.target.value,
+                          }))
+                        }
+                        placeholder="e.g. 1801 Navy, 1637 Red, White"
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          flex: 1,
+                          minHeight: 160,
+                          marginTop: 4,
+                          padding: 10,
+                          border: "1px solid #ccc",
+                          borderRadius: 8,
+                          fontWeight: 400,
+                          resize: "vertical",
+                          boxSizing: "border-box",
+                          fontFamily: "inherit",
+                          fontSize: 14,
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <NeedlepointVendorGridPreview
+                    orderNumber={row.orderNumber}
+                    previewFileId={row.previewFileId}
+                    root={ROOT}
+                  />
                 </div>
               ))}
-            </div>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginTop: 12 }}>
-              Notes for this email
-              <textarea
-                rows={3}
-                value={needlepointOrderNotes}
-                onChange={(e) => setNeedlepointOrderNotes(e.target.value)}
-                style={{
-                  display: "block",
-                  width: "100%",
-                  marginTop: 4,
-                  padding: 8,
-                  border: "1px solid #ccc",
-                  borderRadius: 8,
-                  fontWeight: 400,
-                  boxSizing: "border-box",
-                }}
-              />
-            </label>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 14 }}>
-              <button
-                type="button"
-                onClick={() => setNeedlepointOrderModal(false)}
-                disabled={needlepointSubmitting}
-                style={{ padding: "8px 12px", border: "1px solid #ccc", borderRadius: 8 }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={submitNeedlepointBeltOrder}
-                disabled={needlepointSubmitting}
-                style={{
-                  padding: "8px 12px",
-                  border: "1px solid #0a7",
-                  background: "#0a7",
-                  color: "#fff",
-                  borderRadius: 8,
-                }}
-              >
-                {needlepointSubmitting ? "Creating email…" : "Create email"}
-              </button>
             </div>
           </div>
         </div>
