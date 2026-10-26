@@ -34,6 +34,43 @@ function isCompletedJob(job) {
   return stage === "COMPLETE" || stage === "COMPLETED";
 }
 
+function orderConfirmationFilePart(value) {
+  return String(value || "")
+    .replace(/[\\/:*?"<>|\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[.\s]+|[.\s]+$/g, "");
+}
+
+function orderConfirmationDatePart() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value || "";
+  return `${get("month")}-${get("day")}-${get("year")}`;
+}
+
+function orderConfirmationFilename(company, jobs) {
+  const companyPart = orderConfirmationFilePart(company) || "Customer";
+  const reps = [];
+  const seen = new Set();
+  for (const job of jobs || []) {
+    const rep = orderConfirmationFilePart(job?.["Sales Rep"] || job?.salesRep || "");
+    const key = rep.toLowerCase();
+    if (rep && !seen.has(key)) {
+      seen.add(key);
+      reps.push(rep);
+    }
+  }
+  const pieces = [companyPart];
+  if (reps.length === 1) pieces.push(reps[0]);
+  else if (reps.length > 1) pieces.push(reps.join("-"));
+  pieces.push(orderConfirmationDatePart());
+  return `${pieces.join("_")}.pdf`;
+}
+
 export default function OrderConfirmationPage() {
   const [companyList, setCompanyList] = useState([]);
   const [companyInput, setCompanyInput] = useState("");
@@ -213,7 +250,7 @@ export default function OrderConfirmationPage() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `order_confirmation_${selectedCompany.replace(/[^\w-]+/g, "_")}.pdf`;
+      link.download = orderConfirmationFilename(selectedCompany, selectedJobs);
       document.body.appendChild(link);
       link.click();
       link.remove();
