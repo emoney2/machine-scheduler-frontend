@@ -576,14 +576,17 @@ function Section({ title, hint, children }) {
   );
 }
 
-function Legend({ names, colors }) {
+function Legend({ names, colors, percents }) {
   if (!names.length) return null;
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
       {names.map((name) => (
         <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 650, color: "#334155" }}>
           <span style={{ width: 10, height: 10, borderRadius: 99, background: colors[name] || "#94a3b8" }} />
-          {name}
+          <span>{name}</span>
+          {percents && percents[name] ? (
+            <span style={{ fontWeight: 800, color: "#0f172a" }}>{percents[name]}</span>
+          ) : null}
         </div>
       ))}
     </div>
@@ -1173,7 +1176,13 @@ function SalesDashboard({ data }) {
             />
             <div>
               <div style={{ fontWeight: 800, marginBottom: 6 }}>Piece mix</div>
-              <Legend names={activeReps.filter((row) => row.pieces > 0).map((row) => row.name)} colors={model.colors} />
+              <Legend
+                names={activeReps.filter((row) => row.pieces > 0).map((row) => row.name)}
+                colors={model.colors}
+                percents={Object.fromEntries(
+                  activeReps.filter((row) => row.pieces > 0).map((row) => [row.name, pct(row.pieces, view.totals.pieces)])
+                )}
+              />
             </div>
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
@@ -1188,7 +1197,13 @@ function SalesDashboard({ data }) {
             />
             <div>
               <div style={{ fontWeight: 800, marginBottom: 6 }}>Revenue mix</div>
-              <Legend names={activeReps.filter((row) => row.revenue > 0).map((row) => row.name)} colors={model.colors} />
+              <Legend
+                names={activeReps.filter((row) => row.revenue > 0).map((row) => row.name)}
+                colors={model.colors}
+                percents={Object.fromEntries(
+                  activeReps.filter((row) => row.revenue > 0).map((row) => [row.name, pct(row.revenue, view.totals.revenue)])
+                )}
+              />
             </div>
           </div>
         </div>
