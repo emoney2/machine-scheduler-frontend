@@ -2648,20 +2648,18 @@ function col(width, center = false) {
     }
 
 
-    // initial fetch
+    // Load once. Later updates come from salesUpdated, which the backend emits
+    // only when Production Orders quantity, date, or product actually changes.
     fetchMetrics();
-
-    // periodic refresh every 5 minutes; only when tab is visible
-    const poll = setInterval(() => {
-      if (document.visibilityState === "visible") {
-        fetchMetrics();
-      }
-    }, 5 * 60 * 1000);
+    const onSalesUpdated = () => {
+      if (alive) fetchMetrics();
+    };
+    if (socket) socket.on("salesUpdated", onSalesUpdated);
 
     return () => {
       alive = false;
       try { metricsCtrlRef.current?.abort(); } catch {}
-      clearInterval(poll);
+      if (socket) socket.off("salesUpdated", onSalesUpdated);
     };
   }, []);
 
