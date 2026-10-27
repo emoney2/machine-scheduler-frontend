@@ -2009,10 +2009,12 @@ function col(width, center = false) {
     async ({ showLoading = true } = {}) => {
       if (showLoading) setLoadingKanbanQueue(true);
       try {
-        const res = await axios.get(`${ROOT}/kanban/queue`, {
-          withCredentials: true,
-          timeout: 20000,
-        });
+        const res = await getWithRetry(
+          axios,
+          `${ROOT}/kanban/queue`,
+          { withCredentials: true },
+          [20000, 30000]
+        );
         setKanbanQueueRows(Array.isArray(res.data?.rows) ? res.data.rows : []);
       } catch (e) {
         console.warn("Overview kanban queue fetch failed:", e);
@@ -2021,7 +2023,7 @@ function col(width, center = false) {
         if (showLoading) setLoadingKanbanQueue(false);
       }
     },
-    [ROOT]
+    [ROOT, getWithRetry]
   );
 
   useEffect(() => {
@@ -2034,10 +2036,12 @@ function col(width, center = false) {
     async ({ showLoading = true } = {}) => {
       if (showLoading) setLoadingNeedlepoint(true);
       try {
-        const res = await axios.get(`${ROOT}/needlepoint/pending`, {
-          withCredentials: true,
-          timeout: 20000,
-        });
+        const res = await getWithRetry(
+          axios,
+          `${ROOT}/needlepoint/pending`,
+          { withCredentials: true },
+          [20000, 30000]
+        );
         setNeedlepointOrders(Array.isArray(res.data?.orders) ? res.data.orders : []);
         if (res.data?.supplierEmail) {
           setNeedlepointSupplierEmail(String(res.data.supplierEmail));
@@ -2049,7 +2053,7 @@ function col(width, center = false) {
         if (showLoading) setLoadingNeedlepoint(false);
       }
     },
-    [ROOT]
+    [ROOT, getWithRetry]
   );
 
   useEffect(() => {
@@ -2606,10 +2610,12 @@ function col(width, center = false) {
           hasCachedMetrics: !!cached,
         });
 
-        const res = await axios.get(metricsUrl, {
-          withCredentials: true,
-          timeout: 10000,
-        });
+        const res = await getWithRetry(
+          axios,
+          metricsUrl,
+          { withCredentials: true },
+          [20000, 35000]
+        );
         const data = res?.data;
         console.log("[Overview metrics] fetch success", {
           status: res?.status,
