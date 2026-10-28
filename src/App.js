@@ -62,6 +62,23 @@ window._isSubmittingOrder = false;
 
 
 
+function routeNeedsLiveScheduler(pathname) {
+  const path = String(pathname || "/").toLowerCase();
+  if (path === "/") return true;
+  if (path.startsWith("/machine")) return true;
+  if (path.startsWith("/sewing-calendar")) return true;
+  return false;
+}
+
+function sameJobOrder(a, b) {
+  if (a === b) return true;
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function isActiveStage(stageLike) {
   const s = String(stageLike || '').toLowerCase();
   return s !== 'sewing' && s !== 'complete';
@@ -130,20 +147,34 @@ function isISO8601Z(s) {
   return typeof s === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(s);
 }
 
-// Format a Date/string in America/New_York as "MM/DD h:mm AM/PM"
-function fmtET(dtLike) {
+const ET_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "America/New_York",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+const UTC_FORMAT = new Intl.DateTimeFormat("en-US", {
+  timeZone: "UTC",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+function formatWith(fmt, dtLike) {
   const d = typeof dtLike === "string" ? new Date(dtLike) : dtLike;
   if (!(d instanceof Date) || isNaN(d)) return "";
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).formatToParts(d);
+  const parts = fmt.formatToParts(d);
   const get = (t) => parts.find((p) => p.type === t)?.value || "";
   return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
+}
+
+// Format a Date/string in America/New_York as "MM/DD h:mm AM/PM"
+function fmtET(dtLike) {
+  return formatWith(ET_FORMAT, dtLike);
 }
 
 // ---- Time formatting (display only) ---- export function formatLocalStamp(iso) { if (!iso) return ""; // accept Date, number, or string const d = typeof iso === "string" || typeof iso === "number" ? new Date(iso) : iso; if (isNaN(d)) return ""; // local parts const mm = String(d.getMonth() + 1).padStart(2, "0"); const dd = String(d.getDate()).padStart(2, "0"); let hh = d.getHours(); const mins = String(d.getMinutes()).padStart(2, "0"); const ampm = hh >= 12 ? "PM" : "AM"; hh = hh % 12 || 12; return ${mm}/${dd} ${hh}:${mins} ${ampm}; }
@@ -292,10 +323,14 @@ export default function App() {
 
   // NEW: prevent overlapping combined fetches
   const combinedInFlightRef = useRef(false);
+  const combinedPendingRef = useRef(false);
 
   // Keep last-seen hashes for delta polling
   const changesHashesRef = useRef({});
   const changesEmbRevRef = useRef(null);
+  const changesReadyRef = useRef(false);
+  const progressRef = useRef({});
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   // Log once on mount (optional — keeps your existing console signal)
   useEffect(() => {
@@ -337,9 +372,7 @@ export default function App() {
           console.warn("🟡 /api/ping failed:", err?.message || err);
         }
       }
-      if (!cancelled) {
-        fetchAllCombined();
-      }
+      if (!cancelled) setSessionChecked(true);
     })();
     return () => {
       cancelled = true;
@@ -364,6 +397,7 @@ export default function App() {
   const manualStateWriteGuardUntil = useRef(0);
   const MANUAL_STATE_GUARD_MS = 5000;
   const columnsRef = useRef(null);
+  const linksRef = useRef({});
   const placeholdersRef = useRef([]);
 
   const isManualStateGuarded = () =>
@@ -380,6 +414,7 @@ export default function App() {
   // Which route are we on? (Scheduler is at "/")
   const location = useLocation();
   const isScheduler = location.pathname === "/";
+  const needsScheduler = routeNeedsLiveScheduler(location.pathname);
   const path = (location.pathname || "/").toLowerCase();
   const isCompactNav = true;
   const isMachineFloor = path.startsWith("/machine/");
@@ -475,6 +510,9 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('jobLinks') || '{}'); }
     catch { return {}; }
   });
+  useEffect(() => {
+    linksRef.current = links;
+  }, [links]);
   const [syncStatus, setSyncStatus] = useState('');
 
 
@@ -572,11 +610,12 @@ export default function App() {
   // Real-time updates listener
   useEffect(() => {
     if (!isScheduler) return;
-    // Always keep queue due-date sorted immediately after any change
+    // Always keep queue due-date sorted immediately after any change.
+    // sortQueue returns a new array, so compare job identity, not the array.
     setColumns(prev => {
-      const sorted = sortQueue(prev.queue.jobs);
-      // Avoid churn if already sorted
-      if (sorted === prev.queue.jobs) return prev;
+      const current = prev?.queue?.jobs || [];
+      const sorted = sortQueue(current);
+      if (sameJobOrder(sorted, current)) return prev;
       return {
         ...prev,
         queue: { ...prev.queue, jobs: sorted }
@@ -632,45 +671,42 @@ useEffect(() => {
     const qtyReached =
       !!payload?.embroideryComplete ||
       (Number.isFinite(done) && Number.isFinite(qty) && qty > 0 && done >= qty);
-    if (oid && Number.isFinite(done)) {
-      setColumns((prev) => {
-        if (!prev) return prev;
-        const next = { ...prev };
-        let hit = false;
-        for (const key of [...SCHEDULER_MACHINE_KEYS, "queue"]) {
-          const col = next[key];
-          if (!col?.jobs) continue;
-          next[key] = {
-            ...col,
-            jobs: col.jobs.map((j) => {
-              if (normalizeOrderId(j.id) !== oid) return j;
-              hit = true;
-              return {
-                ...j,
-                completedQty: done,
-                avgCycleMs: Number(payload?.avgCycleMs) || j.avgCycleMs || 0,
-                lastRunAt: payload?.lastRunAt || j.lastRunAt || "",
-                recentRuns: Array.isArray(payload?.recentRuns)
-                  ? payload.recentRuns
-                  : j.recentRuns,
-              };
-            }),
-          };
-        }
-        if (!hit) return prev;
-        SCHEDULER_MACHINE_KEYS.forEach((key) => {
-          next[key].jobs = scheduleMachineJobs(
-            next[key].jobs,
-            SCHEDULER_MACHINE_LABELS[key]
-          );
-        });
-        return next;
-      });
-    }
     if (qtyReached) {
       dropFinishedJob(payload?.orderId);
       fetchAllCombined();
+      return;
     }
+    if (!oid || !Number.isFinite(done)) return;
+
+    const rawId = String(payload?.orderId || oid);
+    progressRef.current = {
+      ...(progressRef.current || {}),
+      [rawId]: done,
+      [oid]: done,
+    };
+
+    const cols = columnsRef.current;
+    let found = false;
+    if (cols) {
+      for (const key of ["queue", ...SCHEDULER_MACHINE_KEYS]) {
+        if ((cols[key]?.jobs || []).some((j) => normalizeOrderId(j.id) === oid)) {
+          found = true;
+          break;
+        }
+      }
+    }
+    if (!found) {
+      fetchAllCombined();
+      return;
+    }
+
+    setColumns((prev) => patchColumnsProgress(prev, [{
+      id: oid,
+      completedQty: done,
+      avgCycleMs: Number(payload?.avgCycleMs) || 0,
+      lastRunAt: payload?.lastRunAt || "",
+      recentRuns: Array.isArray(payload?.recentRuns) ? payload.recentRuns : null,
+    }]));
   };
   socket.on("embroideryFinished", onEmbroideryFinished);
   socket.on("embroideryProgressUpdated", onEmbroideryProgress);
@@ -739,21 +775,7 @@ function addWorkTime(start, ms) {
 }
 
 function fmtDT(dtLike) {
-  const d = typeof dtLike === "string" ? new Date(dtLike) : dtLike;
-  if (!(d instanceof Date) || isNaN(d)) return "";
-
-  // Render in UTC so it matches Google Sheet's ISO Z entries
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "UTC",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).formatToParts(d);
-
-  const get = (t) => parts.find((p) => p.type === t)?.value || "";
-  return `${get("month")}/${get("day")} ${get("hour")}:${get("minute")} ${get("dayPeriod")}`;
+  return formatWith(UTC_FORMAT, dtLike);
 }
 
 
@@ -1016,12 +1038,13 @@ function scheduleMachineJobs(jobs, machineKey = '') {
   let startedReal = false;
 
   return jobs.map((job) => {
-    const isPh = isPlaceholder(job);
+    const next = { ...job };
+    const isPh = isPlaceholder(next);
     const isTopReal = !isPh && !startedReal;
     if (!isPh) startedReal = true;
 
     // 1) Compute late cutoff for this job
-    const due = parseDueDate(job.due_date);
+    const due = parseDueDate(next.due_date);
     let cutoff = null;
     if (due) {
       const eedDay = subWorkDays(due, 6);
@@ -1034,7 +1057,7 @@ function scheduleMachineJobs(jobs, machineKey = '') {
 
     if (isTopReal) {
       // Top job: use sheet start if present, else actual now (no clamp)
-      const sheetIso = job.embroidery_start ? normalizeStart(job.embroidery_start) : null;
+      const sheetIso = next.embroidery_start ? normalizeStart(next.embroidery_start) : null;
       if (sheetIso) {
         startIso = sheetIso;
         start = new Date(sheetIso);
@@ -1051,17 +1074,17 @@ function scheduleMachineJobs(jobs, machineKey = '') {
     }
 
     // Persist ISO on the job for consistent display/calcs
-    job.start_date = startIso;
+    next.start_date = startIso;
 
 
     // 3) Remaining work: observed +N cycle time if we have it, else stitches/30k
-    const completed = Math.max(0, Number(job.completedQty) || 0);
-    const remaining = Math.max(0, (Number(job.quantity) || 0) - completed);
+    const completed = Math.max(0, Number(next.completedQty) || 0);
+    const remaining = Math.max(0, (Number(next.quantity) || 0) - completed);
     const runMs = estimateRemainingMs(
-      job.stitch_count,
+      next.stitch_count,
       remaining,
       headCount,
-      job.avgCycleMs
+      next.avgCycleMs
     );
 
     // In-progress top job: remaining clock starts from now so the end is elastic
@@ -1069,20 +1092,60 @@ function scheduleMachineJobs(jobs, machineKey = '') {
       isTopReal && completed > 0 ? new Date() : start;
     const end = addWorkTime(remainingFrom, runMs);
 
-    // 4) Assign computed times to job (overwrite existing values)
-    job._rawStart = start;
-    job._rawEnd   = end;
-    job.start     = fmtET(start);
-    job.end       = fmtET(end);
-    job.piecesLeft = remaining;
-    job.delivery  = fmtMMDD(addWorkDays(end, 6));
-    job.isLate = cutoff instanceof Date && !isNaN(cutoff) && end > cutoff;
+    // 4) Assign computed times to a copy so unchanged cards can skip rendering
+    next._rawStart = start;
+    next._rawEnd   = end;
+    next.start     = fmtET(start);
+    next.end       = fmtET(end);
+    next.piecesLeft = remaining;
+    next.delivery  = fmtMMDD(addWorkDays(end, 6));
+    next.isLate = cutoff instanceof Date && !isNaN(cutoff) && end > cutoff;
 
     // 5) Advance tracker
     prevEnd = end;
 
-    return job;
+    return next;
   });
+}
+
+function patchColumnsProgress(prev, updates) {
+  if (!prev || !updates?.length) return prev;
+  const byId = new Map(updates.map((u) => [normalizeOrderId(u.id), u]));
+  const next = { ...prev };
+  const machines = [];
+  let changed = false;
+
+  for (const key of ["queue", ...SCHEDULER_MACHINE_KEYS]) {
+    const jobs = prev[key]?.jobs || [];
+    let colChanged = false;
+    const mapped = jobs.map((j) => {
+      const u = byId.get(normalizeOrderId(j.id));
+      if (!u) return j;
+      const done = Number(u.completedQty);
+      if (!Number.isFinite(done)) return j;
+      colChanged = true;
+      changed = true;
+      return {
+        ...j,
+        completedQty: done,
+        avgCycleMs: Number(u.avgCycleMs) || j.avgCycleMs || 0,
+        lastRunAt: u.lastRunAt || j.lastRunAt || "",
+        recentRuns: Array.isArray(u.recentRuns) ? u.recentRuns : j.recentRuns,
+      };
+    });
+    if (!colChanged) continue;
+    next[key] = { ...prev[key], jobs: mapped };
+    if (SCHEDULER_MACHINE_KEYS.includes(key)) machines.push(key);
+  }
+
+  if (!changed) return prev;
+  machines.forEach((key) => {
+    next[key] = {
+      ...next[key],
+      jobs: scheduleMachineJobs(next[key].jobs, SCHEDULER_MACHINE_LABELS[key]),
+    };
+  });
+  return next;
 }
 
 // === Section 4: Link Utilities ===
@@ -1238,11 +1301,11 @@ const fetchOrdersEmbroLinksCore = async () => {
     // 1) Fetch everything in a single round-trip (long timeout for Render cold start)
     let combinedRes;
     try {
-      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
+      combinedRes = await axios.get(API_ROOT + '/combined?scope=scheduler', { timeout: 90000 });
     } catch (firstErr) {
       console.warn("🟡 /combined first attempt failed, retrying in 5s…", firstErr?.message || firstErr);
       await new Promise(r => setTimeout(r, 5000));
-      combinedRes = await axios.get(API_ROOT + '/combined', { timeout: 90000 });
+      combinedRes = await axios.get(API_ROOT + '/combined?scope=scheduler', { timeout: 90000 });
     }
     const payload = combinedRes?.data;
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
@@ -1554,7 +1617,10 @@ const fetchManualStateCore = async (previousCols) => {
       return;
     }
 
-    if (combinedInFlightRef.current) return;
+    if (combinedInFlightRef.current) {
+      combinedPendingRef.current = true;
+      return;
+    }
     combinedInFlightRef.current = true;
 
     try {
@@ -1575,23 +1641,23 @@ const fetchManualStateCore = async (previousCols) => {
       console.warn("fetchAllCombined failed", err?.message || err);
     } finally {
       combinedInFlightRef.current = false;
+      if (combinedPendingRef.current && !window._isSubmittingOrder && !isManualStateGuarded()) {
+        combinedPendingRef.current = false;
+        fetchAllCombined();
+      } else {
+        combinedPendingRef.current = false;
+      }
     }
   };
 
 
 
-  // ─── Section 5D: Initial full load, then every 30s ask "did anything change?" ─────────────
+  // ─── Section 5D: Load the board on scheduler/machine pages, then poll lightly ─────────────
   useEffect(() => {
-    // Disable polling on Scan and Reorder pages for speed and to prevent memory leaks
-    const path = window.location.pathname.toLowerCase();
-    if (path.includes("/scan") || path.includes("/reorder") || path.includes("/order-confirmation")) {
-      console.log("[Polling] disabled on", path);
-      return;
-    }
-    // 1) One full load on mount (keeps your thin status bar behavior)
-    fetchAllCombined();
+    if (!sessionChecked || !needsScheduler) return;
 
     let canceled = false;
+    fetchAllCombined();
 
     async function pollChanges() {
       try {
@@ -1610,10 +1676,20 @@ const fetchManualStateCore = async (previousCols) => {
         }
 
         const serverHashes = data?.hashes || {};
+        const serverProg = data?.progress || {};
         const prevHashes   = changesHashesRef.current || {};
         const embRev = data?.embRev;
 
-        // Figure out if anything changed or was removed
+        // First answer establishes a baseline. An empty memory is not "everything changed".
+        if (!changesReadyRef.current) {
+          changesHashesRef.current = serverHashes;
+          progressRef.current = serverProg;
+          if (embRev != null) changesEmbRevRef.current = embRev;
+          changesReadyRef.current = true;
+          return;
+        }
+
+        // Figure out if the sheet itself changed (not just a piece count)
         let somethingChanged = false;
         if (embRev != null && changesEmbRevRef.current != null && embRev !== changesEmbRevRef.current) {
           somethingChanged = true;
@@ -1621,8 +1697,10 @@ const fetchManualStateCore = async (previousCols) => {
         if (embRev != null) changesEmbRevRef.current = embRev;
 
         // changed/added
-        for (const [oid, h] of Object.entries(serverHashes)) {
-          if (prevHashes[oid] !== h) { somethingChanged = true; break; }
+        if (!somethingChanged) {
+          for (const [oid, h] of Object.entries(serverHashes)) {
+            if (prevHashes[oid] !== h) { somethingChanged = true; break; }
+          }
         }
         // removed
         if (!somethingChanged) {
@@ -1631,14 +1709,36 @@ const fetchManualStateCore = async (previousCols) => {
           }
         }
 
-        // Update our memory for next tick
         changesHashesRef.current = serverHashes;
 
-        // If nothing changed, do nothing (no heavy reload)
-        if (!somethingChanged) return;
+        if (somethingChanged) {
+          progressRef.current = serverProg;
+          await fetchAllCombined();
+          return;
+        }
 
-        // If anything changed, do one normal reload
-        await fetchAllCombined();
+        // While the socket is up, piece counts arrive on embroideryProgressUpdated.
+        // A cached /changes payload can be behind that and would paint the old count.
+        if (socket && socket.connected) return;
+
+        // Piece counts only. Never walk a count backward: /changes can be
+        // a few seconds behind the socket that already painted the +1.
+        const prevProg = progressRef.current || {};
+        const ids = new Set([...Object.keys(prevProg), ...Object.keys(serverProg)]);
+        const updates = [];
+        const merged = { ...prevProg };
+        ids.forEach((oid) => {
+          const nextQty = Number(serverProg[oid] || 0);
+          const prevQty = Number(prevProg[oid] || 0);
+          if (nextQty > prevQty) {
+            merged[oid] = nextQty;
+            updates.push({ id: oid, completedQty: nextQty });
+          }
+        });
+        progressRef.current = merged;
+        if (updates.length) {
+          setColumns((prev) => patchColumnsProgress(prev, updates));
+        }
       } catch (e) {
         // swallow brief hiccups
       }
@@ -1665,7 +1765,7 @@ const fetchManualStateCore = async (previousCols) => {
       window.removeEventListener("focus", pollAfterWake);
       document.removeEventListener("visibilitychange", pollWhenVisible);
     };
-  }, []);
+  }, [sessionChecked, needsScheduler]);
 
   // Daily kiosk reset. If the computer sleeps through 2 AM, the suspended timer
   // fires when it wakes; turning off only the attached TV does not affect it.
@@ -1773,12 +1873,13 @@ const removePlaceholder = async (id) => {
   const cleaned = placeholders.filter(p => p.id !== id);
   setPlaceholders(cleaned);
 
-  // 2) persist updated manual state
+  // 2) persist updated manual state from the live board, not a stale render
+  const liveCols = columnsRef.current || columns;
   const manualState = {
-    machine1:     columns.machine1.jobs.map(j => j.id),
-    machine2:     columns.machine2.jobs.map(j => j.id),
-    machine3:     columns.machine3.jobs.map(j => j.id),
-    machine4:     columns.machine4.jobs.map(j => j.id),
+    machine1:     liveCols.machine1.jobs.map(j => j.id),
+    machine2:     liveCols.machine2.jobs.map(j => j.id),
+    machine3:     liveCols.machine3.jobs.map(j => j.id),
+    machine4:     liveCols.machine4.jobs.map(j => j.id),
     placeholders: cleaned
   };
   try {
@@ -1803,12 +1904,13 @@ const addToDoNotRelink = (jobId) => {
 };
 
 const toggleLink = async (colId, idx) => {
-  const jobs = Array.from(columns[colId].jobs);
+  const liveCols = columnsRef.current || columns;
+  const jobs = Array.from(liveCols[colId].jobs);
   const job  = jobs[idx];
   const next = jobs[idx + 1];
 
   // Build a new links map
-  const newLinks = { ...links };
+  const newLinks = { ...(linksRef.current || links) };
   if (job.linkedTo === next?.id) {
     // unlink: RECORD this jobId so we don't re‐link it on refresh
     delete newLinks[job.id];

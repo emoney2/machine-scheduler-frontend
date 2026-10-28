@@ -48,7 +48,9 @@ try {
     reconnectionDelay: 2000,
     reconnectionDelayMax: 15000,
     withCredentials: false,
-    rememberUpgrade: false,
+    // Keep the websocket after the first successful upgrade so reconnects
+    // are not a burst of HTTP long-polls against the same worker.
+    rememberUpgrade: true,
   });
 
   socket.on("connect", () => {

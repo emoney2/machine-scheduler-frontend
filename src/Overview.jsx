@@ -1757,26 +1757,12 @@ function col(width, center = false) {
           forceFresh || OVERVIEW_BYPASS_SERVER_CACHE
             ? withOverviewNoCache(`${ROOT}/overview`)
             : `${ROOT}/overview`;
-        console.log("[Overview upcoming] source=backend-overview (Production Orders tab only)", {
-          overviewUrl,
-          daysWindow,
-          forceFresh,
-        });
         const overRes = await getWithRetry(
           axios,
           overviewUrl,
           { withCredentials: true, signal: ctrl.signal },
           [15000, 20000]
         );
-        console.log("[Overview upcoming] /overview response", {
-          status: overRes?.status,
-          upcomingCountRaw: Array.isArray(overRes?.data?.upcoming) ? overRes.data.upcoming.length : 0,
-          materialsCountRaw: Array.isArray(overRes?.data?.materials) ? overRes.data.materials.length : 0,
-          materialsFutureCountRaw: Array.isArray(overRes?.data?.materialsFuture)
-            ? overRes.data.materialsFuture.length
-            : 0,
-          jobsSource: overRes?.data?.jobsSource,
-        });
 
         if (!alive) return;
         const data = overRes?.data || {};
@@ -1809,16 +1795,6 @@ function col(width, center = false) {
         });
         upcoming = dedupeJobs(sheetJobs);
         if (alive) setDeptPlanningJobs(dedupeJobs(planningJobs));
-        console.log("📦 Overview data received:", {
-          upcomingCount: upcoming?.length || 0,
-          materialsCount: materials?.length || 0,
-          materialsFutureCount: materialsFuture?.length || 0,
-        });
-        console.log("[Overview upcoming] filtered counts", {
-          rawUpcomingCount: Array.isArray(rawUpcoming) ? rawUpcoming.length : 0,
-          afterWindowFilter: sheetJobs.length,
-          afterDedupe: upcoming.length,
-        });
 
         if (!alive) return;
         saveOverviewCache({ upcoming, materials, materialsFuture });
@@ -1850,15 +1826,6 @@ function col(width, center = false) {
         const materialsFutureArray = Array.isArray(materialsFuture) ? materialsFuture : [];
         setMaterials(materialsArray);
         setMaterialsFuture(materialsFutureArray);
-        console.log(
-          "📦 Fresh materials loaded:",
-          materialsArray.length,
-          "now vendors,",
-          materialsFutureArray.length,
-          "future vendors",
-          materialsArray,
-          materialsFutureArray
-        );
         markUpdated();
       } catch (e) {
         // Abort/cancel is expected when a newer refresh starts — keep prior materials.
@@ -1884,11 +1851,18 @@ function col(width, center = false) {
     // slow safety poll (5 minutes) — refresh displayed Overview data
     const id = setInterval(() => loadFresh(), 300000);
 
-    // Rebuild materials-to-order lists every 10 minutes (writes Overview M/N, then refresh)
+    // Materials lists are rebuilt at most once every 2 hours, and only from
+    // one visible tab. The sheet lock this holds used to stall the live board.
+    const REBUILD_GAP_MS = 2 * 60 * 60 * 1000;
+    const LS_REBUILD_AT = "jrco.overviewMaterialsRebuildAt";
     const rebuildId = setInterval(() => {
       if (!alive) return;
+      if (document.visibilityState !== "visible") return;
+      let last = 0;
+      try { last = Number(localStorage.getItem(LS_REBUILD_AT) || 0); } catch {}
+      if (Number.isFinite(last) && Date.now() - last < REBUILD_GAP_MS) return;
+      try { localStorage.setItem(LS_REBUILD_AT, String(Date.now())); } catch {}
       const rf = refreshOverviewRef.current;
-      // Fire-and-forget rebuild via the same path as the manual button
       axios
         .post(
           `${ROOT}/overview/rebuild-materials`,
@@ -1900,9 +1874,10 @@ function col(width, center = false) {
           if (alive && typeof rf === "function") rf({ bypassDebounce: true });
         })
         .catch((err) => {
-          console.warn("Auto materials rebuild (10 min) failed:", err?.message || err);
+          try { localStorage.removeItem(LS_REBUILD_AT); } catch {}
+          console.warn("Auto materials rebuild failed:", err?.message || err);
         });
-    }, 10 * 60 * 1000);
+    }, 30 * 60 * 1000);
 
     // refresh when backend emits updates (debounced 1s)
     const debounced = (() => {

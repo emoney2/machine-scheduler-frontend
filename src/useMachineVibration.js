@@ -87,6 +87,7 @@ export function useMachineVibration(machineId) {
   const accRef = useRef(null);
   const startedOkRef = useRef(false);
   const lastUiRef = useRef(0);
+  const lastClockWriteRef = useRef(0);
   const lastActivityRef = useRef(0);
   const machineRef = useRef(machineId);
 
@@ -98,6 +99,7 @@ export function useMachineVibration(machineId) {
     hasSmoothRef.current = false;
     smoothRef.current = 0;
     lastActivityRef.current = 0;
+    lastClockWriteRef.current = 0;
     setVibrating(false);
     setLevel(null);
   }, [machineId]);
@@ -117,12 +119,20 @@ export function useMachineVibration(machineId) {
     const burst = next >= ACTIVITY_THRESHOLD;
     if (burst) lastActivityRef.current = t;
     const running = lastActivityRef.current > 0 && t - lastActivityRef.current < SLOW_HOLD_MS;
-    if (t - lastUiRef.current >= 150) {
+    // ~4 Hz is enough for the dot. Samples arrive at 30–60 Hz.
+    if (t - lastUiRef.current >= 250) {
       lastUiRef.current = t;
-      setVibrating(running);
-      setLevel(next);
+      const shown = Math.round(next * 100) / 100;
+      setVibrating((prev) => (prev === running ? prev : running));
+      setLevel((prev) => (prev === shown ? prev : shown));
     }
     if (!burst) return;
+
+    // Persist the running clock on pause/resume and every few seconds,
+    // not on every accelerometer sample.
+    const wasPaused = !!clockRef.current?.pausedAt;
+    if (!wasPaused && t - lastClockWriteRef.current < 5000) return;
+    lastClockWriteRef.current = t;
 
     const iso = nowIso();
     setClock((prev) => {
@@ -210,9 +220,8 @@ export function useMachineVibration(machineId) {
   useEffect(() => {
     const id = setInterval(() => {
       const t = Date.now();
-      setVibrating(
-        lastActivityRef.current > 0 && t - lastActivityRef.current < SLOW_HOLD_MS
-      );
+      const on = lastActivityRef.current > 0 && t - lastActivityRef.current < SLOW_HOLD_MS;
+      setVibrating((prev) => (prev === on ? prev : on));
     }, 400);
     return () => clearInterval(id);
   }, [machineId]);

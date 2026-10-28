@@ -15,6 +15,50 @@ import {
 const THREAD_CONFLICT_BORDER = '#ca8a04';
 const THREAD_CONFLICT_BG_TINT = 'rgba(250, 204, 21, 0.22)';
 
+function materialsKey(job) {
+  const list = Array.isArray(job?.materials) ? job.materials : [];
+  return list.join('\n');
+}
+
+function schedulerCardEqual(prev, next) {
+  if (prev.globalIdx !== next.globalIdx) return false;
+  if (prev.nextJobId !== next.nextJobId) return false;
+  if (prev.conflictSig !== next.conflictSig) return false;
+  if (prev.threadInventoryStatus !== next.threadInventoryStatus) return false;
+  if (prev.materialInventoryStatus !== next.materialInventoryStatus) return false;
+  const a = prev.job;
+  const b = next.job;
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.completedQty === b.completedQty &&
+    a.quantity === b.quantity &&
+    a.start === b.start &&
+    a.end === b.end &&
+    a.delivery === b.delivery &&
+    !!a.isLate === !!b.isLate &&
+    (a.linkedTo || null) === (b.linkedTo || null) &&
+    a.company === b.company &&
+    String(a.product ?? a.Product ?? '') === String(b.product ?? b.Product ?? '') &&
+    String(a.design ?? '') === String(b.design ?? '') &&
+    a.due_date === b.due_date &&
+    a.due_type === b.due_type &&
+    a.threadColors === b.threadColors &&
+    a.imageLink === b.imageLink &&
+    a.stitch_count === b.stitch_count &&
+    a.stitchCount === b.stitchCount &&
+    a.inHand === b.inHand &&
+    a.status === b.status &&
+    String(a.Stage ?? a.stage ?? '') === String(b.Stage ?? b.stage ?? '') &&
+    materialsKey(a) === materialsKey(b)
+  );
+}
+
+const SchedulerJobCard = React.memo(function SchedulerJobCard(props) {
+  return props.render();
+}, schedulerCardEqual);
+
 /** e.g. 18702 → "19K" (round up to the nearest 1,000 stitches) */
 function formatStitchCountK(job) {
   const raw = Number(job?.stitch_count ?? job?.stitchCount ?? 0);
@@ -509,6 +553,35 @@ export default function Section9(props) {
                           .slice(seg.start, seg.start + seg.len)
                           .map((job, jIdx) => {
                             const globalIdx = seg.start + jIdx;
+                            const listedConflicts = conflictResult.byJobId?.[String(job.id)] || [];
+                            const conflictSig = listedConflicts.length
+                              ? listedConflicts.map((c) => c.color).join('\n')
+                              : '';
+                            const nextJobId = jobs[globalIdx + 1]?.id ?? '';
+                            return (
+                              <Draggable
+                                key={job.id.toString()}
+                                draggableId={job.id.toString()}
+                                index={globalIdx}
+                              >
+                                {(prov) => (
+                                  <div
+                                    ref={prov.innerRef}
+                                    {...prov.draggableProps}
+                                    {...prov.dragHandleProps}
+                                    style={{
+                                      margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
+                                      ...prov.draggableProps.style,
+                                    }}
+                                  >
+                                    <SchedulerJobCard
+                                      job={job}
+                                      globalIdx={globalIdx}
+                                      nextJobId={nextJobId}
+                                      conflictSig={conflictSig}
+                                      threadInventoryStatus={threadInventoryStatus}
+                                      materialInventoryStatus={materialInventoryStatus}
+                                      render={() => {
                             const isPh = String(job.id).startsWith('ph-');
                             // for placeholders we need a bit more room
                             const stripWidth = isPh ? 36 : 24;
@@ -565,16 +638,7 @@ export default function Section9(props) {
                               : base;
 
                             return (
-                              <Draggable
-                                key={job.id.toString()}
-                                draggableId={job.id.toString()}
-                                index={globalIdx}
-                              >
-                                {prov => (
                                   <div
-                                    ref={prov.innerRef}
-                                    {...prov.draggableProps}
-                                    {...prov.dragHandleProps}
                                     style={{
                                       position: 'relative',
                                       display: 'grid',
@@ -587,7 +651,6 @@ export default function Section9(props) {
                                       paddingBottom: inProgress ? 12 : 6,
                                       paddingRight: rightPadding,
                                       paddingLeft: job.imageLink ? 6 + 56 + 8 : 6,
-                                      margin: `0 0 ${jIdx < seg.len - 1 ? 6 : 0}px 0`,
                                       background: cardBackground,
                                       border: `2px solid ${cardBorder}`,
                                       borderRadius: 4,
@@ -595,9 +658,7 @@ export default function Section9(props) {
                                       boxShadow: hasThreadConflict && !job.isLate
                                         ? '0 0 0 1px rgba(202, 138, 4, 0.35)'
                                         : undefined,
-                                      ...prov.draggableProps.style
                                     }}
-
                                   >
 {/* Artwork thumbnail (absolute, top-left); hidden if no imageLink. When digitized, show checkmark under image and thread colors in white boxes. */}
 {job.imageLink ? (
@@ -1150,6 +1211,10 @@ export default function Section9(props) {
                                         />
                                       </div>
                                     )}
+                                  </div>
+                                      );
+                                      }}
+                                    />
                                   </div>
                                 )}
                               </Draggable>
