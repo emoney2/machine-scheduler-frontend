@@ -719,6 +719,8 @@ async function getWithRetry(axiosInstance, url, baseConfig = {}, attempts = [150
     } catch (err) {
       lastErr = err;
       if (axios.isCancel(err) || isOverviewAbortError(err)) throw err;
+      const msg = String(err?.message || err?.code || "");
+      if (msg.includes("ERR_INSUFFICIENT_RESOURCES") || msg.includes("INSUFFICIENT_RESOURCES")) throw err;
       const wait = 1000 * Math.pow(1.5, i);
       await new Promise(r => setTimeout(r, wait));
     }
@@ -1969,40 +1971,45 @@ function col(width, center = false) {
   }, [kanbanQueueRows]);
 
   const fetchKanbanQueue = useCallback(
-    async ({ showLoading = true } = {}) => {
+    async ({ showLoading = true, signal } = {}) => {
       if (showLoading) setLoadingKanbanQueue(true);
       try {
         const res = await getWithRetry(
           axios,
           `${ROOT}/kanban/queue`,
-          { withCredentials: true },
+          { withCredentials: true, signal },
           [20000, 30000]
         );
         setKanbanQueueRows(Array.isArray(res.data?.rows) ? res.data.rows : []);
       } catch (e) {
+        if (axios.isCancel(e) || isOverviewAbortError(e)) return;
         console.warn("Overview kanban queue fetch failed:", e);
         setKanbanQueueRows([]);
       } finally {
         if (showLoading) setLoadingKanbanQueue(false);
       }
     },
-    [ROOT, getWithRetry]
+    [ROOT]
   );
 
   useEffect(() => {
-    fetchKanbanQueue({ showLoading: true });
+    const ctrl = new AbortController();
+    fetchKanbanQueue({ showLoading: true, signal: ctrl.signal });
     const id = setInterval(() => fetchKanbanQueue({ showLoading: false }), 300000);
-    return () => clearInterval(id);
+    return () => {
+      ctrl.abort();
+      clearInterval(id);
+    };
   }, [fetchKanbanQueue]);
 
   const fetchNeedlepointOrders = useCallback(
-    async ({ showLoading = true } = {}) => {
+    async ({ showLoading = true, signal } = {}) => {
       if (showLoading) setLoadingNeedlepoint(true);
       try {
         const res = await getWithRetry(
           axios,
           `${ROOT}/needlepoint/pending`,
-          { withCredentials: true },
+          { withCredentials: true, signal },
           [20000, 30000]
         );
         setNeedlepointOrders(Array.isArray(res.data?.orders) ? res.data.orders : []);
@@ -2010,19 +2017,24 @@ function col(width, center = false) {
           setNeedlepointSupplierEmail(String(res.data.supplierEmail));
         }
       } catch (e) {
+        if (axios.isCancel(e) || isOverviewAbortError(e)) return;
         console.warn("Overview needlepoint fetch failed:", e);
         setNeedlepointOrders([]);
       } finally {
         if (showLoading) setLoadingNeedlepoint(false);
       }
     },
-    [ROOT, getWithRetry]
+    [ROOT]
   );
 
   useEffect(() => {
-    fetchNeedlepointOrders({ showLoading: true });
+    const ctrl = new AbortController();
+    fetchNeedlepointOrders({ showLoading: true, signal: ctrl.signal });
     const id = setInterval(() => fetchNeedlepointOrders({ showLoading: false }), 300000);
-    return () => clearInterval(id);
+    return () => {
+      ctrl.abort();
+      clearInterval(id);
+    };
   }, [fetchNeedlepointOrders]);
 
   const selectedNeedlepointOrders = useMemo(
