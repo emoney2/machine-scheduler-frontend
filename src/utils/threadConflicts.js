@@ -4,10 +4,16 @@
  * Ignores schedule times. Only 6-head machines (Machine 2–4) are considered —
  * Machine 1 single cones are not tracked in inventory the same way.
  * If the same color is on two or more 6-head machines, cones needed = 6 × machines.
- * Yellow conflict when on-hand cones cannot cover that.
+ *
+ * Conflict (yellow): on-hand loadable cones cannot cover that peak.
+ * Dual-ready (soft): same color on 2+ machines but stock covers it — OK to
+ * run both; not a shortage and not a buy signal.
+ *
  * Sheet inventory is remaining length (feet / 16500), not physical cones.
  * A 6-head machine pulls evenly from all 6 cones, so leftover length is spread
  * across a multiple of 6 cones — not emptied one cone at a time.
+ * Available cones = max(purchase-based count, length-spread count) so incomplete
+ * Thread Data purchase logs cannot undercount and falsely red-flag.
  * Buy recommendations always round up to pods of 6, and skip colors already
  * covered by on-order cones.
  */
@@ -27,11 +33,13 @@ export const CONE_POD_SIZE = 6;
 function emptyConflictResult(extra = {}) {
   return {
     conflicts: [],
+    dualReady: [],
     byJobId: {},
     buyRecommendations: [],
     optionalBuy: [],
     summary: {
       conflictCount: 0,
+      dualReadyCount: 0,
       jobCount: 0,
       buyCount: 0,
     },
@@ -232,11 +240,13 @@ export function physicalConesFromRemaining(remaining) {
 
 export function availableCones(invEntry) {
   if (!invEntry) return 0;
+  const fromLength = physicalConesFromRemaining(invEntry.inventory);
   const counted = Number(invEntry.cones);
-  if (Number.isFinite(counted) && counted > 0) {
-    return Math.max(0, Math.floor(counted));
-  }
-  return physicalConesFromRemaining(invEntry.inventory);
+  const fromApi =
+    Number.isFinite(counted) && counted > 0 ? Math.max(0, Math.floor(counted)) : 0;
+  // Prefer the higher count: purchase logs can undercount when Thread Data is
+  // incomplete, while leftover length still implies a full extra 6-cone set.
+  return Math.max(fromApi, fromLength);
 }
 
 function onOrderCones(invEntry) {
@@ -287,6 +297,17 @@ function mapConflictJob(j) {
   };
 }
 
+function sortedConflictJobs(jobs) {
+  return jobs
+    .slice()
+    .sort(
+      (a, b) =>
+        String(a.machineKey || '').localeCompare(String(b.machineKey || '')) ||
+        String(a.id).localeCompare(String(b.id))
+    )
+    .map(mapConflictJob);
+}
+
 function evaluateColorConflict({ color, jobs, invEntry }) {
   const machines = machinesFromJobs(jobs);
   if (machines.size < 2) return null;
@@ -299,18 +320,43 @@ function evaluateColorConflict({ color, jobs, invEntry }) {
         : 0
       : availableCones(invEntry);
   const onOrder = onOrderCones(invEntry);
+  const machineList = Array.from(machines.values());
+  const jobsList = jobs.slice();
 
-  if (peakCones <= avail) return null;
+  // Enough stock to load every machine that has this color — dual-ready, not a conflict.
+  if (peakCones <= avail) {
+    const suggestions = buildDualReadySuggestions({
+      color,
+      jobs: jobsList,
+      machines: machineList,
+      avail,
+      peakCones,
+    });
+    return {
+      id: `color-${color}`,
+      kind: 'dual-ready',
+      color,
+      peakConesNeeded: peakCones,
+      availableCones: avail,
+      onOrderCones: onOrder,
+      shortfall: 0,
+      conesToBuy: 0,
+      preferBuy: false,
+      preferReschedule: false,
+      machineCount: machines.size,
+      jobs: sortedConflictJobs(jobsList),
+      suggestions,
+    };
+  }
 
   const shortfall = peakCones - avail;
   const shortfallAfterOrders = Math.max(0, peakCones - avail - onOrder);
   const conesToBuy = buyQtyFor(shortfallAfterOrders);
-  const jobsList = jobs.slice();
   const preferBuy = conesToBuy > 0 && shouldPreferBuy(jobsList, machines.size);
   const suggestions = buildSuggestions({
     color,
     jobs: jobsList,
-    machines: Array.from(machines.values()),
+    machines: machineList,
     avail,
     onOrder,
     peakCones,
@@ -321,6 +367,7 @@ function evaluateColorConflict({ color, jobs, invEntry }) {
 
   return {
     id: `color-${color}`,
+    kind: 'conflict',
     color,
     peakConesNeeded: peakCones,
     availableCones: avail,
@@ -330,19 +377,20 @@ function evaluateColorConflict({ color, jobs, invEntry }) {
     preferBuy,
     preferReschedule: !preferBuy,
     machineCount: machines.size,
-    jobs: jobsList
-      .slice()
-      .sort((a, b) => String(a.machineKey || '').localeCompare(String(b.machineKey || '')) || String(a.id).localeCompare(String(b.id)))
-      .map(mapConflictJob),
+    jobs: sortedConflictJobs(jobsList),
     suggestions,
   };
 }
 
-function finalizeConflicts(conflicts) {
+function finalizeConflicts(conflicts, dualReady = []) {
   conflicts.sort((a, b) => {
     if (a.preferBuy !== b.preferBuy) return a.preferBuy ? -1 : 1;
     return b.shortfall - a.shortfall;
   });
+
+  dualReady.sort((a, b) =>
+    String(a.color || '').localeCompare(String(b.color || ''))
+  );
 
   /** @type {Record<string, typeof conflicts>} */
   const byJobId = {};
@@ -382,11 +430,13 @@ function finalizeConflicts(conflicts) {
 
   return {
     conflicts,
+    dualReady,
     byJobId,
     buyRecommendations,
     optionalBuy,
     summary: {
       conflictCount: conflicts.length,
+      dualReadyCount: dualReady.length,
       jobCount: Object.keys(byJobId).length,
       buyCount: buyRecommendations.length,
     },
@@ -417,42 +467,60 @@ export function detectThreadConflicts(columns, inventoryRaw) {
   }
 
   const conflicts = [];
+  const dualReady = [];
 
   for (const [color, jobsForColor] of byColor) {
-    if (jobsForColor.length < 2) continue;
+    // Need the color on at least two machine columns (jobs on one machine alone is fine).
+    const machines = machinesFromJobs(jobsForColor);
+    if (machines.size < 2) continue;
     const invEntry = lookupInventoryEntry(inventory, color);
-    const conflict = evaluateColorConflict({
+    const evaluated = evaluateColorConflict({
       color,
       jobs: jobsForColor,
       invEntry,
     });
-    if (conflict) conflicts.push(conflict);
+    if (!evaluated) continue;
+    if (evaluated.kind === 'dual-ready') dualReady.push(evaluated);
+    else conflicts.push(evaluated);
   }
 
-  return { ...finalizeConflicts(conflicts), inventoryReady: true };
+  return { ...finalizeConflicts(conflicts, dualReady), inventoryReady: true };
 }
 
 /**
  * Re-score a persisted Scheduler snapshot against live Thread Inventory.
  * Used by Overview Refresh so "have 0" false positives drop without reopening Scheduler.
+ * Colors that clear become dual-ready notes instead of buy/reschedule conflicts.
  */
 export function applyInventoryToConflicts(result, inventoryRaw) {
-  if (!result || !Array.isArray(result.conflicts) || inventoryRaw == null) {
+  if (!result || inventoryRaw == null) {
     return result || emptyConflictResult();
+  }
+  const prior = [
+    ...(Array.isArray(result.conflicts) ? result.conflicts : []),
+    ...(Array.isArray(result.dualReady) ? result.dualReady : []),
+  ];
+  if (!prior.length) {
+    return emptyConflictResult({ inventoryReady: true });
   }
   const inventory = normalizeInventoryMap(inventoryRaw);
   const conflicts = [];
-  for (const c of result.conflicts) {
+  const dualReady = [];
+  const seen = new Set();
+  for (const c of prior) {
     const color = madeiraCode(c.color) || String(c.color || '').trim();
-    if (!color || !Array.isArray(c.jobs) || c.jobs.length < 2) continue;
-    const conflict = evaluateColorConflict({
+    if (!color || seen.has(color) || !Array.isArray(c.jobs) || c.jobs.length < 2) continue;
+    seen.add(color);
+    const evaluated = evaluateColorConflict({
       color,
       jobs: c.jobs,
       invEntry: lookupInventoryEntry(inventory, color),
     });
-    if (conflict) conflicts.push(conflict);
+    if (!evaluated) continue;
+    if (evaluated.kind === 'dual-ready') dualReady.push(evaluated);
+    else conflicts.push(evaluated);
   }
-  return { ...finalizeConflicts(conflicts), inventoryReady: true };
+  return { ...finalizeConflicts(conflicts, dualReady), inventoryReady: true };
 }
 
 function shouldPreferBuy(jobs, machineCount) {
@@ -478,6 +546,17 @@ function buyReason(conflict) {
     return `Color ${conflict.color} is on ${conflict.machineCount} machines — hard to schedule around.`;
   }
   return `Hard/near due dates make keeping color ${conflict.color} on one machine at a time difficult.`;
+}
+
+function buildDualReadySuggestions({ color, jobs, machines, avail, peakCones }) {
+  const machineNames = machines.map((m) => m.machineTitle).join(' and ');
+  const jobBits = jobs.map((j) => `#${j.id} (${j.machineTitle})`).join(', ');
+  return [
+    `${color} is on ${machines.length} machines (${machineNames}): ${jobBits}.`,
+    `Need ${peakCones} cones to load those machines at once; you have ${avail} on hand.`,
+    `Enough cones to double machines — load a full set on each. No order needed.`,
+    `Optional efficiency: keep ${color} on one machine at a time if you want fewer cone changes.`,
+  ];
 }
 
 function buildSuggestions({ color, jobs, machines, avail, onOrder, peakCones, shortfall, conesToBuy, preferBuy }) {

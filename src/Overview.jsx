@@ -8,6 +8,7 @@ import {
   loadPersistedThreadConflicts,
   persistThreadConflicts,
   applyInventoryToConflicts,
+  formatConflictMachines,
 } from "./utils/threadConflicts";
 import {
   loadPersistedSewingCarryover,
@@ -1615,6 +1616,11 @@ function col(width, center = false) {
   }, [refreshThreadConflicts, loadLocalThreadConflicts]);
 
   const threadConflictCount = threadConflictSnapshot?.summary?.conflictCount || 0;
+  const threadDualReadyCount =
+    threadConflictSnapshot?.summary?.dualReadyCount ??
+    (Array.isArray(threadConflictSnapshot?.dualReady)
+      ? threadConflictSnapshot.dualReady.length
+      : 0);
 
   const [sewingCarryoverSnapshot, setSewingCarryoverSnapshot] = useState(() =>
     loadPersistedSewingCarryover()
@@ -3095,7 +3101,9 @@ function col(width, center = false) {
               </button>
             </div>
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
-              Same color on 2+ six-head machines without enough cones. Buy in pods of 6.
+              True conflicts only: same color on 2+ six-head machines without enough cones.
+              Buy in pods of 6, or keep the color on one machine. Colors with enough cones are
+              dual-ready (not listed here).
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -3326,6 +3334,85 @@ function col(width, center = false) {
                   </div>
                 );
               })}
+            </div>
+          </div>
+          )}
+
+          {threadDualReadyCount > 0 && (
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #bbf7d0",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Dual-Ready Thread</span>
+              <span style={subtleUpdatedStyle}>
+                {threadConflictSnapshot?.persistedAt || threadConflictSnapshot?.computedAt
+                  ? `From Scheduler · ${formatClock(
+                      new Date(threadConflictSnapshot.persistedAt || threadConflictSnapshot.computedAt)
+                    )}`
+                  : "From Scheduler"}
+              </span>
+              <button
+                type="button"
+                onClick={refreshThreadConflicts}
+                style={{
+                  marginLeft: "auto",
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: "1px solid #d1d5db",
+                  background: "#fff",
+                  color: "#111827",
+                  cursor: "pointer",
+                }}
+              >
+                Refresh
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 10 }}>
+              Same color on 2+ machines with enough cones to load both. No order needed.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(threadConflictSnapshot?.dualReady || []).map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    border: "1px solid #bbf7d0",
+                    background: "#f0fdf4",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: 14, color: "#14532d" }}>{c.color}</div>
+                  <div style={{ fontSize: 12, color: "#166534", flex: "1 1 auto" }}>
+                    {formatConflictMachines(c)} · need {c.peakConesNeeded} · have {c.availableCones}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      padding: "5px 10px",
+                      borderRadius: 999,
+                      background: "#dcfce7",
+                      color: "#166534",
+                    }}
+                  >
+                    OK to double
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           )}

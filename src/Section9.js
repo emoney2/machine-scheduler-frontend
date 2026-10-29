@@ -319,6 +319,7 @@ export default function Section9(props) {
       <ThreadConflictStrip
         summary={conflictResult.summary}
         conflicts={conflictResult.conflicts}
+        dualReady={conflictResult.dualReady}
         expanded={conflictStripOpen}
         onToggle={() => setConflictStripOpen((v) => !v)}
         onOpenConflict={openConflictById}

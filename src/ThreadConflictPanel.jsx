@@ -260,107 +260,139 @@ function Stat({ label, value, accent }) {
 
 /**
  * Compact strip shown above the scheduler board.
+ * Yellow = true shortages. Soft green = dual-ready (enough cones to run both).
  */
 export function ThreadConflictStrip({
   summary,
   conflicts,
+  dualReady = [],
   expanded,
   onToggle,
   onOpenConflict,
 }) {
   const count = summary?.conflictCount || 0;
-  if (!count) return null;
+  const dualCount = summary?.dualReadyCount ?? (dualReady?.length || 0);
+  if (!count && !dualCount) return null;
 
   return (
-    <div
-      style={{
-        margin: '0 0 12px 0',
-        border: '1px solid #facc15',
-        background: '#fefce8',
-        borderRadius: 8,
-        overflow: 'hidden',
-      }}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '8px 12px',
-          border: 'none',
-          background: 'transparent',
-          cursor: 'pointer',
-          textAlign: 'left',
-          fontSize: 13,
-        }}
-      >
-        <span
+    <div style={{ margin: '0 0 12px 0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {count > 0 && (
+        <div
           style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minWidth: 22,
-            height: 22,
-            borderRadius: 999,
-            background: '#facc15',
-            color: '#713f12',
-            fontWeight: 800,
-            fontSize: 12,
+            border: '1px solid #facc15',
+            background: '#fefce8',
+            borderRadius: 8,
+            overflow: 'hidden',
           }}
         >
-          {count}
-        </span>
-        <span style={{ fontWeight: 700, color: '#713f12' }}>
-          Thread {count === 1 ? 'conflict' : 'conflicts'}
-        </span>
-        <span style={{ color: '#854d0e', fontSize: 12 }}>
-          Same color on multiple 6-head machines · not enough cones
-          {summary.buyCount ? ` · ${summary.buyCount} buy recommended` : ''}
-        </span>
-        <span style={{ marginLeft: 'auto', color: '#854d0e', fontSize: 12 }}>
-          {expanded ? 'Hide' : 'Show'}
-        </span>
-      </button>
-
-      {expanded && (
-        <div style={{ borderTop: '1px solid #fde68a', padding: '8px 12px 10px' }}>
-          {(conflicts || []).map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => onOpenConflict(c.id)}
+          <button
+            type="button"
+            onClick={onToggle}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 12px',
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontSize: 13,
+            }}
+          >
+            <span
               style={{
-                display: 'flex',
-                width: '100%',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: 8,
-                padding: '6px 4px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                textAlign: 'left',
+                justifyContent: 'center',
+                minWidth: 22,
+                height: 22,
+                borderRadius: 999,
+                background: '#facc15',
+                color: '#713f12',
+                fontWeight: 800,
                 fontSize: 12,
-                borderRadius: 6,
               }}
             >
-              <strong style={{ minWidth: 48 }}>{c.color}</strong>
-              <span style={{ color: '#4b5563' }}>
-                {formatConflictMachines(c)} · need {c.peakConesNeeded} · have {c.availableCones}
-              </span>
-              <span
-                style={{
-                  marginLeft: 'auto',
-                  fontWeight: 700,
-                  color: c.preferBuy ? '#991b1b' : '#854d0e',
-                  flexShrink: 0,
-                }}
-              >
-                {c.preferBuy ? `Buy ${c.conesToBuy}` : 'Reschedule'}
-              </span>
-            </button>
+              {count}
+            </span>
+            <span style={{ fontWeight: 700, color: '#713f12' }}>
+              Thread {count === 1 ? 'conflict' : 'conflicts'}
+            </span>
+            <span style={{ color: '#854d0e', fontSize: 12 }}>
+              Same color on multiple 6-head machines · not enough cones
+              {summary.buyCount ? ` · ${summary.buyCount} buy recommended` : ''}
+            </span>
+            <span style={{ marginLeft: 'auto', color: '#854d0e', fontSize: 12 }}>
+              {expanded ? 'Hide' : 'Show'}
+            </span>
+          </button>
+
+          {expanded && (
+            <div style={{ borderTop: '1px solid #fde68a', padding: '8px 12px 10px' }}>
+              {(conflicts || []).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onOpenConflict(c.id)}
+                  style={{
+                    display: 'flex',
+                    width: '100%',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '6px 4px',
+                    border: 'none',
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontSize: 12,
+                    borderRadius: 6,
+                  }}
+                >
+                  <strong style={{ minWidth: 48 }}>{c.color}</strong>
+                  <span style={{ color: '#4b5563' }}>
+                    {formatConflictMachines(c)} · need {c.peakConesNeeded} · have {c.availableCones}
+                  </span>
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      fontWeight: 700,
+                      color: c.preferBuy ? '#991b1b' : '#854d0e',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {c.preferBuy ? `Buy ${c.conesToBuy}` : 'Reschedule'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {dualCount > 0 && (
+        <div
+          style={{
+            border: '1px solid #bbf7d0',
+            background: '#f0fdf4',
+            borderRadius: 8,
+            padding: '8px 12px',
+            fontSize: 12,
+            color: '#166534',
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: dualReady?.length ? 4 : 0 }}>
+            Dual-ready · {dualCount} color{dualCount === 1 ? '' : 's'} with enough cones to load both machines
+          </div>
+          {(dualReady || []).map((c) => (
+            <div key={c.id} style={{ color: '#15803d', marginTop: 2 }}>
+              <strong>{c.color}</strong>
+              {' · '}
+              {formatConflictMachines(c)}
+              {' · '}
+              need {c.peakConesNeeded} · have {c.availableCones} · no order needed
+            </div>
           ))}
         </div>
       )}
