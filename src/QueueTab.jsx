@@ -185,7 +185,7 @@ export default function QueueTab() {
   useEffect(() => {
     let canceled = false;
     (async () => { if (!canceled) await fetchOrders(); })();
-    const t = setInterval(() => { if (!canceled) fetchOrders({ refresh: true }); }, 60000);
+    const t = setInterval(() => { if (!canceled) fetchOrders({ refresh: true }); }, 180000);
     return () => { canceled = true; clearInterval(t); };
   }, [fetchOrders]);
 

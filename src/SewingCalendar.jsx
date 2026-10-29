@@ -821,54 +821,31 @@ export function SewingCalendar({ tv = false, columns }) {
       setLoading(false);
     }
     load();
-    const hashesRef = { current: {} };
     let canceled = false;
 
-    async function pollChanges() {
+    const timer = window.setInterval(() => {
       if (canceled || isWriteGuarded() || syncingRef.current) return;
-      try {
-        const res = await fetch(`${API_ROOT}/changes`, { credentials: "include", cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        const serverHashes = data?.hashes || {};
-        const prev = hashesRef.current || {};
-        let changed = false;
-        for (const [oid, h] of Object.entries(serverHashes)) {
-          if (prev[oid] !== h) { changed = true; break; }
-        }
-        if (!changed) {
-          for (const oid of Object.keys(prev)) {
-            if (!(oid in serverHashes)) { changed = true; break; }
-          }
-        }
-        hashesRef.current = serverHashes;
-        if (changed && Object.keys(prev).length) load();
-      } catch (_) {
-        /* same as Overview / App: skip a missed tick */
-      }
-    }
-
-    const timer = window.setInterval(pollChanges, 30000);
+      load();
+    }, 180000);
     const onBoard = () => {
       if (isWriteGuarded() || syncingRef.current) return;
       load();
     };
+    let orderTimer = null;
+    const onOrder = () => {
+      window.clearTimeout(orderTimer);
+      orderTimer = window.setTimeout(onBoard, 20000);
+    };
     socket.on("sewingBoardUpdated", onBoard);
-    socket.on("ordersUpdated", onBoard);
-    socket.on("orderUpdated", onBoard);
-    const onWake = () => { if (document.visibilityState === "visible") pollChanges(); };
-    window.addEventListener("online", onWake);
-    window.addEventListener("focus", onWake);
-    document.addEventListener("visibilitychange", onWake);
+    socket.on("ordersUpdated", onOrder);
+    socket.on("orderUpdated", onOrder);
     return () => {
       canceled = true;
       window.clearInterval(timer);
+      window.clearTimeout(orderTimer);
       socket.off("sewingBoardUpdated", onBoard);
-      socket.off("ordersUpdated", onBoard);
-      socket.off("orderUpdated", onBoard);
-      window.removeEventListener("online", onWake);
-      window.removeEventListener("focus", onWake);
-      document.removeEventListener("visibilitychange", onWake);
+      socket.off("ordersUpdated", onOrder);
+      socket.off("orderUpdated", onOrder);
     };
   }, [applyPayload, draft, load, isWriteGuarded]);
 

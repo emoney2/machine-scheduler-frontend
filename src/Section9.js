@@ -1,5 +1,5 @@
 // File: frontend/src/Section9.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { fmtMMDD, subWorkDays, parseDueDate } from './helpers';
@@ -118,6 +118,9 @@ export default function Section9(props) {
     machine4: { title: 'Machine 4', headCount: 6, jobs: [] },
   };
 
+  const threadStatusJsonRef = useRef("");
+  const materialStatusJsonRef = useRef("");
+
   // Fetch thread inventory: prefer status API; fallback to raw /threadInventory and derive red/yellow/green
   // Yellow = inventory negative but on-order (Inventory..) > 0
   useEffect(() => {
@@ -135,8 +138,12 @@ export default function Section9(props) {
         const res = await axios.get(`${API_ROOT}/thread-inventory-status`, { withCredentials: true });
         const data = res.data;
         if (data && typeof data === 'object' && !Array.isArray(data)) {
-          setThreadInventoryStatus(data);
+          const json = JSON.stringify(data);
           setThreadInventoryReady(true);
+          if (json !== threadStatusJsonRef.current) {
+            threadStatusJsonRef.current = json;
+            setThreadInventoryStatus(data);
+          }
           return;
         }
       } catch (_) {}
@@ -156,7 +163,7 @@ export default function Section9(props) {
       } catch (_) {}
     };
     fetchThreadStatus();
-    const interval = setInterval(fetchThreadStatus, 180000);
+    const interval = setInterval(fetchThreadStatus, 300000);
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -168,7 +175,11 @@ export default function Section9(props) {
       try {
         const res = await axios.get(`${API_ROOT}/material-inventory-status`, { withCredentials: true });
         if (res.data && typeof res.data === 'object' && !Array.isArray(res.data)) {
-          setMaterialInventoryStatus(res.data);
+          const json = JSON.stringify(res.data);
+          if (json !== materialStatusJsonRef.current) {
+            materialStatusJsonRef.current = json;
+            setMaterialInventoryStatus(res.data);
+          }
           return;
         }
       } catch (_) {}
@@ -191,7 +202,7 @@ export default function Section9(props) {
     let interval = null;
     const boot = setTimeout(() => {
       fetchMaterialStatus();
-      interval = setInterval(fetchMaterialStatus, 60000);
+      interval = setInterval(fetchMaterialStatus, 300000);
     }, 2800);
     return () => {
       clearTimeout(boot);
@@ -217,9 +228,25 @@ export default function Section9(props) {
     return 'green';
   };
 
+  const conflictInput = useMemo(() => {
+    const parts = [];
+    for (const key of ["machine2", "machine3", "machine4"]) {
+      const jobs = safeColumns[key]?.jobs || [];
+      for (const job of jobs) {
+        parts.push(
+          `${job?.id || ""}:${job?.threadColors || ""}:${job?.isLate ? 1 : 0}`
+        );
+      }
+      parts.push("|");
+    }
+    return parts.join(";");
+  }, [safeColumns]);
   const conflictResult = useMemo(
     () => detectThreadConflicts(safeColumns, threadInventoryReady ? threadInventoryStatus : null),
-    [safeColumns, threadInventoryStatus, threadInventoryReady]
+    // conflictInput changes only when machine membership, colors, or late flags change.
+    // A piece count must not recompute this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [conflictInput, threadInventoryStatus, threadInventoryReady]
   );
 
   useEffect(() => {

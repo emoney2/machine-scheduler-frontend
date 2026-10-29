@@ -629,20 +629,29 @@ export default function App() {
 useEffect(() => {
   if (!socket) return;
 
-  const onStartTimeUpdated = () => {
-    if (isManualStateGuarded()) {
-      console.log("[startTimeUpdated] skip fetch (manual-state guarded)");
-      return;
-    }
-    fetchAllCombined();
+  let layoutTimer = null;
+  const scheduleLayoutRefresh = () => {
+    if (isManualStateGuarded()) return;
+    clearTimeout(layoutTimer);
+    layoutTimer = setTimeout(() => {
+      refreshMachineLayout();
+    }, 1500);
   };
-  const onSchedulerStateUpdated = () => {
-    if (!isManualStateGuarded()) fetchAllCombined();
+  const onStartTimeUpdated = (payload) => {
+    if (isManualStateGuarded()) return;
+    const iso = payload?.startTime;
+    const oid = payload?.orderNumber || payload?.orderId;
+    if (!iso || !oid) return;
+    setColumns((prev) => patchJobStart(prev, oid, iso));
+  };
+  const onLinksUpdated = (payload) => {
+    if (isManualStateGuarded()) return;
+    setColumns((prev) => applyLinksToColumns(prev, payload));
   };
 
   socket.on("startTimeUpdated", onStartTimeUpdated);
-  socket.on("manualStateUpdated", onSchedulerStateUpdated);
-  socket.on("linksUpdated", onSchedulerStateUpdated);
+  socket.on("manualStateUpdated", scheduleLayoutRefresh);
+  socket.on("linksUpdated", onLinksUpdated);
   const dropFinishedJob = (orderId) => {
     const want = normalizeOrderId(orderId);
     if (!want) return;
@@ -662,7 +671,6 @@ useEffect(() => {
   };
   const onEmbroideryFinished = (payload) => {
     dropFinishedJob(payload?.orderId);
-    fetchAllCombined();
   };
   const onEmbroideryProgress = (payload) => {
     const oid = normalizeOrderId(payload?.orderId);
@@ -673,7 +681,6 @@ useEffect(() => {
       (Number.isFinite(done) && Number.isFinite(qty) && qty > 0 && done >= qty);
     if (qtyReached) {
       dropFinishedJob(payload?.orderId);
-      fetchAllCombined();
       return;
     }
     if (!oid || !Number.isFinite(done)) return;
@@ -695,10 +702,7 @@ useEffect(() => {
         }
       }
     }
-    if (!found) {
-      fetchAllCombined();
-      return;
-    }
+    if (!found) return;
 
     setColumns((prev) => patchColumnsProgress(prev, [{
       id: oid,
@@ -711,9 +715,10 @@ useEffect(() => {
   socket.on("embroideryFinished", onEmbroideryFinished);
   socket.on("embroideryProgressUpdated", onEmbroideryProgress);
   return () => {
+    clearTimeout(layoutTimer);
     socket.off("startTimeUpdated", onStartTimeUpdated);
-    socket.off("manualStateUpdated", onSchedulerStateUpdated);
-    socket.off("linksUpdated", onSchedulerStateUpdated);
+    socket.off("manualStateUpdated", scheduleLayoutRefresh);
+    socket.off("linksUpdated", onLinksUpdated);
     socket.off("embroideryFinished", onEmbroideryFinished);
     socket.off("embroideryProgressUpdated", onEmbroideryProgress);
   };
@@ -1146,6 +1151,49 @@ function patchColumnsProgress(prev, updates) {
     };
   });
   return next;
+}
+
+function patchJobStart(prev, orderNumber, iso) {
+  const oid = normalizeOrderId(orderNumber);
+  if (!prev || !oid || !iso) return prev;
+  for (const key of ["queue", ...SCHEDULER_MACHINE_KEYS]) {
+    const jobs = prev[key]?.jobs || [];
+    const idx = jobs.findIndex((j) => normalizeOrderId(j.id) === oid);
+    if (idx === -1) continue;
+    const job = jobs[idx];
+    if (job.embroidery_start === iso) return prev;
+    const mapped = jobs.slice();
+    mapped[idx] = { ...job, embroidery_start: iso, start_date: iso };
+    const next = { ...prev, [key]: { ...prev[key], jobs: mapped } };
+    if (SCHEDULER_MACHINE_KEYS.includes(key)) {
+      next[key] = {
+        ...next[key],
+        jobs: scheduleMachineJobs(next[key].jobs, SCHEDULER_MACHINE_LABELS[key]),
+      };
+    }
+    return next;
+  }
+  return prev;
+}
+
+function applyLinksToColumns(prev, map) {
+  if (!prev || !map || typeof map !== "object" || Array.isArray(map)) return prev;
+  const next = { ...prev };
+  let changed = false;
+  for (const key of ["queue", ...SCHEDULER_MACHINE_KEYS]) {
+    const jobs = prev[key]?.jobs || [];
+    let colChanged = false;
+    const mapped = jobs.map((j) => {
+      const linked = map[j.id] || null;
+      if ((j.linkedTo || null) === (linked || null)) return j;
+      colChanged = true;
+      return { ...j, linkedTo: linked };
+    });
+    if (!colChanged) continue;
+    changed = true;
+    next[key] = { ...prev[key], jobs: mapped };
+  }
+  return changed ? next : prev;
 }
 
 // === Section 4: Link Utilities ===
@@ -1650,6 +1698,22 @@ const fetchManualStateCore = async (previousCols) => {
     }
   };
 
+  // Column order only. Does not re-read Production Orders.
+  const refreshMachineLayout = async () => {
+    if (window._isSubmittingOrder || isManualStateGuarded()) return;
+    if (combinedInFlightRef.current) return;
+    const base = columnsRef.current;
+    if (!base?.queue) return;
+    try {
+      const finalCols = await fetchManualStateCore(base);
+      if (isManualStateGuarded() || !finalCols) return;
+      setColumns(finalCols);
+      columnsRef.current = finalCols;
+    } catch (err) {
+      console.warn("manual layout refresh failed", err?.message || err);
+    }
+  };
+
 
 
   // ─── Section 5D: Load the board on scheduler/machine pages, then poll lightly ─────────────
@@ -1717,6 +1781,9 @@ const fetchManualStateCore = async (previousCols) => {
           return;
         }
 
+        // Catch a drag that the socket missed. This reads two cells, not the order sheet.
+        refreshMachineLayout();
+
         // While the socket is up, piece counts arrive on embroideryProgressUpdated.
         // A cached /changes payload can be behind that and would paint the old count.
         if (socket && socket.connected) return;
@@ -1746,24 +1813,11 @@ const fetchManualStateCore = async (previousCols) => {
 
     const handle = setInterval(() => {
       if (!canceled && !window._isSubmittingOrder) pollChanges();
-    }, 30000);
-
-    const pollAfterWake = () => {
-      if (!canceled && !window._isSubmittingOrder) pollChanges();
-    };
-    const pollWhenVisible = () => {
-      if (document.visibilityState === "visible") pollAfterWake();
-    };
-    window.addEventListener("online", pollAfterWake);
-    window.addEventListener("focus", pollAfterWake);
-    document.addEventListener("visibilitychange", pollWhenVisible);
+    }, 180000);
 
     return () => {
       canceled = true;
       clearInterval(handle);
-      window.removeEventListener("online", pollAfterWake);
-      window.removeEventListener("focus", pollAfterWake);
-      document.removeEventListener("visibilitychange", pollWhenVisible);
     };
   }, [sessionChecked, needsScheduler]);
 

@@ -104,7 +104,7 @@ export default function MachineJob({ columns }) {
 
   useEffect(() => {
     loadSendAgent();
-    const timer = setInterval(loadSendAgent, 10000);
+    const timer = setInterval(loadSendAgent, 30000);
     return () => clearInterval(timer);
   }, [loadSendAgent]);
 

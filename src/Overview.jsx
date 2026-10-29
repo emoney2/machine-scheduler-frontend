@@ -1600,17 +1600,14 @@ function col(width, center = false) {
 
   useEffect(() => {
     refreshThreadConflicts();
-    const onFocus = () => refreshThreadConflicts();
     const onStorage = (e) => {
       if (!e.key || e.key === "threadScheduleConflicts.v1") loadLocalThreadConflicts();
     };
     const onCustom = () => loadLocalThreadConflicts();
-    window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
     window.addEventListener("threadScheduleConflictsUpdated", onCustom);
-    const interval = window.setInterval(refreshThreadConflicts, 60000);
+    const interval = window.setInterval(refreshThreadConflicts, 300000);
     return () => {
-      window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("threadScheduleConflictsUpdated", onCustom);
       window.clearInterval(interval);
@@ -1639,20 +1636,17 @@ function col(width, center = false) {
   }, []);
   useEffect(() => {
     refreshSewingCarryover();
-    const onFocus = () => refreshSewingCarryover();
     const onStorage = (e) => {
       if (!e.key || e.key === "sewingCarryover.v1") {
         setSewingCarryoverSnapshot(loadPersistedSewingCarryover());
       }
     };
     const onCustom = () => setSewingCarryoverSnapshot(loadPersistedSewingCarryover());
-    window.addEventListener("focus", onFocus);
     window.addEventListener("storage", onStorage);
     window.addEventListener("sewingCarryoverUpdated", onCustom);
     socket.on("sewingBoardUpdated", refreshSewingCarryover);
-    const interval = window.setInterval(refreshSewingCarryover, 60000);
+    const interval = window.setInterval(refreshSewingCarryover, 300000);
     return () => {
-      window.removeEventListener("focus", onFocus);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("sewingCarryoverUpdated", onCustom);
       socket.off("sewingBoardUpdated", refreshSewingCarryover);
@@ -1884,13 +1878,11 @@ function col(width, center = false) {
       let t;
       return () => {
         clearTimeout(t);
-        t = setTimeout(() => { if (alive) loadFresh(); }, 1000);
+        t = setTimeout(() => { if (alive) loadFresh(); }, 20000);
       };
     })();
     if (socket) {
       socket.on("ordersUpdated", debounced);
-      socket.on("manualStateUpdated", debounced);
-      socket.on("placeholdersUpdated", debounced);
       socket.on("materialsUpdated", debounced);
     }
 
@@ -1912,8 +1904,6 @@ function col(width, center = false) {
       clearInterval(rebuildId);
       if (socket) {
         socket.off("ordersUpdated", debounced);
-        socket.off("manualStateUpdated", debounced);
-        socket.off("placeholdersUpdated", debounced);
         socket.off("materialsUpdated", debounced);
       }
       window.removeEventListener("materialsOrdered", handleMaterialsOrdered);

@@ -1164,7 +1164,7 @@ export default function Ship() {
     }
 
     loadProductionQueue();
-    const t = setInterval(loadProductionQueue, 60000);
+    const t = setInterval(loadProductionQueue, 180000);
     return () => {
       cancelled = true;
       clearInterval(t);
