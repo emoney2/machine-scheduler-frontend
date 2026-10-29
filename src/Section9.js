@@ -245,7 +245,6 @@ export default function Section9(props) {
     () => detectThreadConflicts(safeColumns, threadInventoryReady ? threadInventoryStatus : null),
     // conflictInput changes only when machine membership, colors, or late flags change.
     // A piece count must not recompute this.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [conflictInput, threadInventoryStatus, threadInventoryReady]
   );
 
