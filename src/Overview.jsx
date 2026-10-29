@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import axios from "axios";
 import { socket } from "./socketClient";
 import { API_ROOT } from "./apiRoot";
-import SalesBreakdownModal from "./SalesBreakdownModal";
 import { supabase } from "./supabaseClient";
 import {
   loadPersistedThreadConflicts,
@@ -571,7 +570,6 @@ function GoalMetConfetti({ active }) {
 export default function Overview() {
   const [metrics, setMetrics] = useState(null);
   const [metricsUpdatedAt, setMetricsUpdatedAt] = useState(null);
-  const [salesBreakdownOpen, setSalesBreakdownOpen] = useState(false);
 
 
 
@@ -2613,18 +2611,12 @@ function col(width, center = false) {
     }
 
 
-    // Load once. Later updates come from salesUpdated, which the backend emits
-    // only when Production Orders quantity, date, or product actually changes.
+    // Load the five overview totals once when this page opens.
     fetchMetrics();
-    const onSalesUpdated = () => {
-      if (alive) fetchMetrics();
-    };
-    if (socket) socket.on("salesUpdated", onSalesUpdated);
 
     return () => {
       alive = false;
       try { metricsCtrlRef.current?.abort(); } catch {}
-      if (socket) socket.off("salesUpdated", onSalesUpdated);
     };
   }, []);
 
@@ -2885,23 +2877,11 @@ function col(width, center = false) {
                 const metStretch = !!goalStats?.metStretch;
                 return (
                   <div
-                    role="button"
-                    tabIndex={0}
-                    title="Open sales breakdown"
-                    aria-label="Open sales breakdown for the week"
-                    onClick={() => setSalesBreakdownOpen(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSalesBreakdownOpen(true);
-                      }
-                    }}
                     style={{
                       ...metricBox,
                       position: "relative",
                       overflow: "visible",
                       background: "#f8fafc",
-                      cursor: "pointer",
                     }}
                   >
                     <GoalMetConfetti active={metStretch} />
@@ -2964,7 +2944,7 @@ function col(width, center = false) {
                       <div style={metricLabel} title="Sold This Week">
                         Sold This Week
                       </div>
-                      <div style={{ ...metricValue, textDecoration: "underline", textUnderlineOffset: 3 }}>
+                      <div style={metricValue}>
                         {metrics?.headcovers_sold_this_week != null
                           ? Number.isInteger(metrics.headcovers_sold_this_week)
                             ? String(metrics.headcovers_sold_this_week)
@@ -3003,17 +2983,6 @@ function col(width, center = false) {
                           </div>
                         </>
                       ) : null}
-                      <div
-                        style={{
-                          ...metricSubtext,
-                          color: "#1d4ed8",
-                          fontWeight: 700,
-                          textDecoration: "underline",
-                          textUnderlineOffset: 2,
-                        }}
-                      >
-                        Open sales breakdown
-                      </div>
                     </div>
                   </div>
                 );
@@ -5779,11 +5748,6 @@ function col(width, center = false) {
           </div>
         </div>
       )}
-
-      <SalesBreakdownModal
-        open={salesBreakdownOpen}
-        onClose={() => setSalesBreakdownOpen(false)}
-      />
 
       {/* Gmail popup banner */}
       {gmailPopup && !gmailPopup.closed && (
