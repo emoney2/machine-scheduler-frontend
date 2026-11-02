@@ -116,7 +116,6 @@ function resolveOrderPreview(order) {
 
 const DIGITIZING_VENDOR_EMAIL = "classicdigitizers@gmail.com";
 const DIGITIZING_GMAIL_ACCOUNT = "justin.eckard@jrcogolf.com";
-const DIGITIZING_EMAIL_SUBJECT = "Hi William — hope you're having a great day!";
 
 function resolveGmailAuthUser() {
   const raw = String(process.env.REACT_APP_GMAIL_AUTHUSER || "").trim();
@@ -156,7 +155,16 @@ function openUrlReturn(url) {
   return null;
 }
 
-function buildDigitizingEmailText({ product = "", orderNumber = "", design = "", company = "", designUrl = "" } = {}) {
+function buildDigitizingEmailSubject({ orderNumber = "", design = "" } = {}) {
+  const parts = ["JR & Co Digitize Order"];
+  const order = String(orderNumber || "").trim();
+  const designName = String(design || "").trim();
+  if (order) parts.push(`#${order}`);
+  if (designName) parts.push(designName);
+  return parts.join(" - ");
+}
+
+function buildDigitizingEmailText({ product = "", orderNumber = "", design = "" } = {}) {
   const productName = String(product || "").trim() || "(product not specified)";
   const lines = [
     "Hi William,",
@@ -169,14 +177,11 @@ function buildDigitizingEmailText({ product = "", orderNumber = "", design = "",
   if (order) lines.push(`Order #: ${order}`);
   const designName = String(design || "").trim();
   if (designName) lines.push(`Design: ${designName}`);
-  const companyName = String(company || "").trim();
-  if (companyName) lines.push(`Company: ${companyName}`);
-  const link = String(designUrl || "").trim();
-  if (link) {
-    lines.push("", `Design file: ${link}`);
-  }
   lines.push("", "Thank you!");
-  return { subject: DIGITIZING_EMAIL_SUBJECT, body: lines.join("\n") };
+  return {
+    subject: buildDigitizingEmailSubject({ orderNumber, design }),
+    body: lines.join("\n"),
+  };
 }
 
 function downloadAttachmentPayloads(files) {
@@ -421,73 +426,94 @@ export default function DigitizingList() {
     return base;
   }, [orders, mode]);
 
-  const handleOrderDigitizing = async (order, fileId, designUrl = "") => {
+  const handleOrderDigitizing = async (order, fileId) => {
     const orderId = String(order?.["Order #"] || "").trim();
+    const designName = String(order?.["Design"] || "").trim();
+    const productName = String(order?.["Product"] || "").trim();
     if (!orderId) {
       showToast("Missing order number.", "error", 2400);
+      return;
+    }
+    if (!fileId) {
+      showToast("No design image found to attach.", "error", 2400);
       return;
     }
     if (orderingLock.current) return;
     orderingLock.current = true;
     setOrderingId(orderId);
 
-    // Same as material Order: open a filled Gmail compose window immediately.
     const { subject, body } = buildDigitizingEmailText({
-      product: order?.["Product"] || "",
+      product: productName,
       orderNumber: orderId,
-      design: order?.["Design"] || "",
-      company: order?.["Company Name"] || "",
-      designUrl: designUrl || (fileId ? `https://drive.google.com/file/d/${fileId}/view` : ""),
+      design: designName,
     });
-    const gmailUrl = buildGmailCompose({
-      to: DIGITIZING_VENDOR_EMAIL,
-      subject,
-      body,
-      authUser: resolveGmailAuthUser(),
-    });
-    const popup = openUrlReturn(gmailUrl);
-    if (!popup) {
+
+    try {
+      // Create a real Gmail draft with the design image attached (Drive links are not used).
+      const res = await axios.post(
+        `${API_ROOT}/digitizing/order-email`,
+        {
+          orderNumber: orderId,
+          product: productName,
+          design: designName,
+          fileId,
+        },
+        { withCredentials: true, timeout: 120000 }
+      );
+      const data = res.data || {};
+      const method = data.method || "";
+      const payloads = Array.isArray(data.attachmentsBase64) ? data.attachmentsBase64 : [];
+      const draftUrl = String(data.draftUrl || "").trim();
+      const composeUrl = String(data.composeUrl || "").trim();
+
+      if (method === "gmail_draft" && draftUrl) {
+        const popup = openUrlReturn(draftUrl);
+        if (!popup) {
+          showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
+          return;
+        }
+        showToast("Draft ready with design attached. Review, then Send.", "success", 3200);
+        return;
+      }
+
+      if (method === "smtp") {
+        showToast("Digitizing email sent to William with design attached.", "success", 2800);
+        return;
+      }
+
+      // Fallback: open compose popup + download image for paperclip (no Drive link).
+      if (payloads.length) downloadAttachmentPayloads(payloads);
+      const fallbackUrl =
+        composeUrl ||
+        buildGmailCompose({
+          to: DIGITIZING_VENDOR_EMAIL,
+          subject: data.subject || subject,
+          body: data.body || body,
+          authUser: resolveGmailAuthUser(),
+        });
+      const popup = openUrlReturn(fallbackUrl);
+      if (!popup) {
+        showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
+        return;
+      }
+      showToast(
+        payloads.length
+          ? "Compose ready — paperclip the downloaded design, then Send."
+          : (data.error || "Compose ready, but the design image could not be prepared."),
+        payloads.length ? "success" : "error",
+        4200
+      );
+    } catch (err) {
+      console.error("Order digitizing failed:", err);
+      showToast(
+        err?.response?.data?.error || err?.message || "Failed to create digitizing email.",
+        "error",
+        3600
+      );
+    } finally {
       orderingLock.current = false;
       setOrderingId("");
-      showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
-      return;
     }
-
-    // Download the design so it can be paperclipped onto the compose window.
-    let downloaded = false;
-    if (fileId) {
-      try {
-        const res = await axios.post(
-          `${API_ROOT}/digitizing/order-email`,
-          {
-            orderNumber: orderId,
-            product: order?.["Product"] || "",
-            design: order?.["Design"] || "",
-            company: order?.["Company Name"] || "",
-            fileId,
-            composeOnly: true,
-          },
-          { withCredentials: true, timeout: 120000 }
-        );
-        const payloads = Array.isArray(res.data?.attachmentsBase64) ? res.data.attachmentsBase64 : [];
-        if (payloads.length) {
-          downloadAttachmentPayloads(payloads);
-          downloaded = true;
-        }
-      } catch (err) {
-        console.error("Design download for digitizing email failed:", err);
-      }
-    }
-
-    showToast(
-      downloaded
-        ? "Compose ready — paperclip the downloaded design, then Send."
-        : "Compose ready — design link is in the email body.",
-      "success",
-      3600
-    );
-    orderingLock.current = false;
-    setOrderingId("");
   };
 
   // ---------- Layout ----------
@@ -740,18 +766,19 @@ export default function DigitizingList() {
                   <button
                     type="button"
                     className="btn"
-                    disabled={!!orderingId}
-                    title="Compose email to William with this design"
+                    disabled={!!orderingId || !fileId}
+                    title={fileId ? "Email William with this design attached" : "No design image to attach"}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleOrderDigitizing(order, fileId, openUrl);
+                      handleOrderDigitizing(order, fileId);
                     }}
                     style={{
                       background: isOrdering ? "#e5e7eb" : "#111827",
                       color: isOrdering ? "#374151" : "#fff",
                       borderColor: isOrdering ? "#bbb" : "#111827",
                       whiteSpace: "nowrap",
+                      opacity: !fileId && !isOrdering ? 0.45 : 1,
                       fontSize: 11,
                       padding: "7px 10px",
                     }}
