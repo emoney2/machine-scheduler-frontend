@@ -55,14 +55,16 @@ function resolveOrderPreview(order) {
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
     if (id) {
       return {
+        fileId: id,
         thumbUrl: proxyForId(id),
         openUrl: `https://drive.google.com/file/d/${id}/view`,
       };
     }
     const str = String(idOrUrl);
-    if (/^https?:\/\//i.test(str)) return { thumbUrl: str, openUrl: str };
+    if (/^https?:\/\//i.test(str)) return { fileId: null, thumbUrl: str, openUrl: str };
     if (/^[A-Za-z0-9_-]{12,}$/.test(str)) {
       return {
+        fileId: str,
         thumbUrl: proxyForId(str),
         openUrl: `https://drive.google.com/file/d/${str}/view`,
       };
@@ -109,7 +111,42 @@ function resolveOrderPreview(order) {
     const hit = fromAny(v);
     if (hit) return hit;
   }
-  return { thumbUrl: null, openUrl: null };
+  return { fileId: null, thumbUrl: null, openUrl: null };
+}
+
+function openUrlReturn(url) {
+  try {
+    const w = window.open(url, "_blank", "noopener,width=980,height=720");
+    if (w) {
+      try { w.opener = null; } catch { /* ignore */ }
+      setTimeout(() => {
+        try { window.focus(); } catch { /* ignore */ }
+      }, 0);
+      return w;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function downloadAttachmentPayloads(files) {
+  for (const file of files || []) {
+    try {
+      const bin = atob(String(file.contentBase64 || ""));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: file.mime || "image/jpeg" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.filename || "design.jpg";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Design download failed:", err);
+    }
+  }
 }
 
 /** Match Overview upcoming-jobs image popup. */
@@ -217,6 +254,8 @@ export default function DigitizingList() {
   const [toastMsg, setToastMsg] = useState("");
   const [toastKind, setToastKind] = useState("success");
   const toastTimer = useRef(null);
+  const [orderingId, setOrderingId] = useState("");
+  const orderingLock = useRef(false);
 
   // responsive compact mode for narrow screens
   const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
@@ -331,13 +370,93 @@ export default function DigitizingList() {
     return base;
   }, [orders, mode]);
 
+  const handleOrderDigitizing = async (order, fileId) => {
+    const orderId = String(order?.["Order #"] || "").trim();
+    if (!orderId) {
+      showToast("Missing order number.", "error", 2400);
+      return;
+    }
+    if (!fileId) {
+      showToast("No design image found to attach.", "error", 2400);
+      return;
+    }
+    if (orderingLock.current) return;
+    orderingLock.current = true;
+    setOrderingId(orderId);
+    try {
+      const res = await axios.post(
+        `${API_ROOT}/digitizing/order-email`,
+        {
+          orderNumber: orderId,
+          product: order?.["Product"] || "",
+          design: order?.["Design"] || "",
+          company: order?.["Company Name"] || "",
+          fileId,
+        },
+        { withCredentials: true, timeout: 120000 }
+      );
+      const data = res.data || {};
+      const method = data.method || "";
+      const payloads = Array.isArray(data.attachmentsBase64) ? data.attachmentsBase64 : [];
+      const needsManualAttach =
+        method === "compose_download" || method === "compose_url" || method === "none";
+
+      if (needsManualAttach && payloads.length) {
+        downloadAttachmentPayloads(payloads);
+      }
+
+      const openUrl = data.draftUrl || (needsManualAttach ? data.composeUrl : "");
+      if (openUrl) {
+        const popup = openUrlReturn(openUrl);
+        if (!popup && !needsManualAttach) {
+          showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
+          return;
+        }
+      }
+
+      if (method === "gmail_draft") {
+        showToast("Gmail draft ready with design attached. Review, then Send.", "success", 3200);
+      } else if (method === "smtp") {
+        showToast("Digitizing email sent to William.", "success", 2800);
+      } else if (data.needsGmailAuth) {
+        showToast(
+          payloads.length
+            ? "Downloaded design — attach it in Gmail before sending."
+            : "Gmail permission needed on the server. Design not attached.",
+          "error",
+          4200
+        );
+      } else if (needsManualAttach) {
+        showToast(
+          payloads.length
+            ? "Downloaded design — paperclip it in the Gmail window before sending."
+            : (data.error || "Could not attach the design image."),
+          payloads.length ? "success" : "error",
+          4200
+        );
+      } else {
+        showToast(data.error || "Could not create digitizing email.", "error", 3200);
+      }
+    } catch (err) {
+      console.error("Order digitizing failed:", err);
+      showToast(
+        err?.response?.data?.error || err?.message || "Failed to create digitizing email.",
+        "error",
+        3600
+      );
+    } finally {
+      orderingLock.current = false;
+      setOrderingId("");
+    }
+  };
+
   // ---------- Layout ----------
   // Column order (compact hides Print + Hard/Soft):
-  // [Order#, Preview, Company, Design, Qty, Product, Stage, (Print), Materials, Due, (Hard/Soft)]
+  // [Order#, Preview, Company, Design, Qty, Product, Stage, (Print), Materials, Due, (Hard/Soft), Order]
   const gridFull =
-    "62px 56px 170px 190px 62px 120px 110px 100px minmax(140px,1.15fr) 110px 92px";
+    "62px 56px 170px 190px 62px 120px 110px 100px minmax(140px,1.15fr) 110px 92px 148px";
   const gridCompact =
-    "62px 56px 160px 160px 60px 110px 100px minmax(120px,1fr) 92px";
+    "62px 56px 160px 160px 60px 110px 100px minmax(120px,1fr) 92px 136px";
   const gridTemplate = compact ? gridCompact : gridFull;
 
   const cellBase = {
@@ -387,6 +506,7 @@ export default function DigitizingList() {
         <div style={cellBase}>Materials</div>
         <div style={cellBase}>Due</div>
         {!compact && <div style={cellBase}>Hard/Soft</div>}
+        <div style={cellBase}>Order</div>
       </div>
 
       {/* Loading overlay */}
@@ -439,7 +559,8 @@ export default function DigitizingList() {
             const print   = order["Print"] || "";
             const hardSoft= order["Hard Date/Soft Date"] || "";
             const matLabels = materialLabelsFromOrder(order);
-            const { thumbUrl: imageUrl, openUrl } = resolveOrderPreview(order);
+            const { fileId, thumbUrl: imageUrl, openUrl } = resolveOrderPreview(order);
+            const isOrdering = orderingId === orderId;
 
             const onPreviewClick = (e) => {
               e.preventDefault();
@@ -575,6 +696,30 @@ export default function DigitizingList() {
                 </div>
                 <div style={{ ...cellBase, fontWeight: 700, alignSelf: "center" }}>{fmtMMDD(due)}</div>
                 {!compact && <div style={{ ...cellBase, alignSelf: "center" }}>{hardSoft}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end", alignSelf: "center" }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={!!orderingId || !fileId}
+                    title={fileId ? "Email William with this design attached" : "No design image to attach"}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleOrderDigitizing(order, fileId);
+                    }}
+                    style={{
+                      background: isOrdering ? "#e5e7eb" : "#111827",
+                      color: isOrdering ? "#374151" : "#fff",
+                      borderColor: isOrdering ? "#bbb" : "#111827",
+                      whiteSpace: "nowrap",
+                      opacity: !fileId && !isOrdering ? 0.45 : 1,
+                      fontSize: 11,
+                      padding: "7px 10px",
+                    }}
+                  >
+                    {isOrdering ? "Preparing…" : "Order Digitizing"}
+                  </button>
+                </div>
               </div>
             );
           })}
