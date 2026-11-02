@@ -115,6 +115,13 @@ function resolveOrderPreview(order) {
 }
 
 const DIGITIZING_VENDOR_EMAIL = "classicdigitizers@gmail.com";
+const DIGITIZING_EMAIL_SIGNATURE = [
+  "Thanks,",
+  "Justin Eckard",
+  "JR & Co.",
+  "678.294.5350",
+  "www.jrcogolf.com",
+].join("\n");
 
 function buildDigitizingEmailSubject({ orderNumber = "", design = "" } = {}) {
   const parts = ["JR & Co Digitize Order"];
@@ -138,7 +145,7 @@ function buildDigitizingEmailText({ product = "", orderNumber = "", design = "" 
   if (order) lines.push(`Order #: ${order}`);
   const designName = String(design || "").trim();
   if (designName) lines.push(`Design: ${designName}`);
-  lines.push("", "Thank you!");
+  lines.push("", DIGITIZING_EMAIL_SIGNATURE);
   return {
     subject: buildDigitizingEmailSubject({ orderNumber, design }),
     body: lines.join("\n"),
@@ -149,6 +156,27 @@ function attachmentDataUrl(att) {
   if (!att?.contentBase64) return "";
   const mime = att.mime || "image/jpeg";
   return `data:${mime};base64,${att.contentBase64}`;
+}
+
+function readFileAsAttachment(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || "");
+      const comma = result.indexOf(",");
+      const contentBase64 = comma >= 0 ? result.slice(comma + 1) : result;
+      resolve({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        filename: file.name || "attachment",
+        mime: file.type || "application/octet-stream",
+        contentBase64,
+        size: file.size || 0,
+        isDesign: false,
+      });
+    };
+    reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
 }
 
 /** Match Overview upcoming-jobs image popup. */
@@ -408,7 +436,7 @@ export default function DigitizingList() {
       to: DIGITIZING_VENDOR_EMAIL,
       subject: local.subject,
       body: local.body,
-      attachment: null,
+      attachments: [],
       thumbUrl: thumbUrl || "",
       loading: true,
       sending: false,
@@ -427,6 +455,15 @@ export default function DigitizingList() {
         { withCredentials: true, timeout: 120000 }
       );
       const data = res.data || {};
+      const designAtt = data.attachment
+        ? {
+            id: "design",
+            filename: data.attachment.filename || `${orderId}.jpg`,
+            mime: data.attachment.mime || "image/jpeg",
+            contentBase64: data.attachment.contentBase64,
+            isDesign: true,
+          }
+        : null;
       setComposeModal((prev) =>
         prev && prev.orderId === orderId
           ? {
@@ -434,7 +471,7 @@ export default function DigitizingList() {
               to: data.to || DIGITIZING_VENDOR_EMAIL,
               subject: data.subject || local.subject,
               body: data.body || local.body,
-              attachment: data.attachment || null,
+              attachments: designAtt ? [designAtt] : [],
               loading: false,
             }
           : prev
@@ -452,14 +489,56 @@ export default function DigitizingList() {
     }
   };
 
+  const handleAddExtraAttachments = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length || !composeModal) return;
+    try {
+      const extras = [];
+      for (const file of files) {
+        // Keep payloads reasonable for the API (~12MB each).
+        if (file.size > 12 * 1024 * 1024) {
+          showToast(`${file.name} is too large (max 12MB).`, "error", 3200);
+          continue;
+        }
+        extras.push(await readFileAsAttachment(file));
+      }
+      if (!extras.length) return;
+      setComposeModal((prev) =>
+        prev
+          ? { ...prev, attachments: [...(prev.attachments || []), ...extras] }
+          : prev
+      );
+    } catch (err) {
+      console.error("Add attachment failed:", err);
+      showToast("Could not add one or more files.", "error", 2800);
+    }
+  };
+
+  const handleRemoveAttachment = (attId) => {
+    setComposeModal((prev) => {
+      if (!prev) return prev;
+      const next = (prev.attachments || []).filter((a) => a.id !== attId);
+      // Keep at least the design file if we still have fileId on the server side.
+      return { ...prev, attachments: next };
+    });
+  };
+
   const handleSendDigitizingEmail = async () => {
     if (!composeModal || composeModal.sending || composeModal.loading) return;
-    if (!composeModal.attachment?.contentBase64 && !composeModal.fileId) {
-      showToast("No design image attached.", "error", 2400);
+    const attachments = Array.isArray(composeModal.attachments) ? composeModal.attachments : [];
+    if (!attachments.length && !composeModal.fileId) {
+      showToast("Add at least one attachment before sending.", "error", 2400);
       return;
     }
     setComposeModal((prev) => (prev ? { ...prev, sending: true } : prev));
     try {
+      const extraAttachments = attachments
+        .filter((a) => !a.isDesign)
+        .map((a) => ({
+          filename: a.filename,
+          mime: a.mime,
+          contentBase64: a.contentBase64,
+        }));
       const res = await axios.post(
         `${API_ROOT}/digitizing/order-email`,
         {
@@ -471,15 +550,17 @@ export default function DigitizingList() {
           to: composeModal.to,
           subject: composeModal.subject,
           body: composeModal.body,
+          extraAttachments,
         },
-        { withCredentials: true, timeout: 120000 }
+        { withCredentials: true, timeout: 180000 }
       );
       const data = res.data || {};
       if (!data.ok) {
         throw new Error(data.error || "Send failed");
       }
+      const count = Number(data.attachmentCount || attachments.length || 1);
       showToast(
-        `Sent to William with ${data.attachmentName || "design"} attached.`,
+        `Sent to William with ${count} attachment${count === 1 ? "" : "s"}.`,
         "success",
         3600
       );
@@ -881,63 +962,128 @@ export default function DigitizingList() {
                   borderRadius: 10,
                   padding: 10,
                   background: "#f9fafb",
-                  display: "flex",
-                  gap: 12,
-                  alignItems: "center",
+                  display: "grid",
+                  gap: 10,
                 }}
               >
-                <div
-                  style={{
-                    width: 72,
-                    height: 54,
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    border: "1px solid #ddd",
-                    background: "#fff",
-                    flexShrink: 0,
-                    display: "grid",
-                    placeItems: "center",
-                  }}
-                >
-                  {composeModal.loading ? (
-                    <span style={{ fontSize: 11, color: "#666" }}>…</span>
-                  ) : (
-                    <img
-                      src={
-                        attachmentDataUrl(composeModal.attachment) ||
-                        composeModal.thumbUrl ||
-                        ""
-                      }
-                      alt=""
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12 }}>Attachments</div>
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 10px",
+                      borderRadius: 8,
+                      border: "1px solid #bbb",
+                      background: "#fff",
+                      fontWeight: 700,
+                      fontSize: 11,
+                      cursor: composeModal.loading || composeModal.sending ? "default" : "pointer",
+                      opacity: composeModal.loading || composeModal.sending ? 0.55 : 1,
+                    }}
+                  >
+                    + Add files
+                    <input
+                      type="file"
+                      multiple
+                      disabled={composeModal.loading || composeModal.sending}
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        handleAddExtraAttachments(e.target.files);
+                        e.target.value = "";
                       }}
                     />
-                  )}
+                  </label>
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 12 }}>Attachment</div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#374151",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                    title={composeModal.attachment?.filename || "Design image"}
-                  >
-                    {composeModal.loading
-                      ? "Loading design image…"
-                      : composeModal.attachment?.filename || "Design image"}
+
+                {composeModal.loading ? (
+                  <div style={{ fontSize: 12, color: "#666" }}>Loading design image…</div>
+                ) : (composeModal.attachments || []).length === 0 ? (
+                  <div style={{ fontSize: 12, color: "#6b7280" }}>No files attached yet.</div>
+                ) : (
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {(composeModal.attachments || []).map((att) => {
+                      const preview = att.isDesign
+                        ? attachmentDataUrl(att) || composeModal.thumbUrl
+                        : (String(att.mime || "").startsWith("image/")
+                          ? attachmentDataUrl(att)
+                          : "");
+                      return (
+                        <div
+                          key={att.id}
+                          style={{
+                            display: "flex",
+                            gap: 10,
+                            alignItems: "center",
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            padding: 8,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 52,
+                              height: 40,
+                              borderRadius: 6,
+                              overflow: "hidden",
+                              border: "1px solid #ddd",
+                              background: "#f3f4f6",
+                              flexShrink: 0,
+                              display: "grid",
+                              placeItems: "center",
+                              fontSize: 10,
+                              color: "#6b7280",
+                            }}
+                          >
+                            {preview ? (
+                              <img
+                                src={preview}
+                                alt=""
+                                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                onError={(e) => {
+                                  e.currentTarget.style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              "FILE"
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                              title={att.filename}
+                            >
+                              {att.filename}
+                              {att.isDesign ? " (design)" : ""}
+                            </div>
+                            <div style={{ fontSize: 11, color: "#6b7280" }}>
+                              {att.isDesign ? "Included automatically" : "Added by you"}
+                            </div>
+                          </div>
+                          {!att.isDesign && (
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={composeModal.sending}
+                              onClick={() => handleRemoveAttachment(att.id)}
+                              style={{ background: "#fff", padding: "4px 8px", fontSize: 11 }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
-                    {composeModal.attachment
-                      ? "Will be attached when you send"
-                      : "Waiting for design file"}
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -967,11 +1113,13 @@ export default function DigitizingList() {
                 disabled={
                   composeModal.loading ||
                   composeModal.sending ||
-                  !composeModal.attachment
+                  !(composeModal.attachments || []).length
                 }
                 style={{
                   background:
-                    composeModal.loading || composeModal.sending || !composeModal.attachment
+                    composeModal.loading ||
+                    composeModal.sending ||
+                    !(composeModal.attachments || []).length
                       ? "#9ca3af"
                       : "#111827",
                   color: "#fff",
