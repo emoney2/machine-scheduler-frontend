@@ -125,8 +125,17 @@ function resolveGmailAuthUser() {
 /**
  * Standalone Gmail compose window (same idea as material Order).
  * view=cm / tf=cm opens only the compose UI — not the full inbox/drafts.
+ * When messageId is set, open that API draft (with attachments) inside compose.
  */
-function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
+function buildGmailCompose({
+  to = "",
+  cc = "",
+  bcc = "",
+  subject = "",
+  body = "",
+  authUser,
+  messageId = "",
+} = {}) {
   const account = String(authUser ?? "").trim();
   const p = new URLSearchParams({ view: "cm", fs: "1", tf: "cm" });
   if (to) p.set("to", to);
@@ -135,19 +144,40 @@ function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = ""
   if (subject) p.set("su", subject);
   if (body) p.set("body", body);
   if (account && /^\d+$/.test(account)) {
+    // keep numeric account path below
+  } else if (account) {
+    p.set("authuser", account);
+  }
+  const mid = String(messageId || "").trim();
+  // When opening an attached draft, omit to/su/body so Gmail loads the draft itself.
+  if (mid) {
+    const draftParams = new URLSearchParams({ view: "cm", fs: "1", tf: "cm" });
+    if (account && !/^\d+$/.test(account)) draftParams.set("authuser", account);
+    const base =
+      account && /^\d+$/.test(account)
+        ? `https://mail.google.com/mail/u/${account}/?${draftParams.toString()}`
+        : `https://mail.google.com/mail/?${draftParams.toString()}`;
+    return `${base}#inbox?compose=${encodeURIComponent(mid)}`;
+  }
+  if (account && /^\d+$/.test(account)) {
     return `https://mail.google.com/mail/u/${account}/?${p.toString()}`;
   }
-  if (account) p.set("authuser", account);
-  // Bare /mail/?view=cm opens the compose-only popup (not the mailbox).
   return `https://mail.google.com/mail/?${p.toString()}`;
 }
 
-function openUrlReturn(url) {
+function openUrlReturn(url, { retainHandle = false } = {}) {
   try {
     // Sized popup matches material-order compose; avoids a full-tab mailbox view.
-    const w = window.open(url, "_blank", "noopener,noreferrer,width=780,height=700");
+    // Keep the window handle when we need to navigate it after an async draft create
+    // (noopener would make window.open return null).
+    const features = retainHandle
+      ? "width=780,height=700"
+      : "noopener,noreferrer,width=780,height=700";
+    const w = window.open(url, "_blank", features);
     if (w) {
-      try { w.opener = null; } catch { /* ignore */ }
+      if (!retainHandle) {
+        try { w.opener = null; } catch { /* ignore */ }
+      }
       setTimeout(() => {
         try { window.focus(); } catch { /* ignore */ }
       }, 0);
@@ -449,25 +479,29 @@ export default function DigitizingList() {
       orderNumber: orderId,
       design: designName,
     });
-
-    // Same as material Order: open a standalone Gmail compose window only (view=cm).
-    // Never open draft/inbox URLs — those load the full mailbox.
-    const gmailUrl = buildGmailCompose({
+    const authUser = resolveGmailAuthUser();
+    const fallbackComposeUrl = buildGmailCompose({
       to: DIGITIZING_VENDOR_EMAIL,
       subject,
       body,
-      authUser: resolveGmailAuthUser(),
+      authUser,
     });
-    const popup = openUrlReturn(gmailUrl);
+
+    // Open the popup synchronously (same as material orders) so it isn't blocked,
+    // then point it at the attached draft once the server finishes.
+    const popup = openUrlReturn("about:blank", { retainHandle: true });
     if (!popup) {
       orderingLock.current = false;
       setOrderingId("");
       showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
       return;
     }
+    try {
+      popup.document.write(
+        "<p style='font-family:sans-serif;padding:24px'>Preparing digitizing email with design attached…</p>"
+      );
+    } catch { /* ignore cross-window write issues */ }
 
-    // Gmail compose URLs cannot carry files. Download the design so it can be paperclipped.
-    let downloaded = false;
     try {
       const res = await axios.post(
         `${API_ROOT}/digitizing/order-email`,
@@ -476,29 +510,66 @@ export default function DigitizingList() {
           product: productName,
           design: designName,
           fileId,
-          composeOnly: true,
         },
         { withCredentials: true, timeout: 120000 }
       );
-      const payloads = Array.isArray(res.data?.attachmentsBase64) ? res.data.attachmentsBase64 : [];
-      if (payloads.length) {
-        downloadAttachmentPayloads(payloads);
-        downloaded = true;
+      const data = res.data || {};
+      const method = data.method || "";
+      const payloads = Array.isArray(data.attachmentsBase64) ? data.attachmentsBase64 : [];
+      const messageId = String(data.messageId || "").trim();
+
+      // Standalone compose (view=cm) pointed at the API draft so the image is attached.
+      const attachedComposeUrl = buildGmailCompose({
+        to: data.to || DIGITIZING_VENDOR_EMAIL,
+        subject: data.subject || subject,
+        body: data.body || body,
+        authUser,
+        messageId: method === "gmail_draft" ? messageId : "",
+      });
+      const openUrl =
+        (method === "gmail_draft" && (data.composeUrl || attachedComposeUrl)) ||
+        data.composeUrl ||
+        attachedComposeUrl ||
+        fallbackComposeUrl;
+
+      try {
+        popup.location.href = openUrl;
+      } catch {
+        openUrlReturn(openUrl);
+      }
+
+      if (method === "gmail_draft" && messageId) {
+        showToast("Compose ready with design attached. Review, then Send.", "success", 3200);
+      } else if (method === "smtp") {
+        try { popup.close(); } catch { /* ignore */ }
+        showToast("Digitizing email sent to William with design attached.", "success", 2800);
+      } else {
+        // Last resort: download image for manual paperclip on the filled compose window.
+        if (payloads.length) downloadAttachmentPayloads(payloads);
+        showToast(
+          payloads.length
+            ? "Compose ready — paperclip the downloaded design, then Send."
+            : (data.error || "Compose ready, but the design could not be attached automatically."),
+          payloads.length ? "success" : "error",
+          4200
+        );
       }
     } catch (err) {
-      console.error("Design download for digitizing email failed:", err);
+      console.error("Order digitizing failed:", err);
+      try {
+        popup.location.href = fallbackComposeUrl;
+      } catch {
+        openUrlReturn(fallbackComposeUrl);
+      }
+      showToast(
+        err?.response?.data?.error || err?.message || "Failed to attach design — opened compose without file.",
+        "error",
+        4200
+      );
     } finally {
       orderingLock.current = false;
       setOrderingId("");
     }
-
-    showToast(
-      downloaded
-        ? "Compose ready — paperclip the downloaded design, then Send."
-        : "Compose ready — could not download the design image to attach.",
-      downloaded ? "success" : "error",
-      4200
-    );
   };
 
   // ---------- Layout ----------
