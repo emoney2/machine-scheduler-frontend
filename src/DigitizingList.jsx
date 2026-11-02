@@ -559,10 +559,13 @@ export default function DigitizingList() {
         throw new Error(data.error || "Send failed");
       }
       const count = Number(data.attachmentCount || attachments.length || 1);
+      const fromEmail = String(data.fromEmail || "").trim();
       showToast(
-        `Sent to William with ${count} attachment${count === 1 ? "" : "s"}.`,
+        fromEmail
+          ? `Sent from ${fromEmail} to William (${count} attachment${count === 1 ? "" : "s"}). Check Sent in that mailbox.`
+          : `Sent to William with ${count} attachment${count === 1 ? "" : "s"}.`,
         "success",
-        3600
+        5200
       );
       closeComposeModal();
     } catch (err) {
