@@ -585,37 +585,56 @@ export default function DigitizingList() {
     });
   };
 
-  const handleOpenDigitizingInGmail = () => {
+  const handleSendDigitizingEmail = async () => {
     if (!composeModal || composeModal.sending || composeModal.loading) return;
     const attachments = Array.isArray(composeModal.attachments) ? composeModal.attachments : [];
-    if (!attachments.length) {
-      showToast("Add at least one attachment before opening Gmail.", "error", 2400);
+    if (!attachments.length && !composeModal.fileId) {
+      showToast("Add at least one attachment before sending.", "error", 2400);
       return;
     }
-
-    // Same path as Overview material orders: open Justin's Gmail compose window.
-    const authUser = resolveGmailAuthUser();
-    const gmailUrl = buildGmailCompose({
-      to: composeModal.to || DIGITIZING_VENDOR_EMAIL,
-      subject: composeModal.subject,
-      body: composeModal.body,
-      authUser,
-    });
-    const popup = openUrlReturn(gmailUrl);
-    if (!popup) {
-      showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
-      return;
+    setComposeModal((prev) => (prev ? { ...prev, sending: true } : prev));
+    try {
+      const extraAttachments = attachments
+        .filter((a) => !a.isDesign)
+        .map((a) => ({
+          filename: a.filename,
+          mime: a.mime,
+          contentBase64: a.contentBase64,
+        }));
+      const res = await axios.post(
+        `${API_ROOT}/digitizing/order-email`,
+        {
+          action: "send",
+          orderNumber: composeModal.orderId,
+          product: composeModal.product,
+          design: composeModal.design,
+          fileId: composeModal.fileId,
+          to: composeModal.to,
+          subject: composeModal.subject,
+          body: composeModal.body,
+          extraAttachments,
+        },
+        { withCredentials: true, timeout: 180000 }
+      );
+      const data = res.data || {};
+      if (!data.ok) {
+        throw new Error(data.error || "Send failed");
+      }
+      const count = Number(data.attachmentCount || attachments.length || 1);
+      const fromEmail = String(data.fromEmail || DEFAULT_GMAIL_ACCOUNT).trim();
+      showToast(
+        `Sent from ${fromEmail} with ${count} attachment${count === 1 ? "" : "s"} auto-attached.`,
+        "success",
+        4500
+      );
+      closeComposeModal();
+    } catch (err) {
+      console.error("Send digitizing email failed:", err);
+      setComposeModal((prev) => (prev ? { ...prev, sending: false } : prev));
+      const msg =
+        err?.response?.data?.error || err?.message || "Failed to send digitizing email.";
+      showToast(msg, "error", 6000);
     }
-
-    // Gmail compose URLs cannot carry files — download them for the paperclip.
-    downloadAttachmentPayloads(attachments);
-    const count = attachments.length;
-    showToast(
-      `Opened ${authUser}'s Gmail compose. Paperclip the ${count} downloaded file${count === 1 ? "" : "s"}, then Send.`,
-      "success",
-      5200
-    );
-    closeComposeModal();
   };
 
   // ---------- Layout ----------
@@ -1151,7 +1170,7 @@ export default function DigitizingList() {
               <button
                 type="button"
                 className="btn"
-                onClick={handleOpenDigitizingInGmail}
+                onClick={handleSendDigitizingEmail}
                 disabled={
                   composeModal.loading ||
                   composeModal.sending ||
@@ -1168,7 +1187,7 @@ export default function DigitizingList() {
                   borderColor: "#111827",
                 }}
               >
-                Open in Gmail
+                {composeModal.sending ? "Sending…" : "Send Email"}
               </button>
             </div>
           </div>
