@@ -115,77 +115,6 @@ function resolveOrderPreview(order) {
 }
 
 const DIGITIZING_VENDOR_EMAIL = "classicdigitizers@gmail.com";
-const DIGITIZING_GMAIL_ACCOUNT = "justin.eckard@jrcogolf.com";
-
-function resolveGmailAuthUser() {
-  const raw = String(process.env.REACT_APP_GMAIL_AUTHUSER || "").trim();
-  return raw || DIGITIZING_GMAIL_ACCOUNT;
-}
-
-/**
- * Standalone Gmail compose window (same idea as material Order).
- * view=cm / tf=cm opens only the compose UI — not the full inbox/drafts.
- * When messageId is set, open that API draft (with attachments) inside compose.
- */
-function buildGmailCompose({
-  to = "",
-  cc = "",
-  bcc = "",
-  subject = "",
-  body = "",
-  authUser,
-  messageId = "",
-} = {}) {
-  const account = String(authUser ?? "").trim();
-  const p = new URLSearchParams({ view: "cm", fs: "1", tf: "cm" });
-  if (to) p.set("to", to);
-  if (cc) p.set("cc", cc);
-  if (bcc) p.set("bcc", bcc);
-  if (subject) p.set("su", subject);
-  if (body) p.set("body", body);
-  if (account && /^\d+$/.test(account)) {
-    // keep numeric account path below
-  } else if (account) {
-    p.set("authuser", account);
-  }
-  const mid = String(messageId || "").trim();
-  // When opening an attached draft, omit to/su/body so Gmail loads the draft itself.
-  if (mid) {
-    const draftParams = new URLSearchParams({ view: "cm", fs: "1", tf: "cm" });
-    if (account && !/^\d+$/.test(account)) draftParams.set("authuser", account);
-    const base =
-      account && /^\d+$/.test(account)
-        ? `https://mail.google.com/mail/u/${account}/?${draftParams.toString()}`
-        : `https://mail.google.com/mail/?${draftParams.toString()}`;
-    return `${base}#inbox?compose=${encodeURIComponent(mid)}`;
-  }
-  if (account && /^\d+$/.test(account)) {
-    return `https://mail.google.com/mail/u/${account}/?${p.toString()}`;
-  }
-  return `https://mail.google.com/mail/?${p.toString()}`;
-}
-
-function openUrlReturn(url, { retainHandle = false } = {}) {
-  try {
-    // Sized popup matches material-order compose; avoids a full-tab mailbox view.
-    // Keep the window handle when we need to navigate it after an async draft create
-    // (noopener would make window.open return null).
-    const features = retainHandle
-      ? "width=780,height=700"
-      : "noopener,noreferrer,width=780,height=700";
-    const w = window.open(url, "_blank", features);
-    if (w) {
-      if (!retainHandle) {
-        try { w.opener = null; } catch { /* ignore */ }
-      }
-      setTimeout(() => {
-        try { window.focus(); } catch { /* ignore */ }
-      }, 0);
-      return w;
-    }
-  } catch { /* ignore */ }
-  return null;
-}
 
 function buildDigitizingEmailSubject({ orderNumber = "", design = "" } = {}) {
   const parts = ["JR & Co Digitize Order"];
@@ -216,25 +145,10 @@ function buildDigitizingEmailText({ product = "", orderNumber = "", design = "" 
   };
 }
 
-function downloadAttachmentPayloads(files) {
-  for (const file of files || []) {
-    try {
-      const bin = atob(String(file.contentBase64 || ""));
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
-      const blob = new Blob([bytes], { type: file.mime || "image/jpeg" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = file.filename || "design.jpg";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Design download failed:", err);
-    }
-  }
+function attachmentDataUrl(att) {
+  if (!att?.contentBase64) return "";
+  const mime = att.mime || "image/jpeg";
+  return `data:${mime};base64,${att.contentBase64}`;
 }
 
 /** Match Overview upcoming-jobs image popup. */
@@ -344,6 +258,7 @@ export default function DigitizingList() {
   const toastTimer = useRef(null);
   const [orderingId, setOrderingId] = useState("");
   const orderingLock = useRef(false);
+  const [composeModal, setComposeModal] = useState(null); // { orderId, to, subject, body, attachment, thumbUrl, loading, sending }
 
   // responsive compact mode for narrow screens
   const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
@@ -458,7 +373,13 @@ export default function DigitizingList() {
     return base;
   }, [orders, mode]);
 
-  const handleOrderDigitizing = async (order, fileId) => {
+  const closeComposeModal = () => {
+    setComposeModal(null);
+    setOrderingId("");
+    orderingLock.current = false;
+  };
+
+  const handleOrderDigitizing = async (order, fileId, thumbUrl = "") => {
     const orderId = String(order?.["Order #"] || "").trim();
     const designName = String(order?.["Design"] || "").trim();
     const productName = String(order?.["Product"] || "").trim();
@@ -474,38 +395,30 @@ export default function DigitizingList() {
     orderingLock.current = true;
     setOrderingId(orderId);
 
-    const { subject, body } = buildDigitizingEmailText({
+    const local = buildDigitizingEmailText({
       product: productName,
       orderNumber: orderId,
       design: designName,
     });
-    const authUser = resolveGmailAuthUser();
-    const fallbackComposeUrl = buildGmailCompose({
+    setComposeModal({
+      orderId,
+      fileId,
+      product: productName,
+      design: designName,
       to: DIGITIZING_VENDOR_EMAIL,
-      subject,
-      body,
-      authUser,
+      subject: local.subject,
+      body: local.body,
+      attachment: null,
+      thumbUrl: thumbUrl || "",
+      loading: true,
+      sending: false,
     });
-
-    // Open the popup synchronously (same as material orders) so it isn't blocked,
-    // then point it at the attached draft once the server finishes.
-    const popup = openUrlReturn("about:blank", { retainHandle: true });
-    if (!popup) {
-      orderingLock.current = false;
-      setOrderingId("");
-      showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
-      return;
-    }
-    try {
-      popup.document.write(
-        "<p style='font-family:sans-serif;padding:24px'>Preparing digitizing email with design attached…</p>"
-      );
-    } catch { /* ignore cross-window write issues */ }
 
     try {
       const res = await axios.post(
         `${API_ROOT}/digitizing/order-email`,
         {
+          action: "prepare",
           orderNumber: orderId,
           product: productName,
           design: designName,
@@ -514,61 +427,71 @@ export default function DigitizingList() {
         { withCredentials: true, timeout: 120000 }
       );
       const data = res.data || {};
-      const method = data.method || "";
-      const payloads = Array.isArray(data.attachmentsBase64) ? data.attachmentsBase64 : [];
-      const messageId = String(data.messageId || "").trim();
-
-      // Standalone compose (view=cm) pointed at the API draft so the image is attached.
-      const attachedComposeUrl = buildGmailCompose({
-        to: data.to || DIGITIZING_VENDOR_EMAIL,
-        subject: data.subject || subject,
-        body: data.body || body,
-        authUser,
-        messageId: method === "gmail_draft" ? messageId : "",
-      });
-      const openUrl =
-        (method === "gmail_draft" && (data.composeUrl || attachedComposeUrl)) ||
-        data.composeUrl ||
-        attachedComposeUrl ||
-        fallbackComposeUrl;
-
-      try {
-        popup.location.href = openUrl;
-      } catch {
-        openUrlReturn(openUrl);
-      }
-
-      if (method === "gmail_draft" && messageId) {
-        showToast("Compose ready with design attached. Review, then Send.", "success", 3200);
-      } else if (method === "smtp") {
-        try { popup.close(); } catch { /* ignore */ }
-        showToast("Digitizing email sent to William with design attached.", "success", 2800);
-      } else {
-        // Last resort: download image for manual paperclip on the filled compose window.
-        if (payloads.length) downloadAttachmentPayloads(payloads);
-        showToast(
-          payloads.length
-            ? "Compose ready — paperclip the downloaded design, then Send."
-            : (data.error || "Compose ready, but the design could not be attached automatically."),
-          payloads.length ? "success" : "error",
-          4200
-        );
-      }
+      setComposeModal((prev) =>
+        prev && prev.orderId === orderId
+          ? {
+              ...prev,
+              to: data.to || DIGITIZING_VENDOR_EMAIL,
+              subject: data.subject || local.subject,
+              body: data.body || local.body,
+              attachment: data.attachment || null,
+              loading: false,
+            }
+          : prev
+      );
     } catch (err) {
-      console.error("Order digitizing failed:", err);
-      try {
-        popup.location.href = fallbackComposeUrl;
-      } catch {
-        openUrlReturn(fallbackComposeUrl);
+      console.error("Prepare digitizing email failed:", err);
+      showToast(
+        err?.response?.data?.error || err?.message || "Could not load design attachment.",
+        "error",
+        3600
+      );
+      closeComposeModal();
+    } finally {
+      orderingLock.current = false;
+    }
+  };
+
+  const handleSendDigitizingEmail = async () => {
+    if (!composeModal || composeModal.sending || composeModal.loading) return;
+    if (!composeModal.attachment?.contentBase64 && !composeModal.fileId) {
+      showToast("No design image attached.", "error", 2400);
+      return;
+    }
+    setComposeModal((prev) => (prev ? { ...prev, sending: true } : prev));
+    try {
+      const res = await axios.post(
+        `${API_ROOT}/digitizing/order-email`,
+        {
+          action: "send",
+          orderNumber: composeModal.orderId,
+          product: composeModal.product,
+          design: composeModal.design,
+          fileId: composeModal.fileId,
+          to: composeModal.to,
+          subject: composeModal.subject,
+          body: composeModal.body,
+        },
+        { withCredentials: true, timeout: 120000 }
+      );
+      const data = res.data || {};
+      if (!data.ok) {
+        throw new Error(data.error || "Send failed");
       }
       showToast(
-        err?.response?.data?.error || err?.message || "Failed to attach design — opened compose without file.",
+        `Sent to William with ${data.attachmentName || "design"} attached.`,
+        "success",
+        3600
+      );
+      closeComposeModal();
+    } catch (err) {
+      console.error("Send digitizing email failed:", err);
+      setComposeModal((prev) => (prev ? { ...prev, sending: false } : prev));
+      showToast(
+        err?.response?.data?.error || err?.message || "Failed to send digitizing email.",
         "error",
         4200
       );
-    } finally {
-      orderingLock.current = false;
-      setOrderingId("");
     }
   };
 
@@ -827,7 +750,7 @@ export default function DigitizingList() {
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleOrderDigitizing(order, fileId);
+                      handleOrderDigitizing(order, fileId, imageUrl);
                     }}
                     style={{
                       background: isOrdering ? "#e5e7eb" : "#111827",
@@ -845,6 +768,220 @@ export default function DigitizingList() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {composeModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Order digitizing email"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={closeComposeModal}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(560px, 100%)",
+              background: "#fff",
+              borderRadius: 12,
+              border: "1px solid #ddd",
+              boxShadow: "0 18px 50px rgba(0,0,0,0.22)",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 16px",
+                borderBottom: "1px solid #eee",
+                background: "#fafafa",
+              }}
+            >
+              <div style={{ fontWeight: 800, fontSize: 14 }}>Order Digitizing</div>
+              <button
+                type="button"
+                className="btn"
+                onClick={closeComposeModal}
+                disabled={composeModal.sending}
+                style={{ background: "#fff", padding: "4px 10px" }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ padding: 16, display: "grid", gap: 10 }}>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#555" }}>To</span>
+                <input
+                  value={composeModal.to}
+                  onChange={(e) =>
+                    setComposeModal((prev) => (prev ? { ...prev, to: e.target.value } : prev))
+                  }
+                  disabled={composeModal.loading || composeModal.sending}
+                  style={{
+                    border: "1px solid #ccc",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                  }}
+                />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#555" }}>Subject</span>
+                <input
+                  value={composeModal.subject}
+                  onChange={(e) =>
+                    setComposeModal((prev) => (prev ? { ...prev, subject: e.target.value } : prev))
+                  }
+                  disabled={composeModal.loading || composeModal.sending}
+                  style={{
+                    border: "1px solid #ccc",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                  }}
+                />
+              </label>
+              <label style={{ display: "grid", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#555" }}>Message</span>
+                <textarea
+                  value={composeModal.body}
+                  onChange={(e) =>
+                    setComposeModal((prev) => (prev ? { ...prev, body: e.target.value } : prev))
+                  }
+                  disabled={composeModal.loading || composeModal.sending}
+                  rows={8}
+                  style={{
+                    border: "1px solid #ccc",
+                    borderRadius: 8,
+                    padding: "8px 10px",
+                    fontSize: 13,
+                    resize: "vertical",
+                    fontFamily: "inherit",
+                    lineHeight: 1.35,
+                  }}
+                />
+              </label>
+
+              <div
+                style={{
+                  border: "1px solid #e5e7eb",
+                  borderRadius: 10,
+                  padding: 10,
+                  background: "#f9fafb",
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 72,
+                    height: 54,
+                    borderRadius: 8,
+                    overflow: "hidden",
+                    border: "1px solid #ddd",
+                    background: "#fff",
+                    flexShrink: 0,
+                    display: "grid",
+                    placeItems: "center",
+                  }}
+                >
+                  {composeModal.loading ? (
+                    <span style={{ fontSize: 11, color: "#666" }}>…</span>
+                  ) : (
+                    <img
+                      src={
+                        attachmentDataUrl(composeModal.attachment) ||
+                        composeModal.thumbUrl ||
+                        ""
+                      }
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12 }}>Attachment</div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#374151",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={composeModal.attachment?.filename || "Design image"}
+                  >
+                    {composeModal.loading
+                      ? "Loading design image…"
+                      : composeModal.attachment?.filename || "Design image"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
+                    {composeModal.attachment
+                      ? "Will be attached when you send"
+                      : "Waiting for design file"}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                padding: "12px 16px",
+                borderTop: "1px solid #eee",
+                background: "#fafafa",
+              }}
+            >
+              <button
+                type="button"
+                className="btn"
+                onClick={closeComposeModal}
+                disabled={composeModal.sending}
+                style={{ background: "#fff" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={handleSendDigitizingEmail}
+                disabled={
+                  composeModal.loading ||
+                  composeModal.sending ||
+                  !composeModal.attachment
+                }
+                style={{
+                  background:
+                    composeModal.loading || composeModal.sending || !composeModal.attachment
+                      ? "#9ca3af"
+                      : "#111827",
+                  color: "#fff",
+                  borderColor: "#111827",
+                }}
+              >
+                {composeModal.sending ? "Sending…" : "Send Email"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
