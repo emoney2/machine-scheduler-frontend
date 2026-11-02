@@ -122,9 +122,27 @@ const DIGITIZING_EMAIL_SIGNATURE = [
   "678.294.5350",
   "www.jrcogolf.com",
 ].join("\n");
+const DIGITIZE_ORDERED_KEY = "jrco.digitizing.ordered.v1";
 
 // Same as Overview material orders — open Justin's Gmail compose in the browser.
 const DEFAULT_GMAIL_ACCOUNT = "justin.eckard@jrcogolf.com";
+
+function loadDigitizeOrderedIds() {
+  try {
+    const raw = localStorage.getItem(DIGITIZE_ORDERED_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.map((id) => String(id || "").trim()).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDigitizeOrderedIds(ids) {
+  try {
+    localStorage.setItem(DIGITIZE_ORDERED_KEY, JSON.stringify([...ids]));
+  } catch { /* ignore quota / private mode */ }
+}
 
 function resolveGmailAuthUser() {
   const raw = String(process.env.REACT_APP_GMAIL_AUTHUSER || "").trim();
@@ -349,6 +367,19 @@ export default function DigitizingList() {
   const [orderingId, setOrderingId] = useState("");
   const orderingLock = useRef(false);
   const [composeModal, setComposeModal] = useState(null); // { orderId, to, subject, body, attachment, thumbUrl, loading, sending }
+  const [orderedIds, setOrderedIds] = useState(() => loadDigitizeOrderedIds());
+
+  const markDigitizeOrdered = useCallback((orderId) => {
+    const id = String(orderId || "").trim();
+    if (!id) return;
+    setOrderedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      saveDigitizeOrderedIds(next);
+      return next;
+    });
+  }, []);
 
   // responsive compact mode for narrow screens
   const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
@@ -622,6 +653,7 @@ export default function DigitizingList() {
       }
       const count = Number(data.attachmentCount || attachments.length || 1);
       const fromEmail = String(data.fromEmail || DEFAULT_GMAIL_ACCOUNT).trim();
+      markDigitizeOrdered(composeModal.orderId);
       showToast(
         `Sent from ${fromEmail} with ${count} attachment${count === 1 ? "" : "s"} auto-attached.`,
         "success",
@@ -748,6 +780,7 @@ export default function DigitizingList() {
             const matLabels = materialLabelsFromOrder(order);
             const { fileId, thumbUrl: imageUrl, openUrl } = resolveOrderPreview(order);
             const isOrdering = orderingId === orderId;
+            const alreadyOrdered = orderedIds.has(orderId);
 
             const onPreviewClick = (e) => {
               e.preventDefault();
@@ -887,24 +920,36 @@ export default function DigitizingList() {
                   <button
                     type="button"
                     className="btn"
-                    disabled={!!orderingId || !fileId}
-                    title={fileId ? "Email William with this design attached" : "No design image to attach"}
+                    disabled={alreadyOrdered || !!orderingId || !fileId}
+                    title={
+                      alreadyOrdered
+                        ? "Digitizing already ordered for this job"
+                        : fileId
+                          ? "Email William with this design attached"
+                          : "No design image to attach"
+                    }
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
+                      if (alreadyOrdered) return;
                       handleOrderDigitizing(order, fileId, imageUrl);
                     }}
                     style={{
-                      background: isOrdering ? "#e5e7eb" : "#111827",
-                      color: isOrdering ? "#374151" : "#fff",
-                      borderColor: isOrdering ? "#bbb" : "#111827",
+                      background: alreadyOrdered || isOrdering ? "#e5e7eb" : "#111827",
+                      color: alreadyOrdered || isOrdering ? "#6b7280" : "#fff",
+                      borderColor: alreadyOrdered || isOrdering ? "#d1d5db" : "#111827",
                       whiteSpace: "nowrap",
-                      opacity: !fileId && !isOrdering ? 0.45 : 1,
+                      opacity: !fileId && !alreadyOrdered && !isOrdering ? 0.45 : 1,
                       fontSize: 11,
                       padding: "7px 10px",
+                      cursor: alreadyOrdered ? "default" : "pointer",
                     }}
                   >
-                    {isOrdering ? "Preparing…" : "Order Digitizing"}
+                    {alreadyOrdered
+                      ? "Digitize Ordered"
+                      : isOrdering
+                        ? "Preparing…"
+                        : "Order Digitizing"}
                   </button>
                 </div>
               </div>
