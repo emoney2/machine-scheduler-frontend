@@ -123,6 +123,47 @@ const DIGITIZING_EMAIL_SIGNATURE = [
   "www.jrcogolf.com",
 ].join("\n");
 
+// Same as Overview material orders — open Justin's Gmail compose in the browser.
+const DEFAULT_GMAIL_ACCOUNT = "justin.eckard@jrcogolf.com";
+
+function resolveGmailAuthUser() {
+  const raw = String(process.env.REACT_APP_GMAIL_AUTHUSER || "").trim();
+  if (!raw || raw === "0") return DEFAULT_GMAIL_ACCOUNT;
+  return raw;
+}
+
+function buildGmailCompose({ to = "", cc = "", bcc = "", subject = "", body = "", authUser } = {}) {
+  const account = String(authUser ?? "").trim();
+  const p = new URLSearchParams({ view: "cm", fs: "1" });
+  if (to) p.set("to", to);
+  if (cc) p.set("cc", cc);
+  if (bcc) p.set("bcc", bcc);
+  if (subject) p.set("su", subject);
+  if (body) p.set("body", body);
+  if (!account) {
+    return `https://mail.google.com/mail/?${p.toString()}`;
+  }
+  if (/^\d+$/.test(account)) {
+    return `https://mail.google.com/mail/u/${account}/?${p.toString()}`;
+  }
+  p.set("authuser", account);
+  return `https://mail.google.com/mail/u/?${p.toString()}`;
+}
+
+function openUrlReturn(url) {
+  try {
+    const w = window.open(url, "_blank", "noopener,width=980,height=720");
+    if (w) {
+      try { w.opener = null; } catch { /* ignore */ }
+      setTimeout(() => {
+        try { window.focus(); } catch { /* ignore */ }
+      }, 0);
+      return w;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 function buildDigitizingEmailSubject({ orderNumber = "", design = "" } = {}) {
   const parts = ["JR & Co Digitize Order"];
   const order = String(orderNumber || "").trim();
@@ -177,6 +218,27 @@ function readFileAsAttachment(file) {
     reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
     reader.readAsDataURL(file);
   });
+}
+
+function downloadAttachmentPayloads(files) {
+  for (const file of files || []) {
+    try {
+      const bin = atob(String(file.contentBase64 || ""));
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: file.mime || "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.filename || "attachment";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Attachment download failed:", err);
+    }
+  }
 }
 
 /** Match Overview upcoming-jobs image popup. */
@@ -523,60 +585,37 @@ export default function DigitizingList() {
     });
   };
 
-  const handleSendDigitizingEmail = async () => {
+  const handleOpenDigitizingInGmail = () => {
     if (!composeModal || composeModal.sending || composeModal.loading) return;
     const attachments = Array.isArray(composeModal.attachments) ? composeModal.attachments : [];
-    if (!attachments.length && !composeModal.fileId) {
-      showToast("Add at least one attachment before sending.", "error", 2400);
+    if (!attachments.length) {
+      showToast("Add at least one attachment before opening Gmail.", "error", 2400);
       return;
     }
-    setComposeModal((prev) => (prev ? { ...prev, sending: true } : prev));
-    try {
-      const extraAttachments = attachments
-        .filter((a) => !a.isDesign)
-        .map((a) => ({
-          filename: a.filename,
-          mime: a.mime,
-          contentBase64: a.contentBase64,
-        }));
-      const res = await axios.post(
-        `${API_ROOT}/digitizing/order-email`,
-        {
-          action: "send",
-          orderNumber: composeModal.orderId,
-          product: composeModal.product,
-          design: composeModal.design,
-          fileId: composeModal.fileId,
-          to: composeModal.to,
-          subject: composeModal.subject,
-          body: composeModal.body,
-          extraAttachments,
-        },
-        { withCredentials: true, timeout: 180000 }
-      );
-      const data = res.data || {};
-      if (!data.ok) {
-        throw new Error(data.error || "Send failed");
-      }
-      const count = Number(data.attachmentCount || attachments.length || 1);
-      const fromEmail = String(data.fromEmail || "").trim();
-      showToast(
-        fromEmail
-          ? `Sent from ${fromEmail} to William (${count} attachment${count === 1 ? "" : "s"}). Check Sent in that mailbox.`
-          : `Sent to William with ${count} attachment${count === 1 ? "" : "s"}.`,
-        "success",
-        5200
-      );
-      closeComposeModal();
-    } catch (err) {
-      console.error("Send digitizing email failed:", err);
-      setComposeModal((prev) => (prev ? { ...prev, sending: false } : prev));
-      showToast(
-        err?.response?.data?.error || err?.message || "Failed to send digitizing email.",
-        "error",
-        4200
-      );
+
+    // Same path as Overview material orders: open Justin's Gmail compose window.
+    const authUser = resolveGmailAuthUser();
+    const gmailUrl = buildGmailCompose({
+      to: composeModal.to || DIGITIZING_VENDOR_EMAIL,
+      subject: composeModal.subject,
+      body: composeModal.body,
+      authUser,
+    });
+    const popup = openUrlReturn(gmailUrl);
+    if (!popup) {
+      showToast("Popup blocked — allow pop-ups and try again.", "error", 3200);
+      return;
     }
+
+    // Gmail compose URLs cannot carry files — download them for the paperclip.
+    downloadAttachmentPayloads(attachments);
+    const count = attachments.length;
+    showToast(
+      `Opened ${authUser}'s Gmail compose. Paperclip the ${count} downloaded file${count === 1 ? "" : "s"}, then Send.`,
+      "success",
+      5200
+    );
+    closeComposeModal();
   };
 
   // ---------- Layout ----------
@@ -1112,7 +1151,7 @@ export default function DigitizingList() {
               <button
                 type="button"
                 className="btn"
-                onClick={handleSendDigitizingEmail}
+                onClick={handleOpenDigitizingInGmail}
                 disabled={
                   composeModal.loading ||
                   composeModal.sending ||
@@ -1129,7 +1168,7 @@ export default function DigitizingList() {
                   borderColor: "#111827",
                 }}
               >
-                {composeModal.sending ? "Sending…" : "Send Email"}
+                Open in Gmail
               </button>
             </div>
           </div>
