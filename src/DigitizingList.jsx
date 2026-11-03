@@ -127,12 +127,22 @@ const DIGITIZE_ORDERED_KEY = "jrco.digitizing.ordered.v1";
 // Same as Overview material orders — open Justin's Gmail compose in the browser.
 const DEFAULT_GMAIL_ACCOUNT = "justin.eckard@jrcogolf.com";
 
+function normalizeOrderId(raw) {
+  const s = String(raw ?? "").trim();
+  if (!s) return "";
+  const n = Number(s);
+  if (Number.isFinite(n) && Math.abs(n - Math.round(n)) < 1e-9) {
+    return String(Math.round(n));
+  }
+  return s;
+}
+
 function loadDigitizeOrderedIds() {
   try {
     const raw = localStorage.getItem(DIGITIZE_ORDERED_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.map((id) => String(id || "").trim()).filter(Boolean));
+    return new Set(parsed.map((id) => normalizeOrderId(id)).filter(Boolean));
   } catch {
     return new Set();
   }
@@ -368,9 +378,25 @@ export default function DigitizingList() {
   const orderingLock = useRef(false);
   const [composeModal, setComposeModal] = useState(null); // { orderId, to, subject, body, attachment, thumbUrl, loading, sending }
   const [orderedIds, setOrderedIds] = useState(() => loadDigitizeOrderedIds());
+  const orderedSyncDone = useRef(false);
 
-  const markDigitizeOrdered = useCallback((orderId) => {
-    const id = String(orderId || "").trim();
+  const applyOrderedIds = useCallback((ids) => {
+    const next = new Set(
+      (Array.isArray(ids) ? ids : [])
+        .map((id) => normalizeOrderId(id))
+        .filter(Boolean)
+    );
+    setOrderedIds(next);
+    saveDigitizeOrderedIds(next);
+    return next;
+  }, []);
+
+  const markDigitizeOrdered = useCallback((orderId, allIds) => {
+    if (Array.isArray(allIds)) {
+      applyOrderedIds(allIds);
+      return;
+    }
+    const id = normalizeOrderId(orderId);
     if (!id) return;
     setOrderedIds((prev) => {
       if (prev.has(id)) return prev;
@@ -379,7 +405,46 @@ export default function DigitizingList() {
       saveDigitizeOrderedIds(next);
       return next;
     });
-  }, []);
+  }, [applyOrderedIds]);
+
+  const fetchOrderedIds = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_ROOT}/digitizing/ordered`, {
+        withCredentials: true,
+        timeout: 30000,
+      });
+      const ids = res.data?.orderNumbers || res.data?.keys || [];
+      if (Array.isArray(ids)) applyOrderedIds(ids);
+    } catch (err) {
+      console.warn("Failed to load shared Digitize Ordered list:", err);
+    }
+  }, [applyOrderedIds]);
+
+  // Push any prior browser-only marks to the server once, then load the shared list.
+  useEffect(() => {
+    if (orderedSyncDone.current) return;
+    orderedSyncDone.current = true;
+    let canceled = false;
+    (async () => {
+      const localIds = [...loadDigitizeOrderedIds()];
+      try {
+        if (localIds.length) {
+          await axios.post(
+            `${API_ROOT}/digitizing/ordered`,
+            { orderNumbers: localIds },
+            { withCredentials: true, timeout: 30000 }
+          );
+        }
+      } catch (err) {
+        console.warn("Failed to sync local Digitize Ordered marks:", err);
+      }
+      if (!canceled) {
+        await fetchOrderedIds();
+        // Keep a local cache mirror of the shared list for faster first paint next visit.
+      }
+    })();
+    return () => { canceled = true; };
+  }, [fetchOrderedIds]);
 
   // responsive compact mode for narrow screens
   const [ww, setWw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1400));
@@ -423,13 +488,17 @@ export default function DigitizingList() {
       const url = `${API_ROOT}/combined${opts.refresh ? '?refresh=1' : ''}`;
       const res = await axios.get(url, { withCredentials: true });
       setOrders(res.data?.orders || []);
+      if (opts.refresh) {
+        // Keep Digitize Ordered in sync across computers on poll.
+        fetchOrderedIds();
+      }
     } catch {
       // swallow; UI will show last-known data
     } finally {
       if (!opts.refresh) setIsLoading(false);
       inFlight.current = false;
     }
-  }, []);
+  }, [fetchOrderedIds]);
 
   // initial + polling
   useEffect(() => {
@@ -501,7 +570,7 @@ export default function DigitizingList() {
   };
 
   const handleOrderDigitizing = async (order, fileId, thumbUrl = "") => {
-    const orderId = String(order?.["Order #"] || "").trim();
+    const orderId = normalizeOrderId(order?.["Order #"]);
     const designName = String(order?.["Design"] || "").trim();
     const productName = String(order?.["Product"] || "").trim();
     if (!orderId) {
@@ -653,7 +722,10 @@ export default function DigitizingList() {
       }
       const count = Number(data.attachmentCount || attachments.length || 1);
       const fromEmail = String(data.fromEmail || DEFAULT_GMAIL_ACCOUNT).trim();
-      markDigitizeOrdered(composeModal.orderId);
+      markDigitizeOrdered(
+        composeModal.orderId,
+        Array.isArray(data.orderedOrderNumbers) ? data.orderedOrderNumbers : null
+      );
       showToast(
         `Sent from ${fromEmail} with ${count} attachment${count === 1 ? "" : "s"} auto-attached.`,
         "success",
@@ -768,7 +840,7 @@ export default function DigitizingList() {
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {cards.map(order => {
-            const orderId = String(order["Order #"] || "");
+            const orderId = normalizeOrderId(order["Order #"]);
             const company = order["Company Name"] || "";
             const design  = order["Design"] || "";
             const qty     = order["Quantity"] || "";
