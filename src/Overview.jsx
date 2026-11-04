@@ -1915,7 +1915,7 @@ function col(width, center = false) {
     setRebuildingMaterials(true);
     // Keep existing lists visible; only spin the button (avoid full-panel "Loading…")
     try {
-      await axios.post(
+      const rebuildRes = await axios.post(
         `${ROOT}/overview/rebuild-materials`,
         {},
         {
@@ -1929,6 +1929,14 @@ function col(width, center = false) {
       } catch {}
       const rf = refreshOverviewRef.current;
       if (typeof rf === "function") await rf({ bypassDebounce: true, forceFresh: true });
+      const stats = rebuildRes?.data?.stats || {};
+      const dbg1825 = (stats.threadDebug || []).find((t) => String(t.code) === "1825");
+      const logic = stats.threadOrderLogic || "?";
+      if (dbg1825) {
+        console.info("[materials rebuild]", logic, "1825", dbg1825);
+      } else {
+        console.info("[materials rebuild]", logic, stats);
+      }
     } catch (err) {
       const body = err?.response?.data;
       let msg =
