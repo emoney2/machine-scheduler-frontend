@@ -125,7 +125,8 @@ const DIGITIZING_EMAIL_SIGNATURE = [
 const DIGITIZE_ORDERED_KEY = "jrco.digitizing.ordered.v1";
 
 // Same as Overview material orders — open Justin's Gmail compose in the browser.
-const DEFAULT_GMAIL_ACCOUNT = "justin.eckard@jrcogolf.com";
+const DEFAULT_FROM_EMAIL = "info@jrco.us";
+const DEFAULT_GMAIL_ACCOUNT = DEFAULT_FROM_EMAIL;
 
 function normalizeOrderId(raw) {
   const s = String(raw ?? "").trim();
@@ -721,7 +722,7 @@ export default function DigitizingList() {
         throw new Error(data.error || "Send failed");
       }
       const count = Number(data.attachmentCount || attachments.length || 1);
-      const fromEmail = String(data.fromEmail || DEFAULT_GMAIL_ACCOUNT).trim();
+      const fromEmail = String(data.fromEmail || DEFAULT_FROM_EMAIL).trim();
       markDigitizeOrdered(
         composeModal.orderId,
         Array.isArray(data.orderedOrderNumbers) ? data.orderedOrderNumbers : null
