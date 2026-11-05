@@ -268,6 +268,9 @@ export default function OrderSubmission() {
   const [printPreviews, setPrintPreviews] = useState([]);
   /** When true, Print column is set to YES (checkbox or auto when file uploaded). */
   const [orderHasPrint, setOrderHasPrint] = useState(false);
+  /** JR presentation PDF inspect result (jrco-manifest.json → flat PNG Drive ids). */
+  const [jrPresentationInfo, setJrPresentationInfo] = useState(null);
+  const [jrPresentationBusy, setJrPresentationBusy] = useState(false);
   
   // Track preview URLs for cleanup on unmount
   const prodPreviewUrlsRef = useRef(new Set());
@@ -976,7 +979,17 @@ const companyNames = companies.map((opt) => opt.value);
       return prev.filter((_, idx) => idx !== i);
     });
     // Only update file array; leave form.designName alone
-    setProdFiles((prevFiles) => prevFiles.filter((_, idx) => idx !== i));
+    setProdFiles((prevFiles) => {
+      const next = prevFiles.filter((_, idx) => idx !== i);
+      const stillHasPdf = next.some(
+        (f) =>
+          f &&
+          (f.type === "application/pdf" ||
+            String(f.name || "").toLowerCase().endsWith(".pdf"))
+      );
+      if (!stillHasPdf) setJrPresentationInfo(null);
+      return next;
+    });
   };
 
 
@@ -1169,6 +1182,29 @@ const companyNames = companies.map((opt) => opt.value);
     return { url, type: f.type || "", name: f.name };
   };
 
+  const inspectJrPresentationPdf = async (file) => {
+    const name = String(file?.name || "").toLowerCase();
+    const isPdf =
+      file?.type === "application/pdf" || name.endsWith(".pdf");
+    if (!file || !isPdf) return null;
+    const fd = new FormData();
+    fd.append("pdf", file);
+    const res = await axios.post(`${API_ROOT}/jrco-presentation/inspect`, fd, {
+      withCredentials: true,
+      // 400 = not a JR presentation / local: ids — still return body for UX
+      validateStatus: (s) => s < 500,
+    });
+    if (res.status === 400 && res.data && res.data.error && !res.data.designs) {
+      // Ordinary PDF without jrco-manifest — ignore quietly
+      if (/missing jrco-manifest/i.test(String(res.data.error))) return null;
+      return { ok: false, error: res.data.error, filename: file.name };
+    }
+    if (res.data && Array.isArray(res.data.designs)) {
+      return { ...res.data, filename: file.name };
+    }
+    return null;
+  };
+
   const handleFileChange = async (e, setter, previewSetter, urlsRef) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -1195,6 +1231,34 @@ const companyNames = companies.map((opt) => opt.value);
         }
         return next;
       });
+    }
+
+    // JR Local Presentation PDF → inspect embedded jrco-manifest.json
+    const pdfCandidates = files.filter(
+      (f) =>
+        f &&
+        (f.type === "application/pdf" ||
+          String(f.name || "").toLowerCase().endsWith(".pdf"))
+    );
+    if (pdfCandidates.length) {
+      setJrPresentationBusy(true);
+      try {
+        let lastInfo = null;
+        for (const pdf of pdfCandidates) {
+          const info = await inspectJrPresentationPdf(pdf);
+          if (info) lastInfo = info;
+        }
+        if (lastInfo) {
+          setJrPresentationInfo(lastInfo);
+          if (lastInfo.ok) {
+            setOrderHasPrint(true);
+          }
+        }
+      } catch (err) {
+        console.warn("JR presentation inspect failed:", err);
+      } finally {
+        setJrPresentationBusy(false);
+      }
     }
     // Do not clear e.target.value — that breaks HTML required validation on submit
     // even when prodFiles state already has the selected files.
@@ -1299,6 +1363,20 @@ const submitForm = async () => {
     setIsSubmittingOverlay(false);  // Hide overlay on validation failure
     window._isSubmittingOrder = false;  // Resume polling
     alert("Please select one or more production files.");
+    return;
+  }
+  if (
+    jrPresentationInfo &&
+    jrPresentationInfo.ok === false &&
+    Array.isArray(jrPresentationInfo.blockingErrors) &&
+    jrPresentationInfo.blockingErrors.length
+  ) {
+    setIsSubmittingOverlay(false);
+    window._isSubmittingOrder = false;
+    alert(
+      jrPresentationInfo.blockingErrors.join("\n") ||
+        "This JR presentation PDF cannot resolve production flat PNGs from Drive."
+    );
     return;
   }
   if (useOrderShipAddress) {
@@ -1565,6 +1643,7 @@ const submitForm = async () => {
     setProdPreviews([]);
     setPrintPreviews([]);
     setOrderHasPrint(false);
+    setJrPresentationInfo(null);
     setTrueReorder(false);
   } catch (err) {
     console.error(err);
@@ -3633,7 +3712,7 @@ const handleSaveNewCompany = async () => {
             multiple
             {...(isNeedlepoint
               ? { accept: "image/*,.pdf,.json,.jrneedlepoint.json,application/json" }
-              : {})}
+              : { accept: "image/*,.pdf,application/pdf" })}
             required={!form.isReorder}
             onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews, prodPreviewUrlsRef)}
             style={{ marginBottom: "0.5rem" }}
@@ -3641,6 +3720,56 @@ const handleSaveNewCompany = async () => {
           {isNeedlepoint && (
             <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
               Needlepoint Studio: attach the saved <code>.jrneedlepoint.json</code> to see a belt thumbnail.
+            </div>
+          )}
+          {!isNeedlepoint && (
+            <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
+              JR presentation PDF: attaches immutable flat PNG(s) from Drive on submit (page JPEGs are proof only).
+            </div>
+          )}
+          {jrPresentationBusy && (
+            <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#4338ca" }}>
+              Reading JR presentation manifest…
+            </div>
+          )}
+          {jrPresentationInfo && Array.isArray(jrPresentationInfo.designs) && (
+            <div
+              style={{
+                fontSize: "0.85rem",
+                marginBottom: "0.5rem",
+                padding: "0.5rem 0.65rem",
+                borderRadius: 6,
+                border: `1px solid ${jrPresentationInfo.ok ? "#bbf7d0" : "#fecaca"}`,
+                background: jrPresentationInfo.ok ? "#f0fdf4" : "#fef2f2",
+                color: jrPresentationInfo.ok ? "#14532d" : "#7f1d1d",
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                JR presentation
+                {jrPresentationInfo.filename ? ` — ${jrPresentationInfo.filename}` : ""}
+                {jrPresentationInfo.ok
+                  ? `: ${jrPresentationInfo.designs.length} flat PNG(s) will resolve from Drive on submit`
+                  : ": cannot resolve production flats"}
+              </div>
+              <ul style={{ margin: "0 0 0 1.1rem", padding: 0 }}>
+                {jrPresentationInfo.designs.map((d, i) => (
+                  <li key={d.designId || i}>
+                    Page {d.page}
+                    {d.productType ? ` · ${d.productType}` : ""}
+                    {d.idKind === "local"
+                      ? " — local: id (no Drive upload)"
+                      : d.flatPngDriveFileId
+                        ? ` · Drive ${String(d.flatPngDriveFileId).slice(0, 10)}…`
+                        : ""}
+                    {d.error ? ` — ${d.error}` : ""}
+                  </li>
+                ))}
+              </ul>
+              {!jrPresentationInfo.ok && (
+                <div style={{ marginTop: 6 }}>
+                  Re-export after Drive is configured, or attach the flat PNG manually under Print Files.
+                </div>
+              )}
             </div>
           )}
           <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
