@@ -141,6 +141,11 @@ function isNeedlepointProduct(product) {
     .includes("needlepoint");
 }
 
+/** Towels are outsourced — no Material / Fur / EMB Backing on submit. */
+function isTowelProduct(product) {
+  return String(product || "").toLowerCase().includes("towel");
+}
+
 function emptyNeedlepointSizes() {
   return Object.fromEntries(NEEDLEPOINT_BELT_SIZES.map((size) => [size, ""]));
 }
@@ -428,6 +433,8 @@ export default function OrderSubmission() {
   });
   const [needlepointSizes, setNeedlepointSizes] = useState(() => emptyNeedlepointSizes());
   const isNeedlepoint = isNeedlepointProduct(form.product);
+  const isTowel = isTowelProduct(form.product);
+  const skipsMaterials = isNeedlepoint || isTowel;
 
   useEffect(() => {
     if (!isNeedlepoint) return;
@@ -599,7 +606,7 @@ export default function OrderSubmission() {
     .map(p => p.toLowerCase())
     .includes(form.product.trim().toLowerCase());
   const materialsInvalid =
-    !isNeedlepoint && (
+    !skipsMaterials && (
       form.materials.filter(m => m.trim()).some(m =>
         isUnknownInventoryName(m, materialsInv, incompleteMaterials)
       )
@@ -613,11 +620,12 @@ export default function OrderSubmission() {
       )
     );
   // Fur color is not needed for yardage book holders, scorecard holders,
-  // or any needlepoint product.
+  // towels, or any needlepoint product.
   const furNotNeeded = (() => {
     const p = form.product.trim().toLowerCase();
     return (
       p.includes("needlepoint") ||
+      p.includes("towel") ||
       p.includes("yardage") ||
       p.includes("scorecard")
     );
@@ -1203,7 +1211,7 @@ const handleSubmit = async (e) => {
       alert("Enter at least one belt size quantity.");
       return;
     }
-  } else {
+  } else if (!skipsMaterials) {
     // Unknown materials first — never cover the Add New Material modal
     // with the yellow "Submitting…" overlay (including reorders).
     const missingMat = findMissingMaterial(form, materialsInv, incompleteMaterials);
@@ -1258,7 +1266,7 @@ const handleSubmit = async (e) => {
     }
   }
 
-  if (!isNeedlepoint) {
+  if (!skipsMaterials) {
     // ── New: ensure any non‑empty Material[i] has form.materialPercents[i] filled ──
     for (let i = 0; i < form.materials.length; i++) {
       const mat = form.materials[i].trim();
@@ -1307,11 +1315,16 @@ const submitForm = async () => {
   const fd = new FormData();
   Object.entries(form).forEach(([key, value]) => {
     if (key === "materials") {
-      value.forEach(m => fd.append("materials", isNeedlepoint ? "" : m));
+      value.forEach(m => fd.append("materials", skipsMaterials ? "" : m));
     } else if (key === "materialPercents") {
-      value.forEach(p => fd.append("materialPercents", isNeedlepoint ? "" : p));
+      value.forEach(p => fd.append("materialPercents", skipsMaterials ? "" : p));
     } else if (key === "quantity" && isNeedlepoint) {
       fd.append("quantity", String(needlepointTotalQty(needlepointSizes)));
+    } else if (
+      skipsMaterials &&
+      (key === "backMaterial" || key === "furColor" || key === "embBacking")
+    ) {
+      fd.append(key, "");
     } else {
       fd.append(key, value);
     }
@@ -3240,7 +3253,7 @@ const handleSaveNewCompany = async () => {
           </div>
         </fieldset>
 
-        {/* Needlepoint belt sizes — no materials */}
+        {/* Needlepoint belt sizes / towels — no materials */}
         {isNeedlepoint ? (
           <fieldset style={{ padding: "1rem", marginBottom: "2rem" }}>
             <legend style={{ marginBottom: "1rem", fontSize: "1.1rem", fontWeight: 600 }}>
@@ -3292,6 +3305,15 @@ const handleSaveNewCompany = async () => {
             </div>
             <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700 }}>
               Total qty: {needlepointTotalQty(needlepointSizes) || 0}
+            </div>
+          </fieldset>
+        ) : isTowel ? (
+          <fieldset style={{ padding: "1rem", marginBottom: "2rem" }}>
+            <legend style={{ marginBottom: "1rem", fontSize: "1.1rem", fontWeight: 600 }}>
+              Materials
+            </legend>
+            <div style={{ fontSize: 13, color: "#6b7280" }}>
+              Towels do not use materials — nothing to enter here.
             </div>
           </fieldset>
         ) : (
@@ -3688,7 +3710,7 @@ const handleSaveNewCompany = async () => {
                   f &&
                   (String(f.type || "").startsWith("image/") ||
                     /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(f.name || "")))
-              ) && !isNeedlepoint && (
+              ) && !skipsMaterials && (
                 <button
                   type="button"
                   onClick={suggestMaterialsFromArtwork}
