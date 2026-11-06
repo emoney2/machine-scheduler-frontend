@@ -380,6 +380,8 @@ export default function DigitizingList() {
   const [composeModal, setComposeModal] = useState(null); // { orderId, to, subject, body, attachment, thumbUrl, loading, sending }
   const [orderedIds, setOrderedIds] = useState(() => loadDigitizeOrderedIds());
   const orderedSyncDone = useRef(false);
+  const [inboxStatus, setInboxStatus] = useState(null);
+  const [inboxBusy, setInboxBusy] = useState(false);
 
   const applyOrderedIds = useCallback((ids) => {
     const next = new Set(
@@ -420,6 +422,77 @@ export default function DigitizingList() {
       console.warn("Failed to load shared Digitize Ordered list:", err);
     }
   }, [applyOrderedIds]);
+
+  const fetchInboxStatus = useCallback(async () => {
+    try {
+      const res = await axios.get(`${API_ROOT}/digitizing/inbox/status`, {
+        withCredentials: true,
+        timeout: 30000,
+      });
+      if (res.data) setInboxStatus(res.data);
+    } catch (err) {
+      console.warn("Failed to load digitizing inbox status:", err);
+    }
+  }, []);
+
+  const runInboxAction = useCallback(async (payload) => {
+    setInboxBusy(true);
+    try {
+      const res = await axios.post(
+        `${API_ROOT}/digitizing/inbox/run`,
+        payload || {},
+        { withCredentials: true, timeout: 180000 }
+      );
+      const data = res.data || {};
+      if (data.dryRun) {
+        const first = (data.results || []).find((r) => r.proposed) || data.results?.[0];
+        const proposed = first?.proposed;
+        if (proposed) {
+          showToast(
+            `Dry-run: order ${proposed.orderNumber} → folder ${proposed.folderId || "?"} (${(proposed.filenames || []).length} files)`,
+            "success",
+            5000
+          );
+        } else {
+          showToast("Dry-run finished (no qualifying messages).", "success", 3500);
+        }
+      } else {
+        showToast("Digitizing inbox check finished.", "success", 3000);
+      }
+      await fetchInboxStatus();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error || err?.message || "Digitizing inbox action failed.";
+      showToast(msg, "error", 5000);
+    } finally {
+      setInboxBusy(false);
+    }
+  }, [fetchInboxStatus]);
+
+  const toggleInboxActivation = useCallback(async (enable) => {
+    setInboxBusy(true);
+    try {
+      await axios.post(
+        `${API_ROOT}/digitizing/inbox/activate`,
+        { enabled: enable },
+        { withCredentials: true, timeout: 60000 }
+      );
+      await fetchInboxStatus();
+      showToast(
+        enable
+          ? "Digitizing inbox activated — new vendor emails will import after this moment."
+          : "Digitizing inbox paused.",
+        "success",
+        4000
+      );
+    } catch (err) {
+      const msg =
+        err?.response?.data?.error || err?.message || "Could not update inbox activation.";
+      showToast(msg, "error", 5000);
+    } finally {
+      setInboxBusy(false);
+    }
+  }, [fetchInboxStatus]);
 
   // Push any prior browser-only marks to the server once, then load the shared list.
   useEffect(() => {
@@ -504,10 +577,16 @@ export default function DigitizingList() {
   // initial + polling
   useEffect(() => {
     let canceled = false;
-    (async () => { if (!canceled) await fetchOrders(); })();
-    const t = setInterval(() => { if (!canceled) fetchOrders({ refresh: true }); }, 180000);
+    (async () => {
+      if (!canceled) await fetchOrders();
+      if (!canceled) await fetchInboxStatus();
+    })();
+    const t = setInterval(() => {
+      if (!canceled) fetchOrders({ refresh: true });
+      if (!canceled) fetchInboxStatus();
+    }, 180000);
     return () => { canceled = true; clearInterval(t); };
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchInboxStatus]);
 
   // Filter + sort (+optional partition like Fur List)
   const cards = useMemo(() => {
@@ -778,6 +857,119 @@ export default function DigitizingList() {
         <div style={{ flex: 1 }} />
       </div>
 
+      {/* Vendor inbox importer status (server-side; runs when this browser is closed) */}
+      <div
+        style={{
+          marginBottom: 10,
+          padding: "10px 12px",
+          borderRadius: 10,
+          border: "1px solid #ddd",
+          background: "#f8fafc",
+          display: "grid",
+          gap: 8,
+        }}
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <div style={{ fontWeight: 800, color: "#111827" }}>Digitizing files inbox</div>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: "3px 8px",
+              borderRadius: 999,
+              background: inboxStatus?.activated ? "#dcfce7" : "#fee2e2",
+              color: inboxStatus?.activated ? "#166534" : "#991b1b",
+            }}
+          >
+            {inboxStatus?.activated ? "Activated" : "Not activated"}
+          </span>
+          <span style={{ fontSize: 11, color: "#6b7280" }}>
+            Env {inboxStatus?.featureEnabledEnv ? "on" : "off"} ·{" "}
+            {inboxStatus?.pubsubTopicConfigured ? "Pub/Sub configured" : "Polling reconcile"}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button
+            type="button"
+            className="btn"
+            disabled={inboxBusy}
+            onClick={() => toggleInboxActivation(!(inboxStatus?.activated))}
+          >
+            {inboxStatus?.activated ? "Pause" : "Activate"}
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={inboxBusy}
+            onClick={() => runInboxAction({ dryRun: true })}
+          >
+            Dry-run
+          </button>
+          <button
+            type="button"
+            className="btn"
+            disabled={inboxBusy}
+            onClick={() => runInboxAction({})}
+            style={{ background: "#111827", color: "#fff", borderColor: "#111827" }}
+          >
+            Check now
+          </button>
+        </div>
+        <div style={{ color: "#4b5563", fontSize: 11 }}>
+          Watches {inboxStatus?.mailbox || "info@jrco.us"} for {inboxStatus?.vendorEmail || "classicdigitizers@gmail.com"}.
+          Last check: {inboxStatus?.lastCheckAt ? new Date(inboxStatus.lastCheckAt).toLocaleString() : "—"}.
+          Last success: {inboxStatus?.lastSuccessAt ? new Date(inboxStatus.lastSuccessAt).toLocaleString() : "—"}.
+          {inboxStatus?.lastError ? ` Error: ${inboxStatus.lastError}` : ""}
+        </div>
+        {(inboxStatus?.needsReview?.length > 0 || inboxStatus?.errors?.length > 0) && (
+          <div style={{ display: "grid", gap: 4 }}>
+            {(inboxStatus.needsReview || []).slice(0, 5).map((row) => (
+              <div key={`nr-${row.messageId}`} style={{ fontSize: 11, color: "#92400e" }}>
+                Needs review · {row.orderNumber || "?"} · {row.subject || row.messageId}
+                {" — "}{row.error || "ambiguous / missing folder"}
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={inboxBusy}
+                  style={{ marginLeft: 8, padding: "2px 8px", fontSize: 10 }}
+                  onClick={() =>
+                    runInboxAction({ messageIds: [row.messageId], force: true })
+                  }
+                >
+                  Retry
+                </button>
+              </div>
+            ))}
+            {(inboxStatus.errors || []).slice(0, 5).map((row) => (
+              <div key={`er-${row.messageId}`} style={{ fontSize: 11, color: "#b91c1c" }}>
+                Error · {row.orderNumber || "?"} · {row.error || "failed"}
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={inboxBusy}
+                  style={{ marginLeft: 8, padding: "2px 8px", fontSize: 10 }}
+                  onClick={() =>
+                    runInboxAction({ messageIds: [row.messageId], force: true })
+                  }
+                >
+                  Retry
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {(inboxStatus?.imported || []).slice(0, 5).length > 0 && (
+          <div style={{ display: "grid", gap: 3 }}>
+            {(inboxStatus.imported || []).slice(0, 5).map((row) => (
+              <div key={`im-${row.messageId}`} style={{ fontSize: 11, color: "#065f46" }}>
+                Digitize files received · Order {row.orderNumber}
+                {row.receivedAt ? ` · ${new Date(row.receivedAt).toLocaleString()}` : ""}
+                {" · "}{(row.filenames || []).join(", ")}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Header row */}
       <div
         className="hdr"
@@ -854,6 +1046,7 @@ export default function DigitizingList() {
             const { fileId, thumbUrl: imageUrl, openUrl } = resolveOrderPreview(order);
             const isOrdering = orderingId === orderId;
             const alreadyOrdered = orderedIds.has(orderId);
+            const filesReceived = (inboxStatus?.importedOrderNumbers || []).includes(orderId);
 
             const onPreviewClick = (e) => {
               e.preventDefault();
@@ -1024,6 +1217,20 @@ export default function DigitizingList() {
                         ? "Preparing…"
                         : "Order Digitizing"}
                   </button>
+                  {filesReceived && (
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#065f46",
+                        whiteSpace: "nowrap",
+                      }}
+                      title="Vendor EMB/DST files were saved to this order’s Drive folder"
+                    >
+                      Digitize files received
+                    </div>
+                  )}
                 </div>
               </div>
             );
