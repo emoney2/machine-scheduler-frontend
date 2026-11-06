@@ -281,6 +281,7 @@ export default function OrderSubmission() {
   const [isPrefilling, setIsPrefilling] = useState(false);
   const [isSubmittingOverlay, setIsSubmittingOverlay] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [successWasEdit, setSuccessWasEdit] = useState(false);
   const [prodFilesLoading, setProdFilesLoading] = useState(false);
   const [printFilesLoading, setPrintFilesLoading] = useState(false);
   const [suggestingMaterials, setSuggestingMaterials] = useState(false);
@@ -294,6 +295,15 @@ export default function OrderSubmission() {
   const [lastJobThumbFailed, setLastJobThumbFailed] = useState(false);
   const [reorderingLastJob, setReorderingLastJob] = useState(false);
   const [trueReorder, setTrueReorder] = useState(false);
+  /** When set, submit patches this existing order instead of creating a new one. */
+  const [editingOrderNumber, setEditingOrderNumber] = useState(null);
+  const [editingBackOrderNumber, setEditingBackOrderNumber] = useState("");
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+  const [editModalJob, setEditModalJob] = useState(null);
+  const [editingLastJob, setEditingLastJob] = useState(false);
+  /** Existing Drive thumbnails shown while editing (not re-uploaded unless replaced). */
+  const [editExistingProdThumbs, setEditExistingProdThumbs] = useState([]);
+  const [editExistingPrintThumbs, setEditExistingPrintThumbs] = useState([]);
 
   useEffect(() => {
     setLastJobThumbFailed(false);
@@ -488,6 +498,218 @@ export default function OrderSubmission() {
     setReorderData(d => ({ ...d, [name]: value }));
   };
 
+  const loadJobForOrderNumber = async (orderNumber, company) => {
+    let job = null;
+    const companyName = String(company || "").trim();
+    if (companyName) {
+      const { data } = await axios.get(
+        `${API_ROOT}/jobs-for-company?company=${encodeURIComponent(companyName)}`
+      );
+      const jobs = data?.jobs || [];
+      job =
+        jobs.find(
+          (j) => String(j["Order #"] || j.orderId || "").trim() === String(orderNumber)
+        ) || null;
+    }
+    if (!job) {
+      const { data } = await axios.get(
+        `${API_ROOT}/orders/${encodeURIComponent(orderNumber)}`
+      );
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      job = data;
+    }
+    return job;
+  };
+
+  const collectDriveFileIdsFromImageField = (imageField) => {
+    const raw = String(imageField || "");
+    const ids = [];
+    const re = /\/file\/d\/([A-Za-z0-9_-]{10,})|[?&]id=([A-Za-z0-9_-]{10,})/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      const id = m[1] || m[2];
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  };
+
+  /** Normalize sheet due dates (ISO, M/D/YYYY, or Sheets serial) for <input type="date">. */
+  const normalizeDueDateForInput = (raw) => {
+    if (raw == null || raw === "") return "";
+    if (typeof raw === "number" && Number.isFinite(raw)) {
+      const ms = Math.round((raw - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+    }
+    const s = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (mdy) {
+      const mm = mdy[1].padStart(2, "0");
+      const dd = mdy[2].padStart(2, "0");
+      let yyyy = mdy[3];
+      if (yyyy.length === 2) yyyy = `20${yyyy}`;
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    const parsed = Date.parse(s);
+    if (Number.isFinite(parsed)) return new Date(parsed).toISOString().slice(0, 10);
+    return "";
+  };
+
+  const loadEditExistingThumbnails = async (job) => {
+    const prodIds = collectDriveFileIdsFromImageField(job?.Image || job?.["Production Files"]);
+    setEditExistingProdThumbs(
+      prodIds.slice(0, 8).map((id) => ({
+        id,
+        url: driveThumbnailSrc(id),
+        name: id,
+      }))
+    );
+
+    const printFolderMatch = String(job?.["Print Files"] || "").match(
+      /\/folders\/([A-Za-z0-9_-]{10,})/
+    );
+    if (!printFolderMatch) {
+      setEditExistingPrintThumbs([]);
+      return;
+    }
+    try {
+      const res = await fetch(
+        `${API_ROOT}/list-folder-files?folderId=${printFolderMatch[1]}`
+      );
+      const data = await res.json();
+      const files = Array.isArray(data?.files) ? data.files : [];
+      setEditExistingPrintThumbs(
+        files.slice(0, 8).map((f) => ({
+          id: f.id,
+          url: driveThumbnailSrc(f.id),
+          name: f.name || f.id,
+        }))
+      );
+    } catch {
+      setEditExistingPrintThumbs([]);
+    }
+  };
+
+  const applyJobToFormForEdit = (job) => {
+    const orderNum = String(job["Order #"] || job.orderNumber || "").trim();
+    setEditingOrderNumber(orderNum);
+    const maybeBack = String(
+      lastAcceptedCustomerJob?.backOrderNumber || ""
+    ).trim();
+    setEditingBackOrderNumber(maybeBack);
+
+    setForm((prev) => ({
+      ...prev,
+      company: job["Company Name"] || "",
+      designName: job["Design"] || "",
+      quantity: job["Quantity"] != null ? String(job["Quantity"]) : "",
+      product: job["Product"] || "",
+      price: job["Price"] != null ? String(job["Price"]) : "",
+      dueDate: normalizeDueDateForInput(job["Due Date"]),
+      dateType: job["Hard Date/Soft Date"] || "Hard Date",
+      shippingType: /local/i.test(
+        String(
+          job["Shipping Method"] ||
+            job["Shipping Type"] ||
+            job["Ship Via"] ||
+            ""
+        )
+      )
+        ? "Local Delivery"
+        : "UPS",
+      salesRep:
+        job["REP"] ?? job["Sales Rep"] ?? job["Referral"] ?? "",
+      poNumber:
+        job["PO #"] ?? job["PO"] ?? job["Customer PO #"] ?? "",
+      notes: job["Notes"] || "",
+      materials: [
+        job["Material1"] || "",
+        job["Material2"] || "",
+        job["Material3"] || "",
+        job["Material4"] || "",
+        job["Material5"] || "",
+      ],
+      materialPercents: [1, 2, 3, 4, 5].map((n) => {
+        const keyNoSpace = `Material${n}%`;
+        const keyWithSpace = `Material ${n}%`;
+        const keyPercent = `Material${n} Percent`;
+        const keySpacePercent = `Material ${n} Percent`;
+        const raw =
+          job[keyNoSpace] ??
+          job[keyWithSpace] ??
+          job[keyPercent] ??
+          job[keySpacePercent] ??
+          "";
+        return raw !== "" && raw !== null && raw !== undefined
+          ? String(raw).trim()
+          : "";
+      }),
+      backMaterial: job["Back Material"] || "",
+      embBacking: job["EMB Backing"] || "Cut Away",
+      furColor: job["Fur Color"] || "",
+      isReorder: false,
+    }));
+
+    const printYes = String(job["Print"] || "").trim().toUpperCase() === "YES";
+    setOrderHasPrint(printYes);
+
+    const shipStreet =
+      job["Order Ship Street 1"] || job["Shipping Street Address 1"] || "";
+    if (String(shipStreet || "").trim()) {
+      setUseOrderShipAddress(true);
+      setOrderShipAddressForm({
+        companyName: job["Order Ship Company"] || job["Company Name"] || "",
+        contactName: job["Order Ship Contact"] || "",
+        phone: job["Order Ship Phone"] || "",
+        street1: job["Order Ship Street 1"] || "",
+        street2: job["Order Ship Street 2"] || "",
+        city: job["Order Ship City"] || "",
+        state: job["Order Ship State"] || "",
+        zip: job["Order Ship ZIP"] || job["Order Ship Zip"] || "",
+      });
+    } else {
+      setUseOrderShipAddress(false);
+    }
+
+    // Do not re-download files as File objects — only replace when user uploads new ones.
+    setProdFiles([]);
+    setPrintFiles([]);
+    setProdPreviews([]);
+    setPrintPreviews([]);
+    setTrueReorder(false);
+    setJrPresentationInfo(null);
+
+    if (isNeedlepointProduct(job["Product"]) && orderNum) {
+      axios
+        .get(`${API_ROOT}/needlepoint/order/${encodeURIComponent(orderNum)}`, {
+          withCredentials: true,
+        })
+        .then((res) => {
+          const sizes = res.data?.order?.sizes || {};
+          setNeedlepointSizes((prev) => {
+            const next = { ...emptyNeedlepointSizes(), ...prev };
+            NEEDLEPOINT_BELT_SIZES.forEach((size) => {
+              if (sizes[size]) next[size] = String(sizes[size]);
+            });
+            return next;
+          });
+        })
+        .catch(() => {});
+    }
+  };
+
+  const clearEditMode = () => {
+    setEditingOrderNumber(null);
+    setEditingBackOrderNumber("");
+    setShowEditOrderModal(false);
+    setEditModalJob(null);
+    setEditExistingProdThumbs([]);
+    setEditExistingPrintThumbs([]);
+  };
+
   /** Same as picking a job on /reorder: load full job, then prefill this form. */
   const handleReorderLastJob = async () => {
     const orderNumber = String(lastAcceptedCustomerJob?.orderNumber || "").trim();
@@ -496,35 +718,37 @@ export default function OrderSubmission() {
 
     setReorderingLastJob(true);
     try {
-      let job = null;
-
-      if (company) {
-        const { data } = await axios.get(
-          `${API_ROOT}/jobs-for-company?company=${encodeURIComponent(company)}`
-        );
-        const jobs = data?.jobs || [];
-        job =
-          jobs.find(
-            (j) => String(j["Order #"] || j.orderId || "").trim() === orderNumber
-          ) || null;
-      }
-
-      if (!job) {
-        const { data } = await axios.get(
-          `${API_ROOT}/orders/${encodeURIComponent(orderNumber)}`
-        );
-        if (data?.error) {
-          throw new Error(data.error);
-        }
-        job = data;
-      }
-
+      const job = await loadJobForOrderNumber(orderNumber, company);
+      clearEditMode();
       navigate("/order", { state: { reorderJob: job } });
     } catch (err) {
       console.error("❌ Failed to load last job for reorder:", err);
       alert("Failed to load that order for reorder.");
     } finally {
       setReorderingLastJob(false);
+    }
+  };
+
+  /** Load last submitted order into an edit popup, then into the form. */
+  const handleEditLastJob = async () => {
+    const orderNumber = String(lastAcceptedCustomerJob?.orderNumber || "").trim();
+    const company = String(lastAcceptedCustomerJob?.company || "").trim();
+    if (!orderNumber || editingLastJob) return;
+
+    setEditingLastJob(true);
+    try {
+      const job = await loadJobForOrderNumber(orderNumber, company);
+      applyJobToFormForEdit(job);
+      await loadEditExistingThumbnails(job);
+      setEditModalJob(job);
+      setShowEditOrderModal(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      console.error("❌ Failed to load last job for edit:", err);
+      alert("Failed to load that order for editing.");
+      clearEditMode();
+    } finally {
+      setEditingLastJob(false);
     }
   };
 
@@ -1359,7 +1583,7 @@ const submitForm = async () => {
 
   console.log("🧪 prodFiles right before check:", prodFiles);
 
-  if (prodFiles.length === 0 && !form.isReorder) {
+  if (prodFiles.length === 0 && !form.isReorder && !editingOrderNumber) {
     setIsSubmittingOverlay(false);  // Hide overlay on validation failure
     window._isSubmittingOrder = false;  // Resume polling
     alert("Please select one or more production files.");
@@ -1416,11 +1640,12 @@ const submitForm = async () => {
     fd.append("needlepointSizes", JSON.stringify(sizesPayload));
   }
 
-  // 🧵 Add reorderFrom if this is a reorder
-  if (reorderJob && reorderJob["Order #"]) {
+  // 🧵 Add reorderFrom if this is a reorder (not when editing an existing order)
+  if (!editingOrderNumber && reorderJob && reorderJob["Order #"]) {
     fd.append("reorderFrom", reorderJob["Order #"]);
   }
   const stampTrueReorder =
+    !editingOrderNumber &&
     !!(form.isReorder && trueReorder && isTrueReorderEligible(form, reorderJob));
   fd.append("trueReorder", stampTrueReorder ? "true" : "false");
 
@@ -1432,13 +1657,17 @@ const submitForm = async () => {
       fd.append("prodFiles", safeFile);
       console.log(`📦 Added prodFile[${i}]:`, safeFile.name, safeFile.size, safeFile.type);
     });
-  } else if (!form.isReorder) {
+  } else if (!form.isReorder && !editingOrderNumber) {
     setIsSubmittingOverlay(false);  // Hide overlay on validation failure
     window._isSubmittingOrder = false;  // Resume polling
     alert("Please select one or more production files.");
     return;
   } else {
-    console.warn("⚠️ No prodFiles but this is reorder, continuing...");
+    console.warn(
+      editingOrderNumber
+        ? "⚠️ No new prodFiles on edit — keeping existing photos."
+        : "⚠️ No prodFiles but this is reorder, continuing..."
+    );
   }
 
   // 🖨️ Print column: use checkbox (orderHasPrint) so you can submit YES before file is ready
@@ -1511,7 +1740,9 @@ const submitForm = async () => {
   try {
     const baseForSubmit = API_ROOT.replace(/\/api$/, "");
     const submitUrl = process.env.REACT_APP_ORDER_SUBMIT_URL || `${baseForSubmit}/submit`;
-
+    const editUrl = editingOrderNumber
+      ? `${API_ROOT}/orders/${encodeURIComponent(editingOrderNumber)}/edit`
+      : null;
 
     const config = {
       headers: { "Content-Type": "multipart/form-data" },
@@ -1522,12 +1753,14 @@ const submitForm = async () => {
     };
 
     // ⬇️ keep the response so we can use any returned IDs/fields
-    const { data } = await axios.post(submitUrl, fd, config);
+    const { data } = await axios.post(editUrl || submitUrl, fd, config);
 
     let previewFileId =
       extractPrimaryFileIdFromSubmitResponse(data) ||
+      (editExistingProdThumbs[0]?.id || null) ||
       extractDriveIdFromAny(reorderData?.previewUrl || "") ||
-      extractDriveIdFromAny(form?.prodLink || "");
+      extractDriveIdFromAny(form?.prodLink || "") ||
+      (lastAcceptedCustomerJob?.previewFileId || null);
 
     let thumbDataUrl = null;
     if (!previewFileId && prodPreviews.length > 0 && prodPreviews[0]?.url) {
@@ -1535,24 +1768,31 @@ const submitForm = async () => {
     }
 
     const { primary: ordPrimary, back: ordBack } = extractOrderNumbersFromSubmitResponse(data);
-    if (stampTrueReorder && ordPrimary && reorderJob?.["Order #"]) {
+    const savedOrder =
+      ordPrimary ||
+      (editingOrderNumber ? String(editingOrderNumber) : null);
+    const savedBack =
+      ordBack ||
+      (editingOrderNumber ? editingBackOrderNumber : "") ||
+      "";
+    if (stampTrueReorder && savedOrder && reorderJob?.["Order #"]) {
       pingLocalTrueReorderStamp({
-        order: ordPrimary,
+        order: savedOrder,
         sourceOrder: reorderJob["Order #"],
-        backOrder: ordBack,
+        backOrder: savedBack,
       });
     }
-    if (!ordPrimary) {
+    if (!savedOrder) {
       console.warn(
         "[OrderSubmission] Submit succeeded but no order # parsed from response; check backend JSON keys.",
         data
       );
     }
-    if (ordPrimary) {
+    if (savedOrder) {
       const snap = {
         acceptedAt: new Date().toISOString(),
-        orderNumber: ordPrimary,
-        backOrderNumber: ordBack || "",
+        orderNumber: savedOrder,
+        backOrderNumber: savedBack || "",
         company: String(form.company || "").trim(),
         designName: String(form.designName || "").trim(),
         product: String(form.product || "").trim(),
@@ -1567,7 +1807,7 @@ const submitForm = async () => {
 
     // ⬇️ If backend returns a Drive fileId for the primary production file,
     // write the Preview cell formula immediately (so the sheet shows the thumbnail now).
-    if (data?.primaryFileId && (data?.orderNumber ?? data?.order)) {
+    if (data?.primaryFileId && (data?.orderNumber ?? data?.order ?? savedOrder)) {
       const f = buildPreviewFormulaFromId(data.primaryFileId);
       try {
         try {
@@ -1579,9 +1819,9 @@ const submitForm = async () => {
           const fromProdLink = form?.prodLink ? (form.prodLink.match(/id=([A-Za-z0-9_-]+)/)?.[1]
                           || form.prodLink.match(/\/file\/d\/([A-Za-z0-9_-]+)/)?.[1]) : null;
 
-          const fileId = fromFormula || fromProdLink;
+          const fileId = fromFormula || fromProdLink || data.primaryFileId;
           if (fileId) {
-            const ordKey = String(data.orderNumber ?? data.order ?? "");
+            const ordKey = String(data.orderNumber ?? data.order ?? savedOrder ?? "");
             await axios.post(
               `${API_ROOT}/drive/warmThumbnails`,
               { pairs: [ { id: fileId, v: ordKey, sz: "w160" } ] },
@@ -1597,11 +1837,16 @@ const submitForm = async () => {
       }
     }
 
+    const wasEdit = !!editingOrderNumber;
     setIsSubmittingOverlay(false);
+    setSuccessWasEdit(wasEdit);
     setShowSuccessOverlay(true);
     setTimeout(() => {
       setShowSuccessOverlay(false);
+      setSuccessWasEdit(false);
     }, 3000);
+
+    clearEditMode();
 
     // reset
     setForm({
@@ -1645,9 +1890,20 @@ const submitForm = async () => {
     setOrderHasPrint(false);
     setJrPresentationInfo(null);
     setTrueReorder(false);
+    setUseOrderShipAddress(false);
+    setOrderShipAddressForm({
+      companyName: "",
+      contactName: "",
+      phone: "",
+      street1: "",
+      street2: "",
+      city: "",
+      state: "",
+      zip: "",
+    });
   } catch (err) {
     console.error(err);
-    alert(err.response?.data?.error || "Submission failed");
+    alert(err.response?.data?.error || (editingOrderNumber ? "Edit failed" : "Submission failed"));
   } finally {
     setIsSubmitting(false);
     setUploadProgress(0);
@@ -2162,8 +2418,27 @@ const handleSaveNewCompany = async () => {
             </span>
             <button
               type="button"
+              onClick={handleEditLastJob}
+              disabled={editingLastJob || reorderingLastJob}
+              style={{
+                flexShrink: 0,
+                padding: "4px 10px",
+                fontSize: 11,
+                fontWeight: 600,
+                background: editingLastJob ? "#fcd34d" : "#d97706",
+                color: "#fff",
+                border: "none",
+                borderRadius: 4,
+                cursor: editingLastJob ? "wait" : "pointer",
+              }}
+              title="Edit this order — only changed fields and new photos are saved"
+            >
+              {editingLastJob ? "Loading…" : "Edit Order"}
+            </button>
+            <button
+              type="button"
               onClick={handleReorderLastJob}
-              disabled={reorderingLastJob}
+              disabled={reorderingLastJob || editingLastJob}
               style={{
                 flexShrink: 0,
                 padding: "4px 10px",
@@ -2217,6 +2492,256 @@ const handleSaveNewCompany = async () => {
         </div>
       )}
 
+      {editingOrderNumber && (
+        <div
+          role="status"
+          style={{
+            position: "sticky",
+            top: 42,
+            zIndex: 890,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            padding: "8px 12px",
+            margin: "0 0 10px 0",
+            border: "1px solid #f59e0b",
+            borderRadius: 6,
+            background: "#fffbeb",
+            color: "#92400e",
+            fontSize: 13,
+          }}
+        >
+          <strong>Editing order #{editingOrderNumber}</strong>
+          {editingBackOrderNumber ? (
+            <span>(paired #{editingBackOrderNumber})</span>
+          ) : null}
+          <span style={{ color: "#a16207" }}>
+            Change only what you need — including new photos — then Save Changes.
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              clearEditMode();
+              setForm({
+                company: "",
+                designName: "",
+                quantity: "",
+                product: "",
+                price: "",
+                dueDate: "",
+                dateType: "Hard Date",
+                shippingType: "UPS",
+                salesRep: "",
+                poNumber: "",
+                materials: ["", "", "", "", ""],
+                materialPercents: ["", "", "", "", ""],
+                backMaterial: "",
+                embBacking: "Cut Away",
+                furColor: "",
+                notes: "",
+              });
+              setNeedlepointSizes(emptyNeedlepointSizes());
+              setProdFiles([]);
+              setPrintFiles([]);
+              setProdPreviews([]);
+              setPrintPreviews([]);
+              setOrderHasPrint(false);
+            }}
+            style={{
+              marginLeft: "auto",
+              padding: "4px 10px",
+              fontSize: 12,
+              fontWeight: 600,
+              border: "1px solid #d97706",
+              borderRadius: 4,
+              background: "#fff",
+              color: "#92400e",
+              cursor: "pointer",
+            }}
+          >
+            Cancel edit
+          </button>
+        </div>
+      )}
+
+      {showEditOrderModal && editModalJob && (
+        <div
+          className="ms-dialog-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            zIndex: 10050,
+            padding: "2rem 1rem",
+            overflowY: "auto",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowEditOrderModal(false);
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 10,
+              width: "min(640px, 100%)",
+              padding: "1.25rem 1.5rem",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: "0.5rem" }}>
+              Edit Order #{editingOrderNumber}
+            </h2>
+            <p style={{ marginTop: 0, color: "#4b5563", fontSize: 14 }}>
+              Review the current order below. Close this popup, change anything in
+              the form (including photos), then click <strong>Save Changes</strong>.
+              Only fields and photos you change are updated — the rest of the web
+              app refreshes right away.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gap: 6,
+                fontSize: 14,
+                marginBottom: "0.75rem",
+                padding: "0.75rem",
+                background: "#f9fafb",
+                borderRadius: 8,
+                border: "1px solid #e5e7eb",
+              }}
+            >
+              <div>
+                <strong>Company:</strong> {editModalJob["Company Name"] || "—"}
+              </div>
+              <div>
+                <strong>Design:</strong> {editModalJob["Design"] || "—"}
+              </div>
+              <div>
+                <strong>Product:</strong> {editModalJob["Product"] || "—"}
+              </div>
+              <div>
+                <strong>Qty:</strong> {editModalJob["Quantity"] ?? "—"}
+                {" · "}
+                <strong>Due:</strong> {editModalJob["Due Date"] || "—"}
+              </div>
+              <div>
+                <strong>PO #:</strong>{" "}
+                {editModalJob["PO #"] || editModalJob["PO"] || "—"}
+              </div>
+              {editModalJob["Notes"] ? (
+                <div>
+                  <strong>Notes:</strong> {editModalJob["Notes"]}
+                </div>
+              ) : null}
+            </div>
+            {(editExistingProdThumbs.length > 0 ||
+              editExistingPrintThumbs.length > 0) && (
+              <div style={{ marginBottom: "0.75rem" }}>
+                {editExistingProdThumbs.length > 0 && (
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                      Current production photos
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {editExistingProdThumbs.map((t) => (
+                        <img
+                          key={t.id}
+                          src={t.url}
+                          alt={t.name}
+                          style={{
+                            width: 64,
+                            height: 64,
+                            objectFit: "contain",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 4,
+                            background: "#f3f4f6",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {editExistingPrintThumbs.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                      Current print photos
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {editExistingPrintThumbs.map((t) => (
+                        <img
+                          key={t.id}
+                          src={t.url}
+                          alt={t.name}
+                          style={{
+                            width: 64,
+                            height: 64,
+                            objectFit: "contain",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 4,
+                            background: "#f3f4f6",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  clearEditMode();
+                  setForm({
+                    company: "",
+                    designName: "",
+                    quantity: "",
+                    product: "",
+                    price: "",
+                    dueDate: "",
+                    dateType: "Hard Date",
+                    shippingType: "UPS",
+                    salesRep: "",
+                    poNumber: "",
+                    materials: ["", "", "", "", ""],
+                    materialPercents: ["", "", "", "", ""],
+                    backMaterial: "",
+                    embBacking: "Cut Away",
+                    furColor: "",
+                    notes: "",
+                  });
+                  setProdFiles([]);
+                  setPrintFiles([]);
+                  setProdPreviews([]);
+                  setPrintPreviews([]);
+                }}
+                style={{ padding: "0.45rem 0.9rem" }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowEditOrderModal(false)}
+                style={{
+                  padding: "0.45rem 0.9rem",
+                  background: "#d97706",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Edit in form
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isSubmittingOverlay && (
         <div style={{
           position: "fixed",
@@ -2233,7 +2758,7 @@ const handleSaveNewCompany = async () => {
           fontWeight: "bold",
           color: "#555",
         }}>
-          🛠️ Submitting order...
+          {editingOrderNumber ? "🛠️ Saving order changes…" : "🛠️ Submitting order..."}
         </div>
       )}
 
@@ -2253,7 +2778,7 @@ const handleSaveNewCompany = async () => {
           fontWeight: "bold",
           color: "#1a3e1a",
         }}>
-          ✅ Order submitted!
+          {successWasEdit ? "✅ Order updated!" : "✅ Order submitted!"}
         </div>
       )}
       {/* ─── Company Modal ───────────────────────────────────── */}
@@ -3693,9 +4218,23 @@ const handleSaveNewCompany = async () => {
             >
               <button
                 type="submit"
-                style={{ marginTop: "0.5rem", padding: "0.5rem 1rem" }}
+                style={{
+                  marginTop: "0.5rem",
+                  padding: "0.5rem 1rem",
+                  background: editingOrderNumber ? "#d97706" : undefined,
+                  color: editingOrderNumber ? "#fff" : undefined,
+                  border: editingOrderNumber ? "none" : undefined,
+                  borderRadius: editingOrderNumber ? 4 : undefined,
+                  fontWeight: editingOrderNumber ? 700 : undefined,
+                }}
               >
-                {isSubmitting ? "Submitting…" : "Submit"}
+                {isSubmitting
+                  ? editingOrderNumber
+                    ? "Saving…"
+                    : "Submitting…"
+                  : editingOrderNumber
+                    ? "Save Changes"
+                    : "Submit"}
               </button>
             </div>
           </div>
@@ -3713,10 +4252,34 @@ const handleSaveNewCompany = async () => {
             {...(isNeedlepoint
               ? { accept: "image/*,.pdf,.json,.jrneedlepoint.json,application/json" }
               : { accept: "image/*,.pdf,application/pdf" })}
-            required={!form.isReorder}
+            required={!form.isReorder && !editingOrderNumber}
             onChange={(e) => handleFileChange(e, setProdFiles, setProdPreviews, prodPreviewUrlsRef)}
             style={{ marginBottom: "0.5rem" }}
           />
+          {editingOrderNumber && (
+            <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#92400e" }}>
+              Existing production photos stay unless you upload replacements above.
+              {editExistingProdThumbs.length > 0 && prodPreviews.length === 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                  {editExistingProdThumbs.map((t) => (
+                    <img
+                      key={t.id}
+                      src={t.url}
+                      alt={t.name}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        objectFit: "contain",
+                        border: "1px solid #fcd34d",
+                        borderRadius: 4,
+                        background: "#fffbeb",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {isNeedlepoint && (
             <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
               Needlepoint Studio: attach the saved <code>.jrneedlepoint.json</code> to see a belt thumbnail.
@@ -3885,6 +4448,30 @@ const handleSaveNewCompany = async () => {
             onChange={(e) => handleFileChange(e, setPrintFiles, setPrintPreviews, printPreviewUrlsRef)}
             style={{ marginBottom: "0.5rem" }}
           />
+          {editingOrderNumber && (
+            <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#92400e" }}>
+              Existing print photos stay unless you upload replacements.
+              {editExistingPrintThumbs.length > 0 && printPreviews.length === 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                  {editExistingPrintThumbs.map((t) => (
+                    <img
+                      key={t.id}
+                      src={t.url}
+                      alt={t.name}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        objectFit: "contain",
+                        border: "1px solid #fcd34d",
+                        borderRadius: 4,
+                        background: "#fffbeb",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
             {printFiles.map((f) => f.name).join(", ")}
           </div>

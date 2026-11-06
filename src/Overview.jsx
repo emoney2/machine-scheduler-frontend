@@ -1873,17 +1873,26 @@ function col(width, center = false) {
         });
     }, 30 * 60 * 1000);
 
-    // refresh when backend emits updates (debounced 1s)
-    const debounced = (() => {
+    // refresh when backend emits updates
+    const debouncedMaterials = (() => {
       let t;
       return () => {
         clearTimeout(t);
         t = setTimeout(() => { if (alive) loadFresh(); }, 20000);
       };
     })();
+    // Order edits should show up quickly (not wait 20s)
+    const debouncedOrders = (() => {
+      let t;
+      return () => {
+        clearTimeout(t);
+        t = setTimeout(() => { if (alive) loadFresh(); }, 800);
+      };
+    })();
     if (socket) {
-      socket.on("ordersUpdated", debounced);
-      socket.on("materialsUpdated", debounced);
+      socket.on("ordersUpdated", debouncedOrders);
+      socket.on("orderUpdated", debouncedOrders);
+      socket.on("materialsUpdated", debouncedMaterials);
     }
 
     // Listen for custom event when materials are ordered
@@ -1903,8 +1912,9 @@ function col(width, center = false) {
       clearInterval(id);
       clearInterval(rebuildId);
       if (socket) {
-        socket.off("ordersUpdated", debounced);
-        socket.off("materialsUpdated", debounced);
+        socket.off("ordersUpdated", debouncedOrders);
+        socket.off("orderUpdated", debouncedOrders);
+        socket.off("materialsUpdated", debouncedMaterials);
       }
       window.removeEventListener("materialsOrdered", handleMaterialsOrdered);
     };

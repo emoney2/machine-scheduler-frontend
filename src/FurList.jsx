@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
+import { socket } from "./socketClient";
 
 // ---------- Config ----------
 const BACKEND_ROOT = API_ROOT.replace(/\/api$/, "");
@@ -259,7 +260,21 @@ export default function FurList() {
     let canceled = false;
     (async () => { if (!canceled) await fetchOrders(); })();
     const t = setInterval(() => { if (!canceled) fetchOrders({ refresh: true }); }, 180000);
-    return () => { canceled = true; clearInterval(t); };
+    const onOrdersChanged = () => {
+      if (!canceled) fetchOrders({ refresh: true });
+    };
+    if (socket) {
+      socket.on("ordersUpdated", onOrdersChanged);
+      socket.on("orderUpdated", onOrdersChanged);
+    }
+    return () => {
+      canceled = true;
+      clearInterval(t);
+      if (socket) {
+        socket.off("ordersUpdated", onOrdersChanged);
+        socket.off("orderUpdated", onOrdersChanged);
+      }
+    };
   }, [fetchOrders]);
 
   // 🆕 Check if Print Service is up

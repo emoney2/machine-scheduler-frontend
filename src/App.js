@@ -652,6 +652,8 @@ useEffect(() => {
   socket.on("startTimeUpdated", onStartTimeUpdated);
   socket.on("manualStateUpdated", scheduleLayoutRefresh);
   socket.on("linksUpdated", onLinksUpdated);
+  socket.on("ordersUpdated", scheduleLayoutRefresh);
+  socket.on("orderUpdated", scheduleLayoutRefresh);
   const dropFinishedJob = (orderId) => {
     const want = normalizeOrderId(orderId);
     if (!want) return;
@@ -719,6 +721,8 @@ useEffect(() => {
     socket.off("startTimeUpdated", onStartTimeUpdated);
     socket.off("manualStateUpdated", scheduleLayoutRefresh);
     socket.off("linksUpdated", onLinksUpdated);
+    socket.off("ordersUpdated", scheduleLayoutRefresh);
+    socket.off("orderUpdated", scheduleLayoutRefresh);
     socket.off("embroideryFinished", onEmbroideryFinished);
     socket.off("embroideryProgressUpdated", onEmbroideryProgress);
   };

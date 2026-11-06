@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
+import { socket } from "./socketClient";
 
 
 // ---------- Utils ----------
@@ -101,7 +102,21 @@ export default function CutList() {
     let canceled = false;
     (async () => { if (!canceled) await fetchOrders(); })();
     const t = setInterval(() => { if (!canceled) fetchOrders({ refresh: true }); }, 180000);
-    return () => { canceled = true; clearInterval(t); };
+    const onOrdersChanged = () => {
+      if (!canceled) fetchOrders({ refresh: true });
+    };
+    if (socket) {
+      socket.on("ordersUpdated", onOrdersChanged);
+      socket.on("orderUpdated", onOrdersChanged);
+    }
+    return () => {
+      canceled = true;
+      clearInterval(t);
+      if (socket) {
+        socket.off("ordersUpdated", onOrdersChanged);
+        socket.off("orderUpdated", onOrdersChanged);
+      }
+    };
   }, [fetchOrders]);
 
   // Filter + sort (exclude completed)

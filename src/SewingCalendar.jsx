@@ -834,7 +834,7 @@ export function SewingCalendar({ tv = false, columns }) {
     let orderTimer = null;
     const onOrder = () => {
       window.clearTimeout(orderTimer);
-      orderTimer = window.setTimeout(onBoard, 20000);
+      orderTimer = window.setTimeout(onBoard, 800);
     };
     socket.on("sewingBoardUpdated", onBoard);
     socket.on("ordersUpdated", onOrder);
