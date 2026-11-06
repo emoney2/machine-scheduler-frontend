@@ -490,10 +490,12 @@ export default function Section9(props) {
                 const st = String(j.status).trim().toLowerCase();
                 return st !== 'complete' && st !== 'sewing';
               })
-              // 🚫 drop towels (case-insensitive; supports job.product or job.Product)
+              // 🚫 drop towels + needlepoint (outsourced — shown on Needlepoint tab)
               .filter(j => {
                 const prod = String(j.product ?? j.Product ?? '').toLowerCase();
-                return !prod.includes('towel');
+                if (prod.includes('towel')) return false;
+                if (prod.replace(/\s+/g, '').includes('needlepoint')) return false;
+                return true;
               });
 
             const segments = [];

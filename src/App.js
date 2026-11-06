@@ -28,6 +28,7 @@ import throttle from 'lodash.throttle';
 import ShipmentComplete from "./ShipmentComplete";
 import BoxSelect from "./BoxSelect";
 import Overview from "./Overview";
+import NeedlepointTab from "./NeedlepointTab";
 import DigitizingList from "./DigitizingList";
 import KanbanQueue from "./KanbanQueue";
 import KanbanWizard from "./KanbanWizard";
@@ -2018,8 +2019,9 @@ function isNonDraggable(job) {
 
   const prod = String(job?.product ?? job?.Product ?? '').toLowerCase();
   const isTowel = prod.includes('towel');
+  const isNeedlepoint = prod.replace(/\s+/g, '').includes('needlepoint');
 
-  return isPlaceholder || notActive || isTowel;
+  return isPlaceholder || notActive || isTowel || isNeedlepoint;
 }
 
 
@@ -2307,11 +2309,9 @@ useEffect(() => {
          { to: "/kanban/queue",      label: "Kanban Queue" },
          { to: "/sales",             label: "Sales" },
          { to: "/sewing-priority",   label: "Sewing Priority" },
-         { to: "/sewing-calendar",   label: "Sewing Calendar" },
-         { to: "/embroidery-calendar", label: "Embroidery Calendar" },
-         { to: "/schedule-approvals", label: "Schedule Approvals" },
-         { to: "/schedule-conflicts", label: "Conflicts" },
-         { to: "/scheduling-settings", label: "Scheduling Settings" }
+         { to: "/needlepoint",       label: "Needlepoint" },
+         // Hidden for now (routes still exist): Sewing Calendar, Embroidery Calendar,
+         // Schedule Approvals, Conflicts, Scheduling Settings
         ].map(({ to, label }) => (
           <NavLink key={to} to={to} style={({ isActive }) => (
             isCompactNav
@@ -2432,6 +2432,7 @@ useEffect(() => {
           }
         />
           <Route path="/overview" element={<Overview />} />
+          <Route path="/needlepoint" element={<NeedlepointTab />} />
           <Route path="/submit" element={<Navigate to="/order" replace />} />
           <Route path="/sewing-priority" element={<SewingPriority />} />
           <Route path="/sewing-calendar" element={<SewingCalendar columns={columns} />} />
