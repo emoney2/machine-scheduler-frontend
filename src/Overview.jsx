@@ -2284,6 +2284,58 @@ function col(width, center = false) {
 
   const closeTowelCompose = () => setTowelCompose(null);
 
+  const readTowelFileAsAttachment = (file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result || "");
+        const comma = result.indexOf(",");
+        const contentBase64 = comma >= 0 ? result.slice(comma + 1) : result;
+        resolve({
+          id: `extra-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          filename: file.name || "attachment",
+          mime: file.type || "application/octet-stream",
+          contentBase64,
+          size: file.size || 0,
+          isDesign: false,
+        });
+      };
+      reader.onerror = () => reject(reader.error || new Error("Failed to read file"));
+      reader.readAsDataURL(file);
+    });
+
+  const handleAddTowelAttachments = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length || !towelCompose) return;
+    try {
+      const extras = [];
+      for (const file of files) {
+        if (file.size > 12 * 1024 * 1024) {
+          alert(`${file.name} is too large (max 12MB).`);
+          continue;
+        }
+        extras.push(await readTowelFileAsAttachment(file));
+      }
+      if (!extras.length) return;
+      setTowelCompose((prev) =>
+        prev ? { ...prev, attachments: [...(prev.attachments || []), ...extras] } : prev
+      );
+    } catch (err) {
+      console.error("Add towel attachment failed:", err);
+      alert("Could not add one or more files.");
+    }
+  };
+
+  const handleRemoveTowelAttachment = (attId) => {
+    setTowelCompose((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        attachments: (prev.attachments || []).filter((a) => a.id !== attId),
+      };
+    });
+  };
+
   const openTowelOrderModal = async () => {
     const rows = selectedTowelOrders;
     if (!rows.length) {
@@ -2321,6 +2373,13 @@ function col(width, center = false) {
         { withCredentials: true, timeout: 120000 }
       );
       const data = res.data || {};
+      const prepared = Array.isArray(data.attachments)
+        ? data.attachments.map((a, i) => ({
+            ...a,
+            id: a.id || `design-${i}`,
+            isDesign: a.isDesign !== false,
+          }))
+        : [];
       setTowelCompose((prev) =>
         prev
           ? {
@@ -2328,7 +2387,7 @@ function col(width, center = false) {
               to: data.to || to,
               subject: data.subject || "",
               body: data.body || "",
-              attachments: Array.isArray(data.attachments) ? data.attachments : [],
+              attachments: prepared,
               fromEmail: data.fromEmail || "justin.eckard@jrcogolf.com",
               missingDesigns: Array.isArray(data.missingDesigns) ? data.missingDesigns : [],
               loading: false,
@@ -2365,12 +2424,20 @@ function col(width, center = false) {
       alert("Enter the supplier email address.");
       return;
     }
-    if (!(towelCompose.attachments || []).length) {
-      alert("No design files found to attach. Check the order folder artwork, then try again.");
+    const attachments = Array.isArray(towelCompose.attachments) ? towelCompose.attachments : [];
+    if (!attachments.length) {
+      alert("Add at least one attachment before sending.");
       return;
     }
     setTowelCompose((prev) => (prev ? { ...prev, sending: true, error: "" } : prev));
     try {
+      const extraAttachments = attachments
+        .filter((a) => !a.isDesign)
+        .map((a) => ({
+          filename: a.filename,
+          mime: a.mime,
+          contentBase64: a.contentBase64,
+        }));
       const res = await axios.post(
         `${ROOT}/towels/order-towels`,
         {
@@ -2386,6 +2453,7 @@ function col(width, center = false) {
             qty: o.qty,
             previewFileId: o.previewFileId || "",
           })),
+          extraAttachments,
         },
         { withCredentials: true, timeout: 180000 }
       );
@@ -2393,7 +2461,7 @@ function col(width, center = false) {
       if (!data.ok) {
         throw new Error(data.error || "Send failed");
       }
-      const count = Number(data.attachmentCount || (towelCompose.attachments || []).length || 1);
+      const count = Number(data.attachmentCount || attachments.length || 1);
       const fromEmail = String(data.fromEmail || "justin.eckard@jrcogolf.com").trim();
       alert(
         `Sent from ${fromEmail} with ${count} attachment${count === 1 ? "" : "s"} auto-attached.`
@@ -5990,28 +6058,65 @@ function col(width, center = false) {
                 />
               </label>
 
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#555" }}>
-                Attachments ({(towelCompose.attachments || []).length})
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#555" }}>
+                  Attachments ({(towelCompose.attachments || []).length})
+                </div>
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "5px 10px",
+                    borderRadius: 8,
+                    border: "1px solid #bbb",
+                    background: "#fff",
+                    fontWeight: 700,
+                    fontSize: 11,
+                    cursor:
+                      towelCompose.loading || towelCompose.sending ? "default" : "pointer",
+                    opacity: towelCompose.loading || towelCompose.sending ? 0.55 : 1,
+                  }}
+                >
+                  + Add files
+                  <input
+                    type="file"
+                    multiple
+                    disabled={towelCompose.loading || towelCompose.sending}
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      handleAddTowelAttachments(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
               </div>
               {towelCompose.loading ? (
                 <div style={{ fontSize: 13, color: "#6b7280" }}>Loading design attachments…</div>
               ) : (towelCompose.attachments || []).length === 0 ? (
                 <div style={{ fontSize: 12, color: "#b45309" }}>
-                  No design files found. Check Drive artwork for the selected order(s).
+                  No files yet. Add artwork with + Add files, or check Drive for the order.
                 </div>
               ) : (
                 <div style={{ display: "grid", gap: 8 }}>
                   {(towelCompose.attachments || []).map((att, idx) => {
                     const isImage = String(att.mime || "").startsWith("image/");
-                    const dataUrl = isImage
-                      ? `data:${att.mime};base64,${att.contentBase64}`
-                      : "";
+                    const dataUrl =
+                      isImage && att.contentBase64
+                        ? `data:${att.mime};base64,${att.contentBase64}`
+                        : "";
                     return (
                       <div
-                        key={`${att.filename}-${idx}`}
+                        key={att.id || `${att.filename}-${idx}`}
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: isImage ? "72px 1fr" : "1fr",
+                          display: "flex",
                           gap: 10,
                           alignItems: "center",
                           border: "1px solid #e5e7eb",
@@ -6020,21 +6125,67 @@ function col(width, center = false) {
                           background: "#fafafa",
                         }}
                       >
-                        {isImage && dataUrl ? (
-                          <img
-                            src={dataUrl}
-                            alt=""
+                        <div
+                          style={{
+                            width: 72,
+                            height: 48,
+                            borderRadius: 6,
+                            overflow: "hidden",
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            display: "grid",
+                            placeItems: "center",
+                            fontSize: 10,
+                            color: "#6b7280",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {dataUrl ? (
+                            <img
+                              src={dataUrl}
+                              alt=""
+                              style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                            />
+                          ) : (
+                            "FILE"
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div
                             style={{
-                              width: 72,
-                              height: 48,
-                              objectFit: "contain",
-                              borderRadius: 6,
-                              background: "#fff",
-                              border: "1px solid #e5e7eb",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
-                          />
-                        ) : null}
-                        <div style={{ fontSize: 12, fontWeight: 600 }}>{att.filename}</div>
+                            title={att.filename}
+                          >
+                            {att.filename}
+                            {att.isDesign ? " (design)" : ""}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#6b7280" }}>
+                            {att.isDesign ? "Included automatically" : "Added by you"}
+                          </div>
+                        </div>
+                        {!att.isDesign && (
+                          <button
+                            type="button"
+                            disabled={towelCompose.sending}
+                            onClick={() => handleRemoveTowelAttachment(att.id)}
+                            style={{
+                              background: "#fff",
+                              padding: "4px 8px",
+                              fontSize: 11,
+                              border: "1px solid #bbb",
+                              borderRadius: 8,
+                              cursor: "pointer",
+                              fontWeight: 700,
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
                     );
                   })}
