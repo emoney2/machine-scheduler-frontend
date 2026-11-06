@@ -1564,6 +1564,14 @@ function col(width, center = false) {
   const [needlepointOrderNotes, setNeedlepointOrderNotes] = useState("");
   const [needlepointSubmitting, setNeedlepointSubmitting] = useState(false);
 
+  const [towelOrders, setTowelOrders] = useState([]);
+  const [loadingTowels, setLoadingTowels] = useState(true);
+  const [towelSupplierEmail, setTowelSupplierEmail] = useState("adam@tempystees.com");
+  const [towelSelected, setTowelSelected] = useState({});
+  const [towelOrderModal, setTowelOrderModal] = useState(false);
+  const [towelOrderNotes, setTowelOrderNotes] = useState("");
+  const [towelSubmitting, setTowelSubmitting] = useState(false);
+
   // ⬇️ Inside export default function Overview() { ... } with your other useState hooks
   const [lastUpdated, setLastUpdated] = useState(null);
   const markUpdated = React.useCallback(() => setLastUpdated(new Date()), []);
@@ -2055,9 +2063,49 @@ function col(width, center = false) {
     };
   }, [fetchNeedlepointOrders]);
 
+  const fetchTowelOrders = useCallback(
+    async ({ showLoading = true, signal } = {}) => {
+      if (showLoading) setLoadingTowels(true);
+      try {
+        const res = await getWithRetry(
+          axios,
+          `${ROOT}/towels/pending`,
+          { withCredentials: true, signal },
+          [20000, 30000]
+        );
+        setTowelOrders(Array.isArray(res.data?.orders) ? res.data.orders : []);
+        if (res.data?.supplierEmail) {
+          setTowelSupplierEmail(String(res.data.supplierEmail));
+        }
+      } catch (e) {
+        if (axios.isCancel(e) || isOverviewAbortError(e)) return;
+        console.warn("Overview towel fetch failed:", e);
+        setTowelOrders([]);
+      } finally {
+        if (showLoading) setLoadingTowels(false);
+      }
+    },
+    [ROOT]
+  );
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchTowelOrders({ showLoading: true, signal: ctrl.signal });
+    const id = setInterval(() => fetchTowelOrders({ showLoading: false }), 300000);
+    return () => {
+      ctrl.abort();
+      clearInterval(id);
+    };
+  }, [fetchTowelOrders]);
+
   const selectedNeedlepointOrders = useMemo(
     () => (needlepointOrders || []).filter((o) => needlepointSelected[o.orderNumber]),
     [needlepointOrders, needlepointSelected]
+  );
+
+  const selectedTowelOrders = useMemo(
+    () => (towelOrders || []).filter((o) => towelSelected[o.orderNumber]),
+    [towelOrders, towelSelected]
   );
 
   const syncNeedlepointDraftToThreadColors = useCallback((orderNumber, draft) => {
@@ -2232,6 +2280,111 @@ function col(width, center = false) {
       alert(e?.response?.data?.error || e?.message || "Failed to create belt order email.");
     } finally {
       setNeedlepointSubmitting(false);
+    }
+  };
+
+  const openTowelOrderModal = () => {
+    if (!selectedTowelOrders.length) {
+      alert("Select one or more towels to order.");
+      return;
+    }
+    setTowelOrderModal(true);
+  };
+
+  const submitTowelOrder = async () => {
+    const rows = selectedTowelOrders;
+    if (!rows.length) {
+      alert("Select one or more towels to order.");
+      return;
+    }
+    const to = String(towelSupplierEmail || "").trim();
+    if (!to.includes("@")) {
+      alert("Enter the supplier email address.");
+      return;
+    }
+    setTowelSubmitting(true);
+    try {
+      const payload = {
+        to,
+        notes: towelOrderNotes,
+        orders: rows.map((o) => ({
+          orderNumber: o.orderNumber,
+          company: o.company,
+          design: o.design,
+          product: o.product,
+          qty: o.qty,
+        })),
+      };
+      const res = await axios.post(`${ROOT}/towels/order-towels`, payload, {
+        withCredentials: true,
+        timeout: 120000,
+      });
+      const data = res.data || {};
+      const method = data.method || "";
+      const missingDesigns = Array.isArray(data.missingDesigns) ? data.missingDesigns : [];
+      const filePayloads = Array.isArray(data.attachmentsBase64) ? data.attachmentsBase64 : [];
+
+      const needsManualAttach =
+        method === "compose_download" || method === "compose_url" || method === "none";
+      if (needsManualAttach && filePayloads.length) {
+        for (const file of filePayloads) {
+          try {
+            const bin = atob(String(file.contentBase64 || ""));
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+            const blob = new Blob([bytes], { type: file.mime || "application/octet-stream" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = file.filename || "design.jpg";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          } catch (dlErr) {
+            console.error("Design download failed:", dlErr);
+          }
+        }
+      }
+
+      const openUrl = data.draftUrl || (needsManualAttach ? data.composeUrl : "");
+      if (openUrl) {
+        const popup = openUrlReturn(openUrl);
+        if (popup) setGmailPopup(popup);
+      }
+
+      let msg = "Towel order email is ready.";
+      if (method === "gmail_draft") {
+        msg = "Gmail draft created with design file(s) attached. Review the draft, then Send.";
+      } else if (method === "smtp") {
+        msg = "Email sent to the supplier with design file(s) attached.";
+      } else if (data.needsGmailAuth) {
+        msg =
+          "Google login needs Gmail permission (one-time browser sign-in — no password stored). " +
+          "On the server PC run: python generate_token.py — then update GOOGLE_TOKEN_JSON. " +
+          (filePayloads.length
+            ? `For now, downloaded ${filePayloads.map((f) => f.filename).join(", ")} — paperclip them before sending.`
+            : "");
+      } else if (needsManualAttach) {
+        msg = filePayloads.length
+          ? `Downloaded ${filePayloads.map((f) => f.filename).join(", ")}. Attach ${
+              filePayloads.length === 1 ? "that file" : "those files"
+            } with the paperclip in Gmail before sending.`
+          : data.error || "No design file was found to attach.";
+      }
+      if (missingDesigns.length) {
+        msg += ` Could not find a design file for order(s): ${missingDesigns.join(", ")}.`;
+      }
+      alert(msg);
+      setTowelOrderModal(false);
+      setTowelSelected({});
+      setTowelOrderNotes("");
+      fetchTowelOrders({ showLoading: false });
+    } catch (e) {
+      console.error("Towel order failed:", e);
+      alert(e?.response?.data?.error || e?.message || "Failed to create towel order email.");
+    } finally {
+      setTowelSubmitting(false);
     }
   };
 
@@ -3837,6 +3990,125 @@ function col(width, center = false) {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Towels to order from Tempy Stees */}
+          <div
+            style={{
+              background: "#fff",
+              border: "1px solid #e5e7eb",
+              borderRadius: 10,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+              padding: 12,
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div style={{ ...header, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>Towels</span>
+              <span style={subtleUpdatedStyle}>
+                {loadingTowels ? "Loading…" : `${towelOrders.length} waiting to order`}
+              </span>
+              <button
+                type="button"
+                onClick={openTowelOrderModal}
+                disabled={!selectedTowelOrders.length}
+                style={{
+                  marginLeft: "auto",
+                  padding: "6px 12px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: "1px solid #0a7",
+                  background: selectedTowelOrders.length ? "#0a7" : "#f3f4f6",
+                  color: selectedTowelOrders.length ? "#fff" : "#9ca3af",
+                  cursor: selectedTowelOrders.length ? "pointer" : "not-allowed",
+                }}
+              >
+                Order selected ({selectedTowelOrders.length})
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
+              Select one or more towels. We create one supplier email to adam@tempystees.com with the
+              designs attached (renamed to the order number).
+            </div>
+            {loadingTowels ? (
+              <div style={{ fontSize: 13, color: "#6b7280" }}>Loading towel orders…</div>
+            ) : !towelOrders.length ? (
+              <div style={{ fontSize: 12, color: "#9ca3af" }}>No towels waiting to order.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {towelOrders.map((row) => {
+                  const checked = !!towelSelected[row.orderNumber];
+                  const thumb = row.previewFileId
+                    ? `${ROOT}/drive/thumbnail?fileId=${encodeURIComponent(row.previewFileId)}&sz=w120`
+                    : null;
+                  return (
+                    <label
+                      key={row.orderNumber}
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "22px 56px 1fr auto",
+                        gap: 8,
+                        alignItems: "center",
+                        border: checked ? "1px solid #0a7" : "1px solid #e5e7eb",
+                        background: checked ? "#f0fdf4" : "#fff",
+                        borderRadius: 8,
+                        padding: "8px 10px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) =>
+                          setTowelSelected((prev) => ({
+                            ...prev,
+                            [row.orderNumber]: e.target.checked,
+                          }))
+                        }
+                      />
+                      <div
+                        style={{
+                          width: 56,
+                          height: 32,
+                          borderRadius: 6,
+                          overflow: "hidden",
+                          background: "#fafafa",
+                          border: "1px solid #e5e7eb",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 10, color: "#9ca3af" }}>No art</span>
+                        )}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          #{row.orderNumber} {row.company ? `· ${row.company}` : ""}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#4b5563" }}>
+                          {[row.design || row.product, `qty ${row.qty || 0}`]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#111827" }}>
+                        {row.qty || 0}
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Needlepoint belts to order from supplier */}
@@ -5574,6 +5846,199 @@ function col(width, center = false) {
               >
                 Order & Log
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {towelOrderModal && (
+        <div
+          className="ms-dialog-overlay ms-dialog-overlay--fullscreen"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "#fff",
+            zIndex: 1600,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              background: "#fff",
+              width: "100%",
+              height: "100%",
+              overflow: "hidden",
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                flex: "0 0 auto",
+                padding: "16px 20px 12px",
+                borderBottom: "1px solid #e5e7eb",
+                background: "#fff",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ flex: "1 1 280px", minWidth: 0 }}>
+                  <h3 style={{ margin: "0 0 4px", fontSize: 20 }}>Order towels</h3>
+                  <div style={{ fontSize: 13, color: "#4b5563" }}>
+                    Review the selected towels, then we create one email to Tempy Stees with the
+                    designs attached and renamed to the order number.
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 10, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setTowelOrderModal(false)}
+                    disabled={towelSubmitting}
+                    style={{ padding: "8px 14px", border: "1px solid #ccc", borderRadius: 8 }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={submitTowelOrder}
+                    disabled={towelSubmitting}
+                    style={{
+                      padding: "8px 14px",
+                      border: "1px solid #0a7",
+                      background: "#0a7",
+                      color: "#fff",
+                      borderRadius: 8,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {towelSubmitting ? "Creating email…" : "Create email"}
+                  </button>
+                </div>
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(240px, 1.2fr) minmax(200px, 1fr)",
+                  gap: 12,
+                }}
+              >
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600 }}>
+                  Supplier email
+                  <input
+                    type="text"
+                    value={towelSupplierEmail}
+                    onChange={(e) => setTowelSupplierEmail(e.target.value)}
+                    placeholder="adam@tempystees.com"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginTop: 4,
+                      padding: 8,
+                      border: "1px solid #ccc",
+                      borderRadius: 8,
+                      fontWeight: 400,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </label>
+                <label style={{ display: "block", fontSize: 13, fontWeight: 600 }}>
+                  Notes for this email
+                  <input
+                    type="text"
+                    value={towelOrderNotes}
+                    onChange={(e) => setTowelOrderNotes(e.target.value)}
+                    placeholder="Optional notes…"
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      marginTop: 4,
+                      padding: 8,
+                      border: "1px solid #ccc",
+                      borderRadius: 8,
+                      fontWeight: 400,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                overflow: "auto",
+                padding: "16px 20px 24px",
+                background: "#f1f5f9",
+                display: "flex",
+                flexDirection: "column",
+                gap: 12,
+              }}
+            >
+              {selectedTowelOrders.map((row) => {
+                const thumb = row.previewFileId
+                  ? `${ROOT}/drive/thumbnail?fileId=${encodeURIComponent(row.previewFileId)}&sz=w320`
+                  : null;
+                return (
+                  <div
+                    key={row.orderNumber}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "120px 1fr",
+                      gap: 14,
+                      alignItems: "center",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 12,
+                      padding: 14,
+                      background: "#fff",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 120,
+                        height: 72,
+                        borderRadius: 8,
+                        overflow: "hidden",
+                        background: "#fafafa",
+                        border: "1px solid #e5e7eb",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      {thumb ? (
+                        <img
+                          src={thumb}
+                          alt=""
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 11, color: "#9ca3af" }}>No art</span>
+                      )}
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}>
+                        #{row.orderNumber} {row.company ? `· ${row.company}` : ""}
+                      </div>
+                      <div style={{ fontSize: 13, color: "#4b5563", marginTop: 4 }}>
+                        {[row.design, row.product, row.qty ? `qty ${row.qty}` : ""]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
