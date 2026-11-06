@@ -62,7 +62,7 @@ function resolveOrderPreview(order) {
   const proxyBase = `${BACKEND_ROOT}/api/drive/thumbnail`;
   const proxyForId = (id) => {
     if (!id) return null;
-    const params = new URLSearchParams({ fileId: id, sz: "w160" }).toString();
+    const params = new URLSearchParams({ fileId: id, sz: "w640" }).toString();
     return `${proxyBase}?${params}`;
   };
 
@@ -194,7 +194,7 @@ export default function NeedlepointTab() {
 
   const gridTemplate = `
     70px
-    56px
+    180px
     150px
     160px
     50px
@@ -314,14 +314,14 @@ export default function NeedlepointTab() {
                   gridTemplateColumns: gridTemplate,
                   alignItems: "center",
                   gap: 8,
-                  padding: 10,
+                  padding: "12px 10px",
                   borderRadius: 10,
                   border: "1px solid #ddd",
                   background: "#fff",
                 }}
               >
                 <div style={{ ...cellBase, fontWeight: 700 }}>{orderId}</div>
-                <div style={{ display: "grid", placeItems: "center" }}>
+                <div style={{ display: "grid", placeItems: "center", padding: "2px 0" }}>
                   <div
                     role={openUrl ? "button" : undefined}
                     tabIndex={openUrl ? 0 : undefined}
@@ -335,12 +335,12 @@ export default function NeedlepointTab() {
                         : undefined
                     }
                     style={{
-                      width: 50,
-                      height: 34,
+                      width: 168,
+                      height: 96,
                       overflow: "hidden",
-                      borderRadius: 6,
+                      borderRadius: 8,
                       border: "1px solid rgba(0,0,0,0.08)",
-                      background: "#fff",
+                      background: "#fafafa",
                       cursor: openUrl ? "pointer" : "default",
                     }}
                   >
@@ -352,7 +352,7 @@ export default function NeedlepointTab() {
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "cover",
+                          objectFit: "contain",
                           display: "block",
                         }}
                         onError={(e) => {
@@ -366,7 +366,7 @@ export default function NeedlepointTab() {
                           height: "100%",
                           display: "grid",
                           placeItems: "center",
-                          fontSize: 10,
+                          fontSize: 11,
                           color: "#666",
                         }}
                       >
