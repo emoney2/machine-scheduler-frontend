@@ -4099,24 +4099,58 @@ function col(width, center = false) {
               <span style={subtleUpdatedStyle}>
                 {loadingTowels ? "Loading…" : `${towelOrders.length} waiting to order`}
               </span>
-              <button
-                type="button"
-                onClick={openTowelOrderModal}
-                disabled={!selectedTowelOrders.length}
-                style={{
-                  marginLeft: "auto",
-                  padding: "6px 12px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 8,
-                  border: "1px solid #0a7",
-                  background: selectedTowelOrders.length ? "#0a7" : "#f3f4f6",
-                  color: selectedTowelOrders.length ? "#fff" : "#9ca3af",
-                  cursor: selectedTowelOrders.length ? "pointer" : "not-allowed",
-                }}
-              >
-                Order selected ({selectedTowelOrders.length})
-              </button>
+              <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  disabled={!towelOrders.length}
+                  onClick={() => {
+                    const allSelected =
+                      towelOrders.length > 0 &&
+                      towelOrders.every((o) => towelSelected[o.orderNumber]);
+                    if (allSelected) {
+                      setTowelSelected({});
+                      return;
+                    }
+                    const next = {};
+                    towelOrders.forEach((o) => {
+                      if (o.orderNumber) next[o.orderNumber] = true;
+                    });
+                    setTowelSelected(next);
+                  }}
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 8,
+                    border: "1px solid #ccc",
+                    background: towelOrders.length ? "#fff" : "#f3f4f6",
+                    color: towelOrders.length ? "#111827" : "#9ca3af",
+                    cursor: towelOrders.length ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {towelOrders.length > 0 &&
+                  towelOrders.every((o) => towelSelected[o.orderNumber])
+                    ? "Clear"
+                    : "Select all"}
+                </button>
+                <button
+                  type="button"
+                  onClick={openTowelOrderModal}
+                  disabled={!selectedTowelOrders.length}
+                  style={{
+                    padding: "6px 12px",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    borderRadius: 8,
+                    border: "1px solid #0a7",
+                    background: selectedTowelOrders.length ? "#0a7" : "#f3f4f6",
+                    color: selectedTowelOrders.length ? "#fff" : "#9ca3af",
+                    cursor: selectedTowelOrders.length ? "pointer" : "not-allowed",
+                  }}
+                >
+                  Order selected ({selectedTowelOrders.length})
+                </button>
+              </div>
             </div>
             <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
               Select one or more towels, review the email, then Send — same flow as Digitizing. Sends
