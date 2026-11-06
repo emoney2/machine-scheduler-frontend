@@ -1020,51 +1020,53 @@ export default function DigitizingList() {
                   <button
                     type="button"
                     className="btn"
-                    disabled={alreadyOrdered || !!orderingId || !fileId}
+                    disabled={filesReceived || alreadyOrdered || !!orderingId || !fileId}
                     title={
-                      alreadyOrdered
-                        ? "Digitizing already ordered for this job"
-                        : fileId
-                          ? "Email William with this design attached"
-                          : "No design image to attach"
+                      filesReceived
+                        ? "Vendor digitizing files are already in this job’s Drive folder"
+                        : alreadyOrdered
+                          ? "Digitizing already ordered for this job"
+                          : fileId
+                            ? "Email William with this design attached"
+                            : "No design image to attach"
                     }
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      if (alreadyOrdered) return;
+                      if (filesReceived || alreadyOrdered) return;
                       handleOrderDigitizing(order, fileId, imageUrl);
                     }}
                     style={{
-                      background: alreadyOrdered || isOrdering ? "#e5e7eb" : "#111827",
-                      color: alreadyOrdered || isOrdering ? "#6b7280" : "#fff",
-                      borderColor: alreadyOrdered || isOrdering ? "#d1d5db" : "#111827",
+                      background: filesReceived
+                        ? "#16a34a"
+                        : alreadyOrdered || isOrdering
+                          ? "#e5e7eb"
+                          : "#111827",
+                      color: filesReceived
+                        ? "#fff"
+                        : alreadyOrdered || isOrdering
+                          ? "#6b7280"
+                          : "#fff",
+                      borderColor: filesReceived
+                        ? "#15803d"
+                        : alreadyOrdered || isOrdering
+                          ? "#d1d5db"
+                          : "#111827",
                       whiteSpace: "nowrap",
-                      opacity: !fileId && !alreadyOrdered && !isOrdering ? 0.45 : 1,
+                      opacity: !fileId && !filesReceived && !alreadyOrdered && !isOrdering ? 0.45 : 1,
                       fontSize: 11,
                       padding: "7px 10px",
-                      cursor: alreadyOrdered ? "default" : "pointer",
+                      cursor: filesReceived || alreadyOrdered ? "default" : "pointer",
                     }}
                   >
-                    {alreadyOrdered
-                      ? "Digitize Ordered"
-                      : isOrdering
-                        ? "Preparing…"
-                        : "Order Digitizing"}
+                    {filesReceived
+                      ? "File in Job folder"
+                      : alreadyOrdered
+                        ? "Digitize Ordered"
+                        : isOrdering
+                          ? "Preparing…"
+                          : "Order Digitizing"}
                   </button>
-                  {filesReceived && (
-                    <div
-                      style={{
-                        marginTop: 4,
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "#065f46",
-                        whiteSpace: "nowrap",
-                      }}
-                      title="Vendor EMB/DST files were saved to this order’s Drive folder"
-                    >
-                      Digitize files received
-                    </div>
-                  )}
                 </div>
               </div>
             );
