@@ -729,7 +729,9 @@ export default function Section9(props) {
           try {
             const m = (job.imageLink || '').match(/\/d\/([a-zA-Z0-9_-]{20,})/);
             const altId = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
-            if (altId) src = `${API_ROOT}/drive/proxy/${altId}?thumb=1&sz=w240`;
+            if (altId) {
+              src = `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(altId)}&sz=w160`;
+            }
           } catch {}
         }
 
@@ -757,7 +759,7 @@ export default function Section9(props) {
             fetchPriority={isAboveFold ? 'high' : 'low'}
             data-upscaled="0"
             onLoad={(e) => {
-              // If Drive thumb came back tiny (like 1x1), retry once with a bigger thumbnail (w512)
+              // If Drive thumb came back tiny (like 1x1), retry once with a bigger thumbnail
               const img = e.currentTarget;
               if (img.dataset.upscaled === '1') return;
               if (img.naturalWidth <= 2 || img.naturalHeight <= 2) {
@@ -766,7 +768,7 @@ export default function Section9(props) {
                   const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
                   if (id) {
                     img.dataset.upscaled = '1';
-                    img.src = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
+                    img.src = `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(id)}&sz=w320`;
                   }
                 } catch {}
               }
@@ -780,7 +782,7 @@ export default function Section9(props) {
                 const id = m ? m[1] : new URL(job.imageLink).searchParams.get('id');
                 if (id) {
                   img.dataset.upscaled = '1';
-                  img.src = `${API_ROOT}/drive/proxy/${id}?thumb=1&sz=w512`;
+                  img.src = `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(id)}&sz=w320`;
                 }
               } catch {}
             }}

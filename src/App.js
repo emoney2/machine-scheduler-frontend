@@ -900,9 +900,8 @@ function extractDriveId(url) {
   return '';
 }
 
-// Use backend thumbnail proxy (thumb=1) with a slightly larger size for better clarity
-// Public Drive thumbnails directly — no backend proxy.
-// Keep one consistent size for caching & speed.
+// Backend thumbnail proxy — public drive.google.com/thumbnail fails for private
+// / shared-drive JR production flats (broken <img> on queue cards).
 function toPreviewUrl(originalUrl /*, v */) {
   if (!originalUrl) return '';
   const id = extractDriveId(originalUrl);
@@ -911,7 +910,7 @@ function toPreviewUrl(originalUrl /*, v */) {
     if (/\.(png|jpe?g|webp|gif)(\?|$)/i.test(originalUrl)) return originalUrl;
     return '';
   }
-  return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
+  return `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(id)}&sz=w160`;
 }
 
 // Full view: open the original link if it’s already a direct image,
