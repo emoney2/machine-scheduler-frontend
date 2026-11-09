@@ -271,6 +271,8 @@ export default function OrderSubmission() {
   /** JR presentation PDF inspect result (jrco-manifest.json → flat PNG Drive ids). */
   const [jrPresentationInfo, setJrPresentationInfo] = useState(null);
   const [jrPresentationBusy, setJrPresentationBusy] = useState(false);
+  /** Selected designId from a multi-page JR presentation (one flat per order). */
+  const [jrSelectedDesignId, setJrSelectedDesignId] = useState("");
   
   // Track preview URLs for cleanup on unmount
   const prodPreviewUrlsRef = useRef(new Set());
@@ -681,6 +683,7 @@ export default function OrderSubmission() {
     setPrintPreviews([]);
     setTrueReorder(false);
     setJrPresentationInfo(null);
+    setJrSelectedDesignId("");
 
     if (isNeedlepointProduct(job["Product"]) && orderNum) {
       axios
@@ -1211,7 +1214,10 @@ const companyNames = companies.map((opt) => opt.value);
           (f.type === "application/pdf" ||
             String(f.name || "").toLowerCase().endsWith(".pdf"))
       );
-      if (!stillHasPdf) setJrPresentationInfo(null);
+      if (!stillHasPdf) {
+        setJrPresentationInfo(null);
+        setJrSelectedDesignId("");
+      }
       return next;
     });
   };
@@ -1474,7 +1480,13 @@ const companyNames = companies.map((opt) => opt.value);
         }
         if (lastInfo) {
           setJrPresentationInfo(lastInfo);
-          if (lastInfo.ok) {
+          const designs = Array.isArray(lastInfo.designs) ? lastInfo.designs : [];
+          const resolvable = designs.filter((d) => d && d.idKind === "drive");
+          // Auto-pick when only one Drive-resolvable design; otherwise ask.
+          setJrSelectedDesignId(
+            resolvable.length === 1 ? String(resolvable[0].designId || "") : ""
+          );
+          if (resolvable.length) {
             setOrderHasPrint(true);
           }
         }
@@ -1589,19 +1601,26 @@ const submitForm = async () => {
     alert("Please select one or more production files.");
     return;
   }
-  if (
-    jrPresentationInfo &&
-    jrPresentationInfo.ok === false &&
-    Array.isArray(jrPresentationInfo.blockingErrors) &&
-    jrPresentationInfo.blockingErrors.length
-  ) {
-    setIsSubmittingOverlay(false);
-    window._isSubmittingOrder = false;
-    alert(
-      jrPresentationInfo.blockingErrors.join("\n") ||
-        "This JR presentation PDF cannot resolve production flat PNGs from Drive."
-    );
-    return;
+  if (jrPresentationInfo && Array.isArray(jrPresentationInfo.designs) && jrPresentationInfo.designs.length) {
+    const designs = jrPresentationInfo.designs;
+    const selected =
+      designs.find((d) => String(d.designId || "") === String(jrSelectedDesignId || "")) ||
+      null;
+    if (!jrSelectedDesignId || !selected) {
+      setIsSubmittingOverlay(false);
+      window._isSubmittingOrder = false;
+      alert("Choose which 3D design / page to use for this order.");
+      return;
+    }
+    if (selected.idKind !== "drive") {
+      setIsSubmittingOverlay(false);
+      window._isSubmittingOrder = false;
+      alert(
+        selected.error ||
+          "That design’s flat PNG is not on Drive yet. Re-export the presentation after Drive is configured, or attach the flat PNG manually under Print Files."
+      );
+      return;
+    }
   }
   if (useOrderShipAddress) {
     const checked = validateOrderShipAddress(orderShipAddressForm);
@@ -1672,6 +1691,9 @@ const submitForm = async () => {
 
   // 🖨️ Print column: use checkbox (orderHasPrint) so you can submit YES before file is ready
   fd.append("print", orderHasPrint ? "YES" : "NO");
+  if (jrSelectedDesignId) {
+    fd.append("jrPresentationDesignIds", jrSelectedDesignId);
+  }
 
   if (useOrderShipAddress) {
     const addr = validateOrderShipAddress(orderShipAddressForm).value;
@@ -1889,6 +1911,7 @@ const submitForm = async () => {
     setPrintPreviews([]);
     setOrderHasPrint(false);
     setJrPresentationInfo(null);
+    setJrSelectedDesignId("");
     setTrueReorder(false);
     setUseOrderShipAddress(false);
     setOrderShipAddressForm({
@@ -4302,33 +4325,65 @@ const handleSaveNewCompany = async () => {
                 marginBottom: "0.5rem",
                 padding: "0.5rem 0.65rem",
                 borderRadius: 6,
-                border: `1px solid ${jrPresentationInfo.ok ? "#bbf7d0" : "#fecaca"}`,
-                background: jrPresentationInfo.ok ? "#f0fdf4" : "#fef2f2",
-                color: jrPresentationInfo.ok ? "#14532d" : "#7f1d1d",
+                border: `1px solid ${
+                  jrPresentationInfo.designs.some((d) => d.idKind === "drive")
+                    ? "#bbf7d0"
+                    : "#fecaca"
+                }`,
+                background: jrPresentationInfo.designs.some((d) => d.idKind === "drive")
+                  ? "#f0fdf4"
+                  : "#fef2f2",
+                color: jrPresentationInfo.designs.some((d) => d.idKind === "drive")
+                  ? "#14532d"
+                  : "#7f1d1d",
               }}
             >
               <div style={{ fontWeight: 600, marginBottom: 4 }}>
                 JR presentation
                 {jrPresentationInfo.filename ? ` — ${jrPresentationInfo.filename}` : ""}
-                {jrPresentationInfo.ok
-                  ? `: ${jrPresentationInfo.designs.length} flat PNG(s) will resolve from Drive on submit`
-                  : ": cannot resolve production flats"}
+                {": choose which design’s flat PNG to attach"}
               </div>
-              <ul style={{ margin: "0 0 0 1.1rem", padding: 0 }}>
-                {jrPresentationInfo.designs.map((d, i) => (
-                  <li key={d.designId || i}>
-                    Page {d.page}
-                    {d.productType ? ` · ${d.productType}` : ""}
-                    {d.idKind === "local"
-                      ? " — local: id (no Drive upload)"
-                      : d.flatPngDriveFileId
-                        ? ` · Drive ${String(d.flatPngDriveFileId).slice(0, 10)}…`
-                        : ""}
-                    {d.error ? ` — ${d.error}` : ""}
-                  </li>
-                ))}
-              </ul>
-              {!jrPresentationInfo.ok && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {jrPresentationInfo.designs.map((d, i) => {
+                  const id = String(d.designId || "");
+                  const disabled = d.idKind !== "drive";
+                  return (
+                    <label
+                      key={id || i}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 8,
+                        cursor: disabled ? "not-allowed" : "pointer",
+                        opacity: disabled ? 0.7 : 1,
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="jrPresentationDesign"
+                        value={id}
+                        disabled={disabled}
+                        checked={jrSelectedDesignId === id}
+                        onChange={() => setJrSelectedDesignId(id)}
+                        style={{ marginTop: 2 }}
+                      />
+                      <span>
+                        Page {d.page}
+                        {d.productType ? ` · ${d.productType}` : ""}
+                        {d.idKind === "local"
+                          ? " — local: id (no Drive upload)"
+                          : d.flatPngDriveFileId
+                            ? ` · Drive ${String(d.flatPngDriveFileId).slice(0, 10)}…`
+                            : ""}
+                        {d.error ? (
+                          <span style={{ display: "block", marginTop: 2 }}>{d.error}</span>
+                        ) : null}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              {!jrPresentationInfo.designs.some((d) => d.idKind === "drive") && (
                 <div style={{ marginTop: 6 }}>
                   Re-export after Drive is configured, or attach the flat PNG manually under Print Files.
                 </div>
