@@ -83,6 +83,22 @@ function sameText(a, b) {
   return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
 }
 
+/** Orders still open for editing (Stage/Status not complete). */
+function isNonCompleteJob(job) {
+  const stage = String(job?.["Stage"] ?? job?.stage ?? "").trim().toUpperCase();
+  const status = String(job?.["Status"] ?? job?.status ?? "").trim().toUpperCase();
+  return (
+    stage !== "COMPLETE" &&
+    stage !== "COMPLETED" &&
+    status !== "COMPLETE" &&
+    status !== "COMPLETED"
+  );
+}
+
+function orderIdFromJob(job) {
+  return String(job?.["Order #"] ?? job?.orderId ?? job?.orderNumber ?? "").trim();
+}
+
 /** True 100% reorder = same design/product/materials as the original job. */
 function isTrueReorderEligible(form, reorderJob) {
   if (!form?.isReorder || !reorderJob) return false;
@@ -399,7 +415,14 @@ export default function OrderSubmission() {
   const [editingBackOrderNumber, setEditingBackOrderNumber] = useState("");
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [editModalJob, setEditModalJob] = useState(null);
-  const [editingLastJob, setEditingLastJob] = useState(false);
+  const [loadingEditJob, setLoadingEditJob] = useState(false);
+  /** Company → open-order picker (edit any non-complete order). */
+  const [showEditOrderPicker, setShowEditOrderPicker] = useState(false);
+  const [editPickerCompany, setEditPickerCompany] = useState("");
+  const [editPickerJobs, setEditPickerJobs] = useState([]);
+  const [editPickerLoading, setEditPickerLoading] = useState(false);
+  const editPickerJobsReqRef = useRef(null);
+  const editPickerDebounceRef = useRef(null);
   /** Existing Drive thumbnails shown while editing (not re-uploaded unless replaced). */
   const [editExistingProdThumbs, setEditExistingProdThumbs] = useState([]);
   const [editExistingPrintThumbs, setEditExistingPrintThumbs] = useState([]);
@@ -693,11 +716,19 @@ export default function OrderSubmission() {
   };
 
   const applyJobToFormForEdit = (job) => {
-    const orderNum = String(job["Order #"] || job.orderNumber || "").trim();
+    const orderNum = orderIdFromJob(job);
     setEditingOrderNumber(orderNum);
-    const maybeBack = String(
-      lastAcceptedCustomerJob?.backOrderNumber || ""
-    ).trim();
+    const lastMatches =
+      String(lastAcceptedCustomerJob?.orderNumber || "").trim() === orderNum;
+    const maybeBack = lastMatches
+      ? String(lastAcceptedCustomerJob?.backOrderNumber || "").trim()
+      : String(
+          job["Back Order #"] ||
+            job["Back Order"] ||
+            job.backOrderNumber ||
+            job.back_order ||
+            ""
+        ).trim();
     setEditingBackOrderNumber(maybeBack);
 
     setForm((prev) => ({
@@ -810,6 +841,21 @@ export default function OrderSubmission() {
     setEditExistingPrintThumbs([]);
   };
 
+  const closeEditOrderPicker = () => {
+    setShowEditOrderPicker(false);
+    setEditPickerCompany("");
+    setEditPickerJobs([]);
+    setEditPickerLoading(false);
+    if (editPickerJobsReqRef.current) {
+      editPickerJobsReqRef.current.cancel("Picker closed");
+      editPickerJobsReqRef.current = null;
+    }
+    if (editPickerDebounceRef.current) {
+      clearTimeout(editPickerDebounceRef.current);
+      editPickerDebounceRef.current = null;
+    }
+  };
+
   /** Same as picking a job on /reorder: load full job, then prefill this form. */
   const handleReorderLastJob = async () => {
     const orderNumber = String(lastAcceptedCustomerJob?.orderNumber || "").trim();
@@ -829,26 +875,90 @@ export default function OrderSubmission() {
     }
   };
 
-  /** Load last submitted order into an edit popup, then into the form. */
-  const handleEditLastJob = async () => {
-    const orderNumber = String(lastAcceptedCustomerJob?.orderNumber || "").trim();
-    const company = String(lastAcceptedCustomerJob?.company || "").trim();
-    if (!orderNumber || editingLastJob) return;
+  /** Open company → open-order picker (any non-complete order). */
+  const openEditOrderPicker = () => {
+    if (loadingEditJob || reorderingLastJob) return;
+    const seed = String(
+      form.company || lastAcceptedCustomerJob?.company || ""
+    ).trim();
+    setShowEditOrderPicker(true);
+    setEditPickerCompany(seed);
+    setEditPickerJobs([]);
+    if (seed && companies.some((c) => c.value === seed)) {
+      loadEditPickerJobsForCompany(seed);
+    }
+  };
 
-    setEditingLastJob(true);
+  const loadEditPickerJobsForCompany = async (value) => {
+    const companyName = String(value || "").trim();
+    if (!companyName) {
+      setEditPickerJobs([]);
+      return;
+    }
+    if (editPickerJobsReqRef.current) {
+      editPickerJobsReqRef.current.cancel("New company selected");
+    }
+    const cancelTokenSource = axios.CancelToken.source();
+    editPickerJobsReqRef.current = cancelTokenSource;
+    setEditPickerLoading(true);
     try {
-      const job = await loadJobForOrderNumber(orderNumber, company);
-      applyJobToFormForEdit(job);
-      await loadEditExistingThumbnails(job);
-      setEditModalJob(job);
+      const { data } = await axios.get(
+        `${API_ROOT}/jobs-for-company?company=${encodeURIComponent(companyName)}`,
+        { cancelToken: cancelTokenSource.token }
+      );
+      const openJobs = (data?.jobs || []).filter(isNonCompleteJob);
+      setEditPickerJobs(openJobs);
+    } catch (err) {
+      if (axios.isCancel(err)) return;
+      console.error("Failed to load open orders for edit:", err);
+      alert("Failed to load open orders for that company.");
+      setEditPickerJobs([]);
+    } finally {
+      if (editPickerJobsReqRef.current === cancelTokenSource) {
+        editPickerJobsReqRef.current = null;
+      }
+      setEditPickerLoading(false);
+    }
+  };
+
+  const handleEditPickerCompanyChange = (e) => {
+    const val = e.target.value;
+    setEditPickerCompany(val);
+    if (editPickerDebounceRef.current) {
+      clearTimeout(editPickerDebounceRef.current);
+    }
+    editPickerDebounceRef.current = setTimeout(() => {
+      if (companies.some((c) => c.value === val)) {
+        loadEditPickerJobsForCompany(val);
+      } else {
+        setEditPickerJobs([]);
+      }
+    }, 300);
+  };
+
+  /** Load a selected open order into the edit popup + form (patches on Save Changes). */
+  const handleSelectJobToEdit = async (job) => {
+    const orderNumber = orderIdFromJob(job);
+    if (!orderNumber || loadingEditJob) return;
+
+    setLoadingEditJob(true);
+    try {
+      const company = String(
+        job["Company Name"] || editPickerCompany || ""
+      ).trim();
+      const fullJob = await loadJobForOrderNumber(orderNumber, company);
+      applyJobToFormForEdit(fullJob || job);
+      await loadEditExistingThumbnails(fullJob || job);
+      setEditModalJob(fullJob || job);
+      closeEditOrderPicker();
       setShowEditOrderModal(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      console.error("❌ Failed to load last job for edit:", err);
+      console.error("❌ Failed to load order for edit:", err);
       alert("Failed to load that order for editing.");
       clearEditMode();
     } finally {
-      setEditingLastJob(false);
+      setLoadingEditJob(false);
     }
   };
 
@@ -2564,27 +2674,8 @@ const handleSaveNewCompany = async () => {
             </span>
             <button
               type="button"
-              onClick={handleEditLastJob}
-              disabled={editingLastJob || reorderingLastJob}
-              style={{
-                flexShrink: 0,
-                padding: "4px 10px",
-                fontSize: 11,
-                fontWeight: 600,
-                background: editingLastJob ? "#fcd34d" : "#d97706",
-                color: "#fff",
-                border: "none",
-                borderRadius: 4,
-                cursor: editingLastJob ? "wait" : "pointer",
-              }}
-              title="Edit this order — only changed fields and new photos are saved"
-            >
-              {editingLastJob ? "Loading…" : "Edit Order"}
-            </button>
-            <button
-              type="button"
               onClick={handleReorderLastJob}
-              disabled={reorderingLastJob || editingLastJob}
+              disabled={reorderingLastJob || loadingEditJob}
               style={{
                 flexShrink: 0,
                 padding: "4px 10px",
@@ -2606,6 +2697,26 @@ const handleSaveNewCompany = async () => {
             No submission recorded in this browser yet — after you submit, order # and details appear here.
           </span>
         )}
+        <button
+          type="button"
+          onClick={openEditOrderPicker}
+          disabled={loadingEditJob || reorderingLastJob}
+          style={{
+            flexShrink: 0,
+            marginLeft: lastAcceptedCustomerJob ? 0 : "auto",
+            padding: "4px 10px",
+            fontSize: 11,
+            fontWeight: 600,
+            background: loadingEditJob ? "#fcd34d" : "#d97706",
+            color: "#fff",
+            border: "none",
+            borderRadius: 4,
+            cursor: loadingEditJob ? "wait" : "pointer",
+          }}
+          title="Look up any open (non-complete) order by company and edit it"
+        >
+          {loadingEditJob ? "Loading…" : "Edit Order"}
+        </button>
       </div>
       {isLoadingCatalog && (
         <div
@@ -2708,6 +2819,150 @@ const handleSaveNewCompany = async () => {
           >
             Cancel edit
           </button>
+        </div>
+      )}
+
+      {showEditOrderPicker && (
+        <div
+          className="ms-dialog-overlay"
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            zIndex: 10050,
+            padding: "2rem 1rem",
+            overflowY: "auto",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeEditOrderPicker();
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 10,
+              width: "min(720px, 100%)",
+              padding: "1.25rem 1.5rem",
+              boxShadow: "0 16px 40px rgba(0,0,0,0.25)",
+            }}
+          >
+            <h2 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
+              Edit an open order
+            </h2>
+            <p style={{ marginTop: 0, color: "#4b5563", fontSize: 14 }}>
+              Type a company name, then pick any order that is not complete.
+              Changes save to that existing Google Sheets row — no new order is
+              created.
+            </p>
+            <input
+              list="os-edit-order-company-list"
+              value={editPickerCompany}
+              onChange={handleEditPickerCompanyChange}
+              placeholder="Start typing a company..."
+              autoFocus
+              style={{ width: "100%", maxWidth: 360, padding: "0.5rem", fontSize: "1rem" }}
+            />
+            <datalist id="os-edit-order-company-list">
+              {companies.map((c) => (
+                <option key={c.value} value={c.value} />
+              ))}
+            </datalist>
+            {editPickerLoading && (
+              <p style={{ marginTop: "0.75rem", color: "#6b7280" }}>
+                Loading open orders…
+              </p>
+            )}
+            {!editPickerLoading &&
+              editPickerCompany &&
+              companies.some((c) => c.value === editPickerCompany) &&
+              editPickerJobs.length === 0 && (
+                <p style={{ marginTop: "0.75rem", color: "#6b7280" }}>
+                  No open (non-complete) orders for this company.
+                </p>
+              )}
+            <div style={{ marginTop: "1rem", maxHeight: "55vh", overflowY: "auto" }}>
+              {editPickerJobs.map((job, idx) => {
+                const id = orderIdFromJob(job);
+                return (
+                  <button
+                    key={`${id}-${idx}`}
+                    type="button"
+                    disabled={loadingEditJob}
+                    onClick={() => handleSelectJobToEdit(job)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      width: "100%",
+                      textAlign: "left",
+                      border: "1px solid #d1d5db",
+                      padding: "0.75rem",
+                      borderRadius: 8,
+                      marginBottom: "0.65rem",
+                      gap: "0.85rem",
+                      background: "#fff",
+                      cursor: loadingEditJob ? "wait" : "pointer",
+                    }}
+                  >
+                    <img
+                      src={job.image || ""}
+                      alt=""
+                      style={{
+                        width: 56,
+                        height: 56,
+                        objectFit: "cover",
+                        borderRadius: 6,
+                        background: "#f3f4f6",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0, fontSize: 14 }}>
+                      <strong>{job.Design || "(No Design)"}</strong>
+                      {" — "}
+                      {job.Product || "?"}
+                      <br />
+                      Order #{id || "?"} · Qty {job.Quantity ?? "?"} · Due{" "}
+                      {job["Due Date"] || "?"}
+                      {job["PO #"] || job.PO ? (
+                        <>
+                          {" "}
+                          · PO # {job["PO #"] || job.PO}
+                        </>
+                      ) : null}
+                      <br />
+                      <span style={{ color: "#6b7280", fontSize: 12 }}>
+                        {job.Stage || job.Status || "Open"}
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        padding: "4px 10px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        background: "#d97706",
+                        color: "#fff",
+                        borderRadius: 4,
+                      }}
+                    >
+                      Edit
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={closeEditOrderPicker}
+                style={{ padding: "0.45rem 0.9rem" }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
