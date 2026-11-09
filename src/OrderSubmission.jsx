@@ -413,8 +413,6 @@ export default function OrderSubmission() {
   /** When set, submit patches this existing order instead of creating a new one. */
   const [editingOrderNumber, setEditingOrderNumber] = useState(null);
   const [editingBackOrderNumber, setEditingBackOrderNumber] = useState("");
-  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
-  const [editModalJob, setEditModalJob] = useState(null);
   const [loadingEditJob, setLoadingEditJob] = useState(false);
   /** Company → open-order picker (edit any non-complete order). */
   const [showEditOrderPicker, setShowEditOrderPicker] = useState(false);
@@ -835,8 +833,6 @@ export default function OrderSubmission() {
   const clearEditMode = () => {
     setEditingOrderNumber(null);
     setEditingBackOrderNumber("");
-    setShowEditOrderModal(false);
-    setEditModalJob(null);
     setEditExistingProdThumbs([]);
     setEditExistingPrintThumbs([]);
   };
@@ -936,7 +932,7 @@ export default function OrderSubmission() {
     }, 300);
   };
 
-  /** Load a selected open order into the edit popup + form (patches on Save Changes). */
+  /** Load a selected open order into the submission form (Save Changes patches the sheet). */
   const handleSelectJobToEdit = async (job) => {
     const orderNumber = orderIdFromJob(job);
     if (!orderNumber || loadingEditJob) return;
@@ -949,9 +945,7 @@ export default function OrderSubmission() {
       const fullJob = await loadJobForOrderNumber(orderNumber, company);
       applyJobToFormForEdit(fullJob || job);
       await loadEditExistingThumbnails(fullJob || job);
-      setEditModalJob(fullJob || job);
       closeEditOrderPicker();
-      setShowEditOrderModal(true);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("❌ Failed to load order for edit:", err);
@@ -2697,26 +2691,6 @@ const handleSaveNewCompany = async () => {
             No submission recorded in this browser yet — after you submit, order # and details appear here.
           </span>
         )}
-        <button
-          type="button"
-          onClick={openEditOrderPicker}
-          disabled={loadingEditJob || reorderingLastJob}
-          style={{
-            flexShrink: 0,
-            marginLeft: lastAcceptedCustomerJob ? 0 : "auto",
-            padding: "4px 10px",
-            fontSize: 11,
-            fontWeight: 600,
-            background: loadingEditJob ? "#fcd34d" : "#d97706",
-            color: "#fff",
-            border: "none",
-            borderRadius: 4,
-            cursor: loadingEditJob ? "wait" : "pointer",
-          }}
-          title="Look up any open (non-complete) order by company and edit it"
-        >
-          {loadingEditJob ? "Loading…" : "Edit Order"}
-        </button>
       </div>
       {isLoadingCatalog && (
         <div
@@ -2774,7 +2748,8 @@ const handleSaveNewCompany = async () => {
             <span>(paired #{editingBackOrderNumber})</span>
           ) : null}
           <span style={{ color: "#a16207" }}>
-            Change only what you need — including new photos — then Save Changes.
+            Update the form (including photos), then Save Changes — the existing
+            Google Sheets row, Image, and Preview thumbnail are updated.
           </span>
           <button
             type="button"
@@ -2850,12 +2825,12 @@ const handleSaveNewCompany = async () => {
             }}
           >
             <h2 style={{ marginTop: 0, marginBottom: "0.35rem" }}>
-              Edit an open order
+              Edit Order
             </h2>
             <p style={{ marginTop: 0, color: "#4b5563", fontSize: 14 }}>
-              Type a company name, then pick any order that is not complete.
-              Changes save to that existing Google Sheets row — no new order is
-              created.
+              Search by company, then click <strong>Edit Order</strong> on an
+              open job. It loads into the form below — Save Changes updates that
+              Google Sheets row (including new images / thumbnails).
             </p>
             <input
               list="os-edit-order-company-list"
@@ -2947,7 +2922,7 @@ const handleSaveNewCompany = async () => {
                         borderRadius: 4,
                       }}
                     >
-                      Edit
+                      Edit Order
                     </span>
                   </button>
                 );
@@ -2960,183 +2935,6 @@ const handleSaveNewCompany = async () => {
                 style={{ padding: "0.45rem 0.9rem" }}
               >
                 Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showEditOrderModal && editModalJob && (
-        <div
-          className="ms-dialog-overlay"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.45)",
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "center",
-            zIndex: 10050,
-            padding: "2rem 1rem",
-            overflowY: "auto",
-          }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowEditOrderModal(false);
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 10,
-              width: "min(640px, 100%)",
-              padding: "1.25rem 1.5rem",
-              boxShadow: "0 16px 40px rgba(0,0,0,0.25)",
-            }}
-          >
-            <h2 style={{ marginTop: 0, marginBottom: "0.5rem" }}>
-              Edit Order #{editingOrderNumber}
-            </h2>
-            <p style={{ marginTop: 0, color: "#4b5563", fontSize: 14 }}>
-              Review the current order below. Close this popup, change anything in
-              the form (including photos), then click <strong>Save Changes</strong>.
-              Only fields and photos you change are updated — the rest of the web
-              app refreshes right away.
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gap: 6,
-                fontSize: 14,
-                marginBottom: "0.75rem",
-                padding: "0.75rem",
-                background: "#f9fafb",
-                borderRadius: 8,
-                border: "1px solid #e5e7eb",
-              }}
-            >
-              <div>
-                <strong>Company:</strong> {editModalJob["Company Name"] || "—"}
-              </div>
-              <div>
-                <strong>Design:</strong> {editModalJob["Design"] || "—"}
-              </div>
-              <div>
-                <strong>Product:</strong> {editModalJob["Product"] || "—"}
-              </div>
-              <div>
-                <strong>Qty:</strong> {editModalJob["Quantity"] ?? "—"}
-                {" · "}
-                <strong>Due:</strong> {editModalJob["Due Date"] || "—"}
-              </div>
-              <div>
-                <strong>PO #:</strong>{" "}
-                {editModalJob["PO #"] || editModalJob["PO"] || "—"}
-              </div>
-              {editModalJob["Notes"] ? (
-                <div>
-                  <strong>Notes:</strong> {editModalJob["Notes"]}
-                </div>
-              ) : null}
-            </div>
-            {(editExistingProdThumbs.length > 0 ||
-              editExistingPrintThumbs.length > 0) && (
-              <div style={{ marginBottom: "0.75rem" }}>
-                {editExistingProdThumbs.length > 0 && (
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                      Current production photos
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {editExistingProdThumbs.map((t) => (
-                        <img
-                          key={t.id}
-                          src={t.url}
-                          alt={t.name}
-                          style={{
-                            width: 64,
-                            height: 64,
-                            objectFit: "contain",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: 4,
-                            background: "#f3f4f6",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {editExistingPrintThumbs.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                      Current print photos
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {editExistingPrintThumbs.map((t) => (
-                        <img
-                          key={t.id}
-                          src={t.url}
-                          alt={t.name}
-                          style={{
-                            width: 64,
-                            height: 64,
-                            objectFit: "contain",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: 4,
-                            background: "#f3f4f6",
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                onClick={() => {
-                  clearEditMode();
-                  setForm({
-                    company: "",
-                    designName: "",
-                    quantity: "",
-                    product: "",
-                    price: "",
-                    dueDate: "",
-                    dateType: "Hard Date",
-                    shippingType: "UPS",
-                    salesRep: "",
-                    poNumber: "",
-                    materials: ["", "", "", "", ""],
-                    materialPercents: ["", "", "", "", ""],
-                    backMaterial: "",
-                    embBacking: "Cut Away",
-                    furColor: "",
-                    notes: "",
-                  });
-                  setProdFiles([]);
-                  setPrintFiles([]);
-                  setProdPreviews([]);
-                  setPrintPreviews([]);
-                }}
-                style={{ padding: "0.45rem 0.9rem" }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowEditOrderModal(false)}
-                style={{
-                  padding: "0.45rem 0.9rem",
-                  background: "#d97706",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 4,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Edit in form
               </button>
             </div>
           </div>
@@ -4037,7 +3835,7 @@ const handleSaveNewCompany = async () => {
         )}
 
 
-        <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem", display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+        <div style={{ gridColumn: "2 / 3", textAlign: "right", marginBottom: "0.5rem", display: "flex", justifyContent: "flex-end", gap: "0.5rem", flexWrap: "wrap" }}>
           <button
             type="button"
             onClick={() => navigate("/order-confirmation")}
@@ -4052,6 +3850,23 @@ const handleSaveNewCompany = async () => {
             }}
           >
             Create Order Confirmation
+          </button>
+          <button
+            type="button"
+            onClick={openEditOrderPicker}
+            disabled={loadingEditJob || reorderingLastJob}
+            style={{
+              padding: "0.25rem 0.5rem",
+              fontSize: "0.8rem",
+              background: loadingEditJob ? "#fcd34d" : "#d97706",
+              color: "#fff",
+              border: "none",
+              borderRadius: "3px",
+              cursor: loadingEditJob ? "wait" : "pointer",
+            }}
+            title="Search by company, then open any non-complete order to edit"
+          >
+            {loadingEditJob ? "Loading…" : "Edit Order"}
           </button>
           <button
             type="button"
