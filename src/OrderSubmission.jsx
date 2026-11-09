@@ -273,6 +273,26 @@ export default function OrderSubmission() {
   const [jrPresentationBusy, setJrPresentationBusy] = useState(false);
   /** Selected designId from a multi-page JR presentation (one flat per order). */
   const [jrSelectedDesignId, setJrSelectedDesignId] = useState("");
+
+  const applyJrPresentationDesign = (design) => {
+    const id = String(design?.designId || "");
+    if (!id) return;
+    setJrSelectedDesignId(id);
+    setOrderHasPrint(true);
+    const productType = String(design?.productType || "").trim();
+    if (!productType) return;
+    // Prefer an existing catalog product that contains this type (e.g. driver → "Driver Cover")
+    const names = Array.isArray(productNames) ? productNames : [];
+    const needle = productType.replace(/_/g, " ").toLowerCase();
+    const match =
+      names.find((p) => String(p).toLowerCase() === needle) ||
+      names.find((p) => String(p).toLowerCase().includes(needle)) ||
+      null;
+    setForm((prev) => {
+      if (String(prev.product || "").trim()) return prev;
+      return { ...prev, product: match || productType };
+    });
+  };
   
   // Track preview URLs for cleanup on unmount
   const prodPreviewUrlsRef = useRef(new Set());
@@ -1482,12 +1502,11 @@ const companyNames = companies.map((opt) => opt.value);
           setJrPresentationInfo(lastInfo);
           const designs = Array.isArray(lastInfo.designs) ? lastInfo.designs : [];
           const resolvable = designs.filter((d) => d && d.idKind === "drive");
-          // Auto-pick when only one Drive-resolvable design; otherwise ask.
-          setJrSelectedDesignId(
-            resolvable.length === 1 ? String(resolvable[0].designId || "") : ""
-          );
-          if (resolvable.length) {
-            setOrderHasPrint(true);
+          // Multi-page PDF = one order per page. Never auto-attach every flat.
+          if (resolvable.length === 1) {
+            applyJrPresentationDesign(resolvable[0]);
+          } else {
+            setJrSelectedDesignId("");
           }
         }
       } catch (err) {
@@ -4310,7 +4329,7 @@ const handleSaveNewCompany = async () => {
           )}
           {!isNeedlepoint && (
             <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
-              JR presentation PDF: attaches immutable flat PNG(s) from Drive on submit (page JPEGs are proof only).
+              JR presentation PDF: each page is a separate order. Pick one design below; only that flat PNG attaches (page JPEGs are proof only).
             </div>
           )}
           {jrPresentationBusy && (
@@ -4321,41 +4340,52 @@ const handleSaveNewCompany = async () => {
           {jrPresentationInfo && Array.isArray(jrPresentationInfo.designs) && (
             <div
               style={{
-                fontSize: "0.85rem",
-                marginBottom: "0.5rem",
-                padding: "0.5rem 0.65rem",
-                borderRadius: 6,
-                border: `1px solid ${
-                  jrPresentationInfo.designs.some((d) => d.idKind === "drive")
-                    ? "#bbf7d0"
-                    : "#fecaca"
+                fontSize: "0.9rem",
+                marginBottom: "0.75rem",
+                padding: "0.75rem 0.85rem",
+                borderRadius: 8,
+                border: `2px solid ${
+                  jrSelectedDesignId
+                    ? "#86efac"
+                    : jrPresentationInfo.designs.some((d) => d.idKind === "drive")
+                      ? "#fbbf24"
+                      : "#fecaca"
                 }`,
-                background: jrPresentationInfo.designs.some((d) => d.idKind === "drive")
+                background: jrSelectedDesignId
                   ? "#f0fdf4"
-                  : "#fef2f2",
-                color: jrPresentationInfo.designs.some((d) => d.idKind === "drive")
-                  ? "#14532d"
-                  : "#7f1d1d",
+                  : jrPresentationInfo.designs.some((d) => d.idKind === "drive")
+                    ? "#fffbeb"
+                    : "#fef2f2",
+                color: "#111827",
               }}
             >
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                JR presentation
-                {jrPresentationInfo.filename ? ` — ${jrPresentationInfo.filename}` : ""}
-                {": choose which design’s flat PNG to attach"}
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                Which design is this order?
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ fontSize: "0.82rem", color: "#4b5563", marginBottom: 10 }}>
+                {jrPresentationInfo.filename ? `${jrPresentationInfo.filename} · ` : ""}
+                {jrPresentationInfo.designs.length} page
+                {jrPresentationInfo.designs.length === 1 ? "" : "s"} in this PDF — submit
+                one order per page. Only the selected flat PNG goes to Print Files.
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {jrPresentationInfo.designs.map((d, i) => {
                   const id = String(d.designId || "");
                   const disabled = d.idKind !== "drive";
+                  const selected = jrSelectedDesignId === id;
                   return (
                     <label
                       key={id || i}
                       style={{
                         display: "flex",
                         alignItems: "flex-start",
-                        gap: 8,
+                        gap: 10,
+                        padding: "0.55rem 0.65rem",
+                        borderRadius: 6,
+                        border: `1px solid ${selected ? "#16a34a" : "#d1d5db"}`,
+                        background: selected ? "#dcfce7" : "#fff",
                         cursor: disabled ? "not-allowed" : "pointer",
-                        opacity: disabled ? 0.7 : 1,
+                        opacity: disabled ? 0.65 : 1,
                       }}
                     >
                       <input
@@ -4363,28 +4393,45 @@ const handleSaveNewCompany = async () => {
                         name="jrPresentationDesign"
                         value={id}
                         disabled={disabled}
-                        checked={jrSelectedDesignId === id}
-                        onChange={() => setJrSelectedDesignId(id)}
-                        style={{ marginTop: 2 }}
+                        checked={selected}
+                        onChange={() => applyJrPresentationDesign(d)}
+                        style={{ marginTop: 3 }}
                       />
                       <span>
-                        Page {d.page}
-                        {d.productType ? ` · ${d.productType}` : ""}
-                        {d.idKind === "local"
-                          ? " — local: id (no Drive upload)"
-                          : d.flatPngDriveFileId
-                            ? ` · Drive ${String(d.flatPngDriveFileId).slice(0, 10)}…`
-                            : ""}
-                        {d.error ? (
-                          <span style={{ display: "block", marginTop: 2 }}>{d.error}</span>
-                        ) : null}
+                        <strong>
+                          Page {d.page}
+                          {d.productType ? ` · ${String(d.productType).replace(/_/g, " ")}` : ""}
+                        </strong>
+                        {d.idKind === "local" ? (
+                          <span style={{ display: "block", marginTop: 2, color: "#b91c1c" }}>
+                            Flat not on Drive — re-export or attach PNG manually
+                          </span>
+                        ) : d.error ? (
+                          <span style={{ display: "block", marginTop: 2, color: "#b91c1c" }}>
+                            {d.error}
+                          </span>
+                        ) : selected ? (
+                          <span style={{ display: "block", marginTop: 2, color: "#166534" }}>
+                            This order will use this flat PNG only
+                          </span>
+                        ) : (
+                          <span style={{ display: "block", marginTop: 2, color: "#6b7280" }}>
+                            Select for this order
+                          </span>
+                        )}
                       </span>
                     </label>
                   );
                 })}
               </div>
+              {!jrSelectedDesignId &&
+                jrPresentationInfo.designs.some((d) => d.idKind === "drive") && (
+                  <div style={{ marginTop: 8, fontWeight: 600, color: "#92400e" }}>
+                    Select one design before submitting.
+                  </div>
+                )}
               {!jrPresentationInfo.designs.some((d) => d.idKind === "drive") && (
-                <div style={{ marginTop: 6 }}>
+                <div style={{ marginTop: 8, color: "#7f1d1d" }}>
                   Re-export after Drive is configured, or attach the flat PNG manually under Print Files.
                 </div>
               )}
