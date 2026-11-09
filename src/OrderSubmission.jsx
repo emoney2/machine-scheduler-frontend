@@ -355,16 +355,22 @@ export default function OrderSubmission() {
 
     const productType = String(design?.productType || "").trim();
     if (!productType) return;
-    // Prefer an existing catalog product that contains this type (e.g. driver → "Driver Cover")
+    // Presentation productType is a 3D template id (e.g. "driver"), NOT the order SKU
+    // (Quilted Driver vs Barrel Driver vs Driver Full…). Only fill Product when the
+    // catalog match is unambiguous — never guess the first alphabetical "…Driver".
     const names = Array.isArray(productNames) ? productNames : [];
-    const needle = productType.replace(/_/g, " ").toLowerCase();
-    const match =
-      names.find((p) => String(p).toLowerCase() === needle) ||
-      names.find((p) => String(p).toLowerCase().includes(needle)) ||
-      null;
+    const needle = productType.replace(/_/g, " ").toLowerCase().trim();
+    if (!needle) return;
+    const exact =
+      names.find((p) => String(p).toLowerCase() === needle) || null;
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const wordRe = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, "i");
+    const fuzzy = names.filter((p) => wordRe.test(String(p)));
+    const match = exact || (fuzzy.length === 1 ? fuzzy[0] : null);
+    if (!match) return;
     setForm((prev) => {
       if (String(prev.product || "").trim()) return prev;
-      return { ...prev, product: match || productType };
+      return { ...prev, product: match };
     });
   };
 
