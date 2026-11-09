@@ -273,27 +273,65 @@ export default function OrderSubmission() {
   const [jrPresentationBusy, setJrPresentationBusy] = useState(false);
   /** Selected designId from a multi-page JR presentation (one flat per order). */
   const [jrSelectedDesignId, setJrSelectedDesignId] = useState("");
+  /** Tile picker modal after Choose Files → Open on a JR presentation PDF. */
+  const [jrTilePickerOpen, setJrTilePickerOpen] = useState(false);
+  const [jrFlatPreviewBusy, setJrFlatPreviewBusy] = useState(false);
+  // Track preview URLs for cleanup on unmount (declared before applyJr… uses it)
+  const prodPreviewUrlsRef = useRef(new Set());
+  const printPreviewUrlsRef = useRef(new Set());
 
-  const applyJrPresentationDesign = (design) => {
+  const applyJrPresentationDesign = async (design) => {
     const id = String(design?.designId || "");
     if (!id) return;
     setJrSelectedDesignId(id);
     setOrderHasPrint(true);
 
-    // Production preview should show the immutable flat PNG, not the multi-page PDF.
+    const flatName =
+      design.suggestedFilename ||
+      `${String(design.productType || "design").replace(/_/g, "-")}-flat.png`;
     const driveId = String(design?.flatPngDriveFileId || "").trim();
+    const pageThumb = String(design?.pageThumbDataUrl || "").trim();
+
+    // Production preview should show the immutable flat PNG, not the multi-page PDF.
+    let previewUrl = "";
+    let previewType = "image/png";
     if (design?.idKind === "drive" && driveId && !/^local:/i.test(driveId)) {
-      const flatName =
-        design.suggestedFilename ||
-        `${String(design.productType || "design").replace(/_/g, "-")}-flat.png`;
-      // Authenticated thumb proxy (same-origin cookie) — SA flats are not public.
-      const previewUrl = `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(
-        driveId
-      )}&sz=w640`;
+      setJrFlatPreviewBusy(true);
+      try {
+        const res = await axios.get(`${API_ROOT}/jrco-presentation/flat-preview`, {
+          params: { fileId: driveId, sz: "w640" },
+          responseType: "blob",
+          withCredentials: true,
+          validateStatus: (s) => s < 500,
+        });
+        const ctype = String(res.headers?.["content-type"] || res.data?.type || "");
+        if (
+          res.status === 200 &&
+          res.data &&
+          res.data.size > 0 &&
+          /^image\//i.test(ctype)
+        ) {
+          previewUrl = URL.createObjectURL(res.data);
+          prodPreviewUrlsRef.current.add(previewUrl);
+          previewType = ctype || "image/jpeg";
+        }
+      } catch (err) {
+        console.warn("JR flat preview fetch failed:", err);
+      } finally {
+        setJrFlatPreviewBusy(false);
+      }
+    }
+    // Fall back to the PDF page tile so the preview is never a broken <img>.
+    if (!previewUrl && pageThumb) {
+      previewUrl = pageThumb;
+      previewType = "image/jpeg";
+    }
+
+    if (previewUrl) {
       setProdPreviews((prev) => {
         const nextPreview = {
           url: previewUrl,
-          type: "image/png",
+          type: previewType,
           name: flatName,
           jrPresentationFlat: true,
           designId: id,
@@ -329,10 +367,7 @@ export default function OrderSubmission() {
       return { ...prev, product: match || productType };
     });
   };
-  
-  // Track preview URLs for cleanup on unmount
-  const prodPreviewUrlsRef = useRef(new Set());
-  const printPreviewUrlsRef = useRef(new Set());
+
   const location = useLocation();
   const reorderJob = location.state?.reorderJob;
   const navigate = useNavigate();
@@ -1534,16 +1569,43 @@ const companyNames = companies.map((opt) => opt.value);
           const info = await inspectJrPresentationPdf(pdf);
           if (info) lastInfo = info;
         }
-        if (lastInfo) {
+        if (lastInfo && Array.isArray(lastInfo.designs) && lastInfo.designs.length) {
           setJrPresentationInfo(lastInfo);
-          const designs = Array.isArray(lastInfo.designs) ? lastInfo.designs : [];
-          const resolvable = designs.filter((d) => d && d.idKind === "drive");
-          // Multi-page PDF = one order per page. Never auto-attach every flat.
-          if (resolvable.length === 1) {
-            applyJrPresentationDesign(resolvable[0]);
-          } else {
-            setJrSelectedDesignId("");
+          setJrSelectedDesignId("");
+          // Drop PDF blob previews — user picks a page tile, then we show the flat PNG.
+          const jrNames = new Set(
+            pdfCandidates.map((f) => String(f.name || "").toLowerCase())
+          );
+          previewSetter((prev) =>
+            prev.filter((p) => {
+              const n = String(p.name || "").toLowerCase();
+              const isPdf =
+                p.type === "application/pdf" || n.endsWith(".pdf");
+              if (!isPdf) return true;
+              return !jrNames.has(n);
+            })
+          );
+          // Prefill Company Name from PDF stem when empty
+          // e.g. "Denver Country Club 2026-11-09.pdf" → "Denver Country Club"
+          const stem = String(lastInfo.filename || "")
+            .replace(/\.pdf$/i, "")
+            .replace(/\s+\d{4}-\d{2}-\d{2}.*$/i, "")
+            .replace(/\s+-\s+\d{4}.*$/i, "")
+            .trim();
+          if (stem) {
+            setForm((prev) => {
+              if (String(prev.company || "").trim()) return prev;
+              const names = Array.isArray(companyNames) ? companyNames : [];
+              const lower = stem.toLowerCase();
+              const match =
+                names.find((c) => String(c).toLowerCase() === lower) ||
+                names.find((c) => String(c).toLowerCase().includes(lower)) ||
+                names.find((c) => lower.includes(String(c).toLowerCase())) ||
+                stem;
+              return { ...prev, company: match };
+            });
           }
+          setJrTilePickerOpen(true);
         }
       } catch (err) {
         console.warn("JR presentation inspect failed:", err);
@@ -4365,12 +4427,17 @@ const handleSaveNewCompany = async () => {
           )}
           {!isNeedlepoint && (
             <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#6b7280" }}>
-              JR presentation PDF: each page is a separate order. Pick one design below; only that flat PNG attaches (page JPEGs are proof only).
+              JR presentation PDF: after Open, pick a page tile — that page’s flat PNG becomes the production preview (one order per page).
             </div>
           )}
           {jrPresentationBusy && (
             <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#4338ca" }}>
-              Reading JR presentation manifest…
+              Reading JR presentation pages…
+            </div>
+          )}
+          {jrFlatPreviewBusy && (
+            <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem", color: "#4338ca" }}>
+              Loading flat PNG preview…
             </div>
           )}
           {jrPresentationInfo && Array.isArray(jrPresentationInfo.designs) && (
@@ -4378,7 +4445,7 @@ const handleSaveNewCompany = async () => {
               style={{
                 fontSize: "0.9rem",
                 marginBottom: "0.75rem",
-                padding: "0.75rem 0.85rem",
+                padding: "0.65rem 0.85rem",
                 borderRadius: 8,
                 border: `2px solid ${
                   jrSelectedDesignId
@@ -4393,81 +4460,52 @@ const handleSaveNewCompany = async () => {
                     ? "#fffbeb"
                     : "#fef2f2",
                 color: "#111827",
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: 10,
               }}
             >
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                Which design is this order?
+              <div style={{ flex: "1 1 180px" }}>
+                <div style={{ fontWeight: 700 }}>
+                  {jrSelectedDesignId
+                    ? (() => {
+                        const d = jrPresentationInfo.designs.find(
+                          (x) => String(x.designId || "") === String(jrSelectedDesignId)
+                        );
+                        return d
+                          ? `Selected: page ${d.page}${
+                              d.productType
+                                ? ` · ${String(d.productType).replace(/_/g, " ")}`
+                                : ""
+                            }`
+                          : "Design selected";
+                      })()
+                    : "Choose a page tile for this order"}
+                </div>
+                <div style={{ fontSize: "0.82rem", color: "#4b5563", marginTop: 2 }}>
+                  {jrPresentationInfo.filename ? `${jrPresentationInfo.filename} · ` : ""}
+                  {jrPresentationInfo.designs.length} page
+                  {jrPresentationInfo.designs.length === 1 ? "" : "s"}
+                </div>
               </div>
-              <div style={{ fontSize: "0.82rem", color: "#4b5563", marginBottom: 10 }}>
-                {jrPresentationInfo.filename ? `${jrPresentationInfo.filename} · ` : ""}
-                {jrPresentationInfo.designs.length} page
-                {jrPresentationInfo.designs.length === 1 ? "" : "s"} in this PDF — submit
-                one order per page. Only the selected flat PNG goes to Print Files.
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {jrPresentationInfo.designs.map((d, i) => {
-                  const id = String(d.designId || "");
-                  const disabled = d.idKind !== "drive";
-                  const selected = jrSelectedDesignId === id;
-                  return (
-                    <label
-                      key={id || i}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 10,
-                        padding: "0.55rem 0.65rem",
-                        borderRadius: 6,
-                        border: `1px solid ${selected ? "#16a34a" : "#d1d5db"}`,
-                        background: selected ? "#dcfce7" : "#fff",
-                        cursor: disabled ? "not-allowed" : "pointer",
-                        opacity: disabled ? 0.65 : 1,
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="jrPresentationDesign"
-                        value={id}
-                        disabled={disabled}
-                        checked={selected}
-                        onChange={() => applyJrPresentationDesign(d)}
-                        style={{ marginTop: 3 }}
-                      />
-                      <span>
-                        <strong>
-                          Page {d.page}
-                          {d.productType ? ` · ${String(d.productType).replace(/_/g, " ")}` : ""}
-                        </strong>
-                        {d.idKind === "local" ? (
-                          <span style={{ display: "block", marginTop: 2, color: "#b91c1c" }}>
-                            Flat not on Drive — re-export or attach PNG manually
-                          </span>
-                        ) : d.error ? (
-                          <span style={{ display: "block", marginTop: 2, color: "#b91c1c" }}>
-                            {d.error}
-                          </span>
-                        ) : selected ? (
-                          <span style={{ display: "block", marginTop: 2, color: "#166534" }}>
-                            This order will use this flat PNG only
-                          </span>
-                        ) : (
-                          <span style={{ display: "block", marginTop: 2, color: "#6b7280" }}>
-                            Select for this order
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-              {!jrSelectedDesignId &&
-                jrPresentationInfo.designs.some((d) => d.idKind === "drive") && (
-                  <div style={{ marginTop: 8, fontWeight: 600, color: "#92400e" }}>
-                    Select one design before submitting.
-                  </div>
-                )}
+              <button
+                type="button"
+                onClick={() => setJrTilePickerOpen(true)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #1d4ed8",
+                  background: "#2563eb",
+                  color: "#fff",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {jrSelectedDesignId ? "Change page" : "Pick page"}
+              </button>
               {!jrPresentationInfo.designs.some((d) => d.idKind === "drive") && (
-                <div style={{ marginTop: 8, color: "#7f1d1d" }}>
+                <div style={{ flexBasis: "100%", color: "#7f1d1d", fontSize: "0.85rem" }}>
                   Re-export after Drive is configured, or attach the flat PNG manually under Print Files.
                 </div>
               )}
@@ -4696,6 +4734,198 @@ const handleSaveNewCompany = async () => {
         {materialNames.map((m) => <option key={m} value={m} />)}
       </datalist>
       {/* ─────────────────────────────────────────────────────────────────── */}
+
+      {jrTilePickerOpen &&
+        jrPresentationInfo &&
+        Array.isArray(jrPresentationInfo.designs) && (
+          <div
+            className="ms-dialog-overlay"
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.55)",
+              zIndex: 10006,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "12px",
+              boxSizing: "border-box",
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="jr-tile-picker-title"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && jrSelectedDesignId) {
+                setJrTilePickerOpen(false);
+              }
+            }}
+          >
+            <div
+              style={{
+                background: "#fafafa",
+                borderRadius: 14,
+                width: "min(920px, 100%)",
+                maxHeight: "min(92vh, 820px)",
+                padding: "16px 18px 14px",
+                boxShadow: "0 16px 48px rgba(0,0,0,0.28)",
+                border: "1px solid #e5e7eb",
+                overflow: "auto",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <h3
+                    id="jr-tile-picker-title"
+                    style={{
+                      margin: 0,
+                      fontSize: 18,
+                      fontWeight: 700,
+                      color: "#1e3a8a",
+                    }}
+                  >
+                    Pick a design for this order
+                  </h3>
+                  <p style={{ margin: "6px 0 0", fontSize: 13, color: "#4b5563" }}>
+                    {jrPresentationInfo.filename
+                      ? `${jrPresentationInfo.filename} — `
+                      : ""}
+                    each tile is one PDF page. Selecting a tile loads that page’s
+                    production flat PNG as the preview.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setJrTilePickerOpen(false)}
+                  aria-label="Close"
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    fontSize: 22,
+                    lineHeight: 1,
+                    cursor: "pointer",
+                    color: "#6b7280",
+                    padding: 4,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {jrPresentationInfo.designs.map((d, i) => {
+                  const id = String(d.designId || "");
+                  const disabled = d.idKind !== "drive";
+                  const selected = jrSelectedDesignId === id;
+                  const thumb =
+                    d.pageThumbDataUrl ||
+                    (Array.isArray(jrPresentationInfo.pageTiles)
+                      ? jrPresentationInfo.pageTiles.find(
+                          (t) => Number(t.page) === Number(d.page)
+                        )?.thumbDataUrl
+                      : "") ||
+                    "";
+                  return (
+                    <button
+                      key={id || i}
+                      type="button"
+                      disabled={disabled || jrFlatPreviewBusy}
+                      onClick={async () => {
+                        await applyJrPresentationDesign(d);
+                        setJrTilePickerOpen(false);
+                      }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "stretch",
+                        gap: 8,
+                        padding: 10,
+                        borderRadius: 10,
+                        border: `2px solid ${
+                          selected ? "#16a34a" : disabled ? "#fecaca" : "#d1d5db"
+                        }`,
+                        background: selected ? "#ecfdf5" : "#fff",
+                        cursor: disabled || jrFlatPreviewBusy ? "not-allowed" : "pointer",
+                        opacity: disabled ? 0.6 : 1,
+                        textAlign: "left",
+                      }}
+                    >
+                      <div
+                        style={{
+                          aspectRatio: "1 / 1",
+                          borderRadius: 8,
+                          background: "#f3f4f6",
+                          border: "1px solid #e5e7eb",
+                          overflow: "hidden",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt={`Page ${d.page}`}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                            }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 13, color: "#9ca3af" }}>
+                            Page {d.page}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>
+                          Page {d.page}
+                          {d.productType
+                            ? ` · ${String(d.productType).replace(/_/g, " ")}`
+                            : ""}
+                        </div>
+                        {disabled ? (
+                          <div style={{ fontSize: 12, color: "#b91c1c", marginTop: 2 }}>
+                            {d.error || "Flat not on Drive"}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                            Use this flat PNG
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {!jrSelectedDesignId && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#92400e",
+                  }}
+                >
+                  Select a tile to continue — required before submit.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
       {showOrderShipAddressModal && (
         <div
