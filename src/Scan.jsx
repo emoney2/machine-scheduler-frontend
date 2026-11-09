@@ -1,7 +1,7 @@
 // src/Scan.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { API_ROOT } from "./apiRoot";
+import { API_ROOT, driveThumbnailSrc } from "./apiRoot";
 
 const requestCache = {};
 
@@ -929,12 +929,7 @@ function Img({ src, style, tint, label, product, furColor }) {
 
   function toThumbnail(url) {
     try {
-      const s = String(url);
-      const m = s.match(/\/d\/([A-Za-z0-9_-]+)/);
-      if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
-      const m2 = s.match(/id=([A-Za-z0-9_-]+)/);
-      if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w400`;
-      return s;
+      return driveThumbnailSrc(url, "w400") || String(url || "");
     } catch {
       return url;
     }

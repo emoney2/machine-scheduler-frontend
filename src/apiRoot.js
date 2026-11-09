@@ -23,6 +23,34 @@ export function getApiRoot() {
 
 export const API_ROOT = getApiRoot();
 
+/**
+ * Build a browser-safe Drive thumbnail URL via our backend proxy.
+ * Public drive.google.com/thumbnail fails for private / shared-drive JR flats.
+ * Accepts a raw Drive file id, Drive link, IMAGE() formula, or existing thumb URL.
+ */
+export function driveThumbnailSrc(fileIdOrUrl, sz = "w160") {
+  if (!fileIdOrUrl) return "";
+  const raw = String(fileIdOrUrl).trim();
+  if (!raw) return "";
+  let id = "";
+  try {
+    const m =
+      raw.match(/[?&]fileId=([A-Za-z0-9_-]{10,})/i) ||
+      raw.match(/[?&]id=([A-Za-z0-9_-]{10,})/) ||
+      raw.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/) ||
+      raw.match(/\/d\/([A-Za-z0-9_-]{10,})/);
+    if (m) id = m[1];
+    else if (/^[A-Za-z0-9_-]{12,}$/.test(raw)) id = raw;
+  } catch (_) {}
+  if (!id) {
+    // Already a non-Drive absolute image URL
+    if (/^https?:\/\//i.test(raw) && !/drive\.google\.com/i.test(raw)) return raw;
+    return "";
+  }
+  const size = String(sz || "w160").trim() || "w160";
+  return `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(id)}&sz=${encodeURIComponent(size)}`;
+}
+
 export function getBackendOrigin() {
   const root = getApiRoot();
   if (root.startsWith("http")) return root.replace(/\/api$/, "");

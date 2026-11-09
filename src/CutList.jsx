@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
-import { API_ROOT } from "./apiRoot";
+import { API_ROOT, driveThumbnailSrc } from "./apiRoot";
 import { socket } from "./socketClient";
 
 
@@ -54,8 +54,10 @@ function orderThumbUrl(order) {
   ];
   for (const f of fields) {
     const id = extractFileIdFromFormulaOrUrl(f);
-    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
-    if (f && /^https?:\/\//i.test(String(f))) return String(f);
+    if (id) return driveThumbnailSrc(id) || "";
+    if (f && /^https?:\/\//i.test(String(f))) {
+      return driveThumbnailSrc(f) || String(f);
+    }
   }
   return "";
 }

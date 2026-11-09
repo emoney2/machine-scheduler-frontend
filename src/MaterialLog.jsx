@@ -1,7 +1,7 @@
 // src/MaterialLog.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { API_ROOT } from "./apiRoot";
+import { API_ROOT, driveThumbnailSrc } from "./apiRoot";
 
 
 // Extract a Drive file ID from any Drive URL
@@ -133,10 +133,10 @@ function getPreviewUrl(obj) {
   const fromLnk = extractUrlFromHyperlinkFormula(raw);
   let url = (fromImg || fromLnk || raw).trim();
 
-  // If it's a Google Drive URL, use the PUBLIC Google thumbnail (no auth needed) as primary.
+  // Google Drive → authenticated backend proxy (public thumbs fail for JR flats)
   if (/^https?:\/\/(drive\.google\.com|docs\.google\.com)\//i.test(url)) {
     const id = driveIdFromUrl(url);
-    if (id) return drivePublicThumbUrl(id, 240); // e.g., https://drive.google.com/thumbnail?id=...&sz=w240
+    if (id) return driveThumbnailSrc(id, "w240");
   }
 
   // Otherwise use the URL directly
@@ -147,7 +147,7 @@ function getPreviewUrl(obj) {
 // --- NEW: resilient preview helpers + component ---
 function drivePublicThumbUrl(id, size = 200) {
   if (!id) return "";
-  return `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${size}`;
+  return driveThumbnailSrc(id, `w${size}`) || "";
 }
 
 function addCacheBuster(u) {

@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import { socket } from "./socketClient";
-import { API_ROOT } from "./apiRoot";
+import { API_ROOT, driveThumbnailSrc } from "./apiRoot";
 import { supabase } from "./supabaseClient";
 import {
   loadPersistedThreadConflicts,
@@ -633,7 +633,9 @@ function getJobThumbUrl(job, ROOT) {
     const id = extractFileIdFromFormulaOrUrl(idOrUrl);
     if (id) return proxyForId(id);
     const s = String(idOrUrl);
-    if (/^https?:\/\//i.test(s)) return s;      // already a URL (server-provided)
+    // Rewrite public Drive thumbs / Drive links through our proxy
+    if (/drive\.google\.com/i.test(s)) return driveThumbnailSrc(s) || null;
+    if (/^https?:\/\//i.test(s)) return s;      // already a non-Drive URL
     if (/^[A-Za-z0-9_-]{12,}$/.test(s)) return proxyForId(s);
     return null;
   };
@@ -1042,11 +1044,7 @@ function isJobInTimeWindow(job, daysWindowNum) {
   return days <= daysWindowNum;
 }
 function deriveThumb(link) {
-  const s = String(link || "");
-  let id = "";
-  if (s.includes("id=")) id = s.split("id=")[1].split("&")[0];
-  else if (s.includes("/file/d/")) id = s.split("/file/d/")[1].split("/")[0];
-  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w160` : "";
+  return driveThumbnailSrc(link) || "";
 }
 function ringColorByShipDate(shipDate) {
   // Handle both "Ship Date" string or the actual field value

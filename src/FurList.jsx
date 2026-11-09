@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import axios from "axios";
-import { API_ROOT } from "./apiRoot";
+import { API_ROOT, driveThumbnailSrc } from "./apiRoot";
 import { socket } from "./socketClient";
 
 // ---------- Config ----------
@@ -74,9 +74,11 @@ function extractFileIdFromFormulaOrUrl(v) {
 }
 
 function orderThumbUrl(order) {
-  // Prefer direct server-provided URL if any
+  // Prefer direct server-provided URL if any (rewrite public Drive thumbs → proxy)
   const direct = firstField(order, ["imageUrl", "image", "thumbnail", "imageURL", "thumbnailUrl"]);
-  if (direct && /^https?:\/\//i.test(String(direct))) return direct;
+  if (direct && /^https?:\/\//i.test(String(direct))) {
+    return driveThumbnailSrc(direct) || direct;
+  }
 
   // Extract a Drive file id from formula or any field in the row
   const previewLike = firstField(order, ["Preview", "preview", "PreviewFormula", "previewFormula"]) || "";
@@ -90,7 +92,7 @@ function orderThumbUrl(order) {
   }
   if (!id) return null;
 
-  return `https://drive.google.com/thumbnail?id=${id}&sz=w160`;
+  return driveThumbnailSrc(id) || null;
 }
 
 

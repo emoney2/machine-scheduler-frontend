@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import { API_ROOT } from "./apiRoot";
+import { API_ROOT, driveThumbnailSrc } from "./apiRoot";
 
 
 function formatMoney(value) {
@@ -525,7 +525,7 @@ export default function OrderConfirmationPage() {
               >
                 {job.image ? (
                   <img
-                    src={job.image}
+                    src={driveThumbnailSrc(job.image) || job.image}
                     alt=""
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                   />
