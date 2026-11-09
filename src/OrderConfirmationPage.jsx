@@ -523,9 +523,13 @@ export default function OrderConfirmationPage() {
                   background: isSelected ? "rgba(255,255,255,0.15)" : "#f9fafb",
                 }}
               >
-                {job.image ? (
+                {(job.imageFileId || job.image || job.Image) ? (
                   <img
-                    src={driveThumbnailSrc(job.image) || job.image}
+                    src={
+                      driveThumbnailSrc(job.imageFileId || job.image || job.Image) ||
+                      job.image ||
+                      ""
+                    }
                     alt=""
                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                   />
