@@ -279,6 +279,42 @@ export default function OrderSubmission() {
     if (!id) return;
     setJrSelectedDesignId(id);
     setOrderHasPrint(true);
+
+    // Production preview should show the immutable flat PNG, not the multi-page PDF.
+    const driveId = String(design?.flatPngDriveFileId || "").trim();
+    if (design?.idKind === "drive" && driveId && !/^local:/i.test(driveId)) {
+      const flatName =
+        design.suggestedFilename ||
+        `${String(design.productType || "design").replace(/_/g, "-")}-flat.png`;
+      // Authenticated thumb proxy (same-origin cookie) — SA flats are not public.
+      const previewUrl = `${API_ROOT}/drive/thumbnail?fileId=${encodeURIComponent(
+        driveId
+      )}&sz=w640`;
+      setProdPreviews((prev) => {
+        const nextPreview = {
+          url: previewUrl,
+          type: "image/png",
+          name: flatName,
+          jrPresentationFlat: true,
+          designId: id,
+          productType: design.productType || "",
+          page: design.page,
+        };
+        if (!prev.length) return [nextPreview];
+        let replaced = false;
+        const mapped = prev.map((p) => {
+          const isJrPdfOrFlat =
+            p.jrPresentationFlat ||
+            p.type === "application/pdf" ||
+            String(p.name || "").toLowerCase().endsWith(".pdf");
+          if (!isJrPdfOrFlat) return p;
+          replaced = true;
+          return nextPreview;
+        });
+        return replaced ? mapped : [...mapped, nextPreview];
+      });
+    }
+
     const productType = String(design?.productType || "").trim();
     if (!productType) return;
     // Prefer an existing catalog product that contains this type (e.g. driver → "Driver Cover")
@@ -4438,7 +4474,21 @@ const handleSaveNewCompany = async () => {
             </div>
           )}
           <div style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>
-            {prodFiles.map((f) => f.name).join(", ")}
+            {jrSelectedDesignId &&
+            Array.isArray(jrPresentationInfo?.designs) &&
+            jrPresentationInfo.designs.some(
+              (d) => String(d.designId || "") === String(jrSelectedDesignId)
+            )
+              ? (() => {
+                  const d = jrPresentationInfo.designs.find(
+                    (x) => String(x.designId || "") === String(jrSelectedDesignId)
+                  );
+                  return (
+                    d?.suggestedFilename ||
+                    `${String(d?.productType || "design").replace(/_/g, "-")}-flat.png`
+                  );
+                })()
+              : prodFiles.map((f) => f.name).join(", ")}
           </div>
 
           <fieldset style={{ padding: "0.5rem", height: "50%" }}>
@@ -4471,10 +4521,13 @@ const handleSaveNewCompany = async () => {
                         alt={p.name}
                         style={{
                           maxWidth: "100%",
-                          maxHeight: p.studioPackage ? 140 : 80,
+                          maxHeight: p.studioPackage || p.jrPresentationFlat ? 140 : 80,
                           objectFit: "contain",
                           display: "block",
-                          background: p.studioPackage ? "#f3f4f6" : "transparent",
+                          background:
+                            p.studioPackage || p.jrPresentationFlat
+                              ? "#f3f4f6"
+                              : "transparent",
                           borderRadius: 4,
                         }}
                       />
@@ -4484,6 +4537,15 @@ const handleSaveNewCompany = async () => {
                           {p.designName ? ` — ${p.designName}` : ""}
                           {p.leather || p.buckle
                             ? ` (${[p.leather, p.buckle].filter(Boolean).join(" / ")})`
+                            : ""}
+                        </div>
+                      )}
+                      {p.jrPresentationFlat && (
+                        <div style={{ fontSize: "0.75rem", color: "#166534", marginTop: 4 }}>
+                          Production flat
+                          {p.page ? ` · page ${p.page}` : ""}
+                          {p.productType
+                            ? ` · ${String(p.productType).replace(/_/g, " ")}`
                             : ""}
                         </div>
                       )}
