@@ -96,7 +96,22 @@ function isNonCompleteJob(job) {
 }
 
 function orderIdFromJob(job) {
-  return String(job?.["Order #"] ?? job?.orderId ?? job?.orderNumber ?? "").trim();
+  if (!job || typeof job !== "object") return "";
+  // Prefer orderId (always set by /jobs-for-company) — empty "Order #" must not block it.
+  const candidates = [
+    job.orderId,
+    job["Order #"],
+    job.orderNumber,
+    job.OrderNumber,
+    job["Order Number"],
+    job["Order#"],
+  ];
+  for (const raw of candidates) {
+    const s = String(raw ?? "").trim();
+    if (!s || s === "?" || s.toLowerCase() === "order #") continue;
+    return s;
+  }
+  return "";
 }
 
 /** True 100% reorder = same design/product/materials as the original job. */
@@ -292,9 +307,18 @@ export default function OrderSubmission() {
   /** Tile picker modal after Choose Files → Open on a JR presentation PDF. */
   const [jrTilePickerOpen, setJrTilePickerOpen] = useState(false);
   const [jrFlatPreviewBusy, setJrFlatPreviewBusy] = useState(false);
+  /** True when selected page was rasterized from PDF (no Drive flat id). */
+  const [jrUsedRasterizedPageFlat, setJrUsedRasterizedPageFlat] = useState(false);
+  /** Keep the original presentation PDF so page re-picks still work after rasterize. */
+  const jrPresentationPdfRef = useRef(null);
   // Track preview URLs for cleanup on unmount (declared before applyJr… uses it)
   const prodPreviewUrlsRef = useRef(new Set());
   const printPreviewUrlsRef = useRef(new Set());
+
+  const isJrPresentationPdfFile = (f) => {
+    const name = String(f?.name || "").toLowerCase();
+    return f?.type === "application/pdf" || name.endsWith(".pdf");
+  };
 
   const applyJrPresentationDesign = async (design) => {
     const id = String(design?.designId || "");
@@ -307,35 +331,111 @@ export default function OrderSubmission() {
       `${String(design.productType || "design").replace(/_/g, "-")}-flat.png`;
     const driveId = String(design?.flatPngDriveFileId || "").trim();
     const pageThumb = String(design?.pageThumbDataUrl || "").trim();
+    const hasDriveFlat =
+      design?.idKind === "drive" && driveId && !/^local:/i.test(driveId);
 
     // Production preview should show the immutable flat PNG, not the multi-page PDF.
     let previewUrl = "";
     let previewType = "image/png";
-    if (design?.idKind === "drive" && driveId && !/^local:/i.test(driveId)) {
-      setJrFlatPreviewBusy(true);
-      try {
-        const res = await axios.get(`${API_ROOT}/jrco-presentation/flat-preview`, {
-          params: { fileId: driveId, sz: "w640" },
-          responseType: "blob",
-          withCredentials: true,
-          validateStatus: (s) => s < 500,
-        });
-        const ctype = String(res.headers?.["content-type"] || res.data?.type || "");
-        if (
-          res.status === 200 &&
-          res.data &&
-          res.data.size > 0 &&
-          /^image\//i.test(ctype)
-        ) {
+    let rasterizedFile = null;
+    setJrFlatPreviewBusy(true);
+    try {
+      if (hasDriveFlat) {
+        try {
+          const res = await axios.get(`${API_ROOT}/jrco-presentation/flat-preview`, {
+            params: { fileId: driveId, sz: "w640" },
+            responseType: "blob",
+            withCredentials: true,
+            validateStatus: (s) => s < 500,
+          });
+          const ctype = String(res.headers?.["content-type"] || res.data?.type || "");
+          if (
+            res.status === 200 &&
+            res.data &&
+            res.data.size > 0 &&
+            /^image\//i.test(ctype)
+          ) {
+            previewUrl = URL.createObjectURL(res.data);
+            prodPreviewUrlsRef.current.add(previewUrl);
+            previewType = ctype || "image/jpeg";
+          }
+        } catch (err) {
+          console.warn("JR flat preview fetch failed:", err);
+        }
+        setJrUsedRasterizedPageFlat(false);
+      } else {
+        // PDF exported without Drive flats — rasterize the selected page for upload.
+        const pdfFile =
+          jrPresentationPdfRef.current ||
+          prodFiles.find(
+            (f) =>
+              isJrPresentationPdfFile(f) &&
+              (!jrPresentationInfo?.filename ||
+                String(f.name || "") === String(jrPresentationInfo.filename || ""))
+          ) ||
+          prodFiles.find((f) => isJrPresentationPdfFile(f));
+        if (!pdfFile) {
+          alert(
+            "Could not find the presentation PDF to rasterize this page. Re-attach the PDF and try again."
+          );
+          return;
+        }
+        try {
+          const fd = new FormData();
+          fd.append("pdf", pdfFile, pdfFile.name || "presentation.pdf");
+          fd.append("page", String(design.page || 1));
+          const res = await axios.post(
+            `${API_ROOT}/jrco-presentation/page-flat`,
+            fd,
+            {
+              withCredentials: true,
+              responseType: "blob",
+              validateStatus: (s) => s < 500,
+            }
+          );
+          const ctype = String(res.headers?.["content-type"] || res.data?.type || "");
+          if (res.status >= 400 || !res.data || !res.data.size) {
+            let msg =
+              "Could not rasterize that PDF page. Attach a flat PNG manually under Production Files.";
+            try {
+              const text = await res.data.text();
+              const parsed = JSON.parse(text);
+              if (parsed?.error) msg = String(parsed.error);
+            } catch (_) {}
+            alert(msg);
+            return;
+          }
+          if (!/^image\//i.test(ctype) && ctype && ctype !== "application/octet-stream") {
+            alert("Unexpected response when rasterizing PDF page.");
+            return;
+          }
+          rasterizedFile = new File([res.data], flatName, {
+            type: "image/png",
+          });
           previewUrl = URL.createObjectURL(res.data);
           prodPreviewUrlsRef.current.add(previewUrl);
-          previewType = ctype || "image/jpeg";
+          previewType = "image/png";
+          setJrUsedRasterizedPageFlat(true);
+          setProdFiles((prev) => {
+            const kept = prev.filter(
+              (f) =>
+                !isJrPresentationPdfFile(f) &&
+                !String(f.name || "").toLowerCase().endsWith("-flat.png")
+            );
+            return [...kept, rasterizedFile];
+          });
+        } catch (err) {
+          console.warn("JR page-flat rasterize failed:", err);
+          alert(
+            err?.response?.data?.error ||
+              err?.message ||
+              "Could not rasterize that PDF page."
+          );
+          return;
         }
-      } catch (err) {
-        console.warn("JR flat preview fetch failed:", err);
-      } finally {
-        setJrFlatPreviewBusy(false);
       }
+    } finally {
+      setJrFlatPreviewBusy(false);
     }
     // Fall back to the PDF page tile so the preview is never a broken <img>.
     if (!previewUrl && pageThumb) {
@@ -353,6 +453,7 @@ export default function OrderSubmission() {
           designId: id,
           productType: design.productType || "",
           page: design.page,
+          rasterizedFromPdf: !hasDriveFlat,
         };
         if (!prev.length) return [nextPreview];
         let replaced = false;
@@ -810,6 +911,8 @@ export default function OrderSubmission() {
     setTrueReorder(false);
     setJrPresentationInfo(null);
     setJrSelectedDesignId("");
+    setJrUsedRasterizedPageFlat(false);
+    jrPresentationPdfRef.current = null;
 
     if (isNeedlepointProduct(job["Product"]) && orderNum) {
       axios
@@ -902,7 +1005,17 @@ export default function OrderSubmission() {
         `${API_ROOT}/jobs-for-company?company=${encodeURIComponent(companyName)}`,
         { cancelToken: cancelTokenSource.token }
       );
-      const openJobs = (data?.jobs || []).filter(isNonCompleteJob);
+      const openJobs = (data?.jobs || [])
+        .map((j) => {
+          const id = orderIdFromJob(j);
+          if (!id) return j;
+          return {
+            ...j,
+            orderId: id,
+            "Order #": String(j["Order #"] || id).trim() || id,
+          };
+        })
+        .filter(isNonCompleteJob);
       setEditPickerJobs(openJobs);
     } catch (err) {
       if (axios.isCancel(err)) return;
@@ -934,17 +1047,34 @@ export default function OrderSubmission() {
 
   /** Load a selected open order into the submission form (Save Changes patches the sheet). */
   const handleSelectJobToEdit = async (job) => {
+    if (loadingEditJob) return;
     const orderNumber = orderIdFromJob(job);
-    if (!orderNumber || loadingEditJob) return;
+    if (!orderNumber) {
+      console.warn("Edit Order clicked but job has no Order #:", job);
+      alert(
+        "This job is missing an Order #, so it can’t be opened for editing. Try refreshing and searching again."
+      );
+      return;
+    }
 
     setLoadingEditJob(true);
     try {
       const company = String(
         job["Company Name"] || editPickerCompany || ""
       ).trim();
-      const fullJob = await loadJobForOrderNumber(orderNumber, company);
-      applyJobToFormForEdit(fullJob || job);
-      await loadEditExistingThumbnails(fullJob || job);
+      let fullJob = null;
+      try {
+        fullJob = await loadJobForOrderNumber(orderNumber, company);
+      } catch (loadErr) {
+        console.warn("Full job fetch failed; using list row:", loadErr);
+      }
+      const jobToEdit = fullJob || {
+        ...job,
+        "Order #": orderNumber,
+        orderId: orderNumber,
+      };
+      applyJobToFormForEdit(jobToEdit);
+      await loadEditExistingThumbnails(jobToEdit);
       closeEditOrderPicker();
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -1418,6 +1548,8 @@ const companyNames = companies.map((opt) => opt.value);
       if (!stillHasPdf) {
         setJrPresentationInfo(null);
         setJrSelectedDesignId("");
+        setJrUsedRasterizedPageFlat(false);
+        jrPresentationPdfRef.current = null;
       }
       return next;
     });
@@ -1682,6 +1814,12 @@ const companyNames = companies.map((opt) => opt.value);
         if (lastInfo && Array.isArray(lastInfo.designs) && lastInfo.designs.length) {
           setJrPresentationInfo(lastInfo);
           setJrSelectedDesignId("");
+          setJrUsedRasterizedPageFlat(false);
+          const matchedPdf =
+            pdfCandidates.find(
+              (f) => String(f.name || "") === String(lastInfo.filename || "")
+            ) || pdfCandidates[pdfCandidates.length - 1];
+          jrPresentationPdfRef.current = matchedPdf || null;
           // Drop PDF blob previews — user picks a page tile, then we show the flat PNG.
           const jrNames = new Set(
             pdfCandidates.map((f) => String(f.name || "").toLowerCase())
@@ -1839,12 +1977,12 @@ const submitForm = async () => {
       alert("Choose which 3D design / page to use for this order.");
       return;
     }
-    if (selected.idKind !== "drive") {
+    if (selected.idKind !== "drive" && !jrUsedRasterizedPageFlat) {
       setIsSubmittingOverlay(false);
       window._isSubmittingOrder = false;
       alert(
         selected.error ||
-          "That design’s flat PNG is not on Drive yet. Re-export the presentation after Drive is configured, or attach the flat PNG manually under Print Files."
+          "That design’s flat PNG is not on Drive yet. Pick the page again to rasterize it from the PDF, or attach a flat PNG under Production Files."
       );
       return;
     }
@@ -1918,8 +2056,15 @@ const submitForm = async () => {
 
   // 🖨️ Print column: use checkbox (orderHasPrint) so you can submit YES before file is ready
   fd.append("print", orderHasPrint ? "YES" : "NO");
-  if (jrSelectedDesignId) {
-    fd.append("jrPresentationDesignIds", jrSelectedDesignId);
+  // Only send Drive design ids — local:/rasterized pages already attached a PNG.
+  if (jrSelectedDesignId && !jrUsedRasterizedPageFlat) {
+    const selectedDrive =
+      (jrPresentationInfo?.designs || []).find(
+        (d) => String(d.designId || "") === String(jrSelectedDesignId)
+      ) || null;
+    if (selectedDrive?.idKind === "drive") {
+      fd.append("jrPresentationDesignIds", jrSelectedDesignId);
+    }
   }
 
   if (useOrderShipAddress) {
@@ -2139,6 +2284,8 @@ const submitForm = async () => {
     setOrderHasPrint(false);
     setJrPresentationInfo(null);
     setJrSelectedDesignId("");
+    setJrUsedRasterizedPageFlat(false);
+    jrPresentationPdfRef.current = null;
     setTrueReorder(false);
     setUseOrderShipAddress(false);
     setOrderShipAddressForm({
@@ -4581,8 +4728,9 @@ const handleSaveNewCompany = async () => {
                 {jrSelectedDesignId ? "Change page" : "Pick page"}
               </button>
               {!jrPresentationInfo.designs.some((d) => d.idKind === "drive") && (
-                <div style={{ flexBasis: "100%", color: "#7f1d1d", fontSize: "0.85rem" }}>
-                  Re-export after Drive is configured, or attach the flat PNG manually under Print Files.
+                <div style={{ flexBasis: "100%", color: "#92400e", fontSize: "0.85rem" }}>
+                  This PDF has no Drive flats — pick a page and we’ll use a rasterized
+                  PNG from that page (or attach a flat PNG manually).
                 </div>
               )}
             </div>
@@ -4903,7 +5051,7 @@ const handleSaveNewCompany = async () => {
               >
                 {jrPresentationInfo.designs.map((d, i) => {
                   const id = String(d.designId || "");
-                  const disabled = d.idKind !== "drive";
+                  const missingDriveFlat = d.idKind !== "drive";
                   const selected = jrSelectedDesignId === id;
                   const thumb =
                     d.pageThumbDataUrl ||
@@ -4917,7 +5065,7 @@ const handleSaveNewCompany = async () => {
                     <button
                       key={id || i}
                       type="button"
-                      disabled={disabled || jrFlatPreviewBusy}
+                      disabled={jrFlatPreviewBusy}
                       onClick={async () => {
                         await applyJrPresentationDesign(d);
                         setJrTilePickerOpen(false);
@@ -4930,11 +5078,15 @@ const handleSaveNewCompany = async () => {
                         padding: 10,
                         borderRadius: 10,
                         border: `2px solid ${
-                          selected ? "#16a34a" : disabled ? "#fecaca" : "#d1d5db"
+                          selected
+                            ? "#16a34a"
+                            : missingDriveFlat
+                              ? "#fbbf24"
+                              : "#d1d5db"
                         }`,
                         background: selected ? "#ecfdf5" : "#fff",
-                        cursor: disabled || jrFlatPreviewBusy ? "not-allowed" : "pointer",
-                        opacity: disabled ? 0.6 : 1,
+                        cursor: jrFlatPreviewBusy ? "wait" : "pointer",
+                        opacity: jrFlatPreviewBusy ? 0.7 : 1,
                         textAlign: "left",
                       }}
                     >
@@ -4973,9 +5125,9 @@ const handleSaveNewCompany = async () => {
                             ? ` · ${String(d.productType).replace(/_/g, " ")}`
                             : ""}
                         </div>
-                        {disabled ? (
-                          <div style={{ fontSize: 12, color: "#b91c1c", marginTop: 2 }}>
-                            {d.error || "Flat not on Drive"}
+                        {missingDriveFlat ? (
+                          <div style={{ fontSize: 12, color: "#92400e", marginTop: 2 }}>
+                            No Drive flat — click to use this PDF page
                           </div>
                         ) : (
                           <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
