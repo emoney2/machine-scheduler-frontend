@@ -409,13 +409,23 @@ export default function OrderSubmission() {
             alert("Unexpected response when rasterizing PDF page.");
             return;
           }
-          rasterizedFile = new File([res.data], flatName, {
+          const safeFlatName = String(flatName || "page-flat.png").toLowerCase().endsWith(
+            ".png"
+          )
+            ? String(flatName || "page-flat.png")
+            : `${String(flatName || "page-flat").replace(/\.[^.]+$/, "")}.png`;
+          const pngBlob =
+            res.data instanceof Blob && /^image\//i.test(res.data.type || "")
+              ? res.data
+              : new Blob([res.data], { type: "image/png" });
+          rasterizedFile = new File([pngBlob], safeFlatName, {
             type: "image/png",
           });
-          previewUrl = URL.createObjectURL(res.data);
+          previewUrl = URL.createObjectURL(pngBlob);
           prodPreviewUrlsRef.current.add(previewUrl);
           previewType = "image/png";
           setJrUsedRasterizedPageFlat(true);
+          // Keep only the order-folder PNG — never submit the multi-page PDF as Image.
           setProdFiles((prev) => {
             const kept = prev.filter(
               (f) =>
