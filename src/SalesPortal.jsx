@@ -19,6 +19,14 @@ function unpaidCommission(repBucket) {
   return repBucket.unpaidCommission ?? repBucket.pipelineCommission ?? 0;
 }
 
+function totalRevenue(repOrders) {
+  if (!repOrders?.length) return 0;
+  return repOrders.reduce((sum, r) => {
+    const n = parseFloat(r.salesAmount ?? r.estimatedSubtotal ?? r["Product subtotal"]);
+    return sum + (Number.isNaN(n) ? 0 : n);
+  }, 0);
+}
+
 const tableWrap = { overflowX: "auto", border: "1px solid #ddd", borderRadius: 6 };
 const thStyle = { padding: 8, background: "#f5f5f5", textAlign: "left" };
 const tdStyle = { padding: 8 };
@@ -146,6 +154,7 @@ export default function SalesPortal() {
   const [summaryByRep, setSummaryByRep] = useState({});
   const [meta, setMeta] = useState(null);
   const [selectedInvoices, setSelectedInvoices] = useState(() => new Set());
+  const [expandedReps, setExpandedReps] = useState(() => new Set());
 
   const ordersFromPayload = (data) => data.orders || data.pipelineOrders || data.commissionRows || data.rows || [];
 
@@ -226,6 +235,16 @@ export default function SalesPortal() {
     setSummaryByRep({});
     setMeta(null);
     setSelectedInvoices(new Set());
+    setExpandedReps(new Set());
+  };
+
+  const toggleRepExpanded = (rep) => {
+    setExpandedReps((prev) => {
+      const next = new Set(prev);
+      if (next.has(rep)) next.delete(rep);
+      else next.add(rep);
+      return next;
+    });
   };
 
   const toggleInvoice = (id) => {
@@ -378,20 +397,92 @@ export default function SalesPortal() {
       ) : (
         repSections.map(([rep, v]) => {
           const repOrders = v.orders || v.pipelineOrders || v.commissionRows || v.rows || [];
+          const expanded = expandedReps.has(rep);
+          const rev = totalRevenue(repOrders);
+          const owedNow = owedAmount(v);
           return (
-            <section key={rep} style={{ marginBottom: "2rem", paddingBottom: "1.5rem", borderBottom: "1px solid #eee" }}>
-              <h3 style={{ fontSize: "1.1rem", margin: "0 0 0.35rem" }}>{rep}</h3>
-              <p style={{ margin: "0 0 0.75rem", color: "#555", fontSize: "0.88rem" }}>
-                <strong>{money(owedAmount(v))}</strong> owed now ·{" "}
-                <strong>{money(unpaidCommission(v))}</strong> total unpaid commission ·{" "}
-                {repOrders.length} invoice{repOrders.length === 1 ? "" : "s"}
-              </p>
-              <OrdersTable
-                rows={repOrders}
-                showCheckboxes
-                selectedInvoices={selectedInvoices}
-                onToggle={toggleInvoice}
-              />
+            <section
+              key={rep}
+              style={{
+                marginBottom: "0.75rem",
+                border: "1px solid #e5e5e5",
+                borderRadius: 8,
+                overflow: "hidden",
+                background: "#fff",
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => toggleRepExpanded(rep)}
+                aria-expanded={expanded}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "0.75rem 1rem",
+                  border: "none",
+                  background: expanded ? "#f7f7f7" : "#fafafa",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "inherit",
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-block",
+                    width: 18,
+                    color: "#555",
+                    fontSize: "0.85rem",
+                    transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+                    transition: "transform 0.15s ease",
+                    flexShrink: 0,
+                  }}
+                >
+                  ▶
+                </span>
+                <span style={{ fontSize: "1.05rem", fontWeight: 600, flex: "1 1 auto", minWidth: 0 }}>
+                  {rep}
+                </span>
+                <span
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "0.5rem 1.25rem",
+                    fontSize: "0.88rem",
+                    color: "#444",
+                    justifyContent: "flex-end",
+                  }}
+                >
+                  <span>
+                    <span style={{ color: "#888", marginRight: 6 }}>Rev</span>
+                    <strong>{money(rev)}</strong>
+                  </span>
+                  <span>
+                    <span style={{ color: "#888", marginRight: 6 }}>Commission owed</span>
+                    <strong>{money(owedNow)}</strong>
+                  </span>
+                  <span style={{ color: "#888" }}>
+                    {repOrders.length} invoice{repOrders.length === 1 ? "" : "s"}
+                  </span>
+                </span>
+              </button>
+              {expanded ? (
+                <div style={{ padding: "0.75rem 1rem 1rem", borderTop: "1px solid #eee" }}>
+                  <p style={{ margin: "0 0 0.75rem", color: "#555", fontSize: "0.88rem" }}>
+                    <strong>{money(owedNow)}</strong> owed now ·{" "}
+                    <strong>{money(unpaidCommission(v))}</strong> total unpaid commission ·{" "}
+                    {repOrders.length} invoice{repOrders.length === 1 ? "" : "s"}
+                  </p>
+                  <OrdersTable
+                    rows={repOrders}
+                    showCheckboxes
+                    selectedInvoices={selectedInvoices}
+                    onToggle={toggleInvoice}
+                  />
+                </div>
+              ) : null}
             </section>
           );
         })
