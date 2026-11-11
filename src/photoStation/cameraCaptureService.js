@@ -8,6 +8,8 @@
  * Prefer ImageCapture.takePhoto(); fall back to canvas (no upscale / no fake 24MP claims).
  */
 
+import { uploadSessionToDrive } from "./driveUpload";
+
 export const CAPTURE_STATES = Object.freeze({
   idle: "idle",
   initializing: "initializing",
@@ -735,10 +737,30 @@ export function createCameraCaptureService({
       setState(CAPTURE_STATES.saving);
       emitProgress({
         step: "saving",
-        message: "Saving results in browser memory…",
+        message: "Uploading photos and video to Google Drive…",
         recording: false,
       });
-      // Phase 1: in-memory only; URLs already created
+
+      let driveError = null;
+      try {
+        await uploadSessionToDrive(session, {
+          onProgress: (p) => {
+            emitProgress({
+              step: "saving",
+              message: p.message,
+              recording: false,
+              driveUpload: p,
+            });
+          },
+        });
+        log("drive upload complete", session.drive);
+      } catch (uploadErr) {
+        // Keep local results available even if Drive fails
+        driveError = uploadErr?.message || String(uploadErr);
+        log("drive upload failed", driveError);
+        session.drive = { ...(session.drive || {}), error: driveError, ok: false };
+      }
+
       session.completedAt = new Date().toISOString();
 
       if (turntable) {
@@ -752,8 +774,14 @@ export function createCameraCaptureService({
       setState(CAPTURE_STATES.complete);
       emitProgress({
         step: "complete",
-        message: "Capture complete — export when ready.",
+        message: driveError
+          ? `Capture complete locally. Drive upload failed: ${driveError}`
+          : session.drive?.folderUrl
+            ? "Capture complete — saved to Google Drive."
+            : "Capture complete — export when ready.",
         recording: false,
+        folderUrl: session.drive?.folderUrl || null,
+        driveError,
       });
     } catch (e) {
       lastError = {

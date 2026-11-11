@@ -345,6 +345,42 @@ export default function PhotoStation() {
         </div>
       </div>
 
+      {session?.drive?.folderUrl || session?.drive?.error ? (
+        <section className="ps-section">
+          <h2 className="ps-section-title">Google Drive</h2>
+          {session.drive.folderUrl ? (
+            <a
+              className="ps-btn ps-btn-secondary"
+              href={session.drive.folderUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "block",
+                textAlign: "center",
+                textDecoration: "none",
+                fontSize: 14,
+                padding: "12px 14px",
+              }}
+            >
+              Open folder {session.drive.folderName || ""}
+            </a>
+          ) : null}
+          {session.drive.error ? (
+            <div className="ps-error" style={{ marginTop: 8 }} role="alert">
+              Drive upload issue: {session.drive.error}
+            </div>
+          ) : (
+            <p className="ps-subtitle" style={{ marginTop: 8 }}>
+              Photos and video were uploaded to{" "}
+              <strong style={{ color: "var(--ps-text)" }}>
+                JR Photo Station / {session.drive.folderName || session.id}
+              </strong>
+              .
+            </p>
+          )}
+        </section>
+      ) : null}
+
       {session?.photos?.length ? (
         <section className="ps-section">
           <h2 className="ps-section-title">Photographs</h2>
@@ -426,8 +462,10 @@ export default function PhotoStation() {
             <li key={n}>{n}</li>
           ))}
           <li>
-            Phase 1 stores files in browser memory only. Safari will not silently write into Apple Photos —
-            use Download / the iOS share sheet. Automatic Drive upload comes in a later phase.
+            After capture, files upload automatically to Google Drive folder{" "}
+            <strong style={{ color: "var(--ps-text)" }}>JR Photo Station</strong> (or{" "}
+            PHOTO_STATION_FOLDER_ID). Browser copies remain available for Download. Safari will not
+            silently write into Apple Photos.
           </li>
         </ul>
         <button
