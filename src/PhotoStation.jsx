@@ -77,31 +77,39 @@ export default function PhotoStation() {
   const [initBusy, setInitBusy] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
 
-  const turntable = useMemo(
-    () =>
-      createSimulatedTurntable({
-        stepMs: 2000,
-        continuousMsPer360: 10000,
-        onLog: (msg, detail) => pushLog(msg, detail),
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-
   function pushLog(msg, detail) {
     const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
       detail != null ? " " + safeJson(detail) : ""
     }`;
     logRef.current = [...logRef.current.slice(-80), line];
     setLogs(logRef.current);
-    // Diagnostic logging for Safari remote debugging / console
     try {
-      // eslint-disable-next-line no-console
       console.log("[PhotoStation]", msg, detail ?? "");
     } catch {
       /* ignore */
     }
   }
+
+  const turntable = useMemo(
+    () =>
+      createSimulatedTurntable({
+        stepMs: 2000,
+        continuousMsPer360: 10000,
+        onLog: (msg, detail) => {
+          const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
+            detail != null ? " " + safeJson(detail) : ""
+          }`;
+          logRef.current = [...logRef.current.slice(-80), line];
+          setLogs(logRef.current);
+          try {
+            console.log("[PhotoStation]", msg, detail ?? "");
+          } catch {
+            /* ignore */
+          }
+        },
+      }),
+    []
+  );
 
   useEffect(() => {
     const service = createCameraCaptureService({
@@ -158,7 +166,6 @@ export default function PhotoStation() {
         /* ignore */
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turntable]);
 
   useEffect(() => {
