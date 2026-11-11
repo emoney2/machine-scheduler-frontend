@@ -41,6 +41,7 @@ import KanbanPrint from "./KanbanPrint";
 import SewingPriority from './SewingPriority';
 import QueueTab from './QueueTab';
 import SalesPortal from "./SalesPortal";
+import PhotoStation from "./PhotoStation";
 import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
 import MachineSensorTest from "./MachineSensorTest";
@@ -2309,6 +2310,7 @@ useEffect(() => {
          { to: "/sales",             label: "Sales" },
          { to: "/sewing-priority",   label: "Sewing Priority" },
          { to: "/needlepoint",       label: "Needlepoint" },
+         { to: "/photo-station",     label: "Social Media Camera App" },
          // Hidden for now (routes still exist): Sewing Calendar, Embroidery Calendar,
          // Schedule Approvals, Conflicts, Scheduling Settings
         ].map(({ to, label }) => (
@@ -2478,6 +2480,7 @@ useEffect(() => {
           <Route path="/quickbooks/login" element={<QuickBooksRedirect />} />
           <Route path="/shipment-complete" element={<ShipmentComplete />} />
           <Route path="/sales" element={<SalesPortal />} />
+          <Route path="/photo-station" element={<PhotoStation />} />
         </Routes>
     </>
   );
