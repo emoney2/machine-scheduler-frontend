@@ -42,6 +42,7 @@ import SewingPriority from './SewingPriority';
 import QueueTab from './QueueTab';
 import SalesPortal from "./SalesPortal";
 import PhotoStation from "./PhotoStation";
+import TurntableBridge from "./TurntableBridge";
 import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
 import MachineSensorTest from "./MachineSensorTest";
@@ -422,7 +423,8 @@ export default function App() {
   const isMachineFloor = path.startsWith("/machine/");
   const isSensorTest = path.startsWith("/machine-sensor");
   const isSewingTv = path === "/sewing-calendar/tv";
-  const hideChrome = isMachineFloor || isSensorTest || isSewingTv;
+  const isTurntableBridge = path === "/turntable-bridge";
+  const hideChrome = isMachineFloor || isSensorTest || isSewingTv || isTurntableBridge;
   const { isFullscreen, toggle: toggleFullscreen } = useMachineFullscreen(isMachineFloor);
 
   const prevM1Top = useRef(null);
@@ -2481,6 +2483,7 @@ useEffect(() => {
           <Route path="/shipment-complete" element={<ShipmentComplete />} />
           <Route path="/sales" element={<SalesPortal />} />
           <Route path="/photo-station" element={<PhotoStation />} />
+          <Route path="/turntable-bridge" element={<TurntableBridge />} />
         </Routes>
     </>
   );

@@ -8,7 +8,7 @@
  * Prefer ImageCapture.takePhoto(); fall back to canvas (no upscale / no fake 24MP claims).
  */
 
-import { uploadSessionToDrive } from "./driveUpload";
+import { enqueueSessionUpload } from "./driveUpload";
 
 export const CAPTURE_STATES = Object.freeze({
   idle: "idle",
@@ -734,33 +734,6 @@ export function createCameraCaptureService({
       const video = await recordVideo(dateStr, sessionNum, signal);
       session.video = video;
 
-      setState(CAPTURE_STATES.saving);
-      emitProgress({
-        step: "saving",
-        message: "Uploading photos and video to Google Drive…",
-        recording: false,
-      });
-
-      let driveError = null;
-      try {
-        await uploadSessionToDrive(session, {
-          onProgress: (p) => {
-            emitProgress({
-              step: "saving",
-              message: p.message,
-              recording: false,
-              driveUpload: p,
-            });
-          },
-        });
-        log("drive upload complete", session.drive);
-      } catch (uploadErr) {
-        // Keep local results available even if Drive fails
-        driveError = uploadErr?.message || String(uploadErr);
-        log("drive upload failed", driveError);
-        session.drive = { ...(session.drive || {}), error: driveError, ok: false };
-      }
-
       session.completedAt = new Date().toISOString();
 
       if (turntable) {
@@ -771,17 +744,31 @@ export function createCameraCaptureService({
         }
       }
 
+      // Queue Drive upload in the background so the next product can start now.
+      try {
+        enqueueSessionUpload(session, {
+          onJobUpdate: (job) => {
+            log(`drive upload [${job.status}] ${job.sessionId}`, job.message);
+          },
+        });
+        log("drive upload queued", session.id);
+      } catch (queueErr) {
+        log("drive upload queue failed", queueErr?.message || queueErr);
+        session.drive = {
+          ...(session.drive || {}),
+          status: "error",
+          error: queueErr?.message || String(queueErr),
+          ok: false,
+        };
+      }
+
       setState(CAPTURE_STATES.complete);
       emitProgress({
         step: "complete",
-        message: driveError
-          ? `Capture complete locally. Drive upload failed: ${driveError}`
-          : session.drive?.folderUrl
-            ? "Capture complete — saved to Google Drive."
-            : "Capture complete — export when ready.",
+        message:
+          "Capture complete — ready for next product. Drive upload continues in background.",
         recording: false,
         folderUrl: session.drive?.folderUrl || null,
-        driveError,
       });
     } catch (e) {
       lastError = {

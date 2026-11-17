@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./PhotoStation.css";
 import {
   CAPTURE_STATES,
@@ -8,6 +8,10 @@ import {
   megapixels,
 } from "./photoStation/cameraCaptureService";
 import { createSimulatedTurntable } from "./photoStation/turntableService";
+import { createComximTurntable } from "./photoStation/comximTurntable";
+import { subscribeUploadQueue } from "./photoStation/driveUpload";
+import { API_ROOT } from "./apiRoot";
+import { socket } from "./socketClient";
 
 function permissionLabel(p) {
   if (p === "granted") return "Camera allowed";
@@ -76,6 +80,13 @@ export default function PhotoStation() {
   const [logs, setLogs] = useState([]);
   const [initBusy, setInitBusy] = useState(false);
   const [showDiag, setShowDiag] = useState(false);
+  const [uploadJobs, setUploadJobs] = useState([]);
+  const [bridgeStatus, setBridgeStatus] = useState({
+    online: false,
+    bleConnected: false,
+    deviceName: null,
+  });
+  const [useSimTurntable, setUseSimTurntable] = useState(false);
 
   function pushLog(msg, detail) {
     const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
@@ -90,26 +101,73 @@ export default function PhotoStation() {
     }
   }
 
-  const turntable = useMemo(
-    () =>
-      createSimulatedTurntable({
+  const turntableLog = useCallback((msg, detail) => {
+    const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
+      detail != null ? " " + safeJson(detail) : ""
+    }`;
+    logRef.current = [...logRef.current.slice(-80), line];
+    setLogs(logRef.current);
+    try {
+      console.log("[PhotoStation]", msg, detail ?? "");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const turntable = useMemo(() => {
+    if (useSimTurntable) {
+      return createSimulatedTurntable({
         stepMs: 2000,
         continuousMsPer360: 10000,
-        onLog: (msg, detail) => {
-          const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
-            detail != null ? " " + safeJson(detail) : ""
-          }`;
-          logRef.current = [...logRef.current.slice(-80), line];
-          setLogs(logRef.current);
-          try {
-            console.log("[PhotoStation]", msg, detail ?? "");
-          } catch {
-            /* ignore */
-          }
-        },
-      }),
-    []
-  );
+        onLog: turntableLog,
+      });
+    }
+    return createComximTurntable({
+      continuousMsPer360: 10000,
+      speedGrade: 6,
+      onLog: turntableLog,
+    });
+  }, [useSimTurntable, turntableLog]);
+
+  useEffect(() => {
+    return subscribeUploadQueue((jobs) => setUploadJobs(jobs));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function refreshBridge() {
+      try {
+        const res = await fetch(`${API_ROOT}/photo-station/turntable-status`, {
+          credentials: "include",
+        });
+        const data = await res.json();
+        if (!cancelled && data) {
+          setBridgeStatus({
+            online: !!data.online,
+            bleConnected: !!data.bleConnected,
+            deviceName: data.deviceName || null,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    refreshBridge();
+    const t = setInterval(refreshBridge, 8000);
+    const onStatus = (p) => {
+      setBridgeStatus({
+        online: !!p?.online,
+        bleConnected: !!p?.bleConnected,
+        deviceName: p?.deviceName || null,
+      });
+    };
+    socket?.on?.("comxim:bridgeStatus", onStatus);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+      socket?.off?.("comxim:bridgeStatus", onStatus);
+    };
+  }, []);
 
   useEffect(() => {
     const service = createCameraCaptureService({
@@ -182,8 +240,12 @@ export default function PhotoStation() {
     state === CAPTURE_STATES.video_capture ||
     state === CAPTURE_STATES.saving;
 
+  const turntableReady =
+    useSimTurntable || (bridgeStatus.online && bridgeStatus.bleConnected);
+
   const canStart =
     !busy &&
+    turntableReady &&
     (state === CAPTURE_STATES.idle ||
       state === CAPTURE_STATES.complete ||
       state === CAPTURE_STATES.error) &&
@@ -241,7 +303,7 @@ export default function PhotoStation() {
         <div className="ps-brand">JR &amp; Co.</div>
         <h1 className="ps-title">Photo Station</h1>
         <p className="ps-subtitle">
-          Place headcover on turntable, press Start once. Six photos + 10s video run automatically.
+          Place headcover on turntable, press Start once. Photos, rotates, and 360 video run automatically.
         </p>
       </header>
 
@@ -264,6 +326,26 @@ export default function PhotoStation() {
           />
           {stateLabel(state)}
         </span>
+        <span className="ps-chip">
+          <span
+            className={`ps-chip-dot ${
+              useSimTurntable
+                ? "warn"
+                : bridgeStatus.online && bridgeStatus.bleConnected
+                  ? "ok"
+                  : bridgeStatus.online
+                    ? "warn"
+                    : "bad"
+            }`}
+          />
+          {useSimTurntable
+            ? "Turntable: simulated"
+            : bridgeStatus.online && bridgeStatus.bleConnected
+              ? `Turntable: ${bridgeStatus.deviceName || "ComXim"}`
+              : bridgeStatus.online
+                ? "Turntable: Fire online, BLE off"
+                : "Turntable: Fire bridge offline"}
+        </span>
         <span className="ps-chip">{streamRes}</span>
         {progress?.recording ? (
           <span className="ps-chip">
@@ -272,6 +354,13 @@ export default function PhotoStation() {
           </span>
         ) : null}
       </div>
+
+      {!useSimTurntable && !(bridgeStatus.online && bridgeStatus.bleConnected) ? (
+        <div className="ps-error" role="status">
+          Fire HD bridge is required for one-button capture. On the Fire tablet open{" "}
+          <strong>/turntable-bridge</strong>, connect Bluetooth to the ComXim, then press Start here.
+        </div>
+      ) : null}
 
       <div className="ps-preview-wrap">
         <video
@@ -345,39 +434,35 @@ export default function PhotoStation() {
         </div>
       </div>
 
-      {session?.drive?.folderUrl || session?.drive?.error ? (
+      {uploadJobs.length ? (
         <section className="ps-section">
-          <h2 className="ps-section-title">Google Drive</h2>
-          {session.drive.folderUrl ? (
-            <a
-              className="ps-btn ps-btn-secondary"
-              href={session.drive.folderUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "block",
-                textAlign: "center",
-                textDecoration: "none",
-                fontSize: 14,
-                padding: "12px 14px",
-              }}
-            >
-              Open folder {session.drive.folderName || ""}
-            </a>
-          ) : null}
-          {session.drive.error ? (
-            <div className="ps-error" style={{ marginTop: 8 }} role="alert">
-              Drive upload issue: {session.drive.error}
-            </div>
-          ) : (
-            <p className="ps-subtitle" style={{ marginTop: 8 }}>
-              Photos and video were uploaded to{" "}
-              <strong style={{ color: "var(--ps-text)" }}>
-                JR Photo Station / {session.drive.folderName || session.id}
-              </strong>
-              .
-            </p>
-          )}
+          <h2 className="ps-section-title">Google Drive uploads</h2>
+          <p className="ps-subtitle" style={{ marginBottom: 8 }}>
+            Uploads run in the background — you can Start the next product anytime.
+          </p>
+          <ul className="ps-notes">
+            {uploadJobs.map((job) => (
+              <li key={job.id}>
+                <strong style={{ color: "var(--ps-text)" }}>{job.sessionId}</strong>
+                {" · "}
+                {jobStatusLabel(job)}
+                {job.folderUrl ? (
+                  <>
+                    {" · "}
+                    <a
+                      href={job.folderUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "#86efac" }}
+                    >
+                      Open folder
+                    </a>
+                  </>
+                ) : null}
+                <div style={{ marginTop: 2 }}>{job.message}</div>
+              </li>
+            ))}
+          </ul>
         </section>
       ) : null}
 
@@ -456,16 +541,28 @@ export default function PhotoStation() {
               : "not available"}
           </li>
           <li>
-            Turntable driver: simulated (2s / 60°, 10s continuous spin). No raw TCP from the browser.
+            Turntable: ComXim MT200RUBL via Fire HD bridge (
+            <a href="/turntable-bridge" style={{ color: "#86efac" }}>
+              /turntable-bridge
+            </a>
+            ).{" "}
+            <button
+              type="button"
+              className="ps-btn ps-btn-secondary"
+              style={{ fontSize: 11, padding: "4px 8px", marginLeft: 6 }}
+              onClick={() => setUseSimTurntable((v) => !v)}
+            >
+              {useSimTurntable ? "Use real ComXim" : "Use simulated turntable"}
+            </button>
           </li>
           {(capabilities?.notes || []).map((n) => (
             <li key={n}>{n}</li>
           ))}
           <li>
-            After capture, files upload automatically to Google Drive folder{" "}
-            <strong style={{ color: "var(--ps-text)" }}>JR Photo Station</strong> (or{" "}
-            PHOTO_STATION_FOLDER_ID). Browser copies remain available for Download. Safari will not
-            silently write into Apple Photos.
+            After capture, files queue for Google Drive (
+            <strong style={{ color: "var(--ps-text)" }}>JR Photo Station</strong>) in the
+            background so the next product can start immediately. Keep this page open until uploads
+            finish.
           </li>
         </ul>
         <button
@@ -498,4 +595,14 @@ function formatBytes(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function jobStatusLabel(job) {
+  if (job.status === "queued") return "Queued";
+  if (job.status === "uploading") {
+    return `Uploading ${job.done || 0}/${job.total || "?"}`;
+  }
+  if (job.status === "done") return "Saved";
+  if (job.status === "error") return "Failed";
+  return job.status || "—";
 }
