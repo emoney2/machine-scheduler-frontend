@@ -323,13 +323,90 @@ export function createCameraCaptureService({
         log("video.play warning", e?.message || e);
       }
     }
+    await waitForVideoPreview(8000);
+  }
+
+  async function waitForVideoPreview(timeoutMs = 8000) {
+    const video = videoEl;
+    if (!video) {
+      throw Object.assign(new Error("Camera preview element is missing."), {
+        code: "PREVIEW_MISSING",
+      });
+    }
+    try {
+      video.muted = true;
+      video.setAttribute("playsinline", "true");
+      video.playsInline = true;
+      if (stream && video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+      await video.play().catch(() => {});
+    } catch {
+      /* ignore */
+    }
+
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (video.videoWidth > 0 && video.videoHeight > 0 && video.readyState >= 2) {
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 50));
+      try {
+        await video.play();
+      } catch {
+        /* ignore */
+      }
+    }
+    throw Object.assign(
+      new Error(
+        "Video preview is not ready for capture. Keep Safari in the foreground and try again."
+      ),
+      { code: "PREVIEW_NOT_READY" }
+    );
+  }
+
+  async function ensureLiveStream() {
+    const track = stream?.getVideoTracks()?.[0];
+    if (track && track.readyState === "live") {
+      if (videoEl && (!videoEl.srcObject || videoEl.videoWidth === 0)) {
+        await attachStream(stream);
+      } else {
+        await waitForVideoPreview(5000);
+      }
+      return;
+    }
+    log("camera track not live — reopening rear camera");
+    if (stream) {
+      try {
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* ignore */
+      }
+      stream = null;
+    }
+    const s = await getRearStream();
+    await attachStream(s);
   }
 
   async function initialize() {
     if (stream) {
-      readTrackInfo(stream);
-      emitProgress({ step: "preview_ready" });
-      return;
+      const track = stream.getVideoTracks()?.[0];
+      if (track && track.readyState === "live") {
+        readTrackInfo(stream);
+        try {
+          await waitForVideoPreview(5000);
+          emitProgress({ step: "preview_ready", message: "Camera ready" });
+          return;
+        } catch {
+          log("existing stream preview not ready — reinitializing");
+        }
+      }
+      try {
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* ignore */
+      }
+      stream = null;
     }
     setState(CAPTURE_STATES.initializing);
     emitProgress({ step: "initializing", message: "Opening rear camera…" });
@@ -341,6 +418,7 @@ export function createCameraCaptureService({
   }
 
   async function captureStill(photoIndex, dateStr, sessionNum) {
+    await ensureLiveStream();
     const track = stream?.getVideoTracks()?.[0];
     if (!track || track.readyState !== "live") {
       throw Object.assign(new Error("Camera stream is not live."), {
@@ -352,6 +430,11 @@ export function createCameraCaptureService({
     let method = "canvas";
     let width = 0;
     let height = 0;
+
+    // Prefer a settled preview frame on iPhone; ImageCapture can stall Safari's stream.
+    await waitForVideoPreview(5000);
+    // Brief settle so autofocus/exposure catch up after a rotate
+    await new Promise((r) => setTimeout(r, 180));
 
     if (typeof ImageCapture !== "undefined") {
       try {
@@ -386,10 +469,14 @@ export function createCameraCaptureService({
     }
 
     if (!blob) {
+      await ensureLiveStream();
+      await waitForVideoPreview(5000);
       const video = videoEl;
       if (!video || !video.videoWidth) {
         throw Object.assign(
-          new Error("Video preview is not ready for canvas capture."),
+          new Error(
+            "Video preview is not ready for canvas capture. Keep the Photo Station page open and unlocked."
+          ),
           { code: "PREVIEW_NOT_READY" }
         );
       }
@@ -408,6 +495,13 @@ export function createCameraCaptureService({
         );
       });
       method = "canvas";
+    }
+
+    // After still capture, Safari may need a moment before the next preview frame.
+    try {
+      await waitForVideoPreview(3000);
+    } catch {
+      log("preview slow to recover after still; continuing");
     }
 
     // Ensure JPEG type when possible
@@ -688,6 +782,7 @@ export function createCameraCaptureService({
       }
 
       setState(CAPTURE_STATES.photo_capture);
+      await ensureLiveStream();
       for (let i = 1; i <= photoCount; i += 1) {
         if (signal.aborted) throw Object.assign(new Error("Cancelled"), { code: "ABORTED" });
         emitProgress({
@@ -697,6 +792,7 @@ export function createCameraCaptureService({
           photoTotal: photoCount,
           recording: false,
         });
+        await ensureLiveStream();
         const photo = await captureStill(i, dateStr, sessionNum);
         session.photos.push(photo);
         emitProgress({
@@ -721,6 +817,9 @@ export function createCameraCaptureService({
           } else {
             await sleep(stepWaitMs, signal);
           }
+          // Safari often drops preview frames while backgrounded/busy during rotates
+          await ensureLiveStream();
+          await new Promise((r) => setTimeout(r, 250));
         }
       }
 
@@ -731,6 +830,7 @@ export function createCameraCaptureService({
         recording: true,
         videoCountdownSec: Math.ceil(videoDurationMs / 1000),
       });
+      await ensureLiveStream();
       const video = await recordVideo(dateStr, sessionNum, signal);
       session.video = video;
 
