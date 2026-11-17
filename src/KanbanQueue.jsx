@@ -488,7 +488,7 @@ export default function KanbanQueue() {
                         {/* link/contact row: show contact info (email or phone) */}
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                           {(() => {
-                            const contact = (r["Order Email"] || "").trim();
+                            const contact = String(r["Order Email"] ?? "").trim();
                             if (!contact) return null;
 
                             const isEmail = contact.includes("@");
