@@ -15,7 +15,7 @@ import axios from 'axios';
 import { socket } from "./socketClient";
 import Inventory from "./Inventory";
 import InventoryOrdered from "./InventoryOrdered";
-import { clearLoginToken } from "./axios-setup";
+import { clearLoginToken, rememberKioskHome, savedKioskHome, startKioskSessionKeep } from "./axios-setup";
 import Section9 from './Section9';
 import OrderSubmission from './OrderSubmission';
 import { subWorkDays, fmtMMDD } from './helpers';
@@ -377,6 +377,7 @@ export default function App() {
       }
       if (!cancelled) setSessionChecked(true);
     })();
+
     return () => {
       cancelled = true;
     };
@@ -416,6 +417,12 @@ export default function App() {
 
   // Which route are we on? (Scheduler is at "/")
   const location = useLocation();
+  const stationHome = savedKioskHome();
+  const openPath = (location.pathname || "/").replace(/\/$/, "") || "/";
+  useEffect(() => {
+    rememberKioskHome(location.pathname);
+    return startKioskSessionKeep(API_ROOT, location.pathname);
+  }, [location.pathname]);
   const isScheduler = location.pathname === "/";
   const needsScheduler = routeNeedsLiveScheduler(location.pathname);
   const path = (location.pathname || "/").toLowerCase();
@@ -2253,6 +2260,10 @@ useEffect(() => {
 }, [isScheduler, columns?.queue?.jobs]);
 
 // === Section 9: Render via Section9.jsx ===
+
+  if (stationHome && openPath === "/") {
+    return <Navigate to={stationHome} replace />;
+  }
 
   return (
     <>

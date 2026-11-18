@@ -536,6 +536,145 @@ export function createCameraCaptureService({
     return photo;
   }
 
+  function isSmoothVideoSettings(settings) {
+    const w = settings?.width || 0;
+    const h = settings?.height || 0;
+    const fps = settings?.frameRate || 0;
+    return w > 0 && h > 0 && w * h <= 1920 * 1080 * 1.25 && fps >= 20;
+  }
+
+  async function openSmoothVideoStream() {
+    const attempts = [
+      {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 60, max: 60 },
+        },
+        audio: false,
+      },
+      {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+        },
+        audio: false,
+      },
+      {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+        },
+        audio: false,
+      },
+    ];
+    let lastErr = null;
+    for (const constraints of attempts) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia(constraints);
+        const settings = s.getVideoTracks()[0]?.getSettings?.() || {};
+        if (isSmoothVideoSettings(settings)) {
+          log("smooth video stream", settings);
+          return s;
+        }
+        log("smooth video stream still too heavy", settings);
+        s.getTracks().forEach((t) => t.stop());
+        lastErr = new Error("Camera stayed at a low frame rate");
+      } catch (e) {
+        lastErr = e;
+        log("smooth video getUserMedia failed", e?.message || e);
+      }
+    }
+    if (lastErr) throw lastErr;
+    throw new Error("Could not open a smooth video stream");
+  }
+
+  async function prepareStreamForSmoothVideo() {
+    const track = stream?.getVideoTracks?.()[0];
+    if (track && track.readyState === "live") {
+      try {
+        track.contentHint = "motion";
+      } catch {
+        /* ignore */
+      }
+      try {
+        await track.applyConstraints({
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+        });
+        await waitForVideoPreview(3000);
+        const settings = track.getSettings?.() || {};
+        if (isSmoothVideoSettings(settings)) {
+          log("smooth video constraints", settings);
+          return settings;
+        }
+        log("in-place video constraints ignored", settings);
+      } catch (e) {
+        log("smooth video constraint failed", e?.message || e);
+      }
+    }
+
+    try {
+      if (stream) {
+        stream.getTracks().forEach((t) => {
+          try {
+            t.stop();
+          } catch {
+            /* ignore */
+          }
+        });
+        stream = null;
+      }
+      const s = await openSmoothVideoStream();
+      await attachStream(s);
+      try {
+        s.getVideoTracks()[0].contentHint = "motion";
+      } catch {
+        /* ignore */
+      }
+      return s.getVideoTracks()[0]?.getSettings?.() || {};
+    } catch (e) {
+      log("reopen smooth stream failed — recording current camera", e?.message || e);
+      if (!stream) {
+        try {
+          const s = await getRearStream();
+          await attachStream(s);
+        } catch (reopenErr) {
+          log("camera reopen failed", reopenErr?.message || reopenErr);
+        }
+      }
+      return stream?.getVideoTracks?.()[0]?.getSettings?.() || null;
+    }
+  }
+
+  async function restorePhotoStream() {
+    const settings = stream?.getVideoTracks?.()[0]?.getSettings?.() || {};
+    const pixels = (settings.width || 0) * (settings.height || 0);
+    if (pixels > 1920 * 1080 * 1.3) return;
+    if (stream) {
+      stream.getTracks().forEach((t) => {
+        try {
+          t.stop();
+        } catch {
+          /* ignore */
+        }
+      });
+      stream = null;
+    }
+    try {
+      const s = await getRearStream();
+      await attachStream(s);
+    } catch (e) {
+      log("restore photo stream failed", e?.message || e);
+    }
+  }
+
   async function recordVideo(dateStr, sessionNum, signal) {
     if (typeof MediaRecorder === "undefined") {
       throw Object.assign(
@@ -549,11 +688,19 @@ export function createCameraCaptureService({
       });
     }
 
+    const videoSettings = (await prepareStreamForSmoothVideo()) || {};
     const mimeType = pickRecorderMimeType();
     const options = {};
     if (mimeType) options.mimeType = mimeType;
-    // Prefer high bitrate when browser accepts it
-    options.videoBitsPerSecond = 16_000_000;
+    const w = videoSettings.width || videoEl?.videoWidth || 1920;
+    const h = videoSettings.height || videoEl?.videoHeight || 1080;
+    const fps = videoSettings.frameRate || 30;
+    // Enough bits to hold every frame. A higher number on a huge photo stream
+    // makes Safari drop frames, which is what looks choppy.
+    options.videoBitsPerSecond = Math.round(
+      Math.min(12_000_000, Math.max(5_000_000, w * h * fps * 0.07))
+    );
+    log("recorder bitrate", { w, h, fps, videoBitsPerSecond: options.videoBitsPerSecond });
 
     let recorder;
     try {
@@ -563,6 +710,7 @@ export function createCameraCaptureService({
       try {
         recorder = new MediaRecorder(stream);
       } catch (e2) {
+        await restorePhotoStream();
         throw Object.assign(
           new Error("Could not start MediaRecorder: " + (e2?.message || e2)),
           { code: "RECORDER_INIT_FAILED", cause: e2 }
@@ -616,9 +764,13 @@ export function createCameraCaptureService({
     });
 
     try {
-      recorder.start(250);
+      // A timeslice makes iPhone Safari recordings stutter. One clip at stop plays smoothly.
+      const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+      if (ios) recorder.start();
+      else recorder.start(1000);
     } catch (e) {
       document.removeEventListener("visibilitychange", onVis);
+      await restorePhotoStream();
       throw Object.assign(
         new Error("MediaRecorder.start failed: " + (e?.message || e)),
         { code: "RECORDER_START_FAILED", cause: e }
@@ -663,6 +815,7 @@ export function createCameraCaptureService({
       clearInterval(countdownTimer);
       document.removeEventListener("visibilitychange", onVis);
       signal?.removeEventListener("abort", onAbort);
+      await restorePhotoStream();
     }
 
     const durationMs = Date.now() - startedAt;
@@ -678,9 +831,8 @@ export function createCameraCaptureService({
     }
 
     const blob = new Blob(chunks, { type: actualMime });
-    const settings = stream.getVideoTracks()[0]?.getSettings?.() || {};
-    const width = settings.width || videoEl?.videoWidth || 0;
-    const height = settings.height || videoEl?.videoHeight || 0;
+    const width = w || videoSettings.width || 0;
+    const height = h || videoSettings.height || 0;
     const filename = buildVideoFilename(dateStr, sessionNum, actualMime);
     const url = URL.createObjectURL(blob);
 

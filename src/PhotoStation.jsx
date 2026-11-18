@@ -87,6 +87,8 @@ export default function PhotoStation() {
     deviceName: null,
   });
   const [useSimTurntable, setUseSimTurntable] = useState(false);
+  const [turntableAngle, setTurntableAngle] = useState(0);
+  const [turntableMoving, setTurntableMoving] = useState(false);
 
   function pushLog(msg, detail) {
     const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
@@ -130,7 +132,74 @@ export default function PhotoStation() {
   }, [useSimTurntable, turntableLog]);
 
   useEffect(() => {
+    let cancelled = false;
+    function read() {
+      try {
+        const st = turntable.getStatus();
+        if (cancelled || !st) return;
+        setTurntableAngle(Number(st.positionDeg) || 0);
+        setTurntableMoving(st.state === "moving");
+      } catch {
+        /* ignore */
+      }
+    }
+    read();
+    const t = setInterval(read, 400);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [turntable]);
+
+  useEffect(() => {
     return subscribeUploadQueue((jobs) => setUploadJobs(jobs));
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia(
+      "(max-width: 520px), (max-height: 500px) and (pointer: coarse)"
+    );
+    const meta = document.querySelector('meta[name="viewport"]');
+    const previous = meta?.getAttribute("content") || "";
+    const locked =
+      "width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+
+    const preventGesture = (event) => {
+      event.preventDefault();
+    };
+    const preventPinch = (event) => {
+      if ((event.touches && event.touches.length > 1) || event.scale > 1) {
+        event.preventDefault();
+      }
+    };
+
+    function apply() {
+      const on = mq.matches;
+      document.documentElement.classList.toggle("ps-kiosk", on);
+      if (meta) meta.setAttribute("content", on ? locked : previous);
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("gestureend", preventGesture);
+      document.removeEventListener("touchmove", preventPinch);
+      if (on) {
+        document.addEventListener("gesturestart", preventGesture, { passive: false });
+        document.addEventListener("gesturechange", preventGesture, { passive: false });
+        document.addEventListener("gestureend", preventGesture, { passive: false });
+        document.addEventListener("touchmove", preventPinch, { passive: false });
+      }
+    }
+
+    apply();
+    mq.addEventListener?.("change", apply);
+    return () => {
+      mq.removeEventListener?.("change", apply);
+      document.documentElement.classList.remove("ps-kiosk");
+      if (meta) meta.setAttribute("content", previous);
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("gestureend", preventGesture);
+      document.removeEventListener("touchmove", preventPinch);
+    };
   }, []);
 
   useEffect(() => {
@@ -347,6 +416,9 @@ export default function PhotoStation() {
                 : "Turntable: Fire bridge offline"}
         </span>
         <span className="ps-chip">{streamRes}</span>
+        {uploadJobs.length ? (
+          <span className="ps-chip">{uploadSummary(uploadJobs)}</span>
+        ) : null}
         {progress?.recording ? (
           <span className="ps-chip">
             <span className="ps-chip-dot rec" />
@@ -376,13 +448,17 @@ export default function PhotoStation() {
             RECORDING {progress.videoCountdownSec ?? ""}s
           </div>
         ) : null}
+        <div className="ps-angle" aria-live="polite">
+          <span className="ps-angle-value">{formatAngle(turntableAngle)}</span>
+          <span className="ps-angle-caption">{turntableMoving ? "Moving" : "Turntable"}</span>
+        </div>
         <div className="ps-preview-overlay">
           <div className="ps-step">{progress?.message || stateLabel(state)}</div>
           <div className="ps-step-sub">
             {busy
               ? `Step: ${progress?.step || state}`
               : state === CAPTURE_STATES.complete
-                ? "Files ready below — export or start next product"
+                ? "Capture finished — start the next product"
                 : "Ready for next capture"}
           </div>
           <div className="ps-progress-track">
@@ -581,6 +657,12 @@ export default function PhotoStation() {
   );
 }
 
+function formatAngle(deg) {
+  const n = Math.round((Number(deg) || 0) * 10) / 10;
+  const text = Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return `${text}°`;
+}
+
 function safeJson(v) {
   try {
     if (typeof v === "string") return v;
@@ -595,6 +677,14 @@ function formatBytes(n) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function uploadSummary(jobs) {
+  const active = jobs.find((j) => j.status === "uploading");
+  if (active) return `Uploading ${active.done || 0}/${active.total || "?"}`;
+  if (jobs.some((j) => j.status === "queued")) return "Upload queued";
+  if (jobs.some((j) => j.status === "error")) return "Upload failed";
+  return "Saved to Drive";
 }
 
 function jobStatusLabel(job) {

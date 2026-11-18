@@ -24,7 +24,7 @@
   margin: 0 auto;
 }
 
-.ps-header {
+.ps-root .ps-header {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -39,14 +39,15 @@
   font-weight: 600;
 }
 
-.ps-title {
+.ps-root .ps-title {
   margin: 0;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  color: var(--ps-text);
 }
 
-.ps-subtitle {
+.ps-root .ps-subtitle {
   margin: 0;
   font-size: 13px;
   color: var(--ps-muted);
@@ -60,7 +61,7 @@
   margin: 12px 0;
 }
 
-.ps-chip {
+.ps-root .ps-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -69,6 +70,7 @@
   background: var(--ps-surface);
   border: 1px solid var(--ps-border);
   font-size: 12px;
+  font-weight: 500;
   color: var(--ps-text);
 }
 
@@ -183,6 +185,38 @@
   letter-spacing: 0.04em;
 }
 
+.ps-angle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  min-width: 72px;
+  padding: 8px 10px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  text-align: right;
+  pointer-events: none;
+}
+
+.ps-angle-value {
+  display: block;
+  font-size: 28px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ps-angle-caption {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d1d5db;
+}
+
 .ps-error {
   margin-top: 12px;
   padding: 12px;
@@ -194,9 +228,10 @@
   line-height: 1.4;
 }
 
-.ps-actions {
+.ps-root .ps-actions {
   display: flex;
   flex-direction: column;
+  flex-wrap: nowrap;
   gap: 10px;
   margin-top: 14px;
 }
@@ -338,10 +373,12 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-.ps-notes {
+.ps-root .ps-notes {
+  display: block;
   margin: 8px 0 0;
   padding: 0;
   list-style: none;
+  font-weight: 400;
 }
 
 .ps-notes li {
@@ -359,5 +396,146 @@
 @media (min-width: 600px) {
   .ps-root {
     padding-top: 20px;
+  }
+}
+
+/* iPhone (and phone landscape): one viewport, no page scroll, no pinch zoom. */
+@media (max-width: 520px), ((max-height: 500px) and (pointer: coarse)) {
+  html.ps-kiosk,
+  html.ps-kiosk body {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden !important;
+    overscroll-behavior: none;
+    touch-action: none;
+    background: #050505;
+  }
+
+  .ps-root {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    width: 100%;
+    max-width: none;
+    height: 100vh;
+    height: 100svh;
+    min-height: 0;
+    max-height: 100svh;
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding:
+      max(6px, env(safe-area-inset-top))
+      10px
+      max(8px, env(safe-area-inset-bottom));
+    touch-action: none;
+    -webkit-text-size-adjust: 100%;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .ps-root,
+  .ps-root * {
+    touch-action: none;
+  }
+
+  .ps-root .ps-header {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+  }
+
+  .ps-brand {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+  }
+
+  .ps-root .ps-title {
+    font-size: 17px;
+    line-height: 1.1;
+    color: var(--ps-text);
+  }
+
+  .ps-root .ps-subtitle {
+    display: none;
+  }
+
+  .ps-status-row {
+    margin: 0 0 6px;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .ps-root .ps-chip {
+    padding: 3px 7px;
+    font-size: 10px;
+    font-weight: 500;
+    border-radius: 6px;
+    gap: 4px;
+    background: var(--ps-surface);
+    color: var(--ps-text);
+  }
+
+  .ps-preview-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    aspect-ratio: auto;
+    max-height: none;
+    border-radius: 12px;
+  }
+
+  .ps-preview-overlay {
+    padding: 8px 10px;
+    gap: 2px;
+  }
+
+  .ps-step {
+    font-size: 13px;
+  }
+
+  .ps-step-sub {
+    font-size: 11px;
+  }
+
+  .ps-progress-track {
+    margin-top: 4px;
+  }
+
+  .ps-error {
+    margin-top: 0;
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    font-size: 11px;
+    line-height: 1.3;
+    flex-shrink: 0;
+  }
+
+  .ps-root .ps-actions {
+    margin-top: 8px;
+    gap: 6px;
+    flex-shrink: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .ps-btn-start {
+    font-size: 17px;
+    padding: 12px 14px;
+  }
+
+  .ps-btn-row .ps-btn {
+    font-size: 13px;
+    padding: 10px 8px;
+  }
+
+  .ps-section {
+    display: none;
   }
 }

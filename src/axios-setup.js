@@ -19,6 +19,92 @@ export function clearLoginToken() {
   } catch (_) {}
 }
 
+export function storeLoginToken(token) {
+  const value = String(token || "").trim();
+  if (!value) return;
+  try {
+    localStorage.setItem(TOKEN_KEY, value);
+  } catch (_) {}
+  applyAuthHeader();
+}
+
+const KIOSK_HOME_KEY = "ms.kioskHome";
+const KIOSK_PATHS = ["/photo-station", "/turntable-bridge"];
+
+export function isStationDevice() {
+  try {
+    return /iPhone|iPad|iPod|Silk|Kindle|Android/i.test(navigator.userAgent || "");
+  } catch (_) {
+    return false;
+  }
+}
+
+export function kioskHomeForPath(pathname) {
+  const path = String(pathname || "/").replace(/\/$/, "") || "/";
+  return KIOSK_PATHS.indexOf(path) >= 0 ? path : "";
+}
+
+export function rememberKioskHome(pathname) {
+  const home = kioskHomeForPath(pathname);
+  if (!home || !isStationDevice()) return;
+  try {
+    localStorage.setItem(KIOSK_HOME_KEY, home);
+  } catch (_) {}
+}
+
+export function savedKioskHome() {
+  if (!isStationDevice()) return "";
+  try {
+    const saved = localStorage.getItem(KIOSK_HOME_KEY) || "";
+    return kioskHomeForPath(saved);
+  } catch (_) {
+    return "";
+  }
+}
+
+export function startKioskSessionKeep(apiRoot, pathname) {
+  const home = kioskHomeForPath(pathname);
+  if (!home || !isStationDevice()) return function noop() {};
+  rememberKioskHome(home);
+  let stopped = false;
+  let lastOk = 0;
+
+  async function keep(force) {
+    if (stopped || !getLoginToken()) return;
+    const now = Date.now();
+    if (!force && lastOk && now - lastOk < 30 * 60 * 1000) return;
+    try {
+      const res = await fetch(`${String(apiRoot || "").replace(/\/$/, "")}/session/keep`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getLoginToken()}`,
+        },
+        body: JSON.stringify({ home }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.token) storeLoginToken(data.token);
+      if (data && data.kiosk) lastOk = Date.now();
+    } catch (_) {}
+  }
+
+  keep(true);
+  const timer = setInterval(function () {
+    keep(true);
+  }, 6 * 60 * 60 * 1000);
+  function onVisible() {
+    if (!document.hidden) keep(false);
+  }
+  document.addEventListener("visibilitychange", onVisible);
+  return function stop() {
+    stopped = true;
+    clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisible);
+  };
+}
+
 function captureTokenFromHash() {
   try {
     const hash = String(window.location.hash || "");
