@@ -89,6 +89,7 @@ export default function PhotoStation() {
   const [useSimTurntable, setUseSimTurntable] = useState(false);
   const [turntableAngle, setTurntableAngle] = useState(0);
   const [turntableMoving, setTurntableMoving] = useState(false);
+  const [jogBusy, setJogBusy] = useState(false);
 
   function pushLog(msg, detail) {
     const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
@@ -314,6 +315,8 @@ export default function PhotoStation() {
 
   const canStart =
     !busy &&
+    !jogBusy &&
+    !turntableMoving &&
     turntableReady &&
     (state === CAPTURE_STATES.idle ||
       state === CAPTURE_STATES.complete ||
@@ -328,6 +331,32 @@ export default function PhotoStation() {
           streamSettings.height
         )} MP stream)`
       : "Resolution pending";
+
+  async function onJog(delta) {
+    if (busy || jogBusy || turntableMoving || !turntableReady) return;
+    setJogBusy(true);
+    setError(null);
+    try {
+      const st = turntable.getStatus();
+      if (st?.state === "disconnected") {
+        await turntable.connect();
+      }
+      let step = delta;
+      if (delta === 0) {
+        const pos = ((Number(turntable.getStatus()?.positionDeg) || 0) % 360 + 360) % 360;
+        if (pos < 0.05) return;
+        step = pos > 180 ? 360 - pos : -pos;
+      }
+      await turntable.rotateDegrees(step);
+    } catch (e) {
+      setError({
+        code: "TURNTABLE",
+        message: e?.message || String(e),
+      });
+    } finally {
+      setJogBusy(false);
+    }
+  }
 
   async function onStart() {
     setError(null);
@@ -474,6 +503,32 @@ export default function PhotoStation() {
       ) : null}
 
       <div className="ps-actions">
+        <div className="ps-jog">
+          <button
+            type="button"
+            className="ps-btn ps-btn-secondary"
+            disabled={busy || jogBusy || turntableMoving || !turntableReady}
+            onClick={() => onJog(0)}
+          >
+            0°
+          </button>
+          <button
+            type="button"
+            className="ps-btn ps-btn-secondary"
+            disabled={busy || jogBusy || turntableMoving || !turntableReady}
+            onClick={() => onJog(10)}
+          >
+            +10°
+          </button>
+          <button
+            type="button"
+            className="ps-btn ps-btn-secondary"
+            disabled={busy || jogBusy || turntableMoving || !turntableReady}
+            onClick={() => onJog(20)}
+          >
+            +20°
+          </button>
+        </div>
         <button
           type="button"
           className="ps-btn ps-btn-start"

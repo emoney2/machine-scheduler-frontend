@@ -275,6 +275,17 @@
   gap: 8px;
 }
 
+.ps-jog {
+  display: flex;
+  gap: 8px;
+}
+
+.ps-jog .ps-btn {
+  flex: 1;
+  font-size: 16px;
+  padding: 12px 8px;
+}
+
 .ps-btn-row .ps-btn {
   flex: 1;
   font-size: 14px;
@@ -523,6 +534,15 @@
     flex-shrink: 0;
     flex-direction: column;
     flex-wrap: nowrap;
+  }
+
+  .ps-jog {
+    gap: 6px;
+  }
+
+  .ps-jog .ps-btn {
+    font-size: 15px;
+    padding: 9px 6px;
   }
 
   .ps-btn-start {
