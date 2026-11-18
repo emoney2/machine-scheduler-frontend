@@ -75,15 +75,16 @@ export function createSimulatedTurntable({
       log("connected", status());
     },
 
-    async rotateDegrees(degrees) {
+    async rotateDegrees(degrees, opts = {}) {
       if (state === TURNTABLE_STATES.disconnected) {
         throw new Error("Turntable is not connected");
       }
       const deg = Number(degrees) || 0;
       const token = ++moveToken;
       state = TURNTABLE_STATES.moving;
-      log(`rotateDegrees ${deg}`, { from: positionDeg });
-      const duration = Math.max(0, (Math.abs(deg) / 60) * stepMs);
+      const grade = Math.max(1, Number(opts.speedGrade) || 6);
+      log(`rotateDegrees ${deg}`, { from: positionDeg, speedGrade: grade });
+      const duration = Math.max(0, (Math.abs(deg) / 60) * stepMs * (6 / grade));
       await wait(duration, token);
       positionDeg = ((positionDeg + deg) % 360 + 360) % 360;
       state = TURNTABLE_STATES.idle;

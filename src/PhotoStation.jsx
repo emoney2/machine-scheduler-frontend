@@ -49,13 +49,14 @@ function stateLabel(state) {
 }
 
 function progressPercent(progress) {
-  const total = (progress?.photoTotal || 6) + 1; // photos + video
+  const total = (progress?.photoTotal || 8) + 1; // photos + video
   if (progress?.step === "complete") return 100;
   if (progress?.recording || progress?.step === "video_starting" || progress?.step === "video_recording") {
-    const photosDone = progress?.photoTotal || 6;
+    const photosDone = progress?.photoTotal || 8;
     const countdown = progress?.videoCountdownSec;
+    const duration = progress?.videoDurationSec || 13;
     const videoFrac =
-      countdown != null ? 1 - Math.min(1, Math.max(0, countdown / 10)) : 0.5;
+      countdown != null ? 1 - Math.min(1, Math.max(0, countdown / duration)) : 0.5;
     return Math.round(((photosDone + videoFrac) / total) * 100);
   }
   const idx = progress?.photoIndex || 0;
@@ -242,7 +243,7 @@ export default function PhotoStation() {
   useEffect(() => {
     const service = createCameraCaptureService({
       turntable,
-      photoCount: 6,
+      photoAngles: [0, 35, 140, 150, 180, 210, 220, 330],
       videoDurationMs: 10000,
       stepWaitMs: 2000,
       onStateChange: (next) => setState(next),

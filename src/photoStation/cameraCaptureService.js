@@ -23,6 +23,12 @@ export const CAPTURE_STATES = Object.freeze({
 const PHOTO_COUNT = 6;
 const VIDEO_MS = 10000;
 const JPEG_QUALITY = 0.92;
+const PHOTO_ANGLES = [0, 35, 140, 150, 180, 210, 220, 330];
+const VIDEO_START_DEG = 270;
+const TURNTABLE_SPEED = 6;
+const TURNTABLE_FAST_SPEED = 24;
+// One full turn from 270 back to 270, then on to 0.
+const VIDEO_SPIN_DEG = 450;
 
 const VIDEO_MIME_CANDIDATES = [
   "video/mp4;codecs=avc1",
@@ -113,6 +119,7 @@ export function createCameraCaptureService({
   onPermission = () => {},
   turntable = null,
   photoCount = PHOTO_COUNT,
+  photoAngles = PHOTO_ANGLES,
   videoDurationMs = VIDEO_MS,
   stepWaitMs = 2000,
 } = {}) {
@@ -675,7 +682,7 @@ export function createCameraCaptureService({
     }
   }
 
-  async function recordVideo(dateStr, sessionNum, signal) {
+  async function recordVideo(dateStr, sessionNum, signal, spin) {
     if (typeof MediaRecorder === "undefined") {
       throw Object.assign(
         new Error("MediaRecorder is not supported in this browser."),
@@ -756,10 +763,16 @@ export function createCameraCaptureService({
     };
     document.addEventListener("visibilitychange", onVis);
 
+    const recordMs = spin
+      ? Math.round((videoDurationMs * VIDEO_SPIN_DEG) / 360)
+      : videoDurationMs;
+    const recordSec = Math.ceil(recordMs / 1000);
+
     emitProgress({
       step: "video_recording",
-      message: "Recording video…",
-      videoCountdownSec: Math.ceil(videoDurationMs / 1000),
+      message: spin ? "Recording from 270° around to 0°…" : "Recording video…",
+      videoCountdownSec: recordSec,
+      videoDurationSec: recordSec,
       recording: true,
     });
 
@@ -783,25 +796,26 @@ export function createCameraCaptureService({
       countdownTimer = setInterval(() => {
         const left = Math.max(
           0,
-          Math.ceil((videoDurationMs - (Date.now() - startedAt)) / 1000)
+          Math.ceil((recordMs - (Date.now() - startedAt)) / 1000)
         );
         emitProgress({
           step: "video_recording",
           recording: true,
           videoCountdownSec: left,
-          message: `Recording… ${left}s`,
+          videoDurationSec: recordSec,
+          message: spin ? `Recording 270° to 0°… ${left}s` : `Recording… ${left}s`,
         });
       }, 200);
 
-      // Drive continuous rotation in parallel; always record for the full duration.
-      const spinPromise = turntable
-        ? turntable.rotateContinuous(1).catch((e) => {
-            log("turntable continuous rotate warning", e?.message || e);
+      // The spin defines the clip: 270° all the way around, then on to 0°.
+      const spinPromise = spin
+        ? spin().catch((e) => {
+            log("video spin warning", e?.message || e);
           })
-        : Promise.resolve();
+        : sleep(videoDurationMs, signal);
 
       try {
-        await sleep(videoDurationMs, signal);
+        await spinPromise;
       } catch (e) {
         if (e?.code !== "ABORTED") throw e;
       }
@@ -935,66 +949,94 @@ export function createCameraCaptureService({
 
       setState(CAPTURE_STATES.photo_capture);
       await ensureLiveStream();
-      for (let i = 1; i <= photoCount; i += 1) {
+      const angles =
+        Array.isArray(photoAngles) && photoAngles.length
+          ? photoAngles.map((n) => Number(n))
+          : Array.from({ length: photoCount }, (_, i) => i * 60);
+      const total = angles.length;
+
+      async function moveTo(targetDeg, fast) {
+        if (!turntable) {
+          await sleep(fast ? 300 : stepWaitMs, signal);
+          return;
+        }
+        const from = Number(turntable.getStatus()?.positionDeg) || 0;
+        const current = ((from % 360) + 360) % 360;
+        const target = ((Number(targetDeg) % 360) + 360) % 360;
+        let delta = target - current;
+        if (delta > 180) delta -= 360;
+        if (delta < -180) delta += 360;
+        if (Math.abs(delta) < 0.4) return;
+        await turntable.rotateDegrees(delta, {
+          speedGrade: fast ? TURNTABLE_FAST_SPEED : TURNTABLE_SPEED,
+        });
+      }
+
+      for (let i = 0; i < total; i += 1) {
         if (signal.aborted) throw Object.assign(new Error("Cancelled"), { code: "ABORTED" });
+        const angle = angles[i];
         emitProgress({
-          step: "photo_capture",
-          message: `Capturing photo ${i} of ${photoCount}…`,
+          step: "turntable_wait",
+          message: `Moving to ${angle}°…`,
           photoIndex: i,
-          photoTotal: photoCount,
+          photoTotal: total,
           recording: false,
         });
+        await moveTo(angle, false);
         await ensureLiveStream();
-        const photo = await captureStill(i, dateStr, sessionNum);
+        await new Promise((r) => setTimeout(r, 250));
+        emitProgress({
+          step: "photo_capture",
+          message: `Capturing photo ${i + 1} of ${total} at ${angle}°…`,
+          photoIndex: i + 1,
+          photoTotal: total,
+          recording: false,
+        });
+        const photo = await captureStill(i + 1, dateStr, sessionNum);
         session.photos.push(photo);
         emitProgress({
           step: "photo_captured",
-          message: `Photo ${i}/${photoCount}: ${photo.width}×${photo.height} (${photo.megapixels} MP)`,
-          photoIndex: i,
-          photoTotal: photoCount,
+          message: `Photo ${i + 1}/${total} at ${angle}°: ${photo.width}×${photo.height} (${photo.megapixels} MP)`,
+          photoIndex: i + 1,
+          photoTotal: total,
           lastPhoto: photo,
         });
-
-        if (i < photoCount) {
-          emitProgress({
-            step: "turntable_wait",
-            message: turntable
-              ? `Rotating turntable 60°…`
-              : `Waiting ${Math.round(stepWaitMs / 1000)}s (simulated turntable)…`,
-            photoIndex: i,
-            photoTotal: photoCount,
-          });
-          if (turntable) {
-            await turntable.rotateDegrees(60);
-          } else {
-            await sleep(stepWaitMs, signal);
-          }
-          // Safari often drops preview frames while backgrounded/busy during rotates
-          await ensureLiveStream();
-          await new Promise((r) => setTimeout(r, 250));
-        }
       }
+
+      emitProgress({
+        step: "turntable_wait",
+        message: `Moving quickly to ${VIDEO_START_DEG}°…`,
+        photoIndex: total,
+        photoTotal: total,
+        recording: false,
+      });
+      await moveTo(VIDEO_START_DEG, true);
 
       setState(CAPTURE_STATES.video_capture);
       emitProgress({
         step: "video_starting",
-        message: "Starting continuous video…",
+        message: `Starting video at ${VIDEO_START_DEG}°…`,
         recording: true,
-        videoCountdownSec: Math.ceil(videoDurationMs / 1000),
+        photoIndex: total,
+        photoTotal: total,
+        videoCountdownSec: Math.ceil((videoDurationMs * VIDEO_SPIN_DEG) / 360 / 1000),
+        videoDurationSec: Math.ceil((videoDurationMs * VIDEO_SPIN_DEG) / 360 / 1000),
       });
       await ensureLiveStream();
-      const video = await recordVideo(dateStr, sessionNum, signal);
+      const video = await recordVideo(dateStr, sessionNum, signal, async () => {
+        if (!turntable) {
+          await sleep(Math.round((videoDurationMs * VIDEO_SPIN_DEG) / 360), signal);
+          return;
+        }
+        // Full turn brings 270° back to 270°, then 90° more lands on 0°.
+        await turntable.rotateDegrees(360, { speedGrade: TURNTABLE_SPEED });
+        await turntable.rotateDegrees(90, { speedGrade: TURNTABLE_SPEED });
+      });
       session.video = video;
 
       session.completedAt = new Date().toISOString();
 
-      if (turntable) {
-        try {
-          await turntable.home();
-        } catch (e) {
-          log("turntable home warning", e?.message || e);
-        }
-      }
+      // The video spin already returned the table to 0°. Don't home again.
 
       // Queue Drive upload in the background so the next product can start now.
       try {

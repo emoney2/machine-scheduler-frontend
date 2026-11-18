@@ -46,6 +46,7 @@ export function createComximTurntable({
   let positionDeg = 0;
   let lastError = null;
   let moveToken = 0;
+  let appliedGrade = null;
 
   function status() {
     return {
@@ -118,7 +119,7 @@ export function createComximTurntable({
       log("connected", status());
     },
 
-    async rotateDegrees(degrees) {
+    async rotateDegrees(degrees, opts = {}) {
       if (state === TURNTABLE_STATES.disconnected) {
         throw new Error("Turntable is not connected");
       }
@@ -127,9 +128,14 @@ export function createComximTurntable({
       const token = ++moveToken;
       state = TURNTABLE_STATES.moving;
       const direction = Number(degrees) < 0 ? 1 : 0; // 0=CW, 1=CCW
+      const grade = Math.max(1, Math.min(30, Math.round(Number(opts.speedGrade) || speedGrade)));
       const cmd = `CT+TURNSINGLE(${direction},${deg.toFixed(1)});`;
-      log(cmd);
+      log(cmd, { speedGrade: grade });
       try {
+        if (appliedGrade !== grade) {
+          await sendCommand(`CT+SETSPEED(${grade});`, "OK", 10000);
+          appliedGrade = grade;
+        }
         await sendCommand(cmd, "TB_END", Math.max(20000, deg * 400));
         if (token !== moveToken) return;
         positionDeg = ((positionDeg + Number(degrees)) % 360 + 360) % 360;
@@ -155,6 +161,7 @@ export function createComximTurntable({
       log("rotateContinuous 360", { grade, continuousMsPer360 });
       try {
         await sendCommand(`CT+SETSPEED(${grade});`, "OK", 10000);
+        appliedGrade = grade;
         // Exact 360° move; wait for TB_END (may finish near video length)
         await sendCommand("CT+TURNSINGLE(0,360.0);", "TB_END", Math.max(continuousMsPer360 + 15000, 45000));
         if (token !== moveToken) return;
