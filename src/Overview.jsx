@@ -681,7 +681,7 @@ function getJobThumbUrl(job, ROOT) {
 }
 
 
-const LS_OVERVIEW_KEY = "jrco.overview.cache.v2";
+const LS_OVERVIEW_KEY = "jrco.overview.cache.v3";
 
 const LS_METRICS_KEY = "jrco.metrics.cache.v1";
 
@@ -1240,6 +1240,190 @@ function SecureImage({ candidates = [], alt = "", style }) {
   );
 }
 
+function sortUncutJobs(jobs) {
+  return [...(jobs || [])].sort((a, b) => {
+    const ad = parseDate(a?.due);
+    const bd = parseDate(b?.due);
+    const at = ad ? ad.getTime() : Infinity;
+    const bt = bd ? bd.getTime() : Infinity;
+    if (at !== bt) return at - bt;
+    return String(a?.order || "").localeCompare(String(b?.order || ""), undefined, { numeric: true });
+  });
+}
+
+function MaterialToOrderLine({ it, vendor, isOpen, onToggle }) {
+  const isThread = String(it.type || "Material").toLowerCase() === "thread";
+  const swatch = isThread ? colorFromName(it.name) : null;
+  const jobs = isThread ? [] : sortUncutJobs(it.jobs);
+  const canExpand = !isThread;
+
+  return (
+    <div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 12,
+          lineHeight: "16px",
+          padding: "2px 0",
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 24,
+            borderRadius: 4,
+            border: "1px solid #ddd",
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#fafafa",
+            flex: "0 0 36px",
+          }}
+          aria-label={isThread ? "Thread image" : "Material image"}
+          title={it.name}
+        >
+          {isThread ? (
+            <ThreadThumb name={it.name} fallbackColor={swatch} />
+          ) : it.color ? (
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                background: it.color,
+                borderRadius: "4px",
+              }}
+            />
+          ) : (
+            <BasicImg
+              src={materialImgUrl(ROOT, vendor, it.name)}
+              alt=""
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }}
+            />
+          )}
+        </div>
+        {canExpand ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={isOpen}
+            title="Show outstanding jobs that still need this material cut"
+            style={{
+              width: 240,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              minWidth: 0,
+              padding: 0,
+              border: "none",
+              background: "transparent",
+              textAlign: "left",
+              cursor: "pointer",
+              font: "inherit",
+              color: "inherit",
+            }}
+          >
+            <span aria-hidden="true" style={{ flex: "0 0 auto", color: "#6b7280", width: 12 }}>
+              {isOpen ? "▼" : "▶"}
+            </span>
+            <span style={{ minWidth: 0, overflow: "hidden" }}>
+              <div
+                style={{
+                  fontWeight: it.type === "Thread" ? "600" : "normal",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {it.label || it.name}
+              </div>
+            </span>
+          </button>
+        ) : (
+          <div
+            style={{
+              width: 240,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            title={it.label || it.name}
+          >
+            <div style={{ fontWeight: it.type === "Thread" ? "600" : "normal" }}>
+              {it.label || it.name}
+            </div>
+            {it.type === "Thread" && it.pct !== undefined && (
+              <div style={{ fontSize: 11, color: "#666" }}>
+                (Inventory: {it.pct}%)
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
+          {it.qty}
+        </div>
+        <div style={{ width: 60 }} title={it.unit || ""}>
+          {it.unit || ""}
+        </div>
+        <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
+          {it.type || "Material"}
+        </div>
+      </div>
+      {canExpand && isOpen && (
+        <div
+          style={{
+            margin: "2px 0 8px 46px",
+            padding: "6px 8px",
+            background: "#f9fafb",
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#6b7280", marginBottom: 4 }}>
+            Outstanding jobs not yet cut
+          </div>
+          {jobs.length === 0 ? (
+            <div style={{ fontSize: 12, color: "#9ca3af" }}>
+              No outstanding jobs still need this material cut.
+            </div>
+          ) : (
+            jobs.map((job) => {
+              const detail = [job.company, job.design, job.product].filter(Boolean).join(" · ");
+              const due = showMMDDorRaw(job.due);
+              return (
+                <div
+                  key={job.order}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "2px 8px",
+                    fontSize: 12,
+                    padding: "3px 0",
+                    alignItems: "baseline",
+                  }}
+                >
+                  <strong>#{job.order}</strong>
+                  {detail ? <span>{detail}</span> : null}
+                  {job.qty !== "" && job.qty != null ? <span>Qty {job.qty}</span> : null}
+                  {due ? <span>Due {due}</span> : null}
+                  {job.stage ? <span style={{ color: "#6b7280" }}>{job.stage}</span> : null}
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** ThreadThumb: tries private backend image first, shows color swatch as fallback layer */
 function ThreadThumb({ name, fallbackColor }) {
   const candidates = React.useMemo(() => urlCandidatesForThreadImage(name), [name]);
@@ -1503,6 +1687,7 @@ function col(width, center = false) {
   const [materials, setMaterials] = useState([]);
   const [materialsFuture, setMaterialsFuture] = useState([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
+  const [openMaterialJobs, setOpenMaterialJobs] = useState({});
 
   // Kanban queue (same data as Kanban Queue tab — consolidated summary)
   const [kanbanQueueRows, setKanbanQueueRows] = useState([]);
@@ -3748,7 +3933,7 @@ function col(width, center = false) {
                   Order now
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-                  Stock covers near-term jobs first · shortfall for Due ≤ 60 days
+                  Stock covers near-term jobs first · shortfall for Due ≤ 60 days. Click a material for jobs not yet cut.
                 </div>
                 {!materials.length ? (
                   <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing in this column.</div>
@@ -3815,90 +4000,20 @@ function col(width, center = false) {
                       </div>
                       <div style={{ marginTop: 6 }}>
                         {(grp.items || []).map((it, j) => {
-                          const isThread =
-                            String(it.type || "Material").toLowerCase() === "thread";
-                          const swatch = isThread ? colorFromName(it.name) : null;
-
+                          const openKey = `now:::${grp.vendor}:::${j}`;
                           return (
-                            <div
-                              key={j}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                fontSize: 12,
-                                lineHeight: "16px",
-                                padding: "2px 0",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 36,
-                                  height: 24,
-                                  borderRadius: 4,
-                                  border: "1px solid #ddd",
-                                  overflow: "hidden",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  background: "#fafafa",
-                                  flex: "0 0 36px",
-                                }}
-                                aria-label={isThread ? "Thread image" : "Material image"}
-                                title={it.name}
-                              >
-                                {isThread ? (
-                                  <ThreadThumb name={it.name} fallbackColor={swatch} />
-                                ) : it.color ? (
-                                  <div
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      background: it.color,
-                                      borderRadius: "4px",
-                                    }}
-                                  />
-                                ) : (
-                                  <BasicImg
-                                    src={materialImgUrl(ROOT, grp.vendor, it.name)}
-                                    alt=""
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                      display: "block",
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              <div
-                                style={{
-                                  width: 240,
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                                title={it.label || it.name}
-                              >
-                                <div style={{ fontWeight: it.type === "Thread" ? "600" : "normal" }}>
-                                  {it.label || it.name}
-                                </div>
-                                {it.type === "Thread" && it.pct !== undefined && (
-                                  <div style={{ fontSize: 11, color: "#666" }}>
-                                    (Inventory: {it.pct}%)
-                                  </div>
-                                )}
-                              </div>
-                              <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
-                                {it.qty}
-                              </div>
-                              <div style={{ width: 60 }} title={it.unit || ""}>
-                                {it.unit || ""}
-                              </div>
-                              <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
-                                {it.type || "Material"}
-                              </div>
-                            </div>
+                            <MaterialToOrderLine
+                              key={openKey}
+                              it={it}
+                              vendor={grp.vendor}
+                              isOpen={!!openMaterialJobs[openKey]}
+                              onToggle={() =>
+                                setOpenMaterialJobs((prev) => ({
+                                  ...prev,
+                                  [openKey]: !prev[openKey],
+                                }))
+                              }
+                            />
                           );
                         })}
                       </div>
@@ -3918,7 +4033,7 @@ function col(width, center = false) {
                   Plan ahead
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-                  Leftover stock after near-term · shortfall for Due in 60+ days
+                  Leftover stock after near-term · shortfall for Due in 60+ days. Click a material for jobs not yet cut.
                 </div>
                 {!materialsFuture.length ? (
                   <div style={{ fontSize: 12, color: "#9ca3af" }}>Nothing deferred to this column.</div>
@@ -3986,90 +4101,20 @@ function col(width, center = false) {
                       </div>
                       <div style={{ marginTop: 6 }}>
                         {(grp.items || []).map((it, j) => {
-                          const isThread =
-                            String(it.type || "Material").toLowerCase() === "thread";
-                          const swatch = isThread ? colorFromName(it.name) : null;
-
+                          const openKey = `future:::${grp.vendor}:::${j}`;
                           return (
-                            <div
-                              key={j}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 10,
-                                fontSize: 12,
-                                lineHeight: "16px",
-                                padding: "2px 0",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 36,
-                                  height: 24,
-                                  borderRadius: 4,
-                                  border: "1px solid #ddd",
-                                  overflow: "hidden",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  background: "#fafafa",
-                                  flex: "0 0 36px",
-                                }}
-                                aria-label={isThread ? "Thread image" : "Material image"}
-                                title={it.name}
-                              >
-                                {isThread ? (
-                                  <ThreadThumb name={it.name} fallbackColor={swatch} />
-                                ) : it.color ? (
-                                  <div
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      background: it.color,
-                                      borderRadius: "4px",
-                                    }}
-                                  />
-                                ) : (
-                                  <BasicImg
-                                    src={materialImgUrl(ROOT, grp.vendor, it.name)}
-                                    alt=""
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      objectFit: "cover",
-                                      display: "block",
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              <div
-                                style={{
-                                  width: 240,
-                                  whiteSpace: "nowrap",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                }}
-                                title={it.label || it.name}
-                              >
-                                <div style={{ fontWeight: it.type === "Thread" ? "600" : "normal" }}>
-                                  {it.label || it.name}
-                                </div>
-                                {it.type === "Thread" && it.pct !== undefined && (
-                                  <div style={{ fontSize: 11, color: "#666" }}>
-                                    (Inventory: {it.pct}%)
-                                  </div>
-                                )}
-                              </div>
-                              <div style={{ width: 70, textAlign: "right" }} title={String(it.qty ?? "")}>
-                                {it.qty}
-                              </div>
-                              <div style={{ width: 60 }} title={it.unit || ""}>
-                                {it.unit || ""}
-                              </div>
-                              <div style={{ width: 80, color: "#666" }} title={it.type || "Material"}>
-                                {it.type || "Material"}
-                              </div>
-                            </div>
+                            <MaterialToOrderLine
+                              key={openKey}
+                              it={it}
+                              vendor={grp.vendor}
+                              isOpen={!!openMaterialJobs[openKey]}
+                              onToggle={() =>
+                                setOpenMaterialJobs((prev) => ({
+                                  ...prev,
+                                  [openKey]: !prev[openKey],
+                                }))
+                              }
+                            />
                           );
                         })}
                       </div>
