@@ -1413,6 +1413,7 @@ function MaterialToOrderLine({ it, vendor, isOpen, onToggle }) {
                   {detail ? <span>{detail}</span> : null}
                   {job.qty !== "" && job.qty != null ? <span>Qty {job.qty}</span> : null}
                   {due ? <span>Due {due}</span> : null}
+                  {job.status ? <span>{job.status}</span> : null}
                   {job.stage ? <span style={{ color: "#6b7280" }}>{job.stage}</span> : null}
                 </div>
               );
