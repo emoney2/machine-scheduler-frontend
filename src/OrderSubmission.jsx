@@ -227,6 +227,148 @@ function findMissingMaterial(form, materialsInv, incompleteNames) {
   return null;
 }
 
+function normalizeInventoryKey(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Match a Photoshop swatch label to a Material Inventory name. */
+function matchInventoryName(candidates, names) {
+  const list = (Array.isArray(names) ? names : [])
+    .map((n) => String(n || "").trim())
+    .filter(Boolean);
+  if (!list.length) return "";
+  const indexed = list.map((raw) => ({ raw, key: normalizeInventoryKey(raw) }));
+  for (const candidate of candidates) {
+    const key = normalizeInventoryKey(candidate);
+    if (!key) continue;
+    const hit = indexed.find((row) => row.key === key);
+    if (hit) return hit.raw;
+  }
+  const primary = candidates.map(normalizeInventoryKey).find(Boolean);
+  if (!primary) return "";
+  const tokens = primary.split(" ").filter((token) => token.length > 1);
+  if (tokens.length >= 2) {
+    const hits = indexed.filter((row) => {
+      const words = row.key.split(" ");
+      return tokens.every((token) => words.includes(token));
+    });
+    if (hits.length === 1) return hits[0].raw;
+  }
+  return "";
+}
+
+function presentationSwatches(design) {
+  const fromList = Array.isArray(design?.materials) ? design.materials : [];
+  const swatches = [];
+  const push = (category, colorName, name) => {
+    const cat = String(category || "").trim();
+    const color = String(colorName || "").trim();
+    const explicit = String(name || "").trim();
+    if (!cat && !color && !explicit) return;
+    swatches.push({ category: cat, colorName: color, name: explicit });
+  };
+  fromList.forEach((item) => {
+    if (typeof item === "string") push("", "", item);
+    else if (item && typeof item === "object") {
+      push(
+        item.category || item.materialCategory,
+        item.colorName || item.materialColorName,
+        item.name
+      );
+    }
+  });
+  if (!swatches.length) {
+    push(design?.materialCategory, design?.materialColorName, "");
+  }
+  return swatches.slice(0, 5);
+}
+
+function swatchMaterialLabel(swatch) {
+  const explicit = String(swatch?.name || "").trim();
+  if (explicit) return explicit;
+  return [swatch?.category, swatch?.colorName].filter(Boolean).join(" ").trim();
+}
+
+function matchProductFromPresentation(productType, productNames) {
+  const names = Array.isArray(productNames) ? productNames : [];
+  const needle = String(productType || "").replace(/_/g, " ").toLowerCase().trim();
+  if (!needle) return { match: "", ambiguous: false };
+  const exact = names.find((p) => String(p).toLowerCase() === needle) || "";
+  if (exact) return { match: exact, ambiguous: false };
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const wordRe = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, "i");
+  const fuzzy = names.filter((p) => wordRe.test(String(p)));
+  if (fuzzy.length === 1) return { match: fuzzy[0], ambiguous: false };
+  if (fuzzy.length > 1) return { match: "", ambiguous: true };
+  return { match: "", ambiguous: false };
+}
+
+/**
+ * Map one presentation page's Photoshop swatches onto order-form fields.
+ * Inventory names win when they match; otherwise the swatch label is used as typed.
+ */
+function buildPresentationAutofill(design, materialNames, productNames) {
+  const inventory = Array.isArray(materialNames) ? materialNames : [];
+  const materials = [];
+  const unmatched = [];
+  presentationSwatches(design).forEach((swatch) => {
+    const label = swatchMaterialLabel(swatch);
+    const candidates = [];
+    if (swatch.name) candidates.push(swatch.name);
+    if (swatch.category && swatch.colorName) {
+      candidates.push(`${swatch.category} ${swatch.colorName}`);
+      candidates.push(`${swatch.colorName} ${swatch.category}`);
+    } else if (swatch.colorName) {
+      candidates.push(swatch.colorName);
+    }
+    if (label) candidates.push(label);
+    const matched = matchInventoryName(candidates, inventory);
+    const value = matched || label;
+    if (!value) return;
+    materials.push(value);
+    if (!matched && inventory.length) unmatched.push(value);
+  });
+
+  const furRaw = String(design?.furColorName || "").trim();
+  const furMatch = furRaw ? matchInventoryName([furRaw], inventory) : "";
+  const furColor = furMatch || furRaw;
+  const product = matchProductFromPresentation(design?.productType, productNames);
+  const designName = String(design?.designName || design?.sourceName || "").trim();
+  const pageLabel = design?.page ? `Page ${design.page}` : "This page";
+  const bits = [];
+  if (materials.length) {
+    bits.push(materials.map((name, i) => `Material ${i + 1} “${name}”`).join(", "));
+  } else {
+    bits.push("no material swatch on this page");
+  }
+  if (furColor) bits.push(`Fur “${furColor}”`);
+  else bits.push("no fur color on this page");
+  if (product.match) bits.push(`Product “${product.match}”`);
+  else if (product.ambiguous) {
+    const kind = String(design?.productType || "").replace(/_/g, " ");
+    bits.push(`product left blank (“${kind}” matches more than one)`);
+  }
+  if (designName) bits.push(`Design “${designName}”`);
+  let note = `${pageLabel}: ${bits.join("; ")}.`;
+  if (materials.length) note += " Enter the material % before submit.";
+  if (unmatched.length) note += ` Not in inventory yet: ${unmatched.join(", ")}.`;
+  if (furRaw && inventory.length && !furMatch) {
+    note += ` Fur “${furRaw}” is not in inventory yet.`;
+  }
+  return {
+    materials,
+    furColor,
+    product: product.match,
+    designName,
+    note,
+  };
+}
+
 /**
  * Tiny JPEG for localStorage when API did not return primaryFileId (older backend).
  */
@@ -311,6 +453,14 @@ export default function OrderSubmission() {
   const [jrUsedRasterizedPageFlat, setJrUsedRasterizedPageFlat] = useState(false);
   /** Keep the original presentation PDF so page re-picks still work after rasterize. */
   const jrPresentationPdfRef = useRef(null);
+  /** Values last written from a presentation page, so a later page pick can replace them. */
+  const jrAutofillRef = useRef({
+    product: "",
+    designName: "",
+    furColor: "",
+    materials: [],
+  });
+  const jrAutofillSigRef = useRef("");
   // Track preview URLs for cleanup on unmount (declared before applyJr… uses it)
   const prodPreviewUrlsRef = useRef(new Set());
   const printPreviewUrlsRef = useRef(new Set());
@@ -324,7 +474,6 @@ export default function OrderSubmission() {
     const id = String(design?.designId || "");
     if (!id) return;
     setJrSelectedDesignId(id);
-    setOrderHasPrint(true);
 
     const flatName =
       design.suggestedFilename ||
@@ -480,25 +629,6 @@ export default function OrderSubmission() {
       });
     }
 
-    const productType = String(design?.productType || "").trim();
-    if (!productType) return;
-    // Presentation productType is a 3D template id (e.g. "driver"), NOT the order SKU
-    // (Quilted Driver vs Barrel Driver vs Driver Full…). Only fill Product when the
-    // catalog match is unambiguous — never guess the first alphabetical "…Driver".
-    const names = Array.isArray(productNames) ? productNames : [];
-    const needle = productType.replace(/_/g, " ").toLowerCase().trim();
-    if (!needle) return;
-    const exact =
-      names.find((p) => String(p).toLowerCase() === needle) || null;
-    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const wordRe = new RegExp(`(?:^|[^a-z0-9])${escaped}(?:[^a-z0-9]|$)`, "i");
-    const fuzzy = names.filter((p) => wordRe.test(String(p)));
-    const match = exact || (fuzzy.length === 1 ? fuzzy[0] : null);
-    if (!match) return;
-    setForm((prev) => {
-      if (String(prev.product || "").trim()) return prev;
-      return { ...prev, product: match };
-    });
   };
 
   const location = useLocation();
@@ -1525,6 +1655,84 @@ useEffect(() => {
 // for matching
 const materialNames = materialsInv;
 
+  useEffect(() => {
+    const emptyAuto = {
+      product: "",
+      designName: "",
+      furColor: "",
+      materials: [],
+    };
+    if (!jrSelectedDesignId || !jrPresentationInfo?.designs) {
+      if (jrAutofillSigRef.current) {
+        jrAutofillSigRef.current = "";
+        jrAutofillRef.current = emptyAuto;
+        setMaterialSuggestNote((prev) =>
+          String(prev || "").startsWith("Page ") ? "" : prev
+        );
+      }
+      return;
+    }
+    const design = jrPresentationInfo.designs.find(
+      (d) => String(d.designId || "") === String(jrSelectedDesignId)
+    );
+    if (!design) return;
+    const fill = buildPresentationAutofill(design, materialNames, products);
+    const signature = JSON.stringify({
+      id: String(design.designId || ""),
+      materials: fill.materials,
+      furColor: fill.furColor,
+      product: fill.product,
+      designName: fill.designName,
+    });
+    if (jrAutofillSigRef.current === signature) return;
+    jrAutofillSigRef.current = signature;
+    const auto = jrAutofillRef.current;
+    const owns = (current, previous) => {
+      const cur = String(current || "").trim();
+      const prevAuto = String(previous || "").trim();
+      return !cur || cur === prevAuto;
+    };
+    setForm((prev) => {
+      const next = { ...prev };
+      if (owns(prev.furColor, auto.furColor)) next.furColor = fill.furColor || "";
+      if (owns(prev.product, auto.product)) {
+        if (fill.product) next.product = fill.product;
+        else if (String(auto.product || "").trim()) next.product = "";
+      }
+      if (owns(prev.designName, auto.designName)) {
+        if (fill.designName) next.designName = fill.designName;
+        else if (String(auto.designName || "").trim()) next.designName = "";
+      }
+      const materials = Array.isArray(prev.materials)
+        ? [...prev.materials]
+        : ["", "", "", "", ""];
+      const percents = Array.isArray(prev.materialPercents)
+        ? [...prev.materialPercents]
+        : ["", "", "", "", ""];
+      while (materials.length < 5) materials.push("");
+      while (percents.length < 5) percents.push("");
+      for (let i = 0; i < 5; i++) {
+        const nextName = fill.materials[i] || "";
+        if (!owns(materials[i], auto.materials?.[i])) continue;
+        if (String(materials[i] || "") !== nextName) {
+          materials[i] = nextName;
+          percents[i] = "";
+        }
+      }
+      next.materials = materials.slice(0, 5);
+      next.materialPercents = percents.slice(0, 5);
+      return next;
+    });
+    jrAutofillRef.current = {
+      product: fill.product || "",
+      designName: fill.designName || "",
+      furColor: fill.furColor || "",
+      materials: [...fill.materials],
+    };
+    setMaterialSuggestNote(fill.note);
+    setMaterialSuggestErr("");
+  }, [jrSelectedDesignId, jrPresentationInfo, materialNames, products]);
+
 // make array of just the names for matching
 const furColorNames = materialNames;
 
@@ -1779,8 +1987,49 @@ const companyNames = companies.map((opt) => opt.value);
   };
 
   const handleFileChange = async (e, setter, previewSetter, urlsRef) => {
-    const files = Array.from(e.target.files || []);
+    let files = Array.from(e.target.files || []);
     if (!files.length) return;
+
+    // A presentation PDF is production art. Choosing it in Print Files must not
+    // attach the flat there or check Print.
+    if (setter === setPrintFiles) {
+      const kept = [];
+      const presentationPdfs = [];
+      for (const f of files) {
+        const name = String(f?.name || "").toLowerCase();
+        const isPdf = f?.type === "application/pdf" || name.endsWith(".pdf");
+        if (!isPdf) {
+          kept.push(f);
+          continue;
+        }
+        try {
+          const info = await inspectJrPresentationPdf(f);
+          if (info && Array.isArray(info.designs) && info.designs.length) {
+            presentationPdfs.push(f);
+            continue;
+          }
+        } catch (err) {
+          console.warn("JR presentation inspect failed:", err);
+        }
+        kept.push(f);
+      }
+      if (presentationPdfs.length) {
+        const dt = new DataTransfer();
+        presentationPdfs.forEach((f) => dt.items.add(f));
+        await handleFileChange(
+          { target: { files: dt.files } },
+          setProdFiles,
+          setProdPreviews,
+          prodPreviewUrlsRef
+        );
+        try {
+          e.target.value = "";
+        } catch (_) {}
+      }
+      files = kept;
+      if (!files.length) return;
+    }
+
     setter((prev) => [...prev, ...files]);
     const previews = await Promise.all(
       files.map((f) => createPreviewForFile(f, urlsRef))
@@ -1864,6 +2113,17 @@ const companyNames = companies.map((opt) => opt.value);
             });
           }
           setJrTilePickerOpen(true);
+          // Drop this PDF from Print if it was attached there too.
+          setPrintFiles((prev) => {
+            const next = prev.filter(
+              (f) => !jrNames.has(String(f.name || "").toLowerCase())
+            );
+            if (prev.length > 0 && next.length === 0) setOrderHasPrint(false);
+            return next;
+          });
+          setPrintPreviews((prev) =>
+            prev.filter((p) => !jrNames.has(String(p.name || "").toLowerCase()))
+          );
         }
       } catch (err) {
         console.warn("JR presentation inspect failed:", err);
@@ -2090,9 +2350,15 @@ const submitForm = async () => {
     fd.append("orderShipZip", addr.zip);
   }
 
-  // 🖨️ Append printFiles
-  if (printFiles.length > 0) {
-    printFiles.forEach((f, i) => {
+  // 🖨️ Append printFiles. A JR presentation PDF stays production-only.
+  const jrPdfName = String(jrPresentationInfo?.filename || "").toLowerCase();
+  const printFilesToSend = printFiles.filter((f) => {
+    const n = String(f?.name || "").toLowerCase();
+    if (jrPdfName && n === jrPdfName) return false;
+    return true;
+  });
+  if (printFilesToSend.length > 0) {
+    printFilesToSend.forEach((f, i) => {
       const safeFile = new File([f], f.name, { type: f.type || "application/octet-stream" });
       fd.append("printFiles", safeFile);
       console.log(`🖨️ Added printFile[${i}]:`, safeFile.name, safeFile.size, safeFile.type);
@@ -5032,7 +5298,8 @@ const handleSaveNewCompany = async () => {
                       ? `${jrPresentationInfo.filename} — `
                       : ""}
                     each tile is one PDF page. Selecting a tile loads that page’s
-                    production flat PNG as the preview.
+                    production flat and fills material, fur, and product from the
+                    Photoshop swatches saved in the PDF.
                   </p>
                 </div>
                 <button
@@ -5135,6 +5402,19 @@ const handleSaveNewCompany = async () => {
                             ? ` · ${String(d.productType).replace(/_/g, " ")}`
                             : ""}
                         </div>
+                        {presentationSwatches(d).length || d.furColorName ? (
+                          <div style={{ fontSize: 12, color: "#1e3a8a", marginTop: 2 }}>
+                            {presentationSwatches(d)
+                              .map(swatchMaterialLabel)
+                              .filter(Boolean)
+                              .join(", ") || "No material swatch"}
+                            {d.furColorName ? ` · ${d.furColorName}` : ""}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                            No swatch names on this page
+                          </div>
+                        )}
                         {missingDriveFlat ? (
                           <div style={{ fontSize: 12, color: "#92400e", marginTop: 2 }}>
                             No Drive flat — click to use this PDF page
