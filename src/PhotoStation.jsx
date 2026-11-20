@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import "./PhotoStation.css";
 import {
   CAPTURE_STATES,
+  captureBaseName,
   createCameraCaptureService,
   downloadBlob,
   downloadSession,
@@ -48,11 +49,17 @@ function stateLabel(state) {
   }
 }
 
+function extractOrderId(raw) {
+  const digits = String(raw || "").replace(/\D+/g, "");
+  const trimmed = digits.replace(/^0+/, "");
+  return trimmed || digits;
+}
+
 function progressPercent(progress) {
-  const total = (progress?.photoTotal || 8) + 1; // photos + video
+  const total = (progress?.photoTotal || 10) + 1; // photos + video
   if (progress?.step === "complete") return 100;
   if (progress?.recording || progress?.step === "video_starting" || progress?.step === "video_recording") {
-    const photosDone = progress?.photoTotal || 8;
+    const photosDone = progress?.photoTotal || 10;
     const countdown = progress?.videoCountdownSec;
     const duration = progress?.videoDurationSec || 13;
     const videoFrac =
@@ -91,6 +98,13 @@ export default function PhotoStation() {
   const [turntableAngle, setTurntableAngle] = useState(0);
   const [turntableMoving, setTurntableMoving] = useState(false);
   const [jogBusy, setJogBusy] = useState(false);
+  const [scanNote, setScanNote] = useState("");
+  const [scanBusy, setScanBusy] = useState(false);
+  const scanFocusRef = useRef(null);
+  const scanBufferRef = useRef("");
+  const scanTimerRef = useRef(null);
+  const scanLockRef = useRef(false);
+  const scanHandlerRef = useRef(async () => {});
 
   function pushLog(msg, detail) {
     const line = `${new Date().toISOString().slice(11, 23)} ${msg}${
@@ -243,7 +257,7 @@ export default function PhotoStation() {
   useEffect(() => {
     const service = createCameraCaptureService({
       turntable,
-      photoAngles: [0, 35, 140, 150, 180, 210, 220, 330],
+      photoAngles: [0, 35, 90, 140, 150, 180, 210, 220, 270, 330],
       videoDurationMs: 10000,
       stepWaitMs: 2000,
       onStateChange: (next) => setState(next),
@@ -316,6 +330,7 @@ export default function PhotoStation() {
 
   const canStart =
     !busy &&
+    !scanBusy &&
     !jogBusy &&
     !turntableMoving &&
     turntableReady &&
@@ -370,14 +385,155 @@ export default function PhotoStation() {
     serviceRef.current?.reset();
     setSession(null);
     setError(null);
+    setScanNote("");
   }
 
   async function onRetake() {
+    const label = session?.orderNumber
+      ? {
+          orderNumber: session.orderNumber,
+          jobName: session.jobName,
+          product: session.product,
+        }
+      : null;
     onReset();
-    // Allow state to settle, then start again
     await new Promise((r) => setTimeout(r, 50));
-    await onStart();
+    setError(null);
+    if (label) setScanNote(captureBaseName(label));
+    await serviceRef.current?.startCapture({ label });
+    const snap = serviceRef.current?.getSnapshot();
+    if (snap?.session) setSession({ ...snap.session });
   }
+
+  async function handleBarcodeScan(raw) {
+    if (scanLockRef.current) return;
+    const orderId = extractOrderId(raw);
+    if (!orderId || !/^\d{1,10}$/.test(orderId)) {
+      setError({ code: "SCAN", message: "That scan is not an order number." });
+      return;
+    }
+    if (!canStart) {
+      setError({
+        code: "SCAN",
+        message: busy
+          ? "Finish this capture before scanning the next job."
+          : "Wait until the turntable is ready.",
+      });
+      return;
+    }
+    scanLockRef.current = true;
+    setScanBusy(true);
+    setError(null);
+    setScanNote(`Looking up ${orderId}…`);
+    try {
+      const res = await fetch(
+        `${API_ROOT}/photo-station/job?orderNumber=${encodeURIComponent(orderId)}`,
+        { credentials: "include" }
+      );
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      if (!res.ok || !data?.order) {
+        setScanNote("");
+        setError({
+          code: "SCAN",
+          message: data?.error || `Order ${orderId} was not found.`,
+        });
+        return;
+      }
+      const label = {
+        orderNumber: String(data.order || orderId).trim(),
+        jobName: String(data.jobName || data.company || "").trim(),
+        product: String(data.product || "").trim(),
+      };
+      setScanNote(captureBaseName(label) || `Order ${label.orderNumber}`);
+      await serviceRef.current?.startCapture({ label });
+      const snap = serviceRef.current?.getSnapshot();
+      if (snap?.session) setSession({ ...snap.session });
+    } catch (e) {
+      setScanNote("");
+      setError({
+        code: "SCAN",
+        message: e?.message || "Could not look up that order.",
+      });
+    } finally {
+      scanLockRef.current = false;
+      setScanBusy(false);
+    }
+  }
+
+  scanHandlerRef.current = handleBarcodeScan;
+
+  useEffect(() => {
+    function focusCatcher() {
+      const el = scanFocusRef.current;
+      if (!el) return;
+      // Stay read-only so iPhone does not open the on-screen keyboard.
+      // A Bluetooth scanner still sends keydown events through this field.
+      el.setAttribute("readonly", "readonly");
+      try {
+        el.focus({ preventScroll: true });
+      } catch {
+        try {
+          el.focus();
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    function onPointerUp(event) {
+      const target = event.target;
+      if (target && target.closest && target.closest("input, textarea")) return;
+      setTimeout(focusCatcher, 0);
+    }
+    function onVis() {
+      if (document.visibilityState === "visible") focusCatcher();
+    }
+    function takeBuffer() {
+      const full = scanBufferRef.current;
+      scanBufferRef.current = "";
+      if (full.trim()) scanHandlerRef.current(full);
+    }
+    function schedule() {
+      clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = setTimeout(takeBuffer, 600);
+    }
+    function onKeyDown(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const target = e.target;
+      if (
+        target &&
+        target !== scanFocusRef.current &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA")
+      ) {
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        clearTimeout(scanTimerRef.current);
+        takeBuffer();
+        return;
+      }
+      if (e.key.length !== 1) return;
+      scanBufferRef.current += e.key;
+      schedule();
+    }
+    focusCatcher();
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("focus", focusCatcher);
+    document.addEventListener("visibilitychange", onVis);
+    document.addEventListener("pointerup", onPointerUp);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("focus", focusCatcher);
+      document.removeEventListener("visibilitychange", onVis);
+      document.removeEventListener("pointerup", onPointerUp);
+      clearTimeout(scanTimerRef.current);
+    };
+  }, []);
 
   async function onExportAll() {
     if (!session) return;
@@ -398,11 +554,23 @@ export default function PhotoStation() {
 
   return (
     <div className="ps-root">
+      <input
+        ref={scanFocusRef}
+        className="ps-scan-catcher"
+        aria-label="Barcode scanner input"
+        autoCapitalize="off"
+        autoCorrect="off"
+        spellCheck={false}
+        autoComplete="off"
+        readOnly
+        inputMode="none"
+        defaultValue=""
+      />
       <header className="ps-header">
         <div className="ps-brand">JR &amp; Co.</div>
         <h1 className="ps-title">Photo Station</h1>
         <p className="ps-subtitle">
-          Place headcover on turntable, press Start once. Photos, rotates, and 360 video run automatically.
+          Scan a job barcode to start, or press Start. Photos, rotates, and the 360 video run automatically.
         </p>
       </header>
 
@@ -508,7 +676,7 @@ export default function PhotoStation() {
           <button
             type="button"
             className="ps-btn ps-btn-secondary"
-            disabled={busy || jogBusy || turntableMoving || !turntableReady}
+            disabled={busy || scanBusy || jogBusy || turntableMoving || !turntableReady}
             onClick={() => onJog(0)}
           >
             0°
@@ -516,7 +684,7 @@ export default function PhotoStation() {
           <button
             type="button"
             className="ps-btn ps-btn-secondary"
-            disabled={busy || jogBusy || turntableMoving || !turntableReady}
+            disabled={busy || scanBusy || jogBusy || turntableMoving || !turntableReady}
             onClick={() => onJog(10)}
           >
             +10°
@@ -524,12 +692,13 @@ export default function PhotoStation() {
           <button
             type="button"
             className="ps-btn ps-btn-secondary"
-            disabled={busy || jogBusy || turntableMoving || !turntableReady}
+            disabled={busy || scanBusy || jogBusy || turntableMoving || !turntableReady}
             onClick={() => onJog(20)}
           >
             +20°
           </button>
         </div>
+        <p className="ps-scan-prompt">{scanNote || "Scan a barcode to start"}</p>
         <button
           type="button"
           className="ps-btn ps-btn-start"

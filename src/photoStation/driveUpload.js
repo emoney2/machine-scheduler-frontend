@@ -42,7 +42,8 @@ export async function uploadPhotoStationFile({ blob, filename, sessionId }) {
  */
 export async function uploadSessionToDrive(session, { onProgress } = {}) {
   if (!session) throw new Error("No capture session to upload");
-  const sessionId = `JR_${session.id || session.dateStr || "session"}`;
+  const sessionId =
+    session.folderName || `JR_${session.id || session.dateStr || "session"}`;
   const photos = (session.photos || []).map((p) => ({
     filename: p.filename,
     blob: p.blob,
@@ -176,7 +177,8 @@ export function subscribeUploadQueue(fn) {
  */
 export function enqueueSessionUpload(session, { onJobUpdate } = {}) {
   if (!session) throw new Error("No capture session to upload");
-  const sessionId = `JR_${session.id || session.dateStr || "session"}`;
+  const sessionId =
+    session.folderName || `JR_${session.id || session.dateStr || "session"}`;
   const photos = (session.photos || [])
     .filter((p) => p?.blob)
     .map((p) => ({ filename: p.filename, blob: p.blob, ref: p }));

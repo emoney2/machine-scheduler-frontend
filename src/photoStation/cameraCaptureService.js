@@ -23,7 +23,8 @@ export const CAPTURE_STATES = Object.freeze({
 const PHOTO_COUNT = 6;
 const VIDEO_MS = 10000;
 const JPEG_QUALITY = 0.92;
-const PHOTO_ANGLES = [0, 35, 140, 150, 180, 210, 220, 330];
+const PHOTO_ANGLES = [0, 35, 90, 140, 150, 180, 210, 220, 270, 330];
+const QUARTER_ANGLES = [0, 90, 180, 270];
 const VIDEO_START_DEG = 270;
 const TURNTABLE_SPEED = 6;
 const TURNTABLE_FAST_SPEED = 24;
@@ -62,8 +63,44 @@ function nextSessionNumber() {
   return n;
 }
 
+export function photoAnglesWithQuarters(angles) {
+  const source = Array.isArray(angles) && angles.length ? angles : PHOTO_ANGLES;
+  const nums = [];
+  for (const raw of [...source, ...QUARTER_ANGLES]) {
+    const n = Number(raw);
+    if (!Number.isFinite(n)) continue;
+    nums.push(((n % 360) + 360) % 360);
+  }
+  return [...new Set(nums)].sort((a, b) => a - b);
+}
+
+export function formatAngleToken(angle) {
+  const n = Number(angle);
+  if (!Number.isFinite(n)) return "0";
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+/** "Order # - Job Name - Product" with characters Drive and files can keep. */
+export function captureBaseName(label) {
+  if (!label) return "";
+  const parts = [label.orderNumber, label.jobName, label.product]
+    .map((part) => String(part || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const name = parts
+    .join(" - ")
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return name.slice(0, 140);
+}
+
 export function buildPhotoFilename(dateStr, sessionNum, photoIndex) {
   return `JR_${dateStr}_${pad3(sessionNum)}_Photo_${pad2(photoIndex)}.jpg`;
+}
+
+export function buildLabeledPhotoFilename(baseName, angle) {
+  return `${baseName} - ${formatAngleToken(angle)}.jpg`;
 }
 
 export function buildVideoFilename(dateStr, sessionNum, mimeType) {
@@ -75,6 +112,17 @@ export function buildVideoFilename(dateStr, sessionNum, mimeType) {
         ? "mov"
         : "webm";
   return `JR_${dateStr}_${pad3(sessionNum)}_360_Video.${ext}`;
+}
+
+export function buildLabeledVideoFilename(baseName, mimeType) {
+  const ext = mimeType?.includes("mp4")
+    ? "mp4"
+    : mimeType?.includes("webm")
+      ? "webm"
+      : mimeType?.includes("quicktime")
+        ? "mov"
+        : "webm";
+  return `${baseName} - 360.${ext}`;
 }
 
 export function megapixels(w, h) {
@@ -424,7 +472,7 @@ export function createCameraCaptureService({
     emitProgress({ step: "preview_ready", message: "Camera ready" });
   }
 
-  async function captureStill(photoIndex, dateStr, sessionNum) {
+  async function captureStill(photoIndex, dateStr, sessionNum, angle) {
     await ensureLiveStream();
     const track = stream?.getVideoTracks()?.[0];
     if (!track || track.readyState !== "live") {
@@ -517,7 +565,9 @@ export function createCameraCaptureService({
       log("still mime", blob.type);
     }
 
-    const filename = buildPhotoFilename(dateStr, sessionNum, photoIndex);
+    const filename = session?.baseName
+      ? buildLabeledPhotoFilename(session.baseName, angle)
+      : buildPhotoFilename(dateStr, sessionNum, photoIndex);
     const url = URL.createObjectURL(blob);
     const mp = megapixels(width, height);
     const photo = {
@@ -847,7 +897,9 @@ export function createCameraCaptureService({
     const blob = new Blob(chunks, { type: actualMime });
     const width = w || videoSettings.width || 0;
     const height = h || videoSettings.height || 0;
-    const filename = buildVideoFilename(dateStr, sessionNum, actualMime);
+    const filename = session?.baseName
+      ? buildLabeledVideoFilename(session.baseName, actualMime)
+      : buildVideoFilename(dateStr, sessionNum, actualMime);
     const url = URL.createObjectURL(blob);
 
     const video = {
@@ -890,7 +942,7 @@ export function createCameraCaptureService({
     }
   }
 
-  async function startCapture() {
+  async function startCapture(opts = {}) {
     if (runLock) {
       log("startCapture ignored — already running");
       return;
@@ -913,10 +965,17 @@ export function createCameraCaptureService({
     revokeSessionUrls(session);
     const dateStr = todayStamp();
     const sessionNum = nextSessionNumber();
+    const baseName = captureBaseName(opts.label);
+    const angles = photoAnglesWithQuarters(photoAngles);
     session = {
       id: `${dateStr}_${pad3(sessionNum)}`,
       dateStr,
       sessionNum,
+      baseName: baseName || null,
+      folderName: baseName || null,
+      orderNumber: opts.label?.orderNumber || null,
+      jobName: opts.label?.jobName || null,
+      product: opts.label?.product || null,
       photos: [],
       video: null,
       startedAt: new Date().toISOString(),
@@ -924,9 +983,9 @@ export function createCameraCaptureService({
     };
     emitProgress({
       step: "starting",
-      message: "Starting capture…",
+      message: baseName ? `Starting ${baseName}…` : "Starting capture…",
       photoIndex: 0,
-      photoTotal: photoCount,
+      photoTotal: angles.length,
     });
 
     try {
@@ -949,10 +1008,6 @@ export function createCameraCaptureService({
 
       setState(CAPTURE_STATES.photo_capture);
       await ensureLiveStream();
-      const angles =
-        Array.isArray(photoAngles) && photoAngles.length
-          ? photoAngles.map((n) => Number(n))
-          : Array.from({ length: photoCount }, (_, i) => i * 60);
       const total = angles.length;
 
       async function moveTo(targetDeg, fast) {
@@ -992,7 +1047,7 @@ export function createCameraCaptureService({
           photoTotal: total,
           recording: false,
         });
-        const photo = await captureStill(i + 1, dateStr, sessionNum);
+        const photo = await captureStill(i + 1, dateStr, sessionNum, angle);
         session.photos.push(photo);
         emitProgress({
           step: "photo_captured",

@@ -236,6 +236,28 @@
   margin-top: 14px;
 }
 
+.ps-scan-catcher {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.ps-scan-prompt {
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ps-text);
+}
+
 .ps-btn {
   appearance: none;
   border: none;
@@ -543,6 +565,11 @@
   .ps-jog .ps-btn {
     font-size: 15px;
     padding: 9px 6px;
+  }
+
+  .ps-scan-prompt {
+    font-size: 13px;
+    flex-shrink: 0;
   }
 
   .ps-btn-start {
