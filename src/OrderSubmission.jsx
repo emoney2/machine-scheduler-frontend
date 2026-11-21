@@ -464,10 +464,109 @@ export default function OrderSubmission() {
   // Track preview URLs for cleanup on unmount (declared before applyJr… uses it)
   const prodPreviewUrlsRef = useRef(new Set());
   const printPreviewUrlsRef = useRef(new Set());
+  const jrPrintSyncRef = useRef(0);
 
   const isJrPresentationPdfFile = (f) => {
     const name = String(f?.name || "").toLowerCase();
     return f?.type === "application/pdf" || name.endsWith(".pdf");
+  };
+
+  const dropLinkedPrintFromState = (nextFile) => {
+    setPrintFiles((prev) => {
+      const hadLinked = prev.some((f) => f && f.jrLinkedPrint);
+      const next = prev.filter((f) => !(f && f.jrLinkedPrint));
+      if (nextFile) next.push(nextFile);
+      if (hadLinked && next.length === 0) setOrderHasPrint(false);
+      return next;
+    });
+    setPrintPreviews((prev) => {
+      prev.forEach((p) => {
+        if (p && p.jrLinkedPrint && p.url && String(p.url).startsWith("blob:")) {
+          URL.revokeObjectURL(p.url);
+          printPreviewUrlsRef.current.delete(p.url);
+        }
+      });
+      const next = prev.filter((p) => !(p && p.jrLinkedPrint));
+      if (nextFile) {
+        const url = URL.createObjectURL(nextFile);
+        printPreviewUrlsRef.current.add(url);
+        next.push({
+          url,
+          type: "application/pdf",
+          name: nextFile.name,
+          jrLinkedPrint: true,
+        });
+      }
+      return next;
+    });
+  };
+
+  const syncLinkedPrintPreview = async (design) => {
+    const token = ++jrPrintSyncRef.current;
+    const stillCurrent = () => token === jrPrintSyncRef.current;
+    const printId = String(design?.printPdfDriveFileId || "").trim();
+    const printSha = String(design?.printPdfSha256 || "").trim();
+    const declaredKind = String(design?.printIdKind || "").trim();
+    const printKind =
+      declaredKind ||
+      (printId ? (/^local:/i.test(printId) ? "local" : "drive") : "empty");
+    if (!printId || printKind === "empty") {
+      dropLinkedPrintFromState(null);
+      return;
+    }
+    if (printKind === "local" || /^local:/i.test(printId)) {
+      dropLinkedPrintFromState(null);
+      alert(
+        design?.printError ||
+          "This page’s print PDF was never uploaded (local:). No print file was attached."
+      );
+      return;
+    }
+    const label =
+      String(design?.designName || design?.productType || "Print File")
+        .replace(/[\\/:*?"<>|]/g, "")
+        .replace(/_/g, " ")
+        .trim() || "Print File";
+    try {
+      const res = await axios.get(`${API_ROOT}/jrco-presentation/print-pdf`, {
+        params: { fileId: printId, sha256: printSha },
+        responseType: "blob",
+        withCredentials: true,
+        validateStatus: (s) => s < 500,
+      });
+      if (!stillCurrent()) return;
+      const ctype = String(res.headers?.["content-type"] || res.data?.type || "");
+      if (res.status !== 200 || !res.data || !res.data.size || /json/i.test(ctype)) {
+        let msg = "Could not download the print PDF. It was not attached.";
+        try {
+          const text = await res.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed?.error) msg = String(parsed.error);
+        } catch (_) {}
+        if (!stillCurrent()) return;
+        dropLinkedPrintFromState(null);
+        alert(msg);
+        return;
+      }
+      const blob =
+        res.data instanceof Blob && /pdf/i.test(res.data.type || ctype)
+          ? res.data
+          : new Blob([res.data], { type: "application/pdf" });
+      const file = new File([blob], `${label}.pdf`, { type: "application/pdf" });
+      file.jrLinkedPrint = true;
+      file.jrPrintDriveFileId = printId;
+      file.jrPrintSha256 = printSha;
+      dropLinkedPrintFromState(file);
+    } catch (err) {
+      if (!stillCurrent()) return;
+      console.warn("JR print PDF preview failed:", err);
+      dropLinkedPrintFromState(null);
+      alert(
+        err?.response?.data?.error ||
+          err?.message ||
+          "Could not download the print PDF. It was not attached."
+      );
+    }
   };
 
   const applyJrPresentationDesign = async (design) => {
@@ -593,6 +692,7 @@ export default function OrderSubmission() {
           return;
         }
       }
+      await syncLinkedPrintPreview(design);
     } finally {
       setJrFlatPreviewBusy(false);
     }
@@ -1629,10 +1729,10 @@ useEffect(() => {
       .catch(() => setVendorsList([]));
   }, []);
 
-  // Auto-check "Print" when user uploads print files (so Print column = YES)
+  // A print preview means Print is YES. The box can still be checked with no file.
   useEffect(() => {
-    if (printFiles.length > 0) setOrderHasPrint(true);
-  }, [printFiles.length]);
+    if (printFiles.length > 0 || printPreviews.length > 0) setOrderHasPrint(true);
+  }, [printFiles.length, printPreviews.length]);
 
   // ─── Cleanup blob URLs on component unmount to prevent memory leaks ───────────
   useEffect(() => {
@@ -1768,6 +1868,7 @@ const companyNames = companies.map((opt) => opt.value);
         setJrSelectedDesignId("");
         setJrUsedRasterizedPageFlat(false);
         jrPresentationPdfRef.current = null;
+        dropLinkedPrintFromState(null);
       }
       return next;
     });
@@ -1776,7 +1877,8 @@ const companyNames = companies.map((opt) => opt.value);
 
   // remove the print file + its preview at index i
   const removePrintFile = (i) => {
-    // Revoke the blob URL before removing to prevent memory leaks
+    // Revoke the blob URL before removing to prevent memory leaks.
+    // Removing the linked print preview means submit will not upload a print PDF.
     setPrintPreviews((prev) => {
       if (prev[i]?.url) {
         URL.revokeObjectURL(prev[i].url);
@@ -1784,7 +1886,12 @@ const companyNames = companies.map((opt) => opt.value);
       }
       return prev.filter((_, idx) => idx !== i);
     });
-    setPrintFiles((f) => f.filter((_, idx) => idx !== i));
+    setPrintFiles((prev) => {
+      const removed = prev[i];
+      const next = prev.filter((_, idx) => idx !== i);
+      if (removed?.jrLinkedPrint && next.length === 0) setOrderHasPrint(false);
+      return next;
+    });
   };
 
 
@@ -2074,6 +2181,7 @@ const companyNames = companies.map((opt) => opt.value);
           setJrPresentationInfo(lastInfo);
           setJrSelectedDesignId("");
           setJrUsedRasterizedPageFlat(false);
+          dropLinkedPrintFromState(null);
           const matchedPdf =
             pdfCandidates.find(
               (f) => String(f.name || "") === String(lastInfo.filename || "")
@@ -2351,8 +2459,18 @@ const submitForm = async () => {
   }
 
   // 🖨️ Append printFiles. A JR presentation PDF stays production-only.
+  // The linked print PDF is not uploaded from the browser. Submit sends its
+  // Drive id only while that preview is still in the list.
   const jrPdfName = String(jrPresentationInfo?.filename || "").toLowerCase();
+  const linkedPrint = printFiles.find(
+    (f) => f && f.jrLinkedPrint && f.jrPrintDriveFileId
+  );
+  if (linkedPrint) {
+    fd.append("jrPrintPdfDriveFileId", String(linkedPrint.jrPrintDriveFileId));
+    fd.append("jrPrintPdfSha256", String(linkedPrint.jrPrintSha256 || ""));
+  }
   const printFilesToSend = printFiles.filter((f) => {
+    if (f && f.jrLinkedPrint) return false;
     const n = String(f?.name || "").toLowerCase();
     if (jrPdfName && n === jrPdfName) return false;
     return true;
@@ -5137,9 +5255,21 @@ const handleSaveNewCompany = async () => {
             <label style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", fontWeight: "normal", fontSize: "0.9rem" }}>
               <input
                 type="checkbox"
-                checked={orderHasPrint}
-                onChange={(e) => setOrderHasPrint(e.target.checked)}
+                checked={orderHasPrint || printPreviews.length > 0}
+                disabled={printPreviews.length > 0}
+                onChange={(e) => {
+                  if (printPreviews.length > 0) {
+                    setOrderHasPrint(true);
+                    return;
+                  }
+                  setOrderHasPrint(e.target.checked);
+                }}
                 aria-label="Print column YES"
+                title={
+                  printPreviews.length > 0
+                    ? "Remove the print preview to clear Print"
+                    : "Check to mark Print YES without a file"
+                }
               />
               Print: YES
             </label>
@@ -5298,8 +5428,8 @@ const handleSaveNewCompany = async () => {
                       ? `${jrPresentationInfo.filename} — `
                       : ""}
                     each tile is one PDF page. Selecting a tile loads that page’s
-                    production flat and fills material, fur, and product from the
-                    Photoshop swatches saved in the PDF.
+                    production flat. If that page has a print PDF, it is added to
+                    Print Preview — remove it there to skip the print file.
                   </p>
                 </div>
                 <button
@@ -5329,6 +5459,7 @@ const handleSaveNewCompany = async () => {
                 {jrPresentationInfo.designs.map((d, i) => {
                   const id = String(d.designId || "");
                   const missingDriveFlat = d.idKind !== "drive";
+                  const printKind = String(d.printIdKind || "");
                   const selected = jrSelectedDesignId === id;
                   const thumb =
                     d.pageThumbDataUrl ||
@@ -5424,6 +5555,15 @@ const handleSaveNewCompany = async () => {
                             Use this flat PNG
                           </div>
                         )}
+                        {printKind === "drive" ? (
+                          <div style={{ fontSize: 12, color: "#166534", marginTop: 2 }}>
+                            Includes a print file
+                          </div>
+                        ) : printKind === "local" ? (
+                          <div style={{ fontSize: 12, color: "#b45309", marginTop: 2 }}>
+                            Print file was not uploaded
+                          </div>
+                        ) : null}
                       </div>
                     </button>
                   );
