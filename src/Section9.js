@@ -1052,7 +1052,8 @@ export default function Section9(props) {
                                           fontWeight: 'bold'
                                         }}
                                       >
-                                        {job.company}{(job.product ?? job.Product) ? ' - ' : ''}{job.product ?? job.Product ?? ''}
+                                        <span style={{ fontSize: 11 }}>{job.company}</span>
+                                        {(job.product ?? job.Product) ? ' - ' : ''}{job.product ?? job.Product ?? ''}
                                       </span>
 
                                       {/* Quantity bubble pinned right */}
