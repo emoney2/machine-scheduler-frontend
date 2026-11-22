@@ -364,7 +364,7 @@ function machineHeadCount(key, columns) {
 function findColumnJob(columns, orderNumber) {
   const want = normalizeOrderId(orderNumber);
   if (!want || !columns) return null;
-  for (const key of ["machine1", "machine2", "machine3", "machine4", "queue"]) {
+  for (const key of ["machine1", "machine2", "machine3", "machine4", "machine5", "queue"]) {
     const hit = (columns[key]?.jobs || []).find((j) => normalizeOrderId(j.id) === want);
     if (hit) return { job: hit, machineKey: key, headCount: machineHeadCount(key, columns) };
   }

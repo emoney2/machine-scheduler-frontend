@@ -302,6 +302,7 @@ export function EmbroideryCalendar() {
       "Machine 2": [],
       "Machine 3": [],
       "Machine 4": [],
+      "Machine 5": [],
     };
     asList(schedule.embroidery).forEach((job) => {
       if (isTowelOrNeedlepoint(job.product)) return;

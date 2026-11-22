@@ -116,6 +116,7 @@ export default function Section9(props) {
     machine2: { title: 'Machine 2', headCount: 6, jobs: [] },
     machine3: { title: 'Machine 3', headCount: 6, jobs: [] },
     machine4: { title: 'Machine 4', headCount: 6, jobs: [] },
+    machine5: { title: 'Machine 5', headCount: 6, jobs: [] },
   };
 
   const threadStatusJsonRef = useRef("");
@@ -230,7 +231,7 @@ export default function Section9(props) {
 
   const conflictInput = useMemo(() => {
     const parts = [];
-    for (const key of ["machine2", "machine3", "machine4"]) {
+    for (const key of ["machine2", "machine3", "machine4", "machine5"]) {
       const jobs = safeColumns[key]?.jobs || [];
       for (const job of jobs) {
         parts.push(
@@ -480,7 +481,7 @@ export default function Section9(props) {
          }}
        >
         <div style={{ display: 'flex', gap: 16, marginTop: 16, overflowX: 'auto' }}>
-          {['queue', 'machine1', 'machine2', 'machine3', 'machine4'].map(colId => {
+          {['queue', 'machine1', 'machine2', 'machine3', 'machine4', 'machine5'].map(colId => {
             const col = safeColumns[colId] || {};
             const rawJobs = Array.isArray(col.jobs) ? col.jobs : [];
             const jobs = rawJobs

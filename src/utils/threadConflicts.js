@@ -1,7 +1,7 @@
 /**
  * Thread-cone conflict detection for multi-head embroidery scheduling.
  *
- * Ignores schedule times. Only 6-head machines (Machine 2–4) are considered —
+ * Ignores schedule times. Only 6-head machines (Machine 2–5) are considered —
  * Machine 1 single cones are not tracked in inventory the same way.
  * If the same color is on two or more 6-head machines, cones needed = 6 × machines.
  *
@@ -19,12 +19,13 @@
  */
 
 /** Only multi-head machines — Machine 1 (1-head) is excluded */
-const MACHINE_KEYS = ['machine2', 'machine3', 'machine4'];
+const MACHINE_KEYS = ['machine2', 'machine3', 'machine4', 'machine5'];
 
 const MACHINE_TITLES = {
   machine2: 'Machine 2',
   machine3: 'Machine 3',
   machine4: 'Machine 4',
+  machine5: 'Machine 5',
 };
 
 /** Default Madeira pod size when recommending a purchase */

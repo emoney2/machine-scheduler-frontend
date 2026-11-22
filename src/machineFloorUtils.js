@@ -7,6 +7,7 @@ export const MACHINE_META = {
   machine2: { title: "Machine 2", headCount: 6 },
   machine3: { title: "Machine 3", headCount: 6 },
   machine4: { title: "Machine 4", headCount: 6 },
+  machine5: { title: "Machine 5", headCount: 6 },
 };
 
 export function apiRoot() {
@@ -72,7 +73,7 @@ export function normalizeOrderId(raw) {
 export function findJobInColumns(columns, orderId) {
   const want = normalizeOrderId(orderId);
   if (!want || !columns) return null;
-  for (const key of ["machine1", "machine2", "machine3", "machine4", "queue"]) {
+  for (const key of ["machine1", "machine2", "machine3", "machine4", "machine5", "queue"]) {
     const hit = (columns[key]?.jobs || []).find((j) => normalizeOrderId(j.id) === want);
     if (hit) return { job: hit, machineKey: key };
   }
