@@ -8,19 +8,39 @@ const BACKEND_ROOT = API_ROOT.replace(/\/api$/, "");
 
 // ---------- Utils ----------
 function toDate(v) {
-  if (v == null) return null;
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return isNaN(v) ? null : v;
+  // Sheets serials are calendar dates. A UTC epoch shifts them back a day
+  // in US timezones, so Jan 1 reads as Dec 31 of the previous year.
   if (typeof v === "number" && isFinite(v)) {
-    const base = new Date(Date.UTC(1899, 11, 30));
-    return new Date(base.getTime() + v * 86400000);
+    const base = new Date(1899, 11, 30);
+    const dt = new Date(base.getTime() + v * 86400000);
+    return isNaN(dt) ? null : dt;
   }
-  const d = new Date(String(v).trim());
-  return isNaN(d) ? null : d;
+  const str = String(v).trim();
+  if (!str) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const [y, m, d] = str.split("T")[0].split("-").map(Number);
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    return isNaN(dt) ? null : dt;
+  }
+  const parts = str.split(/[\/\-]/).map((p) => p.trim());
+  if (parts.length >= 2) {
+    let [m, d, y] = parts.map(Number);
+    if (!y) y = new Date().getFullYear();
+    else if (y < 100) y += 2000;
+    const dt = new Date(y, (m || 1) - 1, d || 1);
+    return isNaN(dt) ? null : dt;
+  }
+  const fallback = new Date(str);
+  return isNaN(fallback) ? null : fallback;
 }
 function fmtMMDD(d) {
   if (!d) return "";
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
-  return `${mm}/${dd}`;
+  const yy = String(d.getFullYear()).slice(-2);
+  return `${mm}/${dd}/${yy}`;
 }
 // Same Drive parsing + **backend thumbnail proxy** as Overview (direct drive.google.com
 // thumbnails often stay blank in <img> until interaction; /api/drive/thumbnail uses server auth).
@@ -558,7 +578,7 @@ export default function DigitizingList() {
 
 
 
-    // 4) Sort: samples (qty 1) at top, then by Due Date (oldest first), then Order #
+    // 4) Sort: samples (qty 1) at top, then by Due Date including year (oldest first), then Order #
     const isSample = (o) => Number(o["Quantity"]) === 1;
     base.sort((a, b) => {
       const aSample = isSample(a);
