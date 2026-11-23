@@ -374,13 +374,6 @@ export default function PhotoStation() {
     }
   }
 
-  async function onStart() {
-    setError(null);
-    await serviceRef.current?.startCapture();
-    const snap = serviceRef.current?.getSnapshot();
-    if (snap?.session) setSession({ ...snap.session });
-  }
-
   function onReset() {
     serviceRef.current?.reset();
     setSession(null);
@@ -394,8 +387,13 @@ export default function PhotoStation() {
           orderNumber: session.orderNumber,
           jobName: session.jobName,
           product: session.product,
+          company: session.company,
         }
       : null;
+    if (!label) {
+      setError({ code: "SCAN", message: "Scan the barcode on the job." });
+      return;
+    }
     onReset();
     await new Promise((r) => setTimeout(r, 50));
     setError(null);
@@ -448,6 +446,7 @@ export default function PhotoStation() {
         orderNumber: String(data.order || orderId).trim(),
         jobName: String(data.jobName || data.company || "").trim(),
         product: String(data.product || "").trim(),
+        company: String(data.company || "").trim(),
       };
       setScanNote(captureBaseName(label) || `Order ${label.orderNumber}`);
       await serviceRef.current?.startCapture({ label });
@@ -570,7 +569,7 @@ export default function PhotoStation() {
         <div className="ps-brand">JR &amp; Co.</div>
         <h1 className="ps-title">Photo Station</h1>
         <p className="ps-subtitle">
-          Scan a job barcode to start, or press Start. Photos, rotates, and the 360 video run automatically.
+          Scan the barcode on the job. Photos, rotates, and the 360 video run automatically.
         </p>
       </header>
 
@@ -627,8 +626,8 @@ export default function PhotoStation() {
 
       {!useSimTurntable && !(bridgeStatus.online && bridgeStatus.bleConnected) ? (
         <div className="ps-error" role="status">
-          Fire HD bridge is required for one-button capture. On the Fire tablet open{" "}
-          <strong>/turntable-bridge</strong>, connect Bluetooth to the ComXim, then press Start here.
+          Fire HD bridge is required. On the Fire tablet open{" "}
+          <strong>/turntable-bridge</strong>, connect Bluetooth to the ComXim, then scan a job barcode here.
         </div>
       ) : null}
 
@@ -698,15 +697,9 @@ export default function PhotoStation() {
             +20°
           </button>
         </div>
-        <p className="ps-scan-prompt">{scanNote || "Scan a barcode to start"}</p>
-        <button
-          type="button"
-          className="ps-btn ps-btn-start"
-          disabled={!canStart}
-          onClick={onStart}
-        >
-          {busy ? "Capture in progress…" : "Start Capture"}
-        </button>
+        <div className="ps-scan-prompt" role="status">
+          {busy ? "Taking photos…" : scanNote || "Scan the barcode on the job."}
+        </div>
         <div className="ps-btn-row">
           <button
             type="button"

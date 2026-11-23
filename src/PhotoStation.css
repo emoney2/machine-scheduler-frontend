@@ -252,10 +252,13 @@
 .ps-scan-prompt {
   margin: 0;
   text-align: center;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--ps-text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.25;
+  padding: 16px 14px;
+  border-radius: 12px;
+  background: var(--ps-accent);
+  color: #04140a;
 }
 
 .ps-btn {
@@ -568,13 +571,10 @@
   }
 
   .ps-scan-prompt {
-    font-size: 13px;
+    font-size: 16px;
+    line-height: 1.2;
+    padding: 12px 10px;
     flex-shrink: 0;
-  }
-
-  .ps-btn-start {
-    font-size: 17px;
-    padding: 12px 14px;
   }
 
   .ps-btn-row .ps-btn {

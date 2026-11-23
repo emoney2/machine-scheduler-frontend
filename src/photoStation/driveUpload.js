@@ -4,12 +4,20 @@ import { API_ROOT } from "../apiRoot";
  * Upload one Photo Station blob to Google Drive via the backend.
  * Auth: axios-setup patches fetch with Bearer + cookies (credentials include).
  */
-export async function uploadPhotoStationFile({ blob, filename, sessionId }) {
+export async function uploadPhotoStationFile({
+  blob,
+  filename,
+  sessionId,
+  company,
+  orderNumber,
+}) {
   if (!blob) throw new Error("Missing file blob");
   const fd = new FormData();
   fd.append("file", blob, filename || "capture.bin");
   fd.append("filename", filename || "capture.bin");
   fd.append("sessionId", sessionId || "session");
+  if (company) fd.append("company", company);
+  if (orderNumber) fd.append("orderNumber", orderNumber);
 
   const res = await fetch(`${API_ROOT}/photo-station/upload`, {
     method: "POST",
@@ -55,6 +63,8 @@ export async function uploadSessionToDrive(session, { onProgress } = {}) {
 
   const result = await uploadSnapshotToDrive({
     sessionId,
+    company: session.company,
+    orderNumber: session.orderNumber,
     photos,
     video,
     onProgress,
@@ -64,7 +74,14 @@ export async function uploadSessionToDrive(session, { onProgress } = {}) {
   return session;
 }
 
-async function uploadSnapshotToDrive({ sessionId, photos, video, onProgress }) {
+async function uploadSnapshotToDrive({
+  sessionId,
+  company,
+  orderNumber,
+  photos,
+  video,
+  onProgress,
+}) {
   const uploads = [];
   const total = photos.length + (video ? 1 : 0);
   let done = 0;
@@ -80,6 +97,8 @@ async function uploadSnapshotToDrive({ sessionId, photos, video, onProgress }) {
       blob: photo.blob,
       filename: photo.filename,
       sessionId,
+      company,
+      orderNumber,
     });
     if (photo.ref) photo.ref.drive = result;
     uploads.push(result);
@@ -97,6 +116,8 @@ async function uploadSnapshotToDrive({ sessionId, photos, video, onProgress }) {
       blob: video.blob,
       filename: video.filename,
       sessionId,
+      company,
+      orderNumber,
     });
     if (video.ref) video.ref.drive = result;
     uploads.push(result);
@@ -205,6 +226,8 @@ export function enqueueSessionUpload(session, { onJobUpdate } = {}) {
     finishedAt: null,
     photos,
     video,
+    company: session.company || "",
+    orderNumber: session.orderNumber || "",
     sessionRef: session,
     onJobUpdate,
   };
@@ -280,6 +303,8 @@ async function pumpQueue() {
       try {
         const { drive, done, total } = await uploadSnapshotToDrive({
           sessionId: job.sessionId,
+          company: job.company,
+          orderNumber: job.orderNumber,
           photos: job.photos,
           video: job.video,
           onProgress: (p) => {

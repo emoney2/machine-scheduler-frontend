@@ -955,6 +955,13 @@ export function createCameraCaptureService({
       log("startCapture ignored — invalid state", state);
       return;
     }
+    if (!opts.label?.orderNumber) {
+      const message = "Scan the barcode on the job.";
+      lastError = { code: "SCAN_REQUIRED", message };
+      setState(CAPTURE_STATES.error);
+      emitProgress({ step: "error", message, error: lastError });
+      return;
+    }
 
     runLock = true;
     lastError = null;
@@ -976,6 +983,7 @@ export function createCameraCaptureService({
       orderNumber: opts.label?.orderNumber || null,
       jobName: opts.label?.jobName || null,
       product: opts.label?.product || null,
+      company: opts.label?.company || null,
       photos: [],
       video: null,
       startedAt: new Date().toISOString(),
