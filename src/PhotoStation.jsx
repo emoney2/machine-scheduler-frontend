@@ -444,7 +444,7 @@ export default function PhotoStation() {
       }
       const label = {
         orderNumber: String(data.order || orderId).trim(),
-        jobName: String(data.jobName || data.company || "").trim(),
+        jobName: String(data.jobName || "").trim(),
         product: String(data.product || "").trim(),
         company: String(data.company || "").trim(),
       };

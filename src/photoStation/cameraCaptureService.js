@@ -81,10 +81,10 @@ export function formatAngleToken(angle) {
   return Number.isInteger(rounded) ? String(rounded) : String(rounded);
 }
 
-/** "Order # - Job Name - Product" with characters Drive and files can keep. */
+/** "Order # - Company - Design - Product" with characters Drive and files can keep. */
 export function captureBaseName(label) {
   if (!label) return "";
-  const parts = [label.orderNumber, label.jobName, label.product]
+  const parts = [label.orderNumber, label.company, label.jobName, label.product]
     .map((part) => String(part || "").replace(/\s+/g, " ").trim())
     .filter(Boolean);
   const name = parts
@@ -92,7 +92,7 @@ export function captureBaseName(label) {
     .replace(/[\\/:*?"<>|]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  return name.slice(0, 140);
+  return name.slice(0, 200);
 }
 
 export function buildPhotoFilename(dateStr, sessionNum, photoIndex) {
