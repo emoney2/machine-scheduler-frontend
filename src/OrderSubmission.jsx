@@ -262,6 +262,26 @@ function matchInventoryName(candidates, names) {
   return "";
 }
 
+const PRINT_OUTLINE_NAMES = {
+  alignment_stick_cover: "AlignmentStickCoverBlackOutline",
+  barrel: "BarrelDriverBlackOutline",
+  blade: "BladeBlackOutline",
+  center_shaft_mallet: "CenterShaftMalletTBlackOutline",
+  df3_mallet: "DF3MalletBlackOutline",
+  fairway: "FairwayBlackOutline",
+  hybrid: "HybridBlackOutline",
+  mallet: "MalletBlackOutline",
+  mid_mallet: "MidMalletBlackOutline",
+};
+
+function outlineNameForProductType(productType) {
+  const key = String(productType || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  return PRINT_OUTLINE_NAMES[key] || "";
+}
+
 function presentationSwatches(design) {
   const fromList = Array.isArray(design?.materials) ? design.materials : [];
   const swatches = [];
@@ -522,11 +542,16 @@ export default function OrderSubmission() {
       );
       return;
     }
-    const label =
-      String(design?.designName || design?.productType || "Print File")
-        .replace(/[\\/:*?"<>|]/g, "")
-        .replace(/_/g, " ")
-        .trim() || "Print File";
+    const outlineToken = outlineNameForProductType(design?.productType);
+    if (!outlineToken) {
+      dropLinkedPrintFromState(null);
+      const shown = String(design?.productType || "").trim() || "(empty)";
+      alert(
+        `No black-outline file name for product type "${shown}". The print PDF was not attached.`
+      );
+      return;
+    }
+    const label = outlineToken;
     try {
       const res = await axios.get(`${API_ROOT}/jrco-presentation/print-pdf`, {
         params: { fileId: printId, sha256: printSha },
@@ -556,6 +581,7 @@ export default function OrderSubmission() {
       file.jrLinkedPrint = true;
       file.jrPrintDriveFileId = printId;
       file.jrPrintSha256 = printSha;
+      file.jrPrintProductType = String(design?.productType || "");
       dropLinkedPrintFromState(file);
     } catch (err) {
       if (!stillCurrent()) return;
@@ -2468,6 +2494,7 @@ const submitForm = async () => {
   if (linkedPrint) {
     fd.append("jrPrintPdfDriveFileId", String(linkedPrint.jrPrintDriveFileId));
     fd.append("jrPrintPdfSha256", String(linkedPrint.jrPrintSha256 || ""));
+    fd.append("jrPrintProductType", String(linkedPrint.jrPrintProductType || ""));
   }
   const printFilesToSend = printFiles.filter((f) => {
     if (f && f.jrLinkedPrint) return false;

@@ -453,7 +453,7 @@ export default function FurList() {
         }
         applyPrintedToOrders(ids);
         await fetchOrders({ refresh: true });
-        showToast("Print sent to PackingSlipPrinter", "success");
+        showToast("Print sent to Print Fur PDF (Wilcom queue)", "success");
       }
     } catch (err) {
       console.error(err);
