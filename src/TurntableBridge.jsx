@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { socket } from "./socketClient";
+import { connectShellyPlug, previouslyPairedShelly } from "./photoStation/shellyBle";
+
+const SHELLY_ID_KEY = "jr.shellyDeviceId";
 
 const UART_SERVICE = "0000ffe0-0000-1000-8000-00805f9b34fb";
 const UART_CHAR = "0000ffe1-0000-1000-8000-00805f9b34fb";
@@ -21,6 +24,17 @@ export default function TurntableBridge() {
   const [bleOk, setBleOk] = useState(false);
   const [busy, setBusy] = useState(false);
   const [lastCmd, setLastCmd] = useState("");
+  const [lightsName, setLightsName] = useState("");
+  const [lightsState, setLightsState] = useState("disconnected");
+  const [lightsWifi, setLightsWifi] = useState(false);
+  const [lightsIp, setLightsIp] = useState("");
+  const [lightsSsid, setLightsSsid] = useState("");
+  const [lightsOn, setLightsOn] = useState(null);
+  const [lightsError, setLightsError] = useState("");
+  const shellyRef = useRef(null);
+  const lightsInfoRef = useRef({ name: "", ip: "", ready: false });
+  const lightsHandlerRef = useRef(null);
+  const lightsConnectLock = useRef(false);
 
   const deviceRef = useRef(null);
   const serverRef = useRef(null);
@@ -57,6 +71,12 @@ export default function TurntableBridge() {
       bleConnected: !!charRef.current,
       deviceName: deviceRef.current?.name || bleName || null,
     });
+    const lights = lightsInfoRef.current;
+    socket.emit("lights:registerBridge", {
+      host: lights.name || "",
+      connected: !!lights.ready && !!shellyRef.current,
+      ip: lights.ip || "",
+    });
   }, [bleName]);
 
   useEffect(() => {
@@ -90,12 +110,21 @@ export default function TurntableBridge() {
         pushLog(`Command failed: ${e?.message || e}`);
       });
     });
+    const onLights = (payload) => {
+      const run = lightsHandlerRef.current;
+      if (!run) return;
+      run(payload).catch((e) => {
+        pushLog(`Lights failed: ${e?.message || e}`);
+      });
+    };
+    socket.on("lights:bridgeSet", onLights);
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("comxim:bridgeRegistered");
       socket.off("comxim:bridgeError");
       socket.off("comxim:bridgeSend");
+      socket.off("lights:bridgeSet", onLights);
     };
   }, [pushLog, registerBridge]);
 
@@ -228,6 +257,211 @@ export default function TurntableBridge() {
     }
   }
 
+  function markLightsDown(message) {
+    shellyRef.current = null;
+    lightsInfoRef.current = { name: "", ip: "", ready: false };
+    setLightsState("disconnected");
+    setLightsWifi(false);
+    setLightsIp("");
+    setLightsSsid("");
+    setLightsOn(null);
+    if (message) setLightsError(message);
+    registerBridge();
+  }
+
+  async function adoptShelly(shelly) {
+    const onDisconnect = () => {
+      if (shellyRef.current?.device !== shelly.device) return;
+      pushLog("Lights Bluetooth disconnected");
+      markLightsDown("Lights Bluetooth disconnected.");
+    };
+    shelly.device.addEventListener("gattserverdisconnected", onDisconnect);
+    shellyRef.current = shelly;
+    let snap;
+    try {
+      snap = await shelly.snapshot();
+    } catch (e) {
+      shellyRef.current = null;
+      try {
+        shelly.device.gatt?.disconnect();
+      } catch {
+        /* ignore */
+      }
+      throw e;
+    }
+    try {
+      localStorage.setItem(SHELLY_ID_KEY, shelly.device.id || "");
+    } catch {
+      /* ignore */
+    }
+    lightsInfoRef.current = { name: snap.name, ip: snap.ip, ready: true };
+    setLightsName(snap.name);
+    setLightsIp(snap.ip);
+    setLightsSsid(snap.ssid);
+    setLightsWifi(snap.wifiUp);
+    setLightsOn(snap.on);
+    setLightsError("");
+    setLightsState("connected");
+    pushLog(
+      `Lights connected: ${snap.name}${snap.wifiUp ? ` on Wi-Fi ${snap.ssid || ""} ${snap.ip}`.trim() : " — Wi-Fi not connected"}`
+    );
+    registerBridge();
+  }
+
+  async function handleLights(payload) {
+    const requestId = payload?.requestId;
+    const on = !!payload?.on;
+    const fromSid = payload?.fromSid;
+    const respond = (result) => {
+      socket?.emit("lights:bridgeResult", {
+        requestId,
+        fromSid,
+        on,
+        host: lightsInfoRef.current.name || shellyRef.current?.name || "",
+        ip: lightsInfoRef.current.ip || "",
+        ...result,
+      });
+    };
+    const shelly = shellyRef.current;
+    if (!shelly || !lightsInfoRef.current.ready) {
+      respond({
+        ok: false,
+        error: "Lights Bluetooth is not connected. On the bridge page, tap Connect Lights Bluetooth.",
+      });
+      pushLog("Lights command ignored — plug not connected");
+      return;
+    }
+    try {
+      pushLog(on ? "Lights ON" : "Lights OFF");
+      await shelly.setOn(on);
+      setLightsOn(on);
+      setLightsError("");
+      respond({ ok: true });
+    } catch (e) {
+      const message = e?.message || String(e);
+      setLightsError(message);
+      respond({ ok: false, error: message });
+      pushLog(`Lights failed: ${message}`);
+    }
+  }
+
+  lightsHandlerRef.current = handleLights;
+
+  async function connectLights() {
+    if (!supportsWebBluetooth()) {
+      pushLog("Web Bluetooth not available. Install Chrome, then open this page in Chrome.");
+      alert("This browser cannot use Bluetooth. Open the bridge page in Chrome.");
+      return;
+    }
+    if (lightsConnectLock.current) return;
+    lightsConnectLock.current = true;
+    setBusy(true);
+    setLightsState("connecting");
+    setLightsError("");
+    try {
+      pushLog("Choose the Shelly plug in the Bluetooth list. Do not choose the turntable.");
+      const shelly = await connectShellyPlug();
+      await adoptShelly(shelly);
+    } catch (e) {
+      if (e?.name === "NotFoundError") {
+        pushLog("Lights chooser closed");
+        setLightsState(lightsInfoRef.current.ready && shellyRef.current ? "connected" : "disconnected");
+        return;
+      }
+      const message = e?.message || String(e);
+      pushLog(`Lights connect failed: ${message}`);
+      if (lightsInfoRef.current.ready && shellyRef.current) {
+        setLightsState("connected");
+        setLightsError(message);
+      } else {
+        markLightsDown(message);
+      }
+    } finally {
+      lightsConnectLock.current = false;
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      if (!supportsWebBluetooth()) return;
+      let acquired = false;
+      try {
+        const saved = localStorage.getItem(SHELLY_ID_KEY) || "";
+        const device = await previouslyPairedShelly(saved);
+        if (!device || cancel || lightsConnectLock.current) return;
+        lightsConnectLock.current = true;
+        acquired = true;
+        setLightsState("connecting");
+        pushLog("Reconnecting lights…");
+        const shelly = await connectShellyPlug(device);
+        if (cancel) {
+          try {
+            shelly.device.gatt?.disconnect();
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+        await adoptShelly(shelly);
+      } catch (e) {
+        if (cancel) return;
+        pushLog(`Lights reconnect failed: ${e?.message || e}`);
+        if (!shellyRef.current) {
+          setLightsState("disconnected");
+          setLightsError(e?.message || "Could not reconnect the lights.");
+        }
+      } finally {
+        if (acquired) lightsConnectLock.current = false;
+      }
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (lightsState !== "connected") return undefined;
+    const id = setInterval(() => {
+      const shelly = shellyRef.current;
+      if (!shelly) return;
+      shelly
+        .snapshot()
+        .then((snap) => {
+          lightsInfoRef.current = { name: snap.name, ip: snap.ip, ready: true };
+          setLightsName(snap.name);
+          setLightsIp(snap.ip);
+          setLightsSsid(snap.ssid);
+          setLightsWifi(snap.wifiUp);
+          setLightsOn(snap.on);
+          setLightsError("");
+        })
+        .catch((e) => {
+          setLightsError(e?.message || "Could not read the plug.");
+        });
+    }, 20000);
+    return () => clearInterval(id);
+  }, [lightsState]);
+
+  async function testLights(on) {
+    const shelly = shellyRef.current;
+    if (!shelly) return;
+    setBusy(true);
+    try {
+      pushLog(on ? "Lights ON" : "Lights OFF");
+      await shelly.setOn(on);
+      setLightsOn(on);
+      setLightsError("");
+    } catch (e) {
+      const message = e?.message || String(e);
+      setLightsError(message);
+      pushLog(`Lights failed: ${message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function connectBle() {
     if (!supportsWebBluetooth()) {
       pushLog("Web Bluetooth not available. Install Chrome from the Amazon Appstore / sideload Chrome, then open this page in Chrome.");
@@ -293,7 +527,7 @@ export default function TurntableBridge() {
       }
 
       setBleOk(true);
-      pushLog("BLE connected — ready for one-button Photo Station");
+      pushLog("Turntable Bluetooth connected");
       registerBridge();
       publishState({ bleConnected: true, deviceName: device.name || "ComXim" });
     } catch (e) {
@@ -332,14 +566,100 @@ export default function TurntableBridge() {
       </div>
       <h1 style={{ margin: "6px 0 8px", fontSize: 26 }}>ComXim Turntable Bridge</h1>
       <p style={{ marginTop: 0, color: "#9ca3af", lineHeight: 1.4 }}>
-        Keep this page open on the Fire HD 10. The iPhone Photo Station Start button sends rotate
-        commands here over the internet, and this tablet talks Bluetooth to the turntable.
+        Keep this page open on the Fire HD 10. The iPhone sends turntable and light commands here.
+        This tablet talks Bluetooth to the turntable and to the Shelly plug.
       </p>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
         <Chip ok={socketOk} label={socketOk ? "Server connected" : "Server offline"} />
-        <Chip ok={bleOk} label={bleOk ? `BLE: ${bleName || "connected"}` : "BLE disconnected"} />
+        <Chip ok={bleOk} label={bleOk ? `Turntable: ${bleName || "connected"}` : "Turntable disconnected"} />
+        <Chip
+          ok={lightsState === "connected" && lightsWifi}
+          warn={lightsState === "connecting" || (lightsState === "connected" && !lightsWifi)}
+          label={
+            lightsState === "connecting"
+              ? "Lights connecting"
+              : lightsState === "connected" && lightsWifi
+                ? "Lights connected"
+                : lightsState === "connected"
+                  ? "Lights: Wi-Fi off"
+                  : "Lights not connected"
+          }
+        />
         {busy ? <Chip ok={false} warn label="Busy" /> : null}
+      </div>
+
+      <div
+        style={{
+          background: "#111",
+          border: `1px solid ${
+            lightsState === "connected" && lightsWifi
+              ? "rgba(22,163,74,0.7)"
+              : lightsState === "connecting"
+                ? "rgba(245,158,11,0.7)"
+                : "rgba(239,68,68,0.55)"
+          }`,
+          borderRadius: 12,
+          padding: "12px 14px",
+          marginBottom: 14,
+        }}
+      >
+        <div style={{ fontSize: 13, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9ca3af" }}>
+          Lights
+        </div>
+        <StatusLine
+          label="Bluetooth"
+          ok={lightsState === "connecting" ? null : lightsState === "connected"}
+          value={lightsState === "connecting" ? "Connecting…" : lightsState === "connected" ? "Connected" : "Not connected"}
+        />
+        <StatusLine
+          label="Wi-Fi"
+          ok={lightsState === "connecting" ? null : lightsState === "connected" && lightsWifi}
+          value={
+            lightsState === "connecting"
+              ? "Checking…"
+              : lightsState === "connected" && lightsWifi
+                ? "Connected"
+                : "Not connected"
+          }
+        />
+        {lightsState === "connected" && lightsWifi ? (
+          <div style={{ color: "#9ca3af", fontSize: 14, marginTop: 4 }}>
+            {[lightsSsid, lightsIp].filter(Boolean).join(" · ")}
+            {lightsName ? ` · ${lightsName}` : ""}
+          </div>
+        ) : null}
+        <StatusLine
+          label="Power"
+          ok={lightsState === "connected" ? (lightsOn ? true : null) : false}
+          value={lightsState === "connected" ? (lightsOn ? "On" : "Off") : "—"}
+        />
+        {lightsError ? (
+          <div style={{ color: "#fecaca", fontSize: 14, marginTop: 8 }}>{lightsError}</div>
+        ) : null}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+          <button type="button" style={btnPrimary} disabled={busy} onClick={connectLights}>
+            {lightsState === "connected" ? "Reconnect Lights Bluetooth" : "Connect Lights Bluetooth"}
+          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              style={{ ...btnSecondary, flex: 1 }}
+              disabled={busy || lightsState !== "connected"}
+              onClick={() => testLights(true)}
+            >
+              Turn lights on
+            </button>
+            <button
+              type="button"
+              style={{ ...btnSecondary, flex: 1 }}
+              disabled={busy || lightsState !== "connected"}
+              onClick={() => testLights(false)}
+            >
+              Turn lights off
+            </button>
+          </div>
+        </div>
       </div>
 
       {!supportsWebBluetooth() ? (
@@ -399,11 +719,30 @@ export default function TurntableBridge() {
       </pre>
 
       <ol style={{ color: "#9ca3af", fontSize: 13, lineHeight: 1.45, paddingLeft: 18 }}>
-        <li>Plug in the Fire HD and keep it awake (Display → stay on while charging).</li>
-        <li>Power on the ComXim turntable and wait ~10 seconds.</li>
-        <li>Tap Connect Turntable Bluetooth and choose the MT200… device.</li>
-        <li>On the iPhone, open Social Media Camera App and press Start once.</li>
+        <li>Tap Connect Lights Bluetooth and choose the Shelly plug, not the turntable.</li>
+        <li>Bluetooth and Wi-Fi both need to say Connected.</li>
+        <li>Power on the ComXim turntable, then tap Connect Turntable Bluetooth.</li>
+        <li>On the iPhone, scan a job barcode. The lights turn on, the photos run, then the lights turn off.</li>
       </ol>
+    </div>
+  );
+}
+
+function StatusLine({ label, ok, value }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 12,
+        fontSize: 18,
+        padding: "8px 0",
+        borderTop: "1px solid #2a2a2a",
+        marginTop: 8,
+      }}
+    >
+      <span style={{ color: "#9ca3af" }}>{label}</span>
+      <span style={{ color: ok == null ? "#e5e7eb" : ok ? "#4ade80" : "#f87171", fontWeight: 700 }}>{value}</span>
     </div>
   );
 }
