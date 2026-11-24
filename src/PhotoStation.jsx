@@ -11,7 +11,6 @@ import {
 import { createSimulatedTurntable } from "./photoStation/turntableService";
 import { createComximTurntable } from "./photoStation/comximTurntable";
 import { subscribeUploadQueue } from "./photoStation/driveUpload";
-import { setPhotoLights } from "./photoStation/shellyLights";
 import { API_ROOT } from "./apiRoot";
 import { socket } from "./socketClient";
 
@@ -382,27 +381,11 @@ export default function PhotoStation() {
     setScanNote("");
   }
 
-  async function captureWithLights(label) {
-    setScanNote("Turning lights on…");
-    const lights = await setPhotoLights(true, 12000);
-    try {
-      if (lights.ok) {
-        setScanNote("Lights on");
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      } else {
-        setError({
-          code: "LIGHTS",
-          message: lights.error || "Could not turn the lights on. Taking photos anyway.",
-        });
-      }
-      if (label) setScanNote(captureBaseName(label));
-      await serviceRef.current?.startCapture({ label });
-      const snap = serviceRef.current?.getSnapshot();
-      if (snap?.session) setSession({ ...snap.session });
-    } finally {
-      setScanNote("Turning lights off…");
-      await setPhotoLights(false, 6000);
-    }
+  async function startLabeledCapture(label) {
+    if (label) setScanNote(captureBaseName(label));
+    await serviceRef.current?.startCapture({ label });
+    const snap = serviceRef.current?.getSnapshot();
+    if (snap?.session) setSession({ ...snap.session });
   }
 
   async function onRetake() {
@@ -421,8 +404,7 @@ export default function PhotoStation() {
     onReset();
     await new Promise((r) => setTimeout(r, 50));
     setError(null);
-    if (label) setScanNote(captureBaseName(label));
-    await captureWithLights(label);
+    await startLabeledCapture(label);
   }
 
   async function handleBarcodeScan(raw) {
@@ -470,8 +452,7 @@ export default function PhotoStation() {
         product: String(data.product || "").trim(),
         company: String(data.company || "").trim(),
       };
-      setScanNote(captureBaseName(label) || `Order ${label.orderNumber}`);
-      await captureWithLights(label);
+      await startLabeledCapture(label);
     } catch (e) {
       setScanNote("");
       setError({

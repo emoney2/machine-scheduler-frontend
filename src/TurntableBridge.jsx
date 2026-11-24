@@ -722,7 +722,7 @@ export default function TurntableBridge() {
         <li>Tap Connect Lights Bluetooth and choose the Shelly plug, not the turntable.</li>
         <li>Bluetooth and Wi-Fi both need to say Connected.</li>
         <li>Power on the ComXim turntable, then tap Connect Turntable Bluetooth.</li>
-        <li>On the iPhone, scan a job barcode. The lights turn on, the photos run, then the lights turn off.</li>
+        <li>Use Turn lights on and Turn lights off on this page. A barcode scan on the iPhone only takes the photos.</li>
       </ol>
     </div>
   );
