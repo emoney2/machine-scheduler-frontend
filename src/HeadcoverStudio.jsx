@@ -249,7 +249,6 @@ export default function HeadcoverStudio() {
     if (!hasOut) return;
     clearTimeout(rerenderTimer.current);
     rerenderTimer.current = setTimeout(() => generate(), 120);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oneColor, furId, logoSize, quick, logoView]);
 
   const toggleStar = (i) => setOut((p) => p.map((x, k) => (k === i ? { ...x, star: !x.star } : x)));
