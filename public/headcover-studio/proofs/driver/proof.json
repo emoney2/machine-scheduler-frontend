@@ -39,7 +39,7 @@
    ],
    "base": "view-2.png",
    "uv": "view-2.uv.bin",
-   "draft": true
+   "exact": true
   },
   {
    "name": "DriverMasterLayout copy 6",
@@ -51,7 +51,7 @@
    ],
    "base": "view-3.png",
    "uv": "view-3.uv.bin",
-   "draft": true
+   "exact": true
   },
   {
    "name": "DriverMasterLayout copy 4",
@@ -63,7 +63,7 @@
    ],
    "base": "view-4.png",
    "uv": "view-4.uv.bin",
-   "draft": true
+   "exact": true
   },
   {
    "name": "DriverMasterLayout copy 2",
@@ -75,7 +75,7 @@
    ],
    "base": "view-5.png",
    "uv": "view-5.uv.bin",
-   "draft": true
+   "exact": true
   }
  ],
  "fur": {
