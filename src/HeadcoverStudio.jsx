@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
 import {
-  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob,
+  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb,
 } from "./headcoverStudio/engine";
 import { matchInventory } from "./headcoverStudio/inventory";
 import "./HeadcoverStudio.css";
@@ -122,8 +122,7 @@ export default function HeadcoverStudio() {
 
   const S = studioRef.current;
   const materials = useMemo(() => (S ? S.materials : []), [S]);
-  const furs = useMemo(() => (S ? S.furs : []), [S]);
-  const fur = furs.find((f) => f.id === furId) || null;
+  const catalogFurs = useMemo(() => (S ? S.furs : []), [S]);
   const hasTemplates = !!(S && S.templates.length);
   const lines = useMemo(() => ["All", ...new Set(materials.map((m) => m.line))], [materials]);
   const libList = useMemo(() => materials.filter((m) => line === "All" || m.line === line), [materials, line]);
@@ -132,8 +131,22 @@ export default function HeadcoverStudio() {
     () => (inventory ? matchInventory(materials, inventory.materials || [], invOverrides, "material") : null),
     [inventory, materials, invOverrides]);
   const furStock = useMemo(
-    () => (inventory ? matchInventory(furs, (inventory.furs || []).map((n) => ({ name: n })), invOverrides, "fur") : null),
-    [inventory, furs, invOverrides]);
+    () => (inventory ? matchInventory(catalogFurs, (inventory.furs || []).map((n) => ({ name: n })), invOverrides, "fur") : null),
+    [inventory, catalogFurs, invOverrides]);
+  // Furs in Material Inventory ("<Color> Fur") that the catalog doesn't show yet are added as solid colours.
+  const furs = useMemo(() => {
+    if (!inventory || !furStock) return catalogFurs;
+    const used = new Set(Object.values(furStock).filter(Boolean));
+    const extra = (inventory.furs || []).filter((n) => !used.has(n)).map((n) => {
+      const row = (inventory.materials || []).find((m) => m.name === n);
+      const hex = /^#[0-9a-f]{6}$/i.test(row?.color || "") ? row.color : "#b7b7b7";
+      return { id: "inventory-" + slug(n), name: n.replace(/\s*fur$/i, "").trim(), line: "Fur Interior Lining", kind: "fur",
+        solid: true, hex, rgb: hexToRgb(hex), tileUrl: null, inventoryName: n };
+    });
+    return [...catalogFurs, ...extra];
+  }, [inventory, furStock, catalogFurs]);
+  const furInStock = (f) => !furStock || !!f.inventoryName || !!furStock[f.id];
+  const fur = furs.find((f) => f.id === furId) || null;
 
   /* ---------- logo ---------- */
   const applyLogoResult = useCallback((res, resetSlots) => {
@@ -395,9 +408,9 @@ export default function HeadcoverStudio() {
             <label style={{ marginTop: 3 }}>Fur</label>
             <span className="furs" style={{ flex: 1 }}>
               {furs.map((f) => (
-                <span key={f.id} title={f.name + (furStock && !furStock[f.id] ? " · not in Material Inventory" : "")}
+                <span key={f.id} title={f.name + (furInStock(f) ? "" : " · not in Material Inventory")}
                   className={"dot" + (f.id === furId ? " sel" : "")}
-                  style={{ ...tileBg(f), opacity: furStock && !furStock[f.id] ? 0.45 : 1 }}
+                  style={{ ...tileBg(f), opacity: furInStock(f) ? 1 : 0.45 }}
                   onClick={() => { ensureTiles([f]).then(() => setFurId(f.id)); }} />
               ))}
             </span>
