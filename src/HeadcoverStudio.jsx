@@ -90,7 +90,7 @@ export default function HeadcoverStudio() {
   const [inventory, setInventory] = useState(null);   // live Material Inventory names (optional)
   const [invOverrides, setInvOverrides] = useState({});
 
-  const [status, setStatus] = useState("Paste a logo to start · Ctrl+V");
+  const [status, setStatus] = useState("Paste a logo to start");
   const [toast, setToast] = useState(null);           // {text, undo?}
   const [logoView, setLogoView] = useState(null);     // canvas copy for the preview
   const [canUndo, setCanUndo] = useState(false);
@@ -235,37 +235,58 @@ export default function HeadcoverStudio() {
     async function onPaste(e) {
       const ae = document.activeElement;
       if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return;
-      const items = [...(e.clipboardData?.items || [])];
-      const img = items.find((i) => i.type.startsWith("image/"));
-      if (img) { e.preventDefault(); loadBlob(img.getAsFile()); return; }
-      const html = e.clipboardData.getData("text/html"), txt = e.clipboardData.getData("text/plain");
+      const cd = e.clipboardData;
+      if (!cd) return;
+      // an image file on the clipboard (desktop copy, iPhone/iPad "Copy" on a photo)
+      const file = [...(cd.files || [])].find((f) => f.type.startsWith("image/"))
+        || [...(cd.items || [])].filter((i) => i.kind === "file" && i.type.startsWith("image/")).map((i) => i.getAsFile()).find(Boolean);
+      if (file) { e.preventDefault(); clearPasteBox(); loadBlob(file); return; }
+      const html = cd.getData("text/html"), txt = (cd.getData("text/uri-list") || cd.getData("text/plain") || "").trim();
       const m = html && html.match(/<img[^>]+src="([^"]+)"/i);
-      const src = m ? m[1].replace(/&amp;/g, "&") : /^https?:\/\/\S+$/.test(txt.trim()) ? txt.trim() : null;
-      if (!src) return;
-      e.preventDefault();
-      try {
-        const r = await fetch(src, src.startsWith("data:") ? undefined : { mode: "cors" });
-        loadBlob(await r.blob());
-      } catch {
-        showToast("That site blocks copying by link. Right-click the image → Copy image, then paste again.");
-      }
+      const src = m ? m[1].replace(/&amp;/g, "&") : /^(https?:|data:image)\S+$/.test(txt) ? txt : null;
+      if (!src) { if (e.target.closest && e.target.closest(".pastebox")) { e.preventDefault(); showToast("That wasn't an image. Press and hold the logo picture → Copy, then paste here."); } return; }
+      e.preventDefault(); clearPasteBox();
+      loadUrl(src);
     }
     document.addEventListener("paste", onPaste);
     return () => document.removeEventListener("paste", onPaste);
   }, [ready, loadBlob, showToast]);
 
-  // tablets have no Ctrl+V: read an image straight from the clipboard instead
+  // phones and tablets have no Ctrl+V. Two ways in: the paste box (press and hold → Paste, which fires a
+  // normal paste event) and the Paste button (reads the clipboard directly where the browser allows it).
+  const pasteBoxRef = useRef(null);
+  const clearPasteBox = () => { if (pasteBoxRef.current) pasteBoxRef.current.innerHTML = ""; pasteBoxRef.current?.blur(); };
+  const loadUrl = useCallback(async (src) => {
+    try {
+      const r = await fetch(src, src.startsWith("data:") ? undefined : { mode: "cors" });
+      if (!r.ok) throw new Error(r.status);
+      loadBlob(await r.blob());
+    } catch {
+      showToast("That site won't share the picture by link. Save the image to Photos, then use “Choose photo”.");
+    }
+  }, [loadBlob, showToast]);
+  const isTouch = typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
   const canClipboard = typeof navigator !== "undefined" && !!(navigator.clipboard && navigator.clipboard.read);
   const pasteFromClipboard = async () => {
+    if (!canClipboard) { pasteBoxRef.current?.focus(); showToast("Press and hold the box → Paste."); return; }
     try {
       const items = await navigator.clipboard.read();
       for (const it of items) {
         const t = it.types.find((x) => x.startsWith("image/"));
         if (t) { loadBlob(await it.getType(t)); return; }
       }
-      showToast("No image on the clipboard. Copy the logo image first (press and hold it → Copy).");
-    } catch {
-      showToast("The browser blocked reading the clipboard. Use “Choose photo / file” instead.");
+      for (const it of items) {   // a copied link to an image
+        const t = it.types.find((x) => x === "text/uri-list" || x === "text/plain");
+        if (t) {
+          const txt = (await (await it.getType(t)).text()).trim();
+          if (/^(https?:|data:image)\S+$/.test(txt)) { loadUrl(txt); return; }
+        }
+      }
+      showToast("No picture on the clipboard. Press and hold the logo image → Copy, then tap Paste again.");
+    } catch (err) {
+      // Safari asks with a small "Paste" bubble first; if it was dismissed, or the browser refuses, use the box
+      pasteBoxRef.current?.focus();
+      showToast("Tap the small “Paste” bubble when it appears, or press and hold the paste box → Paste.");
     }
   };
 
@@ -543,19 +564,29 @@ export default function HeadcoverStudio() {
               <CanvasView canvas={logoView} className="logoPrev" onClick={onLogoClick} />
             ) : (
               <div className="hint">
-                <b>Paste a logo</b><br />Copy it from Google Images, then press <kbd>Ctrl</kbd>+<kbd>V</kbd><br />
-                <span className="small">or drag a file here / click to browse</span>
+                {isTouch ? (
+                  <><b>Add a logo</b><br />Press and hold the logo picture → Copy,<br />then press and hold the box below → Paste<br />
+                    <span className="small">or tap here to pick a photo / file</span></>
+                ) : (
+                  <><b>Paste a logo</b><br />Copy it from Google Images, then press <kbd>Ctrl</kbd>+<kbd>V</kbd><br />
+                    <span className="small">or drag a file here / click to browse</span></>
+                )}
               </div>
             )}
           </div>
           <input type="file" ref={fileRef} accept="image/*" hidden
             onChange={(e) => { if (e.target.files[0]) loadBlob(e.target.files[0]); e.target.value = ""; }} />
-          {canClipboard && (
-            <div className="row">
-              <button className="wide" onClick={pasteFromClipboard}>Paste logo from clipboard</button>
-              <button className="wide" onClick={() => fileRef.current?.click()}>Choose photo / file</button>
-            </div>
-          )}
+          <div className="pasterow">
+            <div ref={pasteBoxRef} className="pastebox" contentEditable suppressContentEditableWarning
+              onInput={() => {   // some browsers drop the pasted picture straight into the box instead of a paste event
+                const el = pasteBoxRef.current, im = el && el.querySelector("img");
+                if (im && im.src) { const src = im.src; clearPasteBox(); loadUrl(src); } else if (el) el.textContent = "";
+              }}
+              onDrop={(e) => e.preventDefault()}
+              data-ph="Press and hold here → Paste" />
+            <button onClick={pasteFromClipboard}>Paste</button>
+            <button onClick={() => fileRef.current?.click()}>Photo / file</button>
+          </div>
           <div className="row">
             <label>Background cleanup</label>
             <input type="range" min="8" max="110" value={tol} onChange={(e) => onTol(+e.target.value)} />

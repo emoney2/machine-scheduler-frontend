@@ -190,3 +190,11 @@
   .hcs .toast{bottom:28px;font-size:15px}
   .hcs .toast button{min-height:0}
 }
+
+/* paste on phones / tablets */
+.hcs .pasterow{display:flex;gap:8px;margin-top:8px;align-items:stretch}
+.hcs .pastebox{flex:1;min-height:44px;border:1px dashed #b9b0a1;border-radius:8px;background:#fff;padding:11px 12px;font-size:14px;color:#111;
+  outline:none;overflow:hidden;white-space:nowrap;-webkit-user-select:text;user-select:text;cursor:text}
+.hcs .pastebox:empty:before{content:attr(data-ph);color:var(--muted)}
+.hcs .pastebox:focus{border-color:#000;border-style:solid}
+.hcs .pastebox img{max-height:20px}
