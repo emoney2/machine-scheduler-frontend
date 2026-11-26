@@ -127,6 +127,7 @@ function loadProofAssets(P) {
   P.ready = (async () => {
     const dir = P.dir;
     for (const v of P.views) {
+      if (v.draft) continue;   // view whose 3D map isn't exact yet: not drawn, so not downloaded
       const [, , w, h] = v.bbox;
       v.basePx = pixelsOf(await loadImg(dir + v.base));
       const d = await inflate16(dir + v.uv);
@@ -418,6 +419,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const fw = flat.width, fh = flat.height, fd = flat.getContext("2d").getImageData(0, 0, fw, fh).data, sx = fw / P.contentW, sy = fh / P.contentH;
     const tmp = makeCanvas(1, 1), tx = tmp.getContext("2d");
     for (const v of P.views) {
+      if (v.draft) continue;
       const [x, y, w, h] = v.bbox, out = new ImageData(w, h), o = out.data, b = v.basePx, uv = v.uvArr;
       for (let i = 0, n = w * h; i < n; i++) {
         const a = b[i * 4 + 3];
