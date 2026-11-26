@@ -15,7 +15,7 @@
    ],
    "base": "view-0.png",
    "uv": "view-0.uv.bin",
-   "draft": false
+   "exact": true
   },
   {
    "name": "MalletMasterLayout copy 3",
@@ -27,7 +27,7 @@
    ],
    "base": "view-1.png",
    "uv": "view-1.uv.bin",
-   "draft": false
+   "exact": true
   },
   {
    "name": "MalletMasterLayout",
@@ -39,7 +39,7 @@
    ],
    "base": "view-2.png",
    "uv": "view-2.uv.bin",
-   "draft": false
+   "exact": true
   },
   {
    "name": "MalletMasterLayout copy 2",
@@ -51,7 +51,7 @@
    ],
    "base": "view-3.png",
    "uv": "view-3.uv.bin",
-   "draft": false
+   "exact": true
   },
   {
    "name": "MalletMasterLayout copy 4",
@@ -63,7 +63,7 @@
    ],
    "base": "view-4.png",
    "uv": "view-4.uv.bin",
-   "draft": false
+   "exact": true
   }
  ],
  "fur": {
@@ -73,7 +73,8 @@
    1396,
    785
   ],
-  "png": "fur.png"
+  "png": "fur.png",
+  "order": 0
  },
  "overlay": "overlay.png"
 }

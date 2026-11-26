@@ -418,8 +418,24 @@ export function createStudio({ materials, furs, templates, proofs }) {
     ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, P.w, P.h);
     const fw = flat.width, fh = flat.height, fd = flat.getContext("2d").getImageData(0, 0, fw, fh).data, sx = fw / P.contentW, sy = fh / P.contentH;
     const tmp = makeCanvas(1, 1), tx = tmp.getContext("2d");
-    for (const v of P.views) {
-      if (v.draft) continue;
+    // fur sits where it does in the 3Draw's layer stack (fur.order = views drawn beneath it; old files: on top)
+    const furAt = P.fur && Number.isInteger(P.fur.order) ? P.fur.order : P.views.length;
+    const drawFur = () => {
+      if (!(P.fur && P.furPx && fur)) return;
+      const [x, y, w, h] = P.fur.bbox, src = P.furPx, out = new ImageData(w, h), o = out.data, c = fur.rgb;
+      const tex = furTexture(fur, w, h, 70);   // 3Draw proofs are ~70 px per inch
+      for (let i = 0; i < w * h; i++) {
+        const a = src[i * 4 + 3];
+        if (!a) continue;
+        const l = (src[i * 4] + src[i * 4 + 1] + src[i * 4 + 2]) / 3, k = l / 174, e = (l - 174) * 0.3;
+        const r0 = tex ? tex[i * 4] : c[0], g0 = tex ? tex[i * 4 + 1] : c[1], b0 = tex ? tex[i * 4 + 2] : c[2];
+        o[i * 4] = Math.max(0, Math.min(255, r0 * k + e)); o[i * 4 + 1] = Math.max(0, Math.min(255, g0 * k + e)); o[i * 4 + 2] = Math.max(0, Math.min(255, b0 * k + e)); o[i * 4 + 3] = a;
+      }
+      tmp.width = w; tmp.height = h; tx.putImageData(out, 0, 0); ctx.drawImage(tmp, x, y);
+    };
+    P.views.forEach((v, vi) => {
+      if (vi === furAt) drawFur();
+      if (v.draft) return;
       const [x, y, w, h] = v.bbox, out = new ImageData(w, h), o = out.data, b = v.basePx, uv = v.uvArr;
       for (let i = 0, n = w * h; i < n; i++) {
         const a = b[i * 4 + 3];
@@ -433,19 +449,8 @@ export function createStudio({ materials, furs, templates, proofs }) {
         o[i * 4] = (b[i * 4] * fd[j]) / 255; o[i * 4 + 1] = (b[i * 4 + 1] * fd[j + 1]) / 255; o[i * 4 + 2] = (b[i * 4 + 2] * fd[j + 2]) / 255; o[i * 4 + 3] = a;
       }
       tmp.width = w; tmp.height = h; tx.putImageData(out, 0, 0); ctx.drawImage(tmp, x, y);
-    }
-    if (P.fur && P.furPx && fur) {
-      const [x, y, w, h] = P.fur.bbox, src = P.furPx, out = new ImageData(w, h), o = out.data, c = fur.rgb;
-      const tex = furTexture(fur, w, h, 70);   // 3Draw proofs are ~70 px per inch
-      for (let i = 0; i < w * h; i++) {
-        const a = src[i * 4 + 3];
-        if (!a) continue;
-        const l = (src[i * 4] + src[i * 4 + 1] + src[i * 4 + 2]) / 3, k = l / 174, e = (l - 174) * 0.3;
-        const r0 = tex ? tex[i * 4] : c[0], g0 = tex ? tex[i * 4 + 1] : c[1], b0 = tex ? tex[i * 4 + 2] : c[2];
-        o[i * 4] = Math.max(0, Math.min(255, r0 * k + e)); o[i * 4 + 1] = Math.max(0, Math.min(255, g0 * k + e)); o[i * 4 + 2] = Math.max(0, Math.min(255, b0 * k + e)); o[i * 4 + 3] = a;
-      }
-      tmp.width = w; tmp.height = h; tx.putImageData(out, 0, 0); ctx.drawImage(tmp, x, y);
-    }
+    });
+    if (furAt >= P.views.length) drawFur();
     if (P.overlayImg) ctx.drawImage(P.overlayImg, 0, 0);
     return cv;
   }

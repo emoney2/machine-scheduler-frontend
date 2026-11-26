@@ -85,7 +85,8 @@
    1378,
    887
   ],
-  "png": "fur.png"
+  "png": "fur.png",
+  "order": 6
  },
  "overlay": "overlay.png"
 }
