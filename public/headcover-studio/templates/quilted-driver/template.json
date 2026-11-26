@@ -1,0 +1,29 @@
+{
+ "name": "Quilted",
+ "product": "Driver",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "design": "quilted",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 283.6,
+  "y": 315.8,
+  "w": 63.2,
+  "h": 60.6
+ },
+ "notes": [
+  "Quilted design built from camo-driver"
+ ],
+ "quilt": {
+  "shade": "quilt-shade.png",
+  "stitch": "quilt-stitch.png",
+  "pattern": "Diamond"
+ },
+ "logoFrom": "camo-driver"
+}

@@ -1,0 +1,36 @@
+{
+ "name": "Striped",
+ "product": "Blade",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "design": "stripes",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 455.94,
+  "y": 314.26,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "blade",
+ "stripes": {
+  "cx": 490.4,
+  "cy": 348.7,
+  "angle": 0,
+  "widths": [
+   67.2,
+   67.2,
+   67.2
+  ],
+  "mask": "stripe-mask.png"
+ },
+ "notes": [
+  "Silver Britches style: three 1.12\" stripes through the logo spot, zigzag stitched"
+ ]
+}

@@ -1,0 +1,24 @@
+{
+ "name": "Exotic",
+ "product": "Driver",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "design": "exotic",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 283.6,
+  "y": 315.8,
+  "w": 63.2,
+  "h": 60.6
+ },
+ "notes": [
+  "Exotic design built from camo-driver"
+ ],
+ "logoFrom": "camo-driver"
+}

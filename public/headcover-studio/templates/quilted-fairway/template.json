@@ -1,0 +1,29 @@
+{
+ "name": "Quilted",
+ "product": "Fairway",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "design": "quilted",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 216.64890000000003,
+  "y": 211.4489,
+  "w": 46.702200000000005,
+  "h": 46.702200000000005
+ },
+ "notes": [
+  "Quilted design built from fairway"
+ ],
+ "quilt": {
+  "shade": "quilt-shade.png",
+  "stitch": "quilt-stitch.png",
+  "pattern": "Diamond"
+ },
+ "logoFrom": "fairway"
+}

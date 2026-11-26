@@ -1,0 +1,24 @@
+{
+ "name": "Exotic",
+ "product": "Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "design": "exotic",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 252.70780000000002,
+  "y": 248.70780000000002,
+  "w": 21.384400000000003,
+  "h": 21.384400000000003
+ },
+ "notes": [
+  "Exotic design built from mallet"
+ ],
+ "logoFrom": "mallet"
+}

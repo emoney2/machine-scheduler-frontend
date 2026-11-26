@@ -1,0 +1,30 @@
+{
+ "name": "Quilted",
+ "product": "Mid Mallet",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "design": "quilted",
+ "slots": [],
+ "frame": null,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 439.8,
+  "y": 303.03,
+  "w": 111.0,
+  "h": 111.0,
+  "rot": 0
+ },
+ "notes": [
+  "Quilted design built from mid-mallet"
+ ],
+ "quilt": {
+  "shade": "quilt-shade.png",
+  "stitch": "quilt-stitch.png",
+  "pattern": "Diamond"
+ },
+ "logoFrom": "mid-mallet"
+}

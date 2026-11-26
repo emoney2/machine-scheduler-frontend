@@ -1,0 +1,25 @@
+{
+ "name": "Exotic",
+ "product": "Blade",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "design": "exotic",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 440.9,
+  "y": 321.6,
+  "w": 98.2,
+  "h": 98.2,
+  "rot": 0
+ },
+ "notes": [
+  "Exotic design built from blade"
+ ],
+ "logoFrom": "blade"
+}

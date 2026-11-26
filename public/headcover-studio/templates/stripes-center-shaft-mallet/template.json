@@ -1,0 +1,36 @@
+{
+ "name": "Striped",
+ "product": "Center Shaft Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "design": "stripes",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 230.47,
+  "y": 490.6,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "center-shaft-mallet",
+ "stripes": {
+  "cx": 264.9,
+  "cy": 525.1,
+  "angle": 0,
+  "widths": [
+   67.2,
+   67.2,
+   67.2
+  ],
+  "mask": "stripe-mask.png"
+ },
+ "notes": [
+  "Silver Britches style: three 1.12\" stripes through the logo spot, zigzag stitched"
+ ]
+}

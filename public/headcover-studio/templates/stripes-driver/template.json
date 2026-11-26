@@ -1,0 +1,36 @@
+{
+ "name": "Striped",
+ "product": "Driver",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "design": "stripes",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 280.74,
+  "y": 311.64,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "camo-driver",
+ "stripes": {
+  "cx": 315.2,
+  "cy": 346.1,
+  "angle": 0,
+  "widths": [
+   67.2,
+   67.2,
+   67.2
+  ],
+  "mask": "stripe-mask.png"
+ },
+ "notes": [
+  "Silver Britches style: three 1.12\" stripes through the logo spot, zigzag stitched"
+ ]
+}

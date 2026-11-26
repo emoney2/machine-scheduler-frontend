@@ -1,0 +1,25 @@
+{
+ "name": "Exotic",
+ "product": "Alignment Stick Cover",
+ "w": 966,
+ "h": 942,
+ "pxPerInch": 60.0,
+ "design": "exotic",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 337.87,
+  "y": 233.33,
+  "w": 53.81,
+  "h": 53.81,
+  "rot": 0
+ },
+ "notes": [
+  "Exotic design built from alignment-stick-cover"
+ ],
+ "logoFrom": "alignment-stick-cover"
+}

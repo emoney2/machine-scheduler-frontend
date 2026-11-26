@@ -1,0 +1,36 @@
+{
+ "name": "Striped",
+ "product": "Mid Mallet",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "design": "stripes",
+ "slots": [],
+ "frame": null,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 460.84,
+  "y": 324.07,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "mid-mallet",
+ "stripes": {
+  "cx": 495.3,
+  "cy": 358.5,
+  "angle": 0,
+  "widths": [
+   67.2,
+   67.2,
+   67.2
+  ],
+  "mask": "stripe-mask.png"
+ },
+ "notes": [
+  "Silver Britches style: three 1.12\" stripes through the logo spot, zigzag stitched"
+ ]
+}

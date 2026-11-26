@@ -1,0 +1,29 @@
+{
+ "name": "Quilted",
+ "product": "Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "design": "quilted",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 252.70780000000002,
+  "y": 248.70780000000002,
+  "w": 21.384400000000003,
+  "h": 21.384400000000003
+ },
+ "notes": [
+  "Quilted design built from mallet"
+ ],
+ "quilt": {
+  "shade": "quilt-shade.png",
+  "stitch": "quilt-stitch.png",
+  "pattern": "Diamond"
+ },
+ "logoFrom": "mallet"
+}

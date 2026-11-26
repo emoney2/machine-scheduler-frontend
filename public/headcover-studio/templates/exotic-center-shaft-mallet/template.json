@@ -1,0 +1,25 @@
+{
+ "name": "Exotic",
+ "product": "Center Shaft Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "design": "exotic",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 230.47,
+  "y": 490.6,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "notes": [
+  "Exotic design built from center-shaft-mallet"
+ ],
+ "logoFrom": "center-shaft-mallet"
+}

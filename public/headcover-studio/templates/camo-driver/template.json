@@ -16,10 +16,11 @@
   "material": "Luscious|White"
  },
  "logo": {
-  "x": 283.6,
-  "y": 315.8,
-  "w": 63.2,
-  "h": 60.6
+  "x": 280.74,
+  "y": 311.64,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
  },
  "product": "Driver",
  "pxPerInch": 60,

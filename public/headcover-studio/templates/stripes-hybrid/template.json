@@ -1,0 +1,36 @@
+{
+ "name": "Striped",
+ "product": "Hybrid",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "design": "stripes",
+ "slots": [],
+ "frame": null,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 207.94,
+  "y": 199.94,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "hybrid",
+ "stripes": {
+  "cx": 242.4,
+  "cy": 234.4,
+  "angle": 0,
+  "widths": [
+   67.2,
+   67.2,
+   67.2
+  ],
+  "mask": "stripe-mask.png"
+ },
+ "notes": [
+  "Silver Britches style: three 1.12\" stripes through the logo spot, zigzag stitched"
+ ]
+}

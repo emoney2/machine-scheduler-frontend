@@ -1,0 +1,30 @@
+{
+ "name": "Quilted",
+ "product": "Center Shaft Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "design": "quilted",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 230.47,
+  "y": 490.6,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "notes": [
+  "Quilted design built from center-shaft-mallet"
+ ],
+ "quilt": {
+  "shade": "quilt-shade.png",
+  "stitch": "quilt-stitch.png",
+  "pattern": "Diamond"
+ },
+ "logoFrom": "center-shaft-mallet"
+}

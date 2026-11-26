@@ -1,0 +1,30 @@
+{
+ "name": "Quilted",
+ "product": "DF3 Mallet",
+ "w": 961,
+ "h": 813,
+ "pxPerInch": 60.0,
+ "design": "quilted",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 225.23,
+  "y": 515.18,
+  "w": 71.52,
+  "h": 71.52,
+  "rot": 0
+ },
+ "notes": [
+  "Quilted design built from df3-mallet"
+ ],
+ "quilt": {
+  "shade": "quilt-shade.png",
+  "stitch": "quilt-stitch.png",
+  "pattern": "Diamond"
+ },
+ "logoFrom": "df3-mallet"
+}

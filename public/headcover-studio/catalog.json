@@ -41,6 +41,110 @@
     {
       "id": "alignment-stick-cover",
       "dir": "templates/alignment-stick-cover/"
+    },
+    {
+      "id": "quilted-driver",
+      "dir": "templates/quilted-driver/"
+    },
+    {
+      "id": "quilted-fairway",
+      "dir": "templates/quilted-fairway/"
+    },
+    {
+      "id": "quilted-hybrid",
+      "dir": "templates/quilted-hybrid/"
+    },
+    {
+      "id": "quilted-mallet",
+      "dir": "templates/quilted-mallet/"
+    },
+    {
+      "id": "quilted-blade",
+      "dir": "templates/quilted-blade/"
+    },
+    {
+      "id": "quilted-mid-mallet",
+      "dir": "templates/quilted-mid-mallet/"
+    },
+    {
+      "id": "quilted-center-shaft-mallet",
+      "dir": "templates/quilted-center-shaft-mallet/"
+    },
+    {
+      "id": "quilted-df3-mallet",
+      "dir": "templates/quilted-df3-mallet/"
+    },
+    {
+      "id": "exotic-driver",
+      "dir": "templates/exotic-driver/"
+    },
+    {
+      "id": "exotic-fairway",
+      "dir": "templates/exotic-fairway/"
+    },
+    {
+      "id": "exotic-hybrid",
+      "dir": "templates/exotic-hybrid/"
+    },
+    {
+      "id": "exotic-mallet",
+      "dir": "templates/exotic-mallet/"
+    },
+    {
+      "id": "exotic-blade",
+      "dir": "templates/exotic-blade/"
+    },
+    {
+      "id": "exotic-mid-mallet",
+      "dir": "templates/exotic-mid-mallet/"
+    },
+    {
+      "id": "exotic-center-shaft-mallet",
+      "dir": "templates/exotic-center-shaft-mallet/"
+    },
+    {
+      "id": "exotic-df3-mallet",
+      "dir": "templates/exotic-df3-mallet/"
+    },
+    {
+      "id": "exotic-barrel",
+      "dir": "templates/exotic-barrel/"
+    },
+    {
+      "id": "exotic-alignment-stick-cover",
+      "dir": "templates/exotic-alignment-stick-cover/"
+    },
+    {
+      "id": "stripes-driver",
+      "dir": "templates/stripes-driver/"
+    },
+    {
+      "id": "stripes-fairway",
+      "dir": "templates/stripes-fairway/"
+    },
+    {
+      "id": "stripes-mallet",
+      "dir": "templates/stripes-mallet/"
+    },
+    {
+      "id": "stripes-hybrid",
+      "dir": "templates/stripes-hybrid/"
+    },
+    {
+      "id": "stripes-blade",
+      "dir": "templates/stripes-blade/"
+    },
+    {
+      "id": "stripes-mid-mallet",
+      "dir": "templates/stripes-mid-mallet/"
+    },
+    {
+      "id": "stripes-center-shaft-mallet",
+      "dir": "templates/stripes-center-shaft-mallet/"
+    },
+    {
+      "id": "stripes-df3-mallet",
+      "dir": "templates/stripes-df3-mallet/"
     }
   ],
   "proofs": [

@@ -1,0 +1,25 @@
+{
+ "name": "Exotic",
+ "product": "Barrel",
+ "w": 1071,
+ "h": 1235,
+ "pxPerInch": 60.0,
+ "design": "exotic",
+ "slots": [],
+ "frame": null,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 474.44,
+  "y": 273.48,
+  "w": 125.71,
+  "h": 125.71,
+  "rot": 0
+ },
+ "notes": [
+  "Exotic design built from barrel"
+ ],
+ "logoFrom": "barrel"
+}

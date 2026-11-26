@@ -88,6 +88,11 @@ export async function loadStudioData(base) {
       return Object.assign(T, { id: e.id, dir, ready: null });
     })
   );
+  // Quilted / Exotic use the product's camo logo spot as the standard: logoFrom points at that template
+  templates.forEach((T) => {
+    const S = T.logoFrom && templates.find((x) => x.id === T.logoFrom);
+    if (S && S.logo) T.logo = { ...S.logo };
+  });
   const proofs = await Promise.all(
     (cat.proofs || []).map(async (e) => {
       const dir = base + e.dir;
@@ -108,6 +113,9 @@ function loadTemplateAssets(T) {
     T.frameImg = T.frame ? await loadImg(dir + T.frame) : null;
     T.slotImgs = await Promise.all(T.slots.map((s) => loadImg(dir + s.mask)));
     T.furImg = T.fur ? await loadImg(dir + T.fur.mask) : null;
+    T.quiltShadeImg = T.quilt ? await loadImg(dir + T.quilt.shade) : null;
+    T.stripeMaskImg = T.stripes ? await loadImg(dir + T.stripes.mask) : null;
+    T.quiltStitchImg = T.quilt ? await loadImg(dir + T.quilt.stitch) : null;
     T.logoGround = -1;   // which slot sits under the logo centre (for logo contrast)
     if (T.logo) {
       const cx = Math.round(T.logo.x + T.logo.w / 2), cy = Math.round(T.logo.y + T.logo.h / 2);
@@ -150,10 +158,31 @@ function loadProofAssets(P) {
 }
 
 /** Decode the tile images for a set of swatches (lazily, only what is used). */
+// Some swatch photos (dark gator especially) are so flat that the scales vanish once the 3D shading darkens
+// them. Stretch the texture around its own average so the pattern reads; the average colour stays the same.
+function liftDetail(img) {
+  if (!img) return img;
+  const w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const c = makeCanvas(w, h), x = c.getContext("2d");
+  x.drawImage(img, 0, 0);
+  const d = x.getImageData(0, 0, w, h), p = d.data, n = w * h;
+  let sum = 0, sq = 0;
+  for (let i = 0; i < p.length; i += 4) { const l = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]; sum += l; sq += l * l; }
+  const mean = sum / n, sd = Math.sqrt(Math.max(0, sq / n - mean * mean));
+  const k = Math.min(2.2, 18 / Math.max(sd, 1));   // aim for a texture spread of ~18 levels
+  if (k <= 1.05) return img;
+  const avg = [0, 0, 0];
+  for (let i = 0; i < p.length; i += 4) { avg[0] += p[i]; avg[1] += p[i + 1]; avg[2] += p[i + 2]; }
+  avg[0] /= n; avg[1] /= n; avg[2] /= n;
+  for (let i = 0; i < p.length; i += 4) for (let j = 0; j < 3; j++) p[i + j] = Math.max(0, Math.min(255, avg[j] + (p[i + j] - avg[j]) * k));
+  x.putImageData(d, 0, 0);
+  return c;
+}
+
 export async function ensureTiles(list) {
   await Promise.all(
     list.filter((m) => m && m.tileUrl && !m.solid && !m.img).map(async (m) => {
-      m.img = await loadImg(m.tileUrl);
+      m.img = liftDetail(await loadImg(m.tileUrl));
     })
   );
 }
@@ -204,7 +233,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
   // Patterned materials use their seamless tile at real-world scale: a tile covers m.tileInches.
   function matStyle(ctx, m, ppi = SIL_PPI) {
     if (m.solid) return m.kind === "fur" ? ctx.createPattern(furTile(m.hex), "repeat") : m.hex;
-    if (m.img && m.img.complete && m.img.width) {
+    if (m.img && m.img.complete !== false && m.img.width) {   // an <img> or a lifted canvas
       const p = ctx.createPattern(m.img, "repeat");
       p.setTransform(new DOMMatrix().scale((ppi * (m.tileInches || 2.1)) / m.img.width));
       return p;
@@ -319,12 +348,12 @@ export function createStudio({ materials, furs, templates, proofs }) {
     // opts.rot (degrees) turns the logo upright on panels that sit rotated in the flat layout
     ctx.save(); ctx.translate(cx, cy); if (opts.rot) ctx.rotate((opts.rot * Math.PI) / 180);
     const x = -w / 2, y = -h / 2;
-    if (main && dE(main, ground.rgb) < 28) {   // logo would vanish on its ground: outline it
+    if (!opts.flat && main && dE(main, ground.rgb) < 28) {   // logo would vanish on its ground: outline it
       const o = opts.outline || bestContrast(ground);
       const sil = silhouetteOf(img, o.hex);
       for (let a = 0; a < 16; a++) { const t = (a / 16) * Math.PI * 2; ctx.drawImage(sil, x + Math.cos(t) * 4.5, y + Math.sin(t) * 4.5); }
     }
-    ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 3; ctx.shadowOffsetX = 1.2; ctx.shadowOffsetY = 2.2;
+    if (!opts.flat) { ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 3; ctx.shadowOffsetX = 1.2; ctx.shadowOffsetY = 2.2; }
     ctx.drawImage(img, x, y); ctx.restore();
   }
   function pickThread(c) {
@@ -388,8 +417,44 @@ export function createStudio({ materials, furs, templates, proofs }) {
     // mats = [back panel, camo base, camo mid, camo top]; body fill first, then the camo pieces
     ctx.fillStyle = matStyle(ctx, mats[0], ppi); ctx.fillRect(0, 0, T.w, T.h); ctx.fillStyle = grain(ctx); ctx.fillRect(0, 0, T.w, T.h);
     T.slotImgs.forEach((im, i) => { if (im) maskFill(ctx, T, im, matStyle(ctx, mats[(i + 1) % mats.length], ppi)); });
+    if (T.stripeMaskImg && opts.stripes) {   // Silver Britches-style stripes through the logo spot, zigzag-stitched
+      const S = T.stripes, c = makeCanvas(T.w, T.h), x = c.getContext("2d"), L = T.w + T.h;
+      const total = S.widths.reduce((a, b) => a + b, 0);
+      x.save(); x.translate(S.cx, S.cy); x.rotate(((S.angle || 0) * Math.PI) / 180);
+      let off = -total / 2;
+      const amp = ppi * 0.09, per = ppi * 0.15;   // zigzag ~0.18" wide, 0.15" repeat
+      x.lineWidth = Math.max(1.2, ppi * 0.035); x.lineJoin = "miter";
+      S.widths.forEach((w, i) => {
+        const m = opts.stripes[i % opts.stripes.length];
+        x.fillStyle = matStyle(x, m, ppi); x.fillRect(off, -L, w, 2 * L);
+        // each stripe is zigzag-stitched along both edges in a slightly darker shade of its own colour
+        const [r, g, b] = m.rgb, k = isLight(m) ? 0.91 : 0.82;   // same colour, a shade darker
+        x.strokeStyle = `rgb(${Math.round(r * k)},${Math.round(g * k)},${Math.round(b * k)})`;
+        [off + amp * 1.1, off + w - amp * 1.1].forEach((e) => {
+          x.beginPath();
+          for (let y = -L, j = 0; y <= L; y += per / 2, j++) { const xx = e + (j % 2 ? amp : -amp); if (j === 0) x.moveTo(xx, y); else x.lineTo(xx, y); }
+          x.stroke();
+        });
+        off += w;
+      });
+      x.restore();
+      x.globalCompositeOperation = "destination-in"; x.drawImage(T.stripeMaskImg, 0, 0);
+      ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 2; ctx.shadowOffsetY = 1; ctx.drawImage(c, 0, 0); ctx.restore();
+    }
+    if (T.quiltShadeImg) {   // quilted: puffed diamonds (multiply), then the stitching in the thread colour
+      ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.drawImage(T.quiltShadeImg, 0, 0); ctx.drawImage(T.quiltShadeImg, 0, 0); ctx.restore();
+      if (T.quiltStitchImg) {
+        const c = makeCanvas(T.w, T.h), x = c.getContext("2d");
+        x.drawImage(T.quiltStitchImg, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = opts.thread || "#f2efe8"; x.fillRect(0, 0, T.w, T.h);
+        ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 1; ctx.shadowOffsetY = 0.6; ctx.drawImage(c, 0, 0); ctx.restore();
+      }
+    }
     if (T.frameImg) ctx.drawImage(T.frameImg, 0, 0);
     if (T.furImg && opts.fur) maskFill(ctx, T, T.furImg, matStyle(ctx, opts.fur, ppi), true);
+    if (T.scatter && LOGO.canvas) {   // scattered logo print (Farmington style): one colour, each mark turned
+      const k = Math.min(opts.logoScale || 1, 1.15);   // the size slider can't push marks into each other
+      T.scatter.forEach((m) => drawLogo(ctx, m.x, m.y, m.w * k, m.w * k, mats[0], { tint: opts.scatterTint, rot: m.rot, flat: true }));
+    }
     if (T.logo && LOGO.canvas) {
       const s = opts.logoScale, g = T.logoGround >= 0 ? mats[(T.logoGround + 1) % mats.length] : mats[0];
       const c = { body: mats[0], accent: mats[1], trim: mats[2], extra: mats[3] };
@@ -488,6 +553,54 @@ export function createStudio({ materials, furs, templates, proofs }) {
     return cv;
   }
 
+  /* ----- Quilted / Exotic colourways ----- */
+  const EXOTIC_LINES = ["Gator Leather", "Rustic Gator Leather", "Split-tone Gator Leather", "Ostrich Leather"];
+  const isExotic = (m) => m && EXOTIC_LINES.includes(m.line);
+  // the exotic closest in colour to m (m itself if it already is one); `avoid` keeps colourway B different from A
+  function exoticFor(m, avoid) {
+    if (isExotic(m)) return m;
+    const pool = SW.filter((x) => isExotic(x) && x !== avoid && !x.hidden);
+    return pool.reduce((b, x) => (dE(x.rgb, m.rgb) < dE(b.rgb, m.rgb) ? x : b), pool[0]);
+  }
+  const isSmooth = (m) => m && m.solid && m.kind !== "fur";
+  function smoothFor(m) {
+    if (isSmooth(m)) return m;
+    const pool = SW.filter((x) => x.line === "Classic Leather" && !x.hidden);
+    return pool.reduce((b, x) => (dE(x.rgb, m.rgb) < dE(b.rgb, m.rgb) ? x : b), pool[0]);
+  }
+  // stripes: A = main pick body with the other picks as the three stripes; B = the second pick as body
+  function stripeWays(picks) {
+    const a = (picks.length ? picks : [NAVY, WHITE]).map(smoothFor);
+    const fill = (list, body) => {
+      const out = list.filter((m) => m !== body);
+      for (const extra of [WHITE, BLACK, NAVY]) if (out.length < 3 && !out.includes(extra) && extra !== body) out.push(extra);
+      return [out[0], out[1], out[2]];
+    };
+    const way = (body) => {
+      const stripes = fill(a, body);
+      return { body, stripes };
+    };
+    return { A: way(a[0]), B: way(a[1] || (isLight(a[0]) ? NAVY : WHITE)) };
+  }
+  // scatter: smooth body in the lightest pick with marks in the darkest, and the reverse
+  function scatterWays(picks) {
+    const a = (picks.length ? picks : [NAVY, WHITE]).map(smoothFor);
+    const light = a.reduce((b, m) => (lum(m.rgb) > lum(b.rgb) ? m : b)), dark = a.reduce((b, m) => (lum(m.rgb) < lum(b.rgb) ? m : b));
+    const L = dE(light.rgb, dark.rgb) > 40 ? light : WHITE, D = dE(light.rgb, dark.rgb) > 40 ? dark : (isLight(light) ? NAVY : dark);
+    return { A: { body: L, ink: D }, B: { body: D, ink: L } };
+  }
+  // colourway k (0 = A, 1 = B): main material, a contrasting thread, and the exotic body
+  function designWay(picks, k) {
+    const a = picks.length ? picks : [NAVY, WHITE];
+    const pick = a[k % a.length] || a[0];
+    const main = smoothFor(pick);   // quilting goes on smooth leather, never on an exotic
+    const others = a.filter((x) => x !== pick);
+    const thread = others.find((x) => dE(x.rgb, main.rgb) > 40) || bestContrast(main);
+    const bodyA = exoticFor(a[0]);
+    const body = k === 0 ? bodyA : exoticFor(a[1] || a[0], a[1] ? null : bodyA);
+    return { main, thread, body };
+  }
+
   /** Render everything. Returns [{design, cw, mats, tpl, wide, flat, proof, canvas}]. */
   async function generate({ slots, swapped, oneColor, logoScale, fur, quick, products }) {
     if (!LOGO.canvas || !slots.some(Boolean)) return { out: [], ms: 0 };
@@ -503,13 +616,30 @@ export function createStudio({ materials, furs, templates, proofs }) {
     CUR = { mats: A };
     const out = [];
     const tways = swapped ? [["B", TB], ["A", TA]] : [["A", TA], ["B", TB]];
+    const picks = slots.filter(Boolean);
+    const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks) };
+    await ensureTiles([special.A.body, special.B.body]);
     tpls.forEach((T) => tways.forEach(([cw, m]) => {
-      // a solid design has no camo pieces: it is one colour (the first pick), lightest still goes on the back
-      const mats = T.slots.length ? m : [m[1] && m[1] !== m[0] ? m[1] : m[0], m[0], m[0], m[0]];
-      const flat = renderTemplate(T, mats, { oneColor, logoScale, fur });
+      let mats, shown, thread = null;
+      if (T.design === "quilted") {         // one smooth material, quilted, stitched in a contrasting pick
+        const w = special[cw]; mats = [w.main, w.main, w.main, w.main]; thread = w.thread.hex; shown = [w.main, w.thread];
+      } else if (T.design === "stripes") {   // body + three stripes from the picks (Silver Britches)
+        const w = special.stripes[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body, ...w.stripes];
+      } else if (T.design === "scatter") {   // A: light body, marks in the darkest pick · B: reversed
+        const w = special.scatter[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body, w.ink];
+      } else if (T.design === "exotic") {   // the whole cover (front and back) in an exotic, trim stays leather
+        const w = special[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body];
+      } else if (T.slots.length) { mats = m; shown = m; }
+      else {   // a solid design has no camo pieces: it is one colour (the first pick), lightest still goes on the back
+        mats = [m[1] && m[1] !== m[0] ? m[1] : m[0], m[0], m[0], m[0]]; shown = [mats[0]];
+      }
+      // scattered marks print in the logo's own colours; the one-colour switch prints them in the contrast pick
+      const scatterTint = T.design === "scatter" && oneColor ? special.scatter[cw].ink.hex : null;
+      const st = T.design === "stripes" ? special.stripes[cw] : null;
+      const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, scatterTint, stripes: st && st.stripes });
       const P = proofs.find((p) => p.name === T.product);
       const canvas = P ? renderProof(P, flat, fur) : flat;
-      out.push({ design: `${T.product} · ${T.name}`, product: T.product, cw, mats: T.slots.length ? m : [mats[0]], wide: true, tpl: true, flat, proof: canvas, canvas });
+      out.push({ design: `${T.product} · ${T.name}`, product: T.product, cw, mats: shown, wide: true, tpl: true, flat, proof: canvas, canvas });
     }));
     if (quick || !tpls.length) {
       const ways = swapped ? [["B", B], ["A", A]] : [["A", A], ["B", B]];
