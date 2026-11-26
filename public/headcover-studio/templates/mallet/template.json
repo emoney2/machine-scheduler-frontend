@@ -1,0 +1,38 @@
+{
+ "name": "Camo",
+ "product": "Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "slots": [
+  {
+   "name": "Camo Mid Layer",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Camo Top Layer",
+   "mask": "slot-1.png"
+  }
+ ],
+ "notes": [
+  "ignored hidden: JRCO_FUR_NAME:Light Grey Fur",
+  "ignored hidden: PRINT",
+  "unmapped: Guidelines",
+  "ignored hidden: Quilting",
+  "logo: default placement (add a 'Logo' layer to the PSD to control it)"
+ ],
+ "markers": {
+  "JRCO_FUR_NAME": "Light Grey Fur"
+ },
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 252.70780000000002,
+  "y": 248.70780000000002,
+  "w": 21.384400000000003,
+  "h": 21.384400000000003
+ }
+}

@@ -1,6 +1,40 @@
 {
   "version": 1,
   "swatches": "swatches/swatches.json",
-  "templates": [{ "id": "camo-driver", "dir": "templates/camo-driver/" }],
-  "proofs": [{ "id": "driver", "dir": "proofs/driver/" }]
+  "templates": [
+    {
+      "id": "camo-driver",
+      "dir": "templates/camo-driver/"
+    },
+    {
+      "id": "fairway",
+      "dir": "templates/fairway/"
+    },
+    {
+      "id": "hybrid",
+      "dir": "templates/hybrid/"
+    },
+    {
+      "id": "mallet",
+      "dir": "templates/mallet/"
+    }
+  ],
+  "proofs": [
+    {
+      "id": "driver",
+      "dir": "proofs/driver/"
+    },
+    {
+      "id": "fairway",
+      "dir": "proofs/fairway/"
+    },
+    {
+      "id": "hybrid",
+      "dir": "proofs/hybrid/"
+    },
+    {
+      "id": "mallet",
+      "dir": "proofs/mallet/"
+    }
+  ]
 }

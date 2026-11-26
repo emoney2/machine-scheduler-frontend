@@ -1,0 +1,74 @@
+{
+ "name": "Mallet",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 4809,
+ "contentH": 3825,
+ "views": [
+  {
+   "name": "MalletMasterLayout copy",
+   "bbox": [
+    568,
+    214,
+    407,
+    732
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin"
+  },
+  {
+   "name": "MalletMasterLayout copy 3",
+   "bbox": [
+    566,
+    161,
+    403,
+    290
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin"
+  },
+  {
+   "name": "MalletMasterLayout",
+   "bbox": [
+    571,
+    570,
+    403,
+    365
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin"
+  },
+  {
+   "name": "MalletMasterLayout copy 2",
+   "bbox": [
+    1202,
+    756,
+    71,
+    71
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin"
+  },
+  {
+   "name": "MalletMasterLayout copy 4",
+   "bbox": [
+    80,
+    207,
+    438,
+    731
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin"
+  }
+ ],
+ "fur": {
+  "bbox": [
+   54,
+   172,
+   1396,
+   785
+  ],
+  "png": "fur.png"
+ },
+ "overlay": "overlay.png"
+}

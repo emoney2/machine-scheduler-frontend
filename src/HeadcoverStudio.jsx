@@ -68,6 +68,7 @@ export default function HeadcoverStudio() {
   const [furId, setFurId] = useState(null);
   const [logoSize, setLogoSize] = useState(220);
   const [quick, setQuick] = useState(false);
+  const [products, setProducts] = useState(["Driver"]);
 
   const [out, setOut] = useState([]);
   const [swapped, setSwapped] = useState(false);
@@ -244,7 +245,7 @@ export default function HeadcoverStudio() {
     const seq = ++genSeq.current;
     setBusy(true);
     const { out: o, ms } = await s.generate({
-      slots, swapped: opts.swapped ?? swapped, oneColor, logoScale: logoSize / 100, fur, quick,
+      slots, swapped: opts.swapped ?? swapped, oneColor, logoScale: logoSize / 100, fur, quick, products,
     });
     if (seq !== genSeq.current) return;   // a newer render started
     // keep stars when a setting change re-renders the same design + colorway
@@ -254,7 +255,7 @@ export default function HeadcoverStudio() {
     });
     setBusy(false);
     setStatus(`${o.length} renderings in ${(ms / 1000).toFixed(2)} s`);
-  }, [slots, swapped, oneColor, logoSize, fur, quick]);
+  }, [slots, swapped, oneColor, logoSize, fur, quick, products]);
 
   // live re-render once there are results (thread mode, fur, logo size, quick styles, logo edits)
   const hasOut = out.length > 0;
@@ -263,7 +264,7 @@ export default function HeadcoverStudio() {
     if (!hasOut) return;
     clearTimeout(rerenderTimer.current);
     rerenderTimer.current = setTimeout(() => generate(), 120);
-  }, [oneColor, furId, logoSize, quick, logoView]);
+  }, [oneColor, furId, logoSize, quick, logoView, products]);
 
   const toggleStar = (i) => setOut((p) => p.map((x, k) => (k === i ? { ...x, star: !x.star } : x)));
   const swap = () => { const v = !swapped; setSwapped(v); generate({ swapped: v }); };
@@ -421,6 +422,17 @@ export default function HeadcoverStudio() {
             <input type="range" min="60" max="400" value={logoSize} onChange={(e) => setLogoSize(+e.target.value)} />
             <span className="small">{logoSize}%</span>
           </div>
+          <div className="row" style={{ flexWrap: "wrap", alignItems: "flex-start" }}>
+            <label style={{ marginTop: 5 }}>Products</label>
+            <span className="lines" style={{ flex: 1, margin: 0 }}>
+              {S.products.map((p) => (
+                <button key={p} className={products.includes(p) ? "on" : ""}
+                  onClick={() => setProducts((cur) => (cur.includes(p) ? (cur.length > 1 ? cur.filter((x) => x !== p) : cur) : [...cur, p]))}>
+                  {p}
+                </button>
+              ))}
+            </span>
+          </div>
           <div className="row"><label><input type="checkbox" checked={quick} onChange={(e) => setQuick(e.target.checked)} /> Include quick styles (stand-in shapes)</label></div>
           <button className="primary" disabled={!canGo || busy} onClick={() => generate()}>Design covers &nbsp;↵</button>
 
@@ -447,7 +459,7 @@ export default function HeadcoverStudio() {
           {!out.length ? (
             <div className="empty-state">
               <div className="big">Paste a club logo, pick colors, hit Enter.</div>
-              <div>{hasTemplates ? `${S.templates.length} design${S.templates.length > 1 ? "s" : ""} × 2 colorways as 3D proofs, rendered right here in the browser.` : "8 quick styles × 2 colorways, rendered right here in the browser."}</div>
+              <div>{hasTemplates ? `${products.join(", ")}: 2 colorways each as 3D proofs, rendered right here in the browser. Pick more products on the left.` : "8 quick styles × 2 colorways, rendered right here in the browser."}</div>
             </div>
           ) : (
             <>
@@ -487,7 +499,7 @@ export default function HeadcoverStudio() {
             <div className="small" style={{ color: "#bbb" }}>Colorway {cur.cw}</div>
             <div className="mats">
               {cur.mats.map((m, k) => (
-                <div key={k}><span className="dot" style={{ ...tileBg(m), verticalAlign: "middle" }} /> {S.roles(cur.tpl)[k]}: {m.name} <span style={{ color: "#999" }}>{m.line}</span></div>
+                <div key={k}><span className="dot" style={{ ...tileBg(m), verticalAlign: "middle" }} /> {cur.mats.length === 1 ? "Body" : S.roles(cur.tpl)[k]}: {m.name} <span style={{ color: "#999" }}>{m.line}</span></div>
               ))}
               {cur.tpl && fur && <div><span className="dot" style={{ ...tileBg(fur), verticalAlign: "middle" }} /> Fur: {fur.name}</div>}
             </div>

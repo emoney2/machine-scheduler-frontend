@@ -1,0 +1,85 @@
+{
+ "name": "Hybrid",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 4500,
+ "contentH": 4287,
+ "views": [
+  {
+   "name": "HybridMasterLayout",
+   "bbox": [
+    5,
+    70,
+    1325,
+    928
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin"
+  },
+  {
+   "name": "HybridMasterLayout copy",
+   "bbox": [
+    775,
+    94,
+    384,
+    898
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin"
+  },
+  {
+   "name": "HybridMasterLayout copy 2",
+   "bbox": [
+    523,
+    105,
+    242,
+    881
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin"
+  },
+  {
+   "name": "HybridMasterLayout copy 3",
+   "bbox": [
+    523,
+    106,
+    242,
+    884
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin"
+  },
+  {
+   "name": "HybridMasterLayout copy 4",
+   "bbox": [
+    1200,
+    101,
+    242,
+    881
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin"
+  },
+  {
+   "name": "HybridMasterLayout copy 5",
+   "bbox": [
+    1200,
+    102,
+    242,
+    884
+   ],
+   "base": "view-5.png",
+   "uv": "view-5.uv.bin"
+  }
+ ],
+ "fur": {
+  "bbox": [
+   39,
+   87,
+   1457,
+   933
+  ],
+  "png": "fur.png"
+ },
+ "overlay": "overlay.png"
+}

@@ -80,57 +80,72 @@ export async function loadStudioData(base) {
   const sw = await (await fetch(base + cat.swatches, { cache: "no-cache" })).json();
   const all = (sw.materials || sw).map((s) => ({ ...s, rgb: hexToRgb(s.hex), tileUrl: s.tile ? swDir + s.tile : null }));
 
+  // Only the small manifests load up front; each product's images and UV maps load when it's first used.
   const templates = await Promise.all(
     (cat.templates || []).map(async (e) => {
       const dir = base + e.dir;
       const T = await (await fetch(dir + "template.json", { cache: "no-cache" })).json();
-      T.id = e.id;
-      T.frameImg = T.frame ? await loadImg(dir + T.frame) : null;
-      T.slotImgs = await Promise.all(T.slots.map((s) => loadImg(dir + s.mask)));
-      T.furImg = T.fur ? await loadImg(dir + T.fur.mask) : null;
-      T.logoGround = -1;   // which slot sits under the logo centre (for logo contrast)
-      if (T.logo) {
-        const cx = Math.round(T.logo.x + T.logo.w / 2), cy = Math.round(T.logo.y + T.logo.h / 2);
-        T.slotImgs.forEach((im, i) => {
-          if (!im) return;
-          const c = makeCanvas(T.w, T.h), x = c.getContext("2d");
-          x.drawImage(im, 0, 0);
-          if (x.getImageData(cx, cy, 1, 1).data[3] > 128) T.logoGround = i;
-        });
-      }
-      return T;
+      return Object.assign(T, { id: e.id, dir, ready: null });
     })
   );
-
   const proofs = await Promise.all(
     (cat.proofs || []).map(async (e) => {
       const dir = base + e.dir;
       const P = await (await fetch(dir + "proof.json", { cache: "no-cache" })).json();
-      for (const v of P.views) {
-        const [, , w, h] = v.bbox;
-        v.basePx = pixelsOf(await loadImg(dir + v.base));
-        const d = await inflate16(dir + v.uv);
-        const uv = new Uint16Array(w * h * 2);
-        for (let r = 0; r < h; r++) {
-          let pu = 0, pv = 0;
-          for (let q = 0; q < w; q++) {
-            const k = (r * w + q) * 2;
-            pu = (q ? pu + d[k] : d[k]) & 0xffff;
-            pv = (q ? pv + d[k + 1] : d[k + 1]) & 0xffff;
-            uv[k] = pu; uv[k + 1] = pv;
-          }
-        }
-        v.uvArr = uv;
-      }
-      if (P.fur) P.furPx = pixelsOf(await loadImg(dir + P.fur.png));
-      P.overlayImg = P.overlay ? await loadImg(dir + P.overlay) : null;
-      return P;
+      return Object.assign(P, { id: e.id, dir, ready: null });
     })
   );
 
   const materials = all.filter((s) => s.kind !== "fur");
   const furs = all.filter((s) => s.kind === "fur");
   return { materials, furs, templates, proofs };
+}
+
+function loadTemplateAssets(T) {
+  if (T.ready) return T.ready;
+  T.ready = (async () => {
+    const dir = T.dir;
+    T.frameImg = T.frame ? await loadImg(dir + T.frame) : null;
+    T.slotImgs = await Promise.all(T.slots.map((s) => loadImg(dir + s.mask)));
+    T.furImg = T.fur ? await loadImg(dir + T.fur.mask) : null;
+    T.logoGround = -1;   // which slot sits under the logo centre (for logo contrast)
+    if (T.logo) {
+      const cx = Math.round(T.logo.x + T.logo.w / 2), cy = Math.round(T.logo.y + T.logo.h / 2);
+      T.slotImgs.forEach((im, i) => {
+        if (!im) return;
+        const c = makeCanvas(T.w, T.h), x = c.getContext("2d");
+        x.drawImage(im, 0, 0);
+        if (x.getImageData(cx, cy, 1, 1).data[3] > 128) T.logoGround = i;
+      });
+    }
+  })();
+  return T.ready;
+}
+
+function loadProofAssets(P) {
+  if (P.ready) return P.ready;
+  P.ready = (async () => {
+    const dir = P.dir;
+    for (const v of P.views) {
+      const [, , w, h] = v.bbox;
+      v.basePx = pixelsOf(await loadImg(dir + v.base));
+      const d = await inflate16(dir + v.uv);
+      const uv = new Uint16Array(w * h * 2);
+      for (let r = 0; r < h; r++) {
+        let pu = 0, pv = 0;
+        for (let q = 0; q < w; q++) {
+          const k = (r * w + q) * 2;
+          pu = (q ? pu + d[k] : d[k]) & 0xffff;
+          pv = (q ? pv + d[k + 1] : d[k + 1]) & 0xffff;
+          uv[k] = pu; uv[k + 1] = pv;
+        }
+      }
+      v.uvArr = uv;
+    }
+    if (P.fur) P.furPx = pixelsOf(await loadImg(dir + P.fur.png));
+    P.overlayImg = P.overlay ? await loadImg(dir + P.overlay) : null;
+  })();
+  return P.ready;
 }
 
 /** Decode the tile images for a set of swatches (lazily, only what is used). */
@@ -465,22 +480,29 @@ export function createStudio({ materials, furs, templates, proofs }) {
   }
 
   /** Render everything. Returns [{design, cw, mats, tpl, wide, flat, proof, canvas}]. */
-  async function generate({ slots, swapped, oneColor, logoScale, fur, quick }) {
+  async function generate({ slots, swapped, oneColor, logoScale, fur, quick, products }) {
     if (!LOGO.canvas || !slots.some(Boolean)) return { out: [], ms: 0 };
     const A = expand(slots), B = [A[1], A[0], A[3], A[2]];
     const [TA, TB] = templateWays(slots);
-    await ensureTiles([...A, ...TA, ...TB, fur, WHITE, BLACK, NAVY]);
+    const tpls = templates.filter((T) => !products || products.includes(T.product));
+    await Promise.all([
+      ensureTiles([...A, ...TA, ...TB, fur, WHITE, BLACK, NAVY]),
+      ...tpls.map(loadTemplateAssets),
+      ...tpls.map((T) => proofs.find((p) => p.name === T.product)).filter(Boolean).map(loadProofAssets),
+    ]);
     const t0 = performance.now();
     CUR = { mats: A };
     const out = [];
     const tways = swapped ? [["B", TB], ["A", TA]] : [["A", TA], ["B", TB]];
-    templates.forEach((T) => tways.forEach(([cw, m]) => {
-      const flat = renderTemplate(T, m, { oneColor, logoScale, fur });
+    tpls.forEach((T) => tways.forEach(([cw, m]) => {
+      // a solid design has no camo pieces: it is one colour (the first pick), lightest still goes on the back
+      const mats = T.slots.length ? m : [m[1] && m[1] !== m[0] ? m[1] : m[0], m[0], m[0], m[0]];
+      const flat = renderTemplate(T, mats, { oneColor, logoScale, fur });
       const P = proofs.find((p) => p.name === T.product);
       const canvas = P ? renderProof(P, flat, fur) : flat;
-      out.push({ design: T.name, cw, mats: m, wide: true, tpl: true, flat, proof: canvas, canvas });
+      out.push({ design: `${T.product} · ${T.name}`, product: T.product, cw, mats: T.slots.length ? m : [mats[0]], wide: true, tpl: true, flat, proof: canvas, canvas });
     }));
-    if (quick || !templates.length) {
+    if (quick || !tpls.length) {
       const ways = swapped ? [["B", B], ["A", A]] : [["A", A], ["B", B]];
       DESIGNS.forEach((d) => ways.forEach(([cw, m]) => out.push({ design: d.name, cw, mats: m, canvas: renderOne(d, m, { oneColor }) })));
     }
@@ -653,8 +675,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
     return c;
   }
 
+  const products = [...new Set(templates.map((T) => T.product))];
   return {
-    materials: SW, furs, templates, proofs, WHITE, BLACK,
+    materials: SW, furs, templates, proofs, products, WHITE, BLACK,
     hasLogo: () => !!LOGO.canvas, logoCanvas: () => LOGO.canvas,
     loadBlob, processLogo, eraseAt, undoErase, resetLogo, nearest, generate, sheet,
     renderTemplate, renderProof,   // exposed for tests / future tools

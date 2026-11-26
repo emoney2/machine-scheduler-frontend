@@ -1,0 +1,85 @@
+{
+ "name": "Fairway",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 1078,
+ "contentH": 1028,
+ "views": [
+  {
+   "name": "FairwayMasterLayout",
+   "bbox": [
+    118,
+    91,
+    388,
+    897
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin"
+  },
+  {
+   "name": "FairwayMasterLayout copy",
+   "bbox": [
+    769,
+    84,
+    416,
+    857
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin"
+  },
+  {
+   "name": "FairwayMasterLayout copy 5",
+   "bbox": [
+    489,
+    91,
+    315,
+    849
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin"
+  },
+  {
+   "name": "FairwayMasterLayout copy 2",
+   "bbox": [
+    517,
+    91,
+    287,
+    849
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin"
+  },
+  {
+   "name": "FairwayMasterLayout copy 3",
+   "bbox": [
+    1161,
+    95,
+    315,
+    849
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin"
+  },
+  {
+   "name": "FairwayMasterLayout copy 4",
+   "bbox": [
+    1163,
+    94,
+    287,
+    849
+   ],
+   "base": "view-5.png",
+   "uv": "view-5.uv.bin"
+  }
+ ],
+ "fur": {
+  "bbox": [
+   83,
+   695,
+   1321,
+   262
+  ],
+  "png": "fur.png"
+ },
+ "overlay": "overlay.png"
+}
