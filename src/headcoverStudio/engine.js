@@ -136,7 +136,7 @@ export async function loadStudioData(base) {
 /** Decode the tile images for a set of swatches (lazily, only what is used). */
 export async function ensureTiles(list) {
   await Promise.all(
-    list.filter((m) => m && m.tileUrl && !m.img).map(async (m) => {
+    list.filter((m) => m && m.tileUrl && !m.solid && !m.img).map(async (m) => {
       m.img = await loadImg(m.tileUrl);
     })
   );
@@ -170,8 +170,24 @@ export function createStudio({ materials, furs, templates, proofs }) {
     }
     return ctx.createPattern(grainPat, "repeat");
   }
-  // Real-world scale: a tile covers m.tileInches; the target canvas has ppi pixels per inch.
+  // Fur strokes for solid furs in the flat layout (the 3D proof uses the product's own fur shading).
+  const furCache = {};
+  function furTile(hex) {
+    if (furCache[hex]) return furCache[hex];
+    const c = makeCanvas(96, 96), x = c.getContext("2d");
+    x.fillStyle = hex; x.fillRect(0, 0, 96, 96);
+    for (let i = 0; i < 900; i++) {
+      const px = Math.random() * 96, py = Math.random() * 96, l = 4 + Math.random() * 7, a = -1.2 + Math.random() * 0.5, v = Math.random() < 0.5;
+      x.strokeStyle = v ? `rgba(255,255,255,${0.15 + Math.random() * 0.25})` : `rgba(70,70,70,${0.12 + Math.random() * 0.2})`;
+      x.lineWidth = 1; x.beginPath(); x.moveTo(px, py); x.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); x.stroke();
+    }
+    furCache[hex] = c;
+    return c;
+  }
+  // Solid colours tint the template's leather (flat colour; the proof's shading supplies the leather look).
+  // Patterned materials use their seamless tile at real-world scale: a tile covers m.tileInches.
   function matStyle(ctx, m, ppi = SIL_PPI) {
+    if (m.solid) return m.kind === "fur" ? ctx.createPattern(furTile(m.hex), "repeat") : m.hex;
     if (m.img && m.img.complete && m.img.width) {
       const p = ctx.createPattern(m.img, "repeat");
       p.setTransform(new DOMMatrix().scale((ppi * (m.tileInches || 2.1)) / m.img.width));
@@ -370,8 +386,8 @@ export function createStudio({ materials, furs, templates, proofs }) {
     // fur tile resampled to the proof's pixel scale, so tie-dye / tiger / custom prints read correctly
     const key = fur.id + ":" + w + "x" + h;
     if (furPxCache.has(key)) return furPxCache.get(key);
-    let data = null;
-    if (fur.img && fur.img.width) {
+    let data = null;   // null = tint the fur shading with fur.rgb (solid furs)
+    if (!fur.solid && fur.img && fur.img.width) {
       const c = makeCanvas(w, h), x = c.getContext("2d");
       const p = x.createPattern(fur.img, "repeat");
       p.setTransform(new DOMMatrix().scale((ppi * (fur.tileInches || 2.1)) / fur.img.width));

@@ -8,6 +8,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#c47564",
+   "solid": true,
    "tile": "classic-leather-salmon.jpg",
    "tileInches": 2.1,
    "source": "p23@4172,341"
@@ -19,6 +20,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#df9a9d",
+   "solid": true,
    "tile": "classic-leather-soft-pink.jpg",
    "tileInches": 2.1,
    "source": "p23@3920,341"
@@ -30,6 +32,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#b9415f",
+   "solid": true,
    "tile": "classic-leather-rose.jpg",
    "tileInches": 2.1,
    "source": "p23@3668,341"
@@ -41,6 +44,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#ac285e",
+   "solid": true,
    "tile": "classic-leather-fuchsia.jpg",
    "tileInches": 2.1,
    "source": "p23@3416,341"
@@ -52,6 +56,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#b01423",
+   "solid": true,
    "tile": "classic-leather-bright-red.jpg",
    "tileInches": 2.1,
    "source": "p23@3164,340"
@@ -63,6 +68,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#802027",
+   "solid": true,
    "tile": "classic-leather-red.jpg",
    "tileInches": 2.1,
    "source": "p23@2912,341"
@@ -74,6 +80,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#973830",
+   "solid": true,
    "tile": "classic-leather-rust.jpg",
    "tileInches": 2.1,
    "source": "p23@2660,340"
@@ -85,6 +92,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#be5b34",
+   "solid": true,
    "tile": "classic-leather-burnt-orange.jpg",
    "tileInches": 2.1,
    "source": "p23@2408,340"
@@ -96,6 +104,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#e05129",
+   "solid": true,
    "tile": "classic-leather-orange.jpg",
    "tileInches": 2.1,
    "source": "p23@2151,340"
@@ -107,6 +116,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#da9a00",
+   "solid": true,
    "tile": "classic-leather-golden-yellow.jpg",
    "tileInches": 2.1,
    "source": "p23@1904,343"
@@ -118,6 +128,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#e6b422",
+   "solid": true,
    "tile": "classic-leather-yellow.jpg",
    "tileInches": 2.1,
    "source": "p23@1647,340"
@@ -129,6 +140,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#463431",
+   "solid": true,
    "tile": "classic-leather-dark-brown.jpg",
    "tileInches": 2.1,
    "source": "p23@1395,343"
@@ -140,6 +152,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#945638",
+   "solid": true,
    "tile": "classic-leather-light-brown.jpg",
    "tileInches": 2.1,
    "source": "p23@1143,343"
@@ -151,6 +164,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#cb9a61",
+   "solid": true,
    "tile": "classic-leather-camel.jpg",
    "tileInches": 2.1,
    "source": "p23@891,346"
@@ -162,6 +176,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#d6b899",
+   "solid": true,
    "tile": "classic-leather-tan.jpg",
    "tileInches": 2.1,
    "source": "p23@639,346"
@@ -173,6 +188,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#dfdfdf",
+   "solid": true,
    "tile": "classic-leather-white.jpg",
    "tileInches": 2.1,
    "source": "p23@382,346"
@@ -184,6 +200,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#2a292c",
+   "solid": true,
    "tile": "classic-leather-black.jpg",
    "tileInches": 2.1,
    "source": "p23@4172,1061"
@@ -195,6 +212,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#76665c",
+   "solid": true,
    "tile": "classic-leather-taupe.jpg",
    "tileInches": 2.1,
    "source": "p23@3920,1061"
@@ -206,6 +224,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#615e5f",
+   "solid": true,
    "tile": "classic-leather-medium-grey.jpg",
    "tileInches": 2.1,
    "source": "p23@3668,1061"
@@ -217,6 +236,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#3c372f",
+   "solid": true,
    "tile": "classic-leather-cocoa.jpg",
    "tileInches": 2.1,
    "source": "p23@3416,1061"
@@ -228,6 +248,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#685f2d",
+   "solid": true,
    "tile": "classic-leather-olive.jpg",
    "tileInches": 2.1,
    "source": "p23@3164,1060"
@@ -239,6 +260,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#82852a",
+   "solid": true,
    "tile": "classic-leather-citron.jpg",
    "tileInches": 2.1,
    "source": "p23@2912,1061"
@@ -250,6 +272,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#29563e",
+   "solid": true,
    "tile": "classic-leather-kelly-green.jpg",
    "tileInches": 2.1,
    "source": "p23@2660,1060"
@@ -261,6 +284,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#629186",
+   "solid": true,
    "tile": "classic-leather-seafoam.jpg",
    "tileInches": 2.1,
    "source": "p23@2408,1060"
@@ -272,6 +296,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#a8b7b5",
+   "solid": true,
    "tile": "classic-leather-robins-egg.jpg",
    "tileInches": 2.1,
    "source": "p23@2151,1060"
@@ -283,6 +308,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#2c2f39",
+   "solid": true,
    "tile": "classic-leather-navy-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@1904,1063"
@@ -294,6 +320,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#222d45",
+   "solid": true,
    "tile": "classic-leather-flag-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@1647,1060"
@@ -305,6 +332,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#232950",
+   "solid": true,
    "tile": "classic-leather-deep-royal-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@1395,1063"
@@ -316,6 +344,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#838da1",
+   "solid": true,
    "tile": "classic-leather-powder-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@1143,1063"
@@ -327,6 +356,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#5680b4",
+   "solid": true,
    "tile": "classic-leather-sky-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@891,1066"
@@ -338,6 +368,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#85b7cd",
+   "solid": true,
    "tile": "classic-leather-light-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@639,1066"
@@ -349,6 +380,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#9b7fb2",
+   "solid": true,
    "tile": "classic-leather-light-purple.jpg",
    "tileInches": 2.1,
    "source": "p23@382,1066"
@@ -360,6 +392,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#c3c2c1",
+   "solid": true,
    "tile": "classic-leather-light-grey.jpg",
    "tileInches": 2.1,
    "source": "p23@117,1066"
@@ -371,6 +404,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#a8aca9",
+   "solid": false,
    "tile": "gator-leather-metallic-silver.jpg",
    "tileInches": 2.1,
    "source": "p23@4172,1896"
@@ -382,6 +416,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#b09051",
+   "solid": false,
    "tile": "gator-leather-metallic-gold.jpg",
    "tileInches": 2.1,
    "source": "p23@3920,1896"
@@ -393,6 +428,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#e2928a",
+   "solid": false,
    "tile": "gator-leather-pink.jpg",
    "tileInches": 2.1,
    "source": "p23@3668,1896"
@@ -404,6 +440,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#c7572b",
+   "solid": false,
    "tile": "gator-leather-orange.jpg",
    "tileInches": 2.1,
    "source": "p23@3416,1896"
@@ -415,6 +452,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#853337",
+   "solid": false,
    "tile": "gator-leather-red.jpg",
    "tileInches": 2.1,
    "source": "p23@3164,1895"
@@ -426,6 +464,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#262932",
+   "solid": false,
    "tile": "gator-leather-navy-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@2912,1896"
@@ -437,6 +476,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#4a5160",
+   "solid": false,
    "tile": "gator-leather-denim.jpg",
    "tileInches": 2.1,
    "source": "p23@2660,1895"
@@ -448,6 +488,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#507aab",
+   "solid": false,
    "tile": "gator-leather-light-blue.jpg",
    "tileInches": 2.1,
    "source": "p23@2408,1895"
@@ -459,6 +500,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#21312d",
+   "solid": false,
    "tile": "gator-leather-dark-green.jpg",
    "tileInches": 2.1,
    "source": "p23@2151,1895"
@@ -470,6 +512,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#e8b81a",
+   "solid": false,
    "tile": "gator-leather-yellow.jpg",
    "tileInches": 2.1,
    "source": "p23@1904,1898"
@@ -481,6 +524,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#e2e2e2",
+   "solid": false,
    "tile": "gator-leather-white.jpg",
    "tileInches": 2.1,
    "source": "p23@1647,1895"
@@ -492,6 +536,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#73381f",
+   "solid": false,
    "tile": "gator-leather-cognac.jpg",
    "tileInches": 2.1,
    "source": "p23@1395,1898"
@@ -503,6 +548,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#2e2525",
+   "solid": false,
    "tile": "gator-leather-brown.jpg",
    "tileInches": 2.1,
    "source": "p23@1143,1898"
@@ -514,6 +560,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#72716b",
+   "solid": false,
    "tile": "gator-leather-light-grey.jpg",
    "tileInches": 2.1,
    "source": "p23@891,1901"
@@ -525,6 +572,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#383839",
+   "solid": false,
    "tile": "gator-leather-dark-grey.jpg",
    "tileInches": 2.1,
    "source": "p23@639,1901"
@@ -536,6 +584,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#1c1c1d",
+   "solid": false,
    "tile": "gator-leather-black.jpg",
    "tileInches": 2.1,
    "source": "p23@382,1901"
@@ -547,6 +596,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#795640",
+   "solid": false,
    "tile": "ostrich-leather-brown-black.jpg",
    "tileInches": 2.1,
    "source": "p24@4359,1127"
@@ -558,6 +608,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#393839",
+   "solid": false,
    "tile": "ostrich-leather-black.jpg",
    "tileInches": 2.1,
    "source": "p24@4107,1127"
@@ -569,6 +620,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#534138",
+   "solid": false,
    "tile": "ostrich-leather-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@3855,1130"
@@ -580,6 +632,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#834e34",
+   "solid": false,
    "tile": "ostrich-leather-light-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@3603,1130"
@@ -591,6 +644,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#8d5b35",
+   "solid": false,
    "tile": "ostrich-leather-tan.jpg",
    "tileInches": 2.1,
    "source": "p24@3346,1130"
@@ -602,6 +656,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#ab4d56",
+   "solid": true,
    "tile": "metallic-leather-red.jpg",
    "tileInches": 2.1,
    "source": "p24@3989,1900"
@@ -613,6 +668,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#bb613f",
+   "solid": true,
    "tile": "metallic-leather-bronze.jpg",
    "tileInches": 2.1,
    "source": "p24@3737,1900"
@@ -624,6 +680,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#966c3f",
+   "solid": true,
    "tile": "metallic-leather-gold.jpg",
    "tileInches": 2.1,
    "source": "p24@3485,1903"
@@ -635,6 +692,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#96918d",
+   "solid": true,
    "tile": "metallic-leather-silver.jpg",
    "tileInches": 2.1,
    "source": "p24@3233,1903"
@@ -646,6 +704,7 @@
    "origin": "USA",
    "kind": "material",
    "hex": "#343339",
+   "solid": true,
    "tile": "metallic-leather-steel.jpg",
    "tileInches": 2.1,
    "source": "p24@2976,1903"
@@ -657,6 +716,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#1d1c21",
+   "solid": false,
    "tile": "heritage-leather-black.jpg",
    "tileInches": 2.1,
    "source": "p24@2162,1889"
@@ -668,6 +728,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#723035",
+   "solid": false,
    "tile": "heritage-leather-red.jpg",
    "tileInches": 2.1,
    "source": "p24@1915,1888"
@@ -679,6 +740,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#3d4e58",
+   "solid": false,
    "tile": "heritage-leather-navy-blue.jpg",
    "tileInches": 2.1,
    "source": "p24@1658,1885"
@@ -690,6 +752,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#b1a38d",
+   "solid": false,
    "tile": "heritage-leather-light-grey.jpg",
    "tileInches": 2.1,
    "source": "p24@1406,1888"
@@ -701,6 +764,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#464a33",
+   "solid": false,
    "tile": "heritage-leather-dark-green.jpg",
    "tileInches": 2.1,
    "source": "p24@1154,1888"
@@ -712,6 +776,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#8f5f48",
+   "solid": false,
    "tile": "heritage-leather-light-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@902,1891"
@@ -723,6 +788,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#423535",
+   "solid": false,
    "tile": "heritage-leather-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@650,1891"
@@ -734,6 +800,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#333334",
+   "solid": false,
    "tile": "heritage-leather-charcoal.jpg",
    "tileInches": 2.1,
    "source": "p24@393,1891"
@@ -745,6 +812,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#774d42",
+   "solid": false,
    "tile": "rustic-gator-leather-cognac.jpg",
    "tileInches": 2.1,
    "source": "p24@3689,350"
@@ -756,6 +824,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#473c3b",
+   "solid": false,
    "tile": "rustic-gator-leather-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@3437,350"
@@ -767,6 +836,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#363639",
+   "solid": false,
    "tile": "rustic-gator-leather-black.jpg",
    "tileInches": 2.1,
    "source": "p24@3180,350"
@@ -778,6 +848,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#232425",
+   "solid": false,
    "tile": "split-tone-gator-leather-black-charcoal.jpg",
    "tileInches": 2.1,
    "source": "p24@2399,356"
@@ -789,6 +860,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#464b30",
+   "solid": false,
    "tile": "split-tone-gator-leather-black-lime.jpg",
    "tileInches": 2.1,
    "source": "p24@2142,356"
@@ -800,6 +872,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#b6ad9a",
+   "solid": false,
    "tile": "split-tone-gator-leather-grey-grey.jpg",
    "tileInches": 2.1,
    "source": "p24@1895,359"
@@ -811,6 +884,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#251a1d",
+   "solid": false,
    "tile": "split-tone-gator-leather-brown-blue.jpg",
    "tileInches": 2.1,
    "source": "p24@1638,356"
@@ -822,6 +896,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#513927",
+   "solid": false,
    "tile": "split-tone-gator-leather-brown-caramel.jpg",
    "tileInches": 2.1,
    "source": "p24@1386,355"
@@ -833,6 +908,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#3c312e",
+   "solid": false,
    "tile": "split-tone-gator-leather-black-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@1134,355"
@@ -844,6 +920,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#3e3a3a",
+   "solid": false,
    "tile": "split-tone-gator-leather-navy-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@882,358"
@@ -855,6 +932,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#9e6e54",
+   "solid": false,
    "tile": "split-tone-gator-leather-brown-copper.jpg",
    "tileInches": 2.1,
    "source": "p24@630,358"
@@ -866,6 +944,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#605d57",
+   "solid": false,
    "tile": "split-tone-gator-leather-black-grey.jpg",
    "tileInches": 2.1,
    "source": "p24@373,358"
@@ -877,6 +956,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#171c29",
+   "solid": false,
    "tile": "distressed-leather-navy-blue.jpg",
    "tileInches": 2.1,
    "source": "p24@2651,1127"
@@ -888,6 +968,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#232a28",
+   "solid": false,
    "tile": "distressed-leather-forest-green.jpg",
    "tileInches": 2.1,
    "source": "p24@2399,1127"
@@ -899,6 +980,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#2c2d24",
+   "solid": false,
    "tile": "distressed-leather-olive.jpg",
    "tileInches": 2.1,
    "source": "p24@2142,1127"
@@ -910,6 +992,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#aa9074",
+   "solid": false,
    "tile": "distressed-leather-sand.jpg",
    "tileInches": 2.1,
    "source": "p24@1895,1130"
@@ -921,6 +1004,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#41322a",
+   "solid": false,
    "tile": "distressed-leather-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@1638,1127"
@@ -932,6 +1016,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#42211c",
+   "solid": false,
    "tile": "distressed-leather-chestnut.jpg",
    "tileInches": 2.1,
    "source": "p24@1386,1126"
@@ -943,6 +1028,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#2a1d1e",
+   "solid": false,
    "tile": "distressed-leather-dark-brown.jpg",
    "tileInches": 2.1,
    "source": "p24@1134,1126"
@@ -954,6 +1040,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#5e5b56",
+   "solid": false,
    "tile": "distressed-leather-slate-grey.jpg",
    "tileInches": 2.1,
    "source": "p24@882,1129"
@@ -965,6 +1052,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#47413d",
+   "solid": false,
    "tile": "distressed-leather-charcoal.jpg",
    "tileInches": 2.1,
    "source": "p24@630,1129"
@@ -976,6 +1064,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#232325",
+   "solid": false,
    "tile": "distressed-leather-black.jpg",
    "tileInches": 2.1,
    "source": "p24@373,1129"
@@ -987,6 +1076,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#9e765a",
+   "solid": false,
    "tile": "fur-interior-lining-tiger-print.jpg",
    "tileInches": 2.1,
    "source": "p26@3974,1774"
@@ -998,6 +1088,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#95836c",
+   "solid": false,
    "tile": "fur-interior-lining-custom-print.jpg",
    "tileInches": 2.1,
    "source": "p26@3722,1774"
@@ -1009,6 +1100,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#8797a0",
+   "solid": false,
    "tile": "fur-interior-lining-navy-tie-dye.jpg",
    "tileInches": 2.1,
    "source": "p26@3470,1774"
@@ -1020,6 +1112,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#9f8e77",
+   "solid": true,
    "tile": "fur-interior-lining-tan.jpg",
    "tileInches": 2.1,
    "source": "p26@3218,1777"
@@ -1031,6 +1124,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#512e72",
+   "solid": true,
    "tile": "fur-interior-lining-purple.jpg",
    "tileInches": 2.1,
    "source": "p26@2966,1778"
@@ -1042,6 +1136,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#a68ab4",
+   "solid": true,
    "tile": "fur-interior-lining-lilac.jpg",
    "tileInches": 2.1,
    "source": "p26@2714,1777"
@@ -1053,6 +1148,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#262439",
+   "solid": true,
    "tile": "fur-interior-lining-navy-blue.jpg",
    "tileInches": 2.1,
    "source": "p26@2462,1777"
@@ -1064,6 +1160,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#173791",
+   "solid": true,
    "tile": "fur-interior-lining-royal-blue.jpg",
    "tileInches": 2.1,
    "source": "p26@2205,1777"
@@ -1075,6 +1172,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#133e1e",
+   "solid": true,
    "tile": "fur-interior-lining-emerald-green.jpg",
    "tileInches": 2.1,
    "source": "p26@1958,1776"
@@ -1086,6 +1184,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#e4bf00",
+   "solid": true,
    "tile": "fur-interior-lining-yellow.jpg",
    "tileInches": 2.1,
    "source": "p26@1701,1777"
@@ -1097,6 +1196,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#d64d11",
+   "solid": true,
    "tile": "fur-interior-lining-orange.jpg",
    "tileInches": 2.1,
    "source": "p26@1449,1776"
@@ -1108,6 +1208,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#8e091d",
+   "solid": true,
    "tile": "fur-interior-lining-red.jpg",
    "tileInches": 2.1,
    "source": "p26@1197,1776"
@@ -1119,6 +1220,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#2e1f17",
+   "solid": true,
    "tile": "fur-interior-lining-brown.jpg",
    "tileInches": 2.1,
    "source": "p26@945,1779"
@@ -1130,6 +1232,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#d7d7d6",
+   "solid": true,
    "tile": "fur-interior-lining-light-grey.jpg",
    "tileInches": 2.1,
    "source": "p26@693,1779"
@@ -1141,6 +1244,7 @@
    "origin": "",
    "kind": "fur",
    "hex": "#0e0e0e",
+   "solid": true,
    "tile": "fur-interior-lining-black.jpg",
    "tileInches": 2.1,
    "source": "p26@436,1779"
@@ -1152,6 +1256,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#a68bb5",
+   "solid": true,
    "tile": "emboss-patch-leather-lilac.jpg",
    "tileInches": 2.1,
    "source": "p26@3974,1047"
@@ -1163,6 +1268,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#e8b379",
+   "solid": true,
    "tile": "emboss-patch-leather-natural.jpg",
    "tileInches": 2.1,
    "source": "p26@3722,1047"
@@ -1174,6 +1280,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#bb6e1d",
+   "solid": true,
    "tile": "emboss-patch-leather-tan.jpg",
    "tileInches": 2.1,
    "source": "p26@3470,1047"
@@ -1185,6 +1292,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#dc5923",
+   "solid": true,
    "tile": "emboss-patch-leather-orange.jpg",
    "tileInches": 2.1,
    "source": "p26@3218,1046"
@@ -1196,6 +1304,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#71353b",
+   "solid": true,
    "tile": "emboss-patch-leather-burgundy.jpg",
    "tileInches": 2.1,
    "source": "p26@2966,1047"
@@ -1207,6 +1316,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#ecac9a",
+   "solid": true,
    "tile": "emboss-patch-leather-soft-pink.jpg",
    "tileInches": 2.1,
    "source": "p26@2714,1046"
@@ -1218,6 +1328,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#b31229",
+   "solid": true,
    "tile": "emboss-patch-leather-red.jpg",
    "tileInches": 2.1,
    "source": "p26@2462,1046"
@@ -1229,6 +1340,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#32558b",
+   "solid": true,
    "tile": "emboss-patch-leather-royal-blue.jpg",
    "tileInches": 2.1,
    "source": "p26@2205,1046"
@@ -1240,6 +1352,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#a08b74",
+   "solid": true,
    "tile": "emboss-patch-leather-light-grey.jpg",
    "tileInches": 2.1,
    "source": "p26@1958,1049"
@@ -1251,6 +1364,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#393946",
+   "solid": true,
    "tile": "emboss-patch-leather-navy-blue.jpg",
    "tileInches": 2.1,
    "source": "p26@1701,1046"
@@ -1262,6 +1376,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#e4dbc6",
+   "solid": true,
    "tile": "emboss-patch-leather-off-white.jpg",
    "tileInches": 2.1,
    "source": "p26@1449,1049"
@@ -1273,6 +1388,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#53a797",
+   "solid": true,
    "tile": "emboss-patch-leather-seafoam.jpg",
    "tileInches": 2.1,
    "source": "p26@1197,1049"
@@ -1284,6 +1400,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#3f3e2a",
+   "solid": true,
    "tile": "emboss-patch-leather-olive.jpg",
    "tileInches": 2.1,
    "source": "p26@945,1048"
@@ -1295,6 +1412,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#46312a",
+   "solid": true,
    "tile": "emboss-patch-leather-brown.jpg",
    "tileInches": 2.1,
    "source": "p26@693,1048"
@@ -1306,6 +1424,7 @@
    "origin": "Italy",
    "kind": "material",
    "hex": "#282726",
+   "solid": true,
    "tile": "emboss-patch-leather-black.jpg",
    "tileInches": 2.1,
    "source": "p26@436,1048"
@@ -1317,6 +1436,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#1f1f1f",
+   "solid": true,
    "tile": "premium-vinyl-solid-black.jpg",
    "tileInches": 2.1,
    "source": "p26@4218,306"
@@ -1328,6 +1448,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#8f9797",
+   "solid": true,
    "tile": "premium-vinyl-solid-light-grey.jpg",
    "tileInches": 2.1,
    "source": "p26@3966,306"
@@ -1339,6 +1460,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#2a5343",
+   "solid": true,
    "tile": "premium-vinyl-solid-forrest-green.jpg",
    "tileInches": 2.1,
    "source": "p26@3714,306"
@@ -1350,6 +1472,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#1fcb46",
+   "solid": true,
    "tile": "premium-vinyl-solid-lime-green.jpg",
    "tileInches": 2.1,
    "source": "p26@3462,306"
@@ -1361,6 +1484,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#343d56",
+   "solid": true,
    "tile": "premium-vinyl-solid-navy-blue.jpg",
    "tileInches": 2.1,
    "source": "p26@3210,305"
@@ -1372,6 +1496,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#1665b7",
+   "solid": true,
    "tile": "premium-vinyl-solid-royal-blue.jpg",
    "tileInches": 2.1,
    "source": "p26@2958,306"
@@ -1383,6 +1508,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#5ac7fd",
+   "solid": true,
    "tile": "premium-vinyl-solid-light-blue.jpg",
    "tileInches": 2.1,
    "source": "p26@2706,305"
@@ -1394,6 +1520,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#4a4077",
+   "solid": true,
    "tile": "premium-vinyl-solid-purple.jpg",
    "tileInches": 2.1,
    "source": "p26@2454,305"
@@ -1405,6 +1532,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#f5c1d5",
+   "solid": true,
    "tile": "premium-vinyl-solid-pink.jpg",
    "tileInches": 2.1,
    "source": "p26@2197,305"
@@ -1416,6 +1544,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#8c2527",
+   "solid": true,
    "tile": "premium-vinyl-solid-red.jpg",
    "tileInches": 2.1,
    "source": "p26@1950,308"
@@ -1427,6 +1556,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#e2682c",
+   "solid": true,
    "tile": "premium-vinyl-solid-orange.jpg",
    "tileInches": 2.1,
    "source": "p26@1693,305"
@@ -1438,6 +1568,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#f0cc17",
+   "solid": true,
    "tile": "premium-vinyl-solid-yellow.jpg",
    "tileInches": 2.1,
    "source": "p26@1441,308"
@@ -1449,6 +1580,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#634b35",
+   "solid": true,
    "tile": "premium-vinyl-solid-brown.jpg",
    "tileInches": 2.1,
    "source": "p26@1189,308"
@@ -1460,6 +1592,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#c7bda5",
+   "solid": true,
    "tile": "premium-vinyl-solid-sand.jpg",
    "tileInches": 2.1,
    "source": "p26@937,311"
@@ -1471,6 +1604,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#e9e3d8",
+   "solid": true,
    "tile": "premium-vinyl-solid-off-white.jpg",
    "tileInches": 2.1,
    "source": "p26@685,311"
@@ -1482,6 +1616,7 @@
    "origin": "",
    "kind": "material",
    "hex": "#e3e9ee",
+   "solid": true,
    "tile": "premium-vinyl-solid-white.jpg",
    "tileInches": 2.1,
    "source": "p26@428,311"

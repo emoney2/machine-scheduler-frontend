@@ -12,8 +12,9 @@ import "./HeadcoverStudio.css";
 const DATA_BASE = `${process.env.PUBLIC_URL || ""}/headcover-studio`;
 const DEFAULT_FUR = "Light Grey";
 
+// Solid materials show as their colour; patterned ones show their tile.
 const tileBg = (m) =>
-  m ? (m.tileUrl ? { backgroundImage: `url("${m.tileUrl}")`, backgroundColor: m.hex } : { background: m.hex }) : {};
+  m ? (m.tileUrl && !m.solid ? { backgroundImage: `url("${m.tileUrl}")`, backgroundColor: m.hex } : { background: m.hex }) : {};
 
 /** Mounts an existing <canvas> element (rendered by the engine) into the React tree. */
 function CanvasView({ canvas, onClick, className }) {
