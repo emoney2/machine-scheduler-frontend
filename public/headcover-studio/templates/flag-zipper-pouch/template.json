@@ -1,0 +1,38 @@
+{
+ "product": "Zipper Pouch",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "slots": [
+  {
+   "name": "Flag field",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Red stripes",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Canton",
+   "mask": "slot-2.png"
+  },
+  {
+   "name": "Stars",
+   "mask": "slot-3.png"
+  }
+ ],
+ "frame": "frame.png",
+ "logo": {
+  "x": 601.74,
+  "y": 305.34,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "zipper-pouch",
+ "name": "Flag",
+ "design": "flag",
+ "notes": [
+  "full American flag on the front, canton top-left; back plain navy"
+ ]
+}

@@ -1,0 +1,33 @@
+{
+ "name": "Tartan",
+ "product": "DF3 Mallet",
+ "w": 961,
+ "h": 813,
+ "pxPerInch": 60.0,
+ "design": "tartan",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 225.23,
+  "y": 515.18,
+  "w": 71.52,
+  "h": 71.52,
+  "rot": 0
+ },
+ "logoFrom": "df3-mallet",
+ "tartan": {
+  "stitches": [
+   "tartan-0.png",
+   "tartan-1.png",
+   "tartan-2.png"
+  ],
+  "repeatIn": 4.0
+ },
+ "notes": [
+  "tartan of straight stitch lines (3 threads) over a solid leather"
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "name": "Camo",
+ "product": "Zipper Pouch",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "slots": [
+  {
+   "name": "Camo Base Layer",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Camo Mid Layer",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Camo Top Layer",
+   "mask": "slot-2.png"
+  }
+ ],
+ "frame": "frame.png",
+ "body": {
+  "name": "White",
+  "material": "Luscious|White"
+ },
+ "logo": {
+  "x": 601.74,
+  "y": 305.34,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "notes": [
+  "zipper pouch: driver camo turned onto the front panel; back plain"
+ ]
+}

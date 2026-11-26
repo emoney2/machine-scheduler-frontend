@@ -177,6 +177,62 @@
     {
       "id": "flag-df3-mallet",
       "dir": "templates/flag-df3-mallet/"
+    },
+    {
+      "id": "zipper-pouch",
+      "dir": "templates/zipper-pouch/"
+    },
+    {
+      "id": "tartan-driver",
+      "dir": "templates/tartan-driver/"
+    },
+    {
+      "id": "tartan-fairway",
+      "dir": "templates/tartan-fairway/"
+    },
+    {
+      "id": "tartan-hybrid",
+      "dir": "templates/tartan-hybrid/"
+    },
+    {
+      "id": "tartan-mallet",
+      "dir": "templates/tartan-mallet/"
+    },
+    {
+      "id": "tartan-blade",
+      "dir": "templates/tartan-blade/"
+    },
+    {
+      "id": "tartan-mid-mallet",
+      "dir": "templates/tartan-mid-mallet/"
+    },
+    {
+      "id": "tartan-center-shaft-mallet",
+      "dir": "templates/tartan-center-shaft-mallet/"
+    },
+    {
+      "id": "tartan-df3-mallet",
+      "dir": "templates/tartan-df3-mallet/"
+    },
+    {
+      "id": "quilted-zipper-pouch",
+      "dir": "templates/quilted-zipper-pouch/"
+    },
+    {
+      "id": "exotic-zipper-pouch",
+      "dir": "templates/exotic-zipper-pouch/"
+    },
+    {
+      "id": "stripes-zipper-pouch",
+      "dir": "templates/stripes-zipper-pouch/"
+    },
+    {
+      "id": "flag-zipper-pouch",
+      "dir": "templates/flag-zipper-pouch/"
+    },
+    {
+      "id": "tartan-zipper-pouch",
+      "dir": "templates/tartan-zipper-pouch/"
     }
   ],
   "proofs": [
@@ -219,6 +275,10 @@
     {
       "id": "alignment-stick-cover",
       "dir": "proofs/alignment-stick-cover/"
+    },
+    {
+      "id": "zipper-pouch",
+      "dir": "proofs/zipper-pouch/"
     }
   ]
 }

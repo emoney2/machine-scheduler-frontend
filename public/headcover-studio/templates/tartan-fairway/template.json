@@ -1,0 +1,32 @@
+{
+ "name": "Tartan",
+ "product": "Fairway",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "design": "tartan",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 216.64890000000003,
+  "y": 211.4489,
+  "w": 46.702200000000005,
+  "h": 46.702200000000005
+ },
+ "logoFrom": "fairway",
+ "tartan": {
+  "stitches": [
+   "tartan-0.png",
+   "tartan-1.png",
+   "tartan-2.png"
+  ],
+  "repeatIn": 4.0
+ },
+ "notes": [
+  "tartan of straight stitch lines (3 threads) over a solid leather"
+ ]
+}

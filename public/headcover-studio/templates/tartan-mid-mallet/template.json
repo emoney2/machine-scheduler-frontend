@@ -1,0 +1,33 @@
+{
+ "name": "Tartan",
+ "product": "Mid Mallet",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "design": "tartan",
+ "slots": [],
+ "frame": null,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 439.8,
+  "y": 303.03,
+  "w": 111.0,
+  "h": 111.0,
+  "rot": 0
+ },
+ "logoFrom": "mid-mallet",
+ "tartan": {
+  "stitches": [
+   "tartan-0.png",
+   "tartan-1.png",
+   "tartan-2.png"
+  ],
+  "repeatIn": 4.0
+ },
+ "notes": [
+  "tartan of straight stitch lines (3 threads) over a solid leather"
+ ]
+}

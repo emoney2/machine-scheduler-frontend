@@ -116,6 +116,7 @@ function loadTemplateAssets(T) {
     T.quiltShadeImg = T.quilt ? await loadImg(dir + T.quilt.shade) : null;
     T.stripeMaskImg = T.stripes ? await loadImg(dir + T.stripes.mask) : null;
     T.quiltStitchImg = T.quilt ? await loadImg(dir + T.quilt.stitch) : null;
+    T.tartanImgs = T.tartan ? await Promise.all(T.tartan.stitches.map((f) => loadImg(dir + f))) : null;
     T.logoGround = -1;   // which slot sits under the logo centre (for logo contrast)
     if (T.logo) {
       const cx = Math.round(T.logo.x + T.logo.w / 2), cy = Math.round(T.logo.y + T.logo.h / 2);
@@ -449,6 +450,13 @@ export function createStudio({ materials, furs, templates, proofs }) {
         ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 1; ctx.shadowOffsetY = 0.6; ctx.drawImage(c, 0, 0); ctx.restore();
       }
     }
+    if (T.tartanImgs && opts.tartan) {   // tartan: straight stitch lines, one thread colour per layer
+      T.tartanImgs.forEach((im, i) => {
+        const c = makeCanvas(T.w, T.h), x = c.getContext("2d");
+        x.drawImage(im, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = opts.tartan[i % opts.tartan.length]; x.fillRect(0, 0, T.w, T.h);
+        ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 1; ctx.shadowOffsetY = 0.7; ctx.drawImage(c, 0, 0); ctx.restore();
+      });
+    }
     if (T.frameImg) ctx.drawImage(T.frameImg, 0, 0);
     if (T.furImg && opts.fur) maskFill(ctx, T, T.furImg, matStyle(ctx, opts.fur, ppi), true);
     if (T.scatter && LOGO.canvas) {   // scattered logo print (Farmington style): one colour, each mark turned
@@ -598,6 +606,19 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const L = dE(light.rgb, dark.rgb) > 40 ? light : WHITE, D = dE(light.rgb, dark.rgb) > 40 ? dark : (isLight(light) ? NAVY : dark);
     return { A: { body: L, ink: D }, B: { body: D, ink: L } };
   }
+  // tartan: a solid (usually the darkest pick) with three thread colours stitched in a sett
+  function tartanWays(picks) {
+    const a = (picks.length ? picks : [NAVY, WHITE]).map(smoothFor);
+    const byDark = [...a].sort((x, y) => lum(x.rgb) - lum(y.rgb));
+    const way = (body) => {
+      const cr = (m) => { const p = lum(m.rgb), q = lum(body.rgb); return (Math.max(p, q) + 0.05) / (Math.min(p, q) + 0.05); };
+      const shows = (m) => m && dE(m.rgb, body.rgb) > 25 && cr(m) > 1.9;   // a thread has to read against the leather
+      const rest = a.filter((m) => m !== body && shows(m)).sort((x, y) => cr(y) - cr(x));   // boldest first = the bold line
+      const pool = [...rest, WHITE, bestContrast(body), isLight(body) ? NAVY : WHITE].filter((m, i, l) => shows(m) && l.indexOf(m) === i);
+      return { body, threads: [pool[0], pool[1] || pool[0], pool[2] || pool[0]] };
+    };
+    return { A: way(byDark[0]), B: byDark[1] && lum(byDark[1].rgb) < 0.3 ? way(byDark[1]) : null };   // B only when a second dark pick exists
+  }
   // colourway k (0 = A, 1 = B): main material, a contrasting thread, and the exotic body
   function designWay(picks, k) {
     const a = picks.length ? picks : [NAVY, WHITE];
@@ -626,13 +647,16 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const out = [];
     const tways = swapped ? [["B", TB], ["A", TA]] : [["A", TA], ["B", TB]];
     const picks = slots.filter(Boolean);
-    const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks), flag: flagWays() };
+    const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks), flag: flagWays(), tartan: tartanWays(picks) };
     await ensureTiles([special.A.body, special.B.body]);
     tpls.forEach((T) => tways.forEach(([cw, m]) => {
-      if (T.design === "flag" && cw === "B") return;   // the flag has one colourway: classic red, white and navy
+      if (T.design === "flag" && cw === "B") return;
+      if (T.design === "tartan" && !special.tartan[cw]) return;   // the flag has one colourway: classic red, white and navy
       let mats, shown, thread = null;
       if (T.design === "quilted") {         // one smooth material, quilted, stitched in a contrasting pick
         const w = special[cw]; mats = [w.main, w.main, w.main, w.main]; thread = w.thread.hex; shown = [w.main, w.thread];
+      } else if (T.design === "tartan") {   // solid body, three stitched thread colours
+        const w = special.tartan[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body, ...w.threads];
       } else if (T.design === "flag") {   // [back, field, red stripes, canton, stars]
         const w = special.flag[cw]; mats = [w.back, w.white, w.red, w.blue, w.white]; shown = [w.blue, w.red, w.white];
       } else if (T.design === "stripes") {   // body + three stripes from the picks (Silver Britches)
@@ -648,7 +672,8 @@ export function createStudio({ materials, furs, templates, proofs }) {
       // scattered marks print in the logo's own colours; the one-colour switch prints them in the contrast pick
       const scatterTint = T.design === "scatter" && oneColor ? special.scatter[cw].ink.hex : null;
       const st = T.design === "stripes" ? special.stripes[cw] : null;
-      const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, scatterTint, stripes: st && st.stripes });
+      const tt = T.design === "tartan" ? special.tartan[cw].threads.map((m) => m.hex) : null;
+      const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, scatterTint, stripes: st && st.stripes, tartan: tt });
       const P = proofs.find((p) => p.name === T.product);
       const canvas = P ? renderProof(P, flat, fur) : flat;
       out.push({ design: `${T.product} · ${T.name}`, product: T.product, cw, mats: shown, wide: true, tpl: true, flat, proof: canvas, canvas });

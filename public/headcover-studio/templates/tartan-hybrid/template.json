@@ -1,0 +1,32 @@
+{
+ "name": "Tartan",
+ "product": "Hybrid",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "design": "tartan",
+ "slots": [],
+ "frame": null,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 228.0187,
+  "y": 202.4187,
+  "w": 64.7626,
+  "h": 64.7626
+ },
+ "logoFrom": "hybrid",
+ "tartan": {
+  "stitches": [
+   "tartan-0.png",
+   "tartan-1.png",
+   "tartan-2.png"
+  ],
+  "repeatIn": 4.0
+ },
+ "notes": [
+  "tartan of straight stitch lines (3 threads) over a solid leather"
+ ]
+}

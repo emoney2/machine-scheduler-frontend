@@ -1,0 +1,32 @@
+{
+ "name": "Tartan",
+ "product": "Driver",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "design": "tartan",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 283.6,
+  "y": 315.8,
+  "w": 63.2,
+  "h": 60.6
+ },
+ "logoFrom": "camo-driver",
+ "tartan": {
+  "stitches": [
+   "tartan-0.png",
+   "tartan-1.png",
+   "tartan-2.png"
+  ],
+  "repeatIn": 4.0
+ },
+ "notes": [
+  "tartan of straight stitch lines (3 threads) over a solid leather"
+ ]
+}

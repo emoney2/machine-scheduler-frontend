@@ -1,0 +1,26 @@
+{
+ "product": "Zipper Pouch",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "slots": [],
+ "frame": "frame.png",
+ "logo": {
+  "x": 601.74,
+  "y": 305.34,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "zipper-pouch",
+ "name": "Quilted",
+ "design": "quilted",
+ "quilt": {
+  "shade": "quilt-shade.png",
+  "stitch": "quilt-stitch.png",
+  "pattern": "Diamond"
+ },
+ "notes": [
+  "diamond quilt, front and back"
+ ]
+}

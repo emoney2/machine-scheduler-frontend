@@ -1,0 +1,21 @@
+{
+ "product": "Zipper Pouch",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "slots": [],
+ "frame": "frame.png",
+ "logo": {
+  "x": 601.74,
+  "y": 305.34,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "logoFrom": "zipper-pouch",
+ "name": "Exotic",
+ "design": "exotic",
+ "notes": [
+  "front and back in the exotic"
+ ]
+}

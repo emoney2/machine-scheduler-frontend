@@ -1,0 +1,33 @@
+{
+ "name": "Tartan",
+ "product": "Blade",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "design": "tartan",
+ "slots": [],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 440.9,
+  "y": 321.6,
+  "w": 98.2,
+  "h": 98.2,
+  "rot": 0
+ },
+ "logoFrom": "blade",
+ "tartan": {
+  "stitches": [
+   "tartan-0.png",
+   "tartan-1.png",
+   "tartan-2.png"
+  ],
+  "repeatIn": 4.0
+ },
+ "notes": [
+  "tartan of straight stitch lines (3 threads) over a solid leather"
+ ]
+}
