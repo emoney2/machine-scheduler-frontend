@@ -367,7 +367,7 @@ export default function HeadcoverStudio() {
     if (!designs.length) return;
     clearTimeout(rerenderTimer.current);
     rerenderTimer.current = setTimeout(() => renderAll(designs), 150);
-  }, [oneColor, furId, logoSize, logoView]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [oneColor, furId, logoSize, logoView]);
 
   const cur = designs[idx] || null;
   const updateDesign = (u, patch) => setDesigns((p) => p.map((d) => (d.uid === u ? { ...d, ...patch } : d)));
@@ -415,7 +415,7 @@ export default function HeadcoverStudio() {
         setSessions(await listSessions());
       } catch (e) { console.warn("[HeadcoverStudio] session not saved", e); }
     }, 600);
-  }, [designs, club, slots, furId, logoSize, oneColor, products, swapped, variant]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [designs, club, slots, furId, logoSize, oneColor, products, swapped, variant]);
 
   const openSession = async (id) => {
     const x = await getSession(id);
