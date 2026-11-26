@@ -1,0 +1,40 @@
+{
+ "name": "Camo",
+ "product": "Center Shaft Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "slots": [
+  {
+   "name": "Camo Mid Layer",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Camo Top Layer",
+   "mask": "slot-1.png"
+  }
+ ],
+ "notes": [
+  "ignored hidden: JRCO_FUR_NAME:Light Grey Fur",
+  "ignored hidden: PRINT",
+  "unmapped: Guidelines",
+  "ignored hidden: Quilting",
+  "logo: default placement (add a 'Logo' layer to the PSD to control it)",
+  "camo from WRP/CamoCSMallet.psd (Camo2/Camo1; club artwork left out)"
+ ],
+ "markers": {
+  "JRCO_FUR_NAME": "Light Grey Fur"
+ },
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 230.47,
+  "y": 490.6,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ }
+}

@@ -1,0 +1,164 @@
+{
+ "name": "Barrel",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 5356,
+ "contentH": 6176,
+ "views": [
+  {
+   "name": "BarrelMasterLayout",
+   "bbox": [
+    1130,
+    427,
+    347,
+    353
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 9",
+   "bbox": [
+    1113,
+    546,
+    370,
+    244
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 10",
+   "bbox": [
+    1113,
+    419,
+    370,
+    182
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 11",
+   "bbox": [
+    1303,
+    419,
+    180,
+    182
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 3",
+   "bbox": [
+    396,
+    241,
+    336,
+    686
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 4",
+   "bbox": [
+    410,
+    241,
+    298,
+    545
+   ],
+   "base": "view-5.png",
+   "uv": "view-5.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy",
+   "bbox": [
+    43,
+    241,
+    319,
+    686
+   ],
+   "base": "view-6.png",
+   "uv": "view-6.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 2",
+   "bbox": [
+    43,
+    241,
+    296,
+    675
+   ],
+   "base": "view-7.png",
+   "uv": "view-7.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 5",
+   "bbox": [
+    43,
+    269,
+    266,
+    647
+   ],
+   "base": "view-8.png",
+   "uv": "view-8.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 6",
+   "bbox": [
+    780,
+    241,
+    319,
+    687
+   ],
+   "base": "view-9.png",
+   "uv": "view-9.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 8",
+   "bbox": [
+    804,
+    241,
+    296,
+    677
+   ],
+   "base": "view-10.png",
+   "uv": "view-10.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BarrelMasterLayout copy 7",
+   "bbox": [
+    828,
+    271,
+    271,
+    647
+   ],
+   "base": "view-11.png",
+   "uv": "view-11.uv.bin",
+   "exact": true
+  }
+ ],
+ "fur": {
+  "bbox": [
+   61,
+   369,
+   1011,
+   567
+  ],
+  "png": "fur.png",
+  "order": 12
+ },
+ "overlay": "overlay.png"
+}

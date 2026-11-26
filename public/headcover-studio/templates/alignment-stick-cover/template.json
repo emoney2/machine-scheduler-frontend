@@ -1,0 +1,28 @@
+{
+ "name": "Solid",
+ "product": "Alignment Stick Cover",
+ "w": 966,
+ "h": 942,
+ "pxPerInch": 60.0,
+ "slots": [],
+ "notes": [
+  "ignored hidden: JRCO_FUR_NAME:Light Grey Fur",
+  "ignored hidden: PRINT",
+  "logo: default placement (add a 'Logo' layer to the PSD to control it)"
+ ],
+ "markers": {
+  "JRCO_FUR_NAME": "Light Grey Fur"
+ },
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 337.87,
+  "y": 233.33,
+  "w": 53.81,
+  "h": 53.81,
+  "rot": 0
+ }
+}

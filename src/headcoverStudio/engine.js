@@ -316,13 +316,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const tint = opts.tint || null;
     const img = logoLayer(w, h, tint);
     const main = tint ? hexToRgb(tint) : LOGO.main;
-    const x = cx - w / 2, y = cy - h / 2;
+    // opts.rot (degrees) turns the logo upright on panels that sit rotated in the flat layout
+    ctx.save(); ctx.translate(cx, cy); if (opts.rot) ctx.rotate((opts.rot * Math.PI) / 180);
+    const x = -w / 2, y = -h / 2;
     if (main && dE(main, ground.rgb) < 28) {   // logo would vanish on its ground: outline it
       const o = opts.outline || bestContrast(ground);
       const sil = silhouetteOf(img, o.hex);
       for (let a = 0; a < 16; a++) { const t = (a / 16) * Math.PI * 2; ctx.drawImage(sil, x + Math.cos(t) * 4.5, y + Math.sin(t) * 4.5); }
     }
-    ctx.save(); ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 3; ctx.shadowOffsetX = 1.2; ctx.shadowOffsetY = 2.2;
+    ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 3; ctx.shadowOffsetX = 1.2; ctx.shadowOffsetY = 2.2;
     ctx.drawImage(img, x, y); ctx.restore();
   }
   function pickThread(c) {
@@ -391,7 +393,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     if (T.logo && LOGO.canvas) {
       const s = opts.logoScale, g = T.logoGround >= 0 ? mats[(T.logoGround + 1) % mats.length] : mats[0];
       const c = { body: mats[0], accent: mats[1], trim: mats[2], extra: mats[3] };
-      drawLogo(ctx, T.logo.x + T.logo.w / 2, T.logo.y + T.logo.h / 2, T.logo.w * s, T.logo.h * s, g, { tint: opts.oneColor ? pickThread({ ...c, body: g }) : null });
+      drawLogo(ctx, T.logo.x + T.logo.w / 2, T.logo.y + T.logo.h / 2, T.logo.w * s, T.logo.h * s, g, { tint: opts.oneColor ? pickThread({ ...c, body: g }) : null, rot: T.logo.rot || 0 });
     }
     return cv;
   }

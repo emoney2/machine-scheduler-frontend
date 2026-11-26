@@ -17,6 +17,30 @@
     {
       "id": "mallet",
       "dir": "templates/mallet/"
+    },
+    {
+      "id": "blade",
+      "dir": "templates/blade/"
+    },
+    {
+      "id": "mid-mallet",
+      "dir": "templates/mid-mallet/"
+    },
+    {
+      "id": "center-shaft-mallet",
+      "dir": "templates/center-shaft-mallet/"
+    },
+    {
+      "id": "df3-mallet",
+      "dir": "templates/df3-mallet/"
+    },
+    {
+      "id": "barrel",
+      "dir": "templates/barrel/"
+    },
+    {
+      "id": "alignment-stick-cover",
+      "dir": "templates/alignment-stick-cover/"
     }
   ],
   "proofs": [
@@ -35,6 +59,30 @@
     {
       "id": "mallet",
       "dir": "proofs/mallet/"
+    },
+    {
+      "id": "blade",
+      "dir": "proofs/blade/"
+    },
+    {
+      "id": "mid-mallet",
+      "dir": "proofs/mid-mallet/"
+    },
+    {
+      "id": "center-shaft-mallet",
+      "dir": "proofs/center-shaft-mallet/"
+    },
+    {
+      "id": "df3-mallet",
+      "dir": "proofs/df3-mallet/"
+    },
+    {
+      "id": "barrel",
+      "dir": "proofs/barrel/"
+    },
+    {
+      "id": "alignment-stick-cover",
+      "dir": "proofs/alignment-stick-cover/"
     }
   ]
 }

@@ -1,0 +1,92 @@
+{
+ "name": "Alignment Stick Cover",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 4833,
+ "contentH": 4713,
+ "views": [
+  {
+   "name": "AlignmentStickCoverMasterLayout",
+   "bbox": [
+    362,
+    54,
+    119,
+    918
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "AlignmentStickCoverMasterLayout copy",
+   "bbox": [
+    931,
+    59,
+    119,
+    920
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "AlignmentStickCoverMasterLayout copy 2",
+   "bbox": [
+    567,
+    56,
+    159,
+    931
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "AlignmentStickCoverMasterLayout copy 3",
+   "bbox": [
+    567,
+    54,
+    259,
+    926
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "AlignmentStickCoverMasterLayout copy 5",
+   "bbox": [
+    1234,
+    63,
+    159,
+    931
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "AlignmentStickCoverMasterLayout copy 4",
+   "bbox": [
+    1134,
+    61,
+    259,
+    926
+   ],
+   "base": "view-5.png",
+   "uv": "view-5.uv.bin",
+   "exact": true
+  }
+ ],
+ "fur": {
+  "bbox": [
+   330,
+   857,
+   949,
+   143
+  ],
+  "png": "fur.png",
+  "order": 0
+ },
+ "overlay": "overlay.png"
+}

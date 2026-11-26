@@ -1,0 +1,80 @@
+{
+ "name": "Center Shaft Mallet",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 2405,
+ "contentH": 1913,
+ "views": [
+  {
+   "name": "CenterShaftMalletMasterLayout",
+   "bbox": [
+    74,
+    200,
+    474,
+    735
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "CenterShaftMalletMasterLayout copy",
+   "bbox": [
+    571,
+    570,
+    403,
+    365
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "CenterShaftMalletMasterLayout copy 2",
+   "bbox": [
+    1023,
+    187,
+    479,
+    788
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "CenterShaftMalletMasterLayout copy 3",
+   "bbox": [
+    563,
+    190,
+    412,
+    336
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "CenterShaftMalletMasterLayout copy 4",
+   "bbox": [
+    562,
+    186,
+    413,
+    269
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin",
+   "exact": true
+  }
+ ],
+ "fur": {
+  "bbox": [
+   44,
+   163,
+   1458,
+   819
+  ],
+  "png": "fur.png",
+  "order": 5
+ },
+ "overlay": "overlay.png"
+}

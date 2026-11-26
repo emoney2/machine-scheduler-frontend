@@ -1,0 +1,80 @@
+{
+ "name": "DF3 Mallet",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 4809,
+ "contentH": 4066,
+ "views": [
+  {
+   "name": "DF3MalletMasterLayout",
+   "bbox": [
+    122,
+    171,
+    444,
+    765
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "DF3MalletMasterLayout copy 2",
+   "bbox": [
+    581,
+    339,
+    384,
+    213
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "DF3MalletMasterLayout copy 3",
+   "bbox": [
+    577,
+    180,
+    397,
+    296
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "DF3MalletMasterLayout copy",
+   "bbox": [
+    571,
+    593,
+    398,
+    378
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "DF3MalletMasterLayout copy 4",
+   "bbox": [
+    1005,
+    534,
+    398,
+    406
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin",
+   "exact": true
+  }
+ ],
+ "fur": {
+  "bbox": [
+   94,
+   157,
+   1359,
+   822
+  ],
+  "png": "fur.png",
+  "order": 4
+ },
+ "overlay": "overlay.png"
+}

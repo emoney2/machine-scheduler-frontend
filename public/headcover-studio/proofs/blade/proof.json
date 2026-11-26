@@ -1,0 +1,56 @@
+{
+ "name": "Blade",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 4964,
+ "contentH": 3097,
+ "views": [
+  {
+   "name": "BladeMasterLayout copy 2",
+   "bbox": [
+    1013,
+    235,
+    413,
+    699
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BladeMasterLayout copy",
+   "bbox": [
+    91,
+    403,
+    613,
+    473
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "BladeMasterLayout",
+   "bbox": [
+    486,
+    70,
+    595,
+    484
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin",
+   "exact": true
+  }
+ ],
+ "fur": {
+  "bbox": [
+   84,
+   69,
+   1286,
+   831
+  ],
+  "png": "fur.png",
+  "order": 0
+ },
+ "overlay": "overlay.png"
+}

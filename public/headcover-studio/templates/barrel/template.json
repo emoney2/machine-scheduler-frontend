@@ -1,0 +1,33 @@
+{
+ "name": "Solid",
+ "product": "Barrel",
+ "w": 1071,
+ "h": 1235,
+ "pxPerInch": 60.0,
+ "slots": [],
+ "notes": [
+  "ignored hidden: JRCO_FUR_NAME:Light Grey Fur",
+  "unmapped: BARREL",
+  "unmapped: BARREL DRIVER",
+  "unmapped: Layer 1",
+  "logo: default placement (add a 'Logo' layer to the PSD to control it)"
+ ],
+ "markers": {
+  "JRCO_FUR_NAME": "Light Grey Fur"
+ },
+ "body": {
+  "name": "PRINT",
+  "material": null
+ },
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 474.44,
+  "y": 273.48,
+  "w": 125.71,
+  "h": 125.71,
+  "rot": 0
+ }
+}

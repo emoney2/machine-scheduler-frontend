@@ -1,0 +1,35 @@
+{
+ "name": "Camo",
+ "product": "DF3 Mallet",
+ "w": 961,
+ "h": 813,
+ "pxPerInch": 60.0,
+ "slots": [
+  {
+   "name": "Camo Mid Layer",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Camo Top Layer",
+   "mask": "slot-1.png"
+  }
+ ],
+ "notes": [
+  "unmapped: PlacementGuides",
+  "logo: default placement (add a 'Logo' layer to the PSD to control it)",
+  "camo from GallowayNational/DF3oneoffCamo.psd (Camo Mid/Top layers; club artwork left out)"
+ ],
+ "markers": {},
+ "frame": "frame.png",
+ "fur": {
+  "name": "Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 225.23,
+  "y": 515.18,
+  "w": 71.52,
+  "h": 71.52,
+  "rot": 0
+ }
+}

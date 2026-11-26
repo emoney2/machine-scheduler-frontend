@@ -1,0 +1,43 @@
+{
+ "name": "Camo",
+ "product": "Blade",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "slots": [
+  {
+   "name": "Layer 1",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Layer 2",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Layer 1",
+   "mask": "slot-2.png"
+  }
+ ],
+ "notes": [
+  "ignored hidden: JRCO_FUR_NAME:Light Grey Fur",
+  "ignored hidden: PRINT",
+  "unmapped: Guidelines",
+  "ignored hidden: Quilting",
+  "logo: default placement (add a 'Logo' layer to the PSD to control it)"
+ ],
+ "markers": {
+  "JRCO_FUR_NAME": "Light Grey Fur"
+ },
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 440.9,
+  "y": 321.6,
+  "w": 98.2,
+  "h": 98.2,
+  "rot": 0
+ }
+}

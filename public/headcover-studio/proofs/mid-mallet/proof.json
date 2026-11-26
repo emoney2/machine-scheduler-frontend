@@ -1,0 +1,56 @@
+{
+ "name": "Mid Mallet",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 4961,
+ "contentH": 3100,
+ "views": [
+  {
+   "name": "MidMalletMasterLayout copy 2",
+   "bbox": [
+    101,
+    313,
+    613,
+    632
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "MidMalletMasterLayout",
+   "bbox": [
+    1030,
+    354,
+    465,
+    606
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "MidMalletMasterLayout copy",
+   "bbox": [
+    454,
+    0,
+    613,
+    578
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin",
+   "exact": true
+  }
+ ],
+ "fur": {
+  "bbox": [
+   47,
+   0,
+   1427,
+   996
+  ],
+  "png": "fur.png",
+  "order": 0
+ },
+ "overlay": "overlay.png"
+}
