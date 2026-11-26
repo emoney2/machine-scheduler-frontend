@@ -632,57 +632,100 @@ export function createStudio({ materials, furs, templates, proofs }) {
   }
 
   /** Render everything. Returns [{design, cw, mats, tpl, wide, flat, proof, canvas}]. */
+  /* ----- designs as editable specs: plan() picks the materials, renderSpec() draws one ----- */
+  // A spec is plain data: the template, the colourway, and one material per named role. Editing a design
+  // just swaps a role's material and re-renders that one card, so sessions can be saved and reopened.
+  const KIND_ROLES = {
+    camo: (T) => ["Back panel", ...T.slots.map((x, i) => `Camo ${i + 1}`)],
+    solid: () => ["Body"],
+    quilted: () => ["Leather", "Quilt thread"],
+    exotic: () => ["Exotic"],
+    stripes: () => ["Body", "Stripe 1", "Stripe 2", "Stripe 3"],
+    tartan: () => ["Leather", "Thread 1", "Thread 2", "Thread 3"],
+    flag: () => ["Navy", "Red", "White"],
+    scatter: () => ["Body", "Marks"],
+  };
+  const kindOf = (T) => T.design || (T.slots.length ? "camo" : "solid");
+  function permute(picks, v) {   // the v-th ordering of the picks (v = 0 keeps them as chosen)
+    const a = picks.slice(), n = a.length, f = [1];
+    for (let i = 1; i <= n; i++) f[i] = f[i - 1] * i;
+    let k = n ? v % f[n] : 0; const out = [];
+    for (let i = n; i > 0; i--) { const q = Math.floor(k / f[i - 1]); k %= f[i - 1]; out.push(a.splice(q, 1)[0]); }
+    return out;
+  }
+  async function plan({ slots, swapped, products, variant = 0 }) {
+    const picks0 = slots.filter(Boolean);
+    if (!picks0.length) return [];
+    const picks = permute(picks0, variant), sl = [...picks, null, null, null, null].slice(0, 4);
+    const [TA, TB] = templateWays(sl);
+    const tpls = templates.filter((T) => !products || products.includes(T.product));
+    const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks), flag: flagWays(), tartan: tartanWays(picks) };
+    const tways = swapped ? [["B", TB], ["A", TA]] : [["A", TA], ["B", TB]];
+    const specs = [];
+    tpls.forEach((T) => tways.forEach(([cw, m]) => {
+      const kind = kindOf(T);
+      if (kind === "scatter") return;   // parked
+      if (kind === "flag" && cw === "B") return;   // the flag has one colourway: classic red, white and navy
+      if (kind === "tartan" && !special.tartan[cw]) return;
+      let r;
+      if (kind === "quilted") r = [special[cw].main, special[cw].thread];
+      else if (kind === "exotic") r = [special[cw].body];
+      else if (kind === "stripes") r = [special.stripes[cw].body, ...special.stripes[cw].stripes];
+      else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
+      else if (kind === "flag") r = [special.flag[cw].blue, special.flag[cw].red, special.flag[cw].white];
+      else if (kind === "camo") r = [m[0], ...T.slots.map((x, i) => m[(i + 1) % m.length])];
+      else r = [m[1] && m[1] !== m[0] ? m[1] : m[0]];
+      const roles = KIND_ROLES[kind](T);
+      specs.push({ tpl: T.id, product: T.product, name: T.name, design: `${T.product} · ${T.name}`, cw, kind,
+        roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })) });
+    }));
+    return specs;
+  }
+  async function renderSpec(spec, { oneColor, logoScale, fur }) {
+    const T = templates.find((t) => t.id === spec.tpl);
+    if (!T) return null;
+    const P = proofs.find((p) => p.name === T.product);
+    const r = spec.roles.map((x) => x.mat);
+    await Promise.all([ensureTiles([...r, fur, WHITE, BLACK, NAVY]), loadTemplateAssets(T), P ? loadProofAssets(P) : null]);
+    CUR = { mats: r };
+    let mats, thread = null, stripes = null, tartan = null;
+    switch (spec.kind) {
+      case "quilted": mats = [r[0], r[0], r[0], r[0]]; thread = r[1].hex; break;
+      case "exotic": mats = [r[0], r[0], r[0], r[0]]; break;
+      case "stripes": mats = [r[0], r[0], r[0], r[0]]; stripes = r.slice(1); break;
+      case "tartan": mats = [r[0], r[0], r[0], r[0]]; tartan = r.slice(1).map((m) => m.hex); break;
+      case "flag": mats = [r[0], r[2], r[1], r[0], r[2]]; break;   // [back, field, red stripes, canton, stars]
+      case "camo": mats = r.length >= 4 ? r : [...r, ...r].slice(0, 4); break;
+      default: mats = [r[0], r[0], r[0], r[0]];
+    }
+    const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, stripes, tartan });
+    const canvas = P ? renderProof(P, flat, fur) : flat;
+    return { flat, canvas, proof: canvas };
+  }
+  const allMats = () => [...SW, ...furs];
+  const matById = (id) => allMats().find((m) => m.id === id) || null;
+
   async function generate({ slots, swapped, oneColor, logoScale, fur, quick, products }) {
     if (!LOGO.canvas || !slots.some(Boolean)) return { out: [], ms: 0 };
-    const A = expand(slots), B = [A[1], A[0], A[3], A[2]];
-    const [TA, TB] = templateWays(slots);
-    const tpls = templates.filter((T) => !products || products.includes(T.product));
-    await Promise.all([
-      ensureTiles([...A, ...TA, ...TB, fur, WHITE, BLACK, NAVY]),
-      ...tpls.map(loadTemplateAssets),
-      ...tpls.map((T) => proofs.find((p) => p.name === T.product)).filter(Boolean).map(loadProofAssets),
-    ]);
     const t0 = performance.now();
-    CUR = { mats: A };
+    const specs = await plan({ slots, swapped, products });
     const out = [];
-    const tways = swapped ? [["B", TB], ["A", TA]] : [["A", TA], ["B", TB]];
-    const picks = slots.filter(Boolean);
-    const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks), flag: flagWays(), tartan: tartanWays(picks) };
-    await ensureTiles([special.A.body, special.B.body]);
-    tpls.forEach((T) => tways.forEach(([cw, m]) => {
-      if (T.design === "flag" && cw === "B") return;
-      if (T.design === "tartan" && !special.tartan[cw]) return;   // the flag has one colourway: classic red, white and navy
-      let mats, shown, thread = null;
-      if (T.design === "quilted") {         // one smooth material, quilted, stitched in a contrasting pick
-        const w = special[cw]; mats = [w.main, w.main, w.main, w.main]; thread = w.thread.hex; shown = [w.main, w.thread];
-      } else if (T.design === "tartan") {   // solid body, three stitched thread colours
-        const w = special.tartan[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body, ...w.threads];
-      } else if (T.design === "flag") {   // [back, field, red stripes, canton, stars]
-        const w = special.flag[cw]; mats = [w.back, w.white, w.red, w.blue, w.white]; shown = [w.blue, w.red, w.white];
-      } else if (T.design === "stripes") {   // body + three stripes from the picks (Silver Britches)
-        const w = special.stripes[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body, ...w.stripes];
-      } else if (T.design === "scatter") {   // A: light body, marks in the darkest pick · B: reversed
-        const w = special.scatter[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body, w.ink];
-      } else if (T.design === "exotic") {   // the whole cover (front and back) in an exotic, trim stays leather
-        const w = special[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body];
-      } else if (T.slots.length) { mats = m; shown = m; }
-      else {   // a solid design has no camo pieces: it is one colour (the first pick), lightest still goes on the back
-        mats = [m[1] && m[1] !== m[0] ? m[1] : m[0], m[0], m[0], m[0]]; shown = [mats[0]];
-      }
-      // scattered marks print in the logo's own colours; the one-colour switch prints them in the contrast pick
-      const scatterTint = T.design === "scatter" && oneColor ? special.scatter[cw].ink.hex : null;
-      const st = T.design === "stripes" ? special.stripes[cw] : null;
-      const tt = T.design === "tartan" ? special.tartan[cw].threads.map((m) => m.hex) : null;
-      const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, scatterTint, stripes: st && st.stripes, tartan: tt });
-      const P = proofs.find((p) => p.name === T.product);
-      const canvas = P ? renderProof(P, flat, fur) : flat;
-      out.push({ design: `${T.product} · ${T.name}`, product: T.product, cw, mats: shown, wide: true, tpl: true, flat, proof: canvas, canvas });
-    }));
-    if (quick || !tpls.length) {
+    for (const sp of specs) {
+      const r = await renderSpec(sp, { oneColor, logoScale, fur });
+      if (r) out.push({ ...sp, mats: sp.roles.map((x) => x.mat), wide: true, tpl: true, spec: sp, ...r });
+    }
+    if (quick || !templates.length) {
+      const A = expand(slots), B = [A[1], A[0], A[3], A[2]];
       const ways = swapped ? [["B", B], ["A", A]] : [["A", A], ["B", B]];
       DESIGNS.forEach((d) => ways.forEach(([cw, m]) => out.push({ design: d.name, cw, mats: m, canvas: renderOne(d, m, { oneColor }) })));
     }
     return { out, ms: performance.now() - t0 };
+  }
+  /** Restore a saved (already cleaned) logo without running the background cleanup again. */
+  async function restoreLogo(blob) {
+    await loadBlob(blob);
+    LOGO.base = cloneCanvas(LOGO.src); LOGO.canvas = cloneCanvas(LOGO.src); LOGO.history = [];
+    return afterLogo();
   }
 
   /* ----- logo intake + background removal ----- */
@@ -856,6 +899,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     materials: SW, furs, templates, proofs, products, WHITE, BLACK,
     hasLogo: () => !!LOGO.canvas, logoCanvas: () => LOGO.canvas,
     loadBlob, processLogo, eraseAt, undoErase, resetLogo, nearest, generate, sheet,
+    plan, renderSpec, restoreLogo, matById,
     renderTemplate, renderProof,   // exposed for tests / future tools
     roles: (tpl) => (tpl ? ["Back panel", "Camo base", "Camo mid", "Camo top"] : ["Body", "Accent", "Trim", "Extra"]),
   };

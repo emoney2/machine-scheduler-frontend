@@ -1,7 +1,7 @@
 /* Headcover Studio (/headcover-studio). Everything is scoped under .hcs so it can't leak into other pages. */
 .hcs{--ink:#111;--paper:#f6f4f0;--line:#ddd8cf;--muted:#7a746a;--gold:#b08d57;--card:#fff;
   font-family:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper);
-  display:flex;flex-direction:column;height:calc(100vh - var(--hcs-top,0px));min-height:520px}
+  display:flex;flex-direction:column;height:calc(100vh - var(--hcs-top,0px));height:calc(100dvh - var(--hcs-top,0px));min-height:520px}
 .hcs *{box-sizing:border-box}
 .hcs-head{height:52px;background:#000;color:#fff;display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0}
 .hcs-head .brand{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:22px;letter-spacing:.5px}
@@ -85,3 +85,108 @@
 .hcs .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;z-index:2200;max-width:80vw}
 .hcs .loading{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:15px}
 @media (max-width:900px){.hcs-main{grid-template-columns:1fr}.hcs aside{border-right:none;border-bottom:1px solid var(--line)}.hcs .card.wide{grid-column:auto}}
+/* ---- sessions + review (swipe-through) ---- */
+.hcs-head .sess{font-size:13px;color:#cfc6b6;margin-left:8px}
+.hcs-head .sess b{color:#fff}
+.hcs .head-btn{background:#222;color:#fff;border-color:#444;padding:6px 12px}
+.hcs .head-btn:hover{border-color:#fff}
+.hcs button.primary.ghost{background:#fff;color:#000;margin-top:8px;font-size:14px;padding:10px}
+.hcs .toast{display:flex;align-items:center;gap:14px}
+.hcs .toast button{background:none;color:var(--gold);border:none;padding:0;font-weight:600;font-size:14px}
+.hcs .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.hcs .scard{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden;cursor:pointer;position:relative;border:2px solid transparent}
+.hcs .scard:hover{border-color:#000}
+.hcs .scard.cur{border-color:var(--gold)}
+.hcs .scard .th{height:150px;background:#f1eee8 center/cover no-repeat}
+.hcs .scard .sm{padding:9px 11px;display:flex;flex-direction:column;gap:2px;font-size:14px}
+.hcs .scard .del{position:absolute;top:6px;right:6px;width:26px;height:26px;padding:0;border-radius:50%;background:rgba(255,255,255,.9);font-size:16px;line-height:1}
+.hcs .review{flex:1;min-height:0;display:flex;flex-direction:column}
+.hcs .rv-bar{display:flex;gap:8px;align-items:center;padding:10px 18px;border-bottom:1px solid var(--line);background:#fbfaf7;flex-wrap:wrap}
+.hcs .rv-bar .title{font-family:Georgia,serif;font-style:italic;font-size:22px;margin:0 6px}
+.hcs .rv-bar .sp{flex:1}
+.hcs .rv-body{flex:1;min-height:0;display:flex}
+.hcs .rv-stage{flex:1;min-width:0;display:flex;flex-direction:column;padding:12px 16px 10px}
+.hcs .car{flex:1;min-height:0;display:flex;align-items:center;gap:8px}
+.hcs .car .viewport{flex:1;height:100%;overflow:hidden;position:relative;touch-action:pan-y;cursor:grab;border-radius:14px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.hcs .car .viewport:active{cursor:grabbing}
+.hcs .car .track{display:flex;height:100%;will-change:transform}
+.hcs .car .slide{flex:0 0 100%;height:100%;display:flex;align-items:center;justify-content:center;padding:8px}
+.hcs .car .stage{width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.hcs .car .stage canvas{max-width:100%;max-height:100%;object-fit:contain;display:block;pointer-events:none}
+.hcs .car .stage.pending{color:var(--muted)}
+.hcs .car .nav{width:46px;height:46px;border-radius:50%;font-size:28px;line-height:1;padding:0;flex-shrink:0}
+.hcs .lockbadge{position:absolute;bottom:12px;left:12px;background:#000;color:#fff;font-size:12px;padding:5px 10px;border-radius:14px}
+.hcs .rv-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:10px 54px 4px}
+.hcs .rv-meta .nm{font-size:16px;font-weight:600}
+.hcs .rv-meta .cw{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-left:8px;font-weight:400}
+.hcs .rv-meta .chips{display:flex;gap:6px;flex-wrap:wrap;flex:1}
+.hcs .mchip{display:inline-flex;align-items:center;gap:5px;font-size:12px;border:1px solid var(--line);border-radius:14px;padding:2px 9px 2px 3px;background:#fff}
+.hcs .rv-meta .acts{display:flex;gap:6px}
+.hcs .rv-meta .acts button{font-size:14px;padding:8px 13px}
+.hcs .rv-meta .acts .lock.on{background:var(--gold);border-color:var(--gold)}
+.hcs .strip{display:flex;gap:6px;overflow-x:auto;padding:8px 54px 2px}
+.hcs .strip .tn{flex:0 0 auto;width:96px;height:64px;border-radius:7px;overflow:hidden;border:2px solid transparent;cursor:pointer;position:relative;background:#fff;display:flex;align-items:center;justify-content:center}
+.hcs .strip .tn img{width:100%;height:100%;object-fit:cover}
+.hcs .strip .tn.cur{border-color:#000}
+.hcs .strip .tn.locked{box-shadow:inset 0 0 0 2px var(--gold)}
+.hcs .strip .tn .lk{position:absolute;top:2px;right:3px;font-size:11px}
+.hcs .editor{width:380px;flex-shrink:0;border-left:1px solid var(--line);background:#fbfaf7;overflow-y:auto;padding:14px 16px 30px}
+.hcs .editor h3{margin:0 0 4px;font-family:Georgia,serif;font-style:italic;font-size:22px}
+.hcs .editor .role{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:7px 9px;margin-top:8px;background:#fff;cursor:pointer}
+.hcs .editor .role:hover,.hcs .editor .role.on{border-color:#000}
+.hcs .editor .role .sw{width:40px;height:40px;border-radius:8px;border:1px solid rgba(0,0,0,.12);background-size:60px;flex-shrink:0}
+.hcs .editor .role .rl{flex:1;font-size:13px;line-height:1.3}
+.hcs .editor .picker{margin-top:10px;border-top:1px solid var(--line);padding-top:6px}
+.hcs .editor .picker input{margin-bottom:8px}
+.hcs .editor .lib{grid-template-columns:repeat(4,1fr)}
+@media (max-width:900px){.hcs .rv-body{flex-direction:column}.hcs .editor{width:auto;border-left:none;border-top:1px solid var(--line)}.hcs .rv-meta,.hcs .strip{padding-left:4px;padding-right:4px}.hcs .car .nav{display:none}}
+
+/* ---- JR logo + tablets ---- */
+.hcs-head .jrlogo{height:40px;width:auto;filter:invert(1);display:block}
+.hcs button.wide{flex:1}
+.hcs button,.hcs .slot,.hcs .swt,.hcs .scard,.hcs .tn,.hcs .role,.hcs .chip{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.hcs .car .viewport{user-select:none;-webkit-user-select:none}
+/* landscape tablets: narrower settings column, editor as a sheet over the bottom of the screen */
+@media (max-width:1200px){
+  .hcs-main{grid-template-columns:390px 1fr}
+  .hcs .slots{grid-template-columns:repeat(2,1fr)}
+  .hcs .slot{height:84px}
+  .hcs .slot .lb{display:flex;flex-direction:column;justify-content:center}
+  .hcs .rv-meta .acts{flex-wrap:wrap}
+  .hcs .rv-body{position:relative}
+  .hcs .editor{position:absolute;right:0;top:0;bottom:0;width:min(380px,90vw);box-shadow:-8px 0 30px rgba(0,0,0,.15);z-index:5}
+}
+/* portrait tablets + phones */
+@media (max-width:900px){
+  .hcs-head{padding:0 12px;gap:10px}
+  .hcs-head .status,.hcs-head .sess{display:none}
+  .hcs-head .sub{font-size:11px;letter-spacing:1.5px}
+  .hcs-main{grid-template-columns:1fr;overflow-y:auto}
+  .hcs .slots{grid-template-columns:repeat(4,1fr)}
+  .hcs .rv-bar button{font-size:14px;padding:8px 11px}
+  .hcs aside,.hcs .results{overflow:visible}
+  .hcs .rv-bar .title{font-size:19px}
+  .hcs .rv-bar .sp{display:none}
+  .hcs .rv-meta{padding:10px 2px 4px}
+  .hcs .rv-meta .acts{width:100%}
+  .hcs .rv-meta .acts button{flex:1}
+  .hcs .editor{position:fixed;left:0;right:0;top:auto;bottom:0;width:auto;max-height:62vh;border-radius:16px 16px 0 0;border-left:none;box-shadow:0 -10px 40px rgba(0,0,0,.25);z-index:1500}
+  .hcs .editor .lib{grid-template-columns:repeat(5,1fr)}
+}
+/* touch screens: bigger targets everywhere */
+@media (pointer:coarse){
+  .hcs button{min-height:44px;font-size:15px;padding:9px 14px}
+  .hcs .lines button{min-height:36px;font-size:13px}
+  .hcs .car .nav{display:none}
+  .hcs .rv-meta .acts button{font-size:16px;min-height:50px}
+  .hcs .strip .tn{width:118px;height:78px}
+  .hcs .furs .dot{width:32px;height:32px}
+  .hcs .swt .t{height:58px}
+  .hcs .slot{height:104px}
+  .hcs .slot .x{width:28px;height:28px;line-height:27px;font-size:18px}
+  .hcs .scard .del{width:36px;height:36px;font-size:20px}
+  .hcs input[type=range]{height:32px}
+  .hcs .editor .role{padding:10px}
+  .hcs .toast{bottom:28px;font-size:15px}
+  .hcs .toast button{min-height:0}
+}

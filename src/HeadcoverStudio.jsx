@@ -5,6 +5,7 @@ import {
   loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb,
 } from "./headcoverStudio/engine";
 import { matchInventory } from "./headcoverStudio/inventory";
+import { saveSession, getSession, deleteSession, listSessions, newId, packSpec, unpackSpec, thumbOf } from "./headcoverStudio/sessions";
 import "./HeadcoverStudio.css";
 
 // Studio data (swatches, design templates, 3D proofs) is served as static files from
@@ -29,18 +30,56 @@ function CanvasView({ canvas, onClick, className }) {
   return <div ref={ref} className={className} onClick={onClick} />;
 }
 
-/** Lightbox copy (the card keeps its own canvas). */
-function LightboxCanvas({ src }) {
-  const c = useMemo(() => copyCanvas(src), [src]);
-  return <CanvasView canvas={c} />;
-}
-
 /** Copies a canvas so the same image can be shown in two places (e.g. card + lightbox). */
 function copyCanvas(src) {
   const c = document.createElement("canvas");
   c.width = src.width; c.height = src.height;
   c.getContext("2d").drawImage(src, 0, 0);
   return c;
+}
+
+let UID = 0;
+const uid = () => `d${++UID}`;
+const specKey = (sp) => `${sp.tpl}|${sp.roles.map((r) => r.mat && r.mat.id).join(",")}`;
+const ago = (t) => {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return "just now"; if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60); if (h < 24) return `${h} h ago`;
+  return new Date(t).toLocaleDateString();
+};
+
+/** Swipe-through of the session's designs, one per page. */
+function Carousel({ designs, idx, setIdx, flat, children }) {
+  const [dx, setDx] = useState(0);
+  const drag = useRef(null);
+  const n = designs.length;
+  const go = (i) => setIdx(Math.max(0, Math.min(n - 1, i)));
+  const down = (e) => { if (e.button !== 0 && e.pointerType === "mouse") return; drag.current = { x: e.clientX, w: e.currentTarget.clientWidth }; e.currentTarget.setPointerCapture?.(e.pointerId); };
+  const move = (e) => { if (drag.current) setDx(e.clientX - drag.current.x); };
+  const up = () => {
+    if (!drag.current) return;
+    const w = drag.current.w; drag.current = null;
+    if (dx < -w * 0.15) go(idx + 1); else if (dx > w * 0.15) go(idx - 1);
+    setDx(0);
+  };
+  return (
+    <div className="car">
+      <button className="nav prev" disabled={idx <= 0} onClick={() => go(idx - 1)} aria-label="Previous">‹</button>
+      <div className="viewport" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+        <div className="track" style={{ transform: `translateX(calc(${-idx * 100}% + ${dx}px))`, transition: dx ? "none" : "transform .28s ease" }}>
+          {designs.map((d, i) => (
+            <div key={d.uid} className="slide">
+              {Math.abs(i - idx) <= 1 && (d.canvas
+                ? <CanvasView canvas={flat && d.flat ? d.flat : d.canvas} className="stage" />
+                : <div className="stage pending">Rendering…</div>)}
+            </div>
+          ))}
+        </div>
+        {children}
+      </div>
+      <button className="nav next" disabled={idx >= n - 1} onClick={() => go(idx + 1)} aria-label="Next">›</button>
+    </div>
+  );
 }
 
 export default function HeadcoverStudio() {
@@ -52,7 +91,7 @@ export default function HeadcoverStudio() {
   const [invOverrides, setInvOverrides] = useState({});
 
   const [status, setStatus] = useState("Paste a logo to start · Ctrl+V");
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState(null);           // {text, undo?}
   const [logoView, setLogoView] = useState(null);     // canvas copy for the preview
   const [canUndo, setCanUndo] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
@@ -70,18 +109,28 @@ export default function HeadcoverStudio() {
   const [quick, setQuick] = useState(false);
   const [products, setProducts] = useState(["Driver"]);
 
-  const [out, setOut] = useState([]);
+  // the session: a batch of designs you swipe through, edit, delete or lock
+  const [view, setView] = useState("setup");          // setup | review
+  const [sessionId, setSessionId] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [designs, setDesigns] = useState([]);         // [{uid, spec, locked, canvas, flat, thumb}]
+  const [idx, setIdx] = useState(0);
+  const [variant, setVariant] = useState(0);
+  const [flatView, setFlatView] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [pickRole, setPickRole] = useState(null);     // role index being changed in the editor
+  const [pickLine, setPickLine] = useState("Your colors");
+  const [pickQuery, setPickQuery] = useState("");
   const [swapped, setSwapped] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [lb, setLb] = useState(null);                 // {i, flat}
   const [save, setSave] = useState(null);             // save-to-customer-folder dialog state
 
   const fileRef = useRef(null);
   const toastTimer = useRef(null);
-  const showToast = useCallback((t) => {
-    setToast(t);
+  const showToast = useCallback((text, undo) => {
+    setToast({ text, undo });
     clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(""), 3600);
+    toastTimer.current = setTimeout(() => setToast(null), undo ? 6000 : 3600);
   }, []);
 
   /* ---------- load data ---------- */
@@ -110,6 +159,7 @@ export default function HeadcoverStudio() {
       .get(`${API_ROOT}/headcover-studio/materials`, { withCredentials: true })
       .then((r) => alive && setInventory(r.data))
       .catch((e) => console.warn("[HeadcoverStudio] inventory unavailable", e?.message));
+    listSessions().then((l) => alive && setSessions(l)).catch(() => {});
     return () => { alive = false; };
   }, []);
 
@@ -127,14 +177,12 @@ export default function HeadcoverStudio() {
   const hasTemplates = !!(S && S.templates.length);
   const lines = useMemo(() => ["All", ...new Set(materials.map((m) => m.line))], [materials]);
   const libList = useMemo(() => materials.filter((m) => line === "All" || m.line === line), [materials, line]);
-  // {swatchId: inventoryName|null}; null when the backend isn't reachable (then nothing is faded)
   const invMap = useMemo(
     () => (inventory ? matchInventory(materials, inventory.materials || [], invOverrides, "material") : null),
     [inventory, materials, invOverrides]);
   const furStock = useMemo(
     () => (inventory ? matchInventory(catalogFurs, (inventory.furs || []).map((n) => ({ name: n })), invOverrides, "fur") : null),
     [inventory, catalogFurs, invOverrides]);
-  // Furs in Material Inventory ("<Color> Fur") that the catalog doesn't show yet are added as solid colours.
   const furs = useMemo(() => {
     if (!inventory || !furStock) return catalogFurs;
     const used = new Set(Object.values(furStock).filter(Boolean));
@@ -150,9 +198,11 @@ export default function HeadcoverStudio() {
   const fur = furs.find((f) => f.id === furId) || null;
 
   /* ---------- logo ---------- */
+  const logoDirty = useRef(false);   // the cleaned logo changed since the session was last saved
   const applyLogoResult = useCallback((res, resetSlots) => {
     if (!res) return;
     setLogoView(copyCanvas(res.canvas));
+    logoDirty.current = true;
     setCanUndo(res.canUndo);
     setSuggestions(res.suggestions);
     if (resetSlots) {
@@ -180,7 +230,6 @@ export default function HeadcoverStudio() {
     catch (e) { showToast(e.message); }
   }, [runProcess, showToast, tol, inside]);
 
-  // paste anywhere on the page (except into text fields)
   useEffect(() => {
     if (!ready) return undefined;
     async function onPaste(e) {
@@ -205,7 +254,21 @@ export default function HeadcoverStudio() {
     return () => document.removeEventListener("paste", onPaste);
   }, [ready, loadBlob, showToast]);
 
-  // re-run background cleanup when the slider / inside toggle change
+  // tablets have no Ctrl+V: read an image straight from the clipboard instead
+  const canClipboard = typeof navigator !== "undefined" && !!(navigator.clipboard && navigator.clipboard.read);
+  const pasteFromClipboard = async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const t = it.types.find((x) => x.startsWith("image/"));
+        if (t) { loadBlob(await it.getType(t)); return; }
+      }
+      showToast("No image on the clipboard. Copy the logo image first (press and hold it → Copy).");
+    } catch {
+      showToast("The browser blocked reading the clipboard. Use “Choose photo / file” instead.");
+    }
+  };
+
   const tolTimer = useRef(null);
   const onTol = (v) => {
     setTol(v);
@@ -236,70 +299,192 @@ export default function HeadcoverStudio() {
   };
   const clearSlot = (i) => { setSlots((p) => p.map((x, k) => (k === i ? null : x))); setActive(i); };
 
-  /* ---------- generate ---------- */
+  /* ---------- rendering a session ---------- */
   const canGo = !!(S && logoView && slots.some(Boolean));
-  const genSeq = useRef(0);
-  const generate = useCallback(async (opts = {}) => {
+  const renderOpts = useCallback(() => ({ oneColor, logoScale: logoSize / 100, fur }), [oneColor, logoSize, fur]);
+  const renderSeq = useRef(0);
+  // (re)draw the given designs one at a time so the first ones show up straight away
+  const renderAll = useCallback(async (list, onlyUids) => {
+    const s = studioRef.current, seq = ++renderSeq.current, o = renderOpts();
+    setBusy(true);
+    for (const d of list) {
+      if (onlyUids && !onlyUids.has(d.uid)) continue;
+      const r = await s.renderSpec(d.spec, o);
+      if (seq !== renderSeq.current) return;
+      if (!r) continue;
+      setDesigns((cur) => cur.map((x) => (x.uid === d.uid ? { ...x, canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) } : x)));
+    }
+    setBusy(false);
+  }, [renderOpts]);
+
+  // Design covers / Redesign / Create new ones. The batch has one place per product design + colorway.
+  // A locked design keeps its place; every other place gets a design (a new combination of the picks
+  // when "Create new ones" is pressed, falling back to the current one if no new combination exists).
+  const buildBatch = useCallback(async ({ fresh = false, next = false } = {}) => {
     const s = studioRef.current;
     if (!s || !s.hasLogo() || !slots.some(Boolean)) return;
-    const seq = ++genSeq.current;
-    setBusy(true);
-    const { out: o, ms } = await s.generate({
-      slots, swapped: opts.swapped ?? swapped, oneColor, logoScale: logoSize / 100, fur, quick, products,
-    });
-    if (seq !== genSeq.current) return;   // a newer render started
-    // keep stars when a setting change re-renders the same design + colorway
-    setOut((prev) => {
-      const starred = new Set(prev.filter((x) => x.star).map((x) => `${x.design}|${x.cw}`));
-      return o.map((x) => ({ ...x, star: starred.has(`${x.design}|${x.cw}`) }));
-    });
-    setBusy(false);
-    setStatus(`${o.length} renderings in ${(ms / 1000).toFixed(2)} s`);
-  }, [slots, swapped, oneColor, logoSize, fur, quick, products]);
+    const base = await s.plan({ slots, swapped, products, variant: 0 });
+    const place = (sp) => `${sp.tpl}|${sp.cw}`;
+    const locked = designs.filter((d) => d.locked);
+    const used = new Set(locked.map((d) => specKey(d.spec)));
+    const current = new Map(designs.filter((d) => !d.locked).map((d) => [place(d.spec), d]));
+    const v = fresh ? 0 : variant;
+    const pools = [];   // later orderings of the picks, fetched as needed
+    const poolAt = async (k) => { while (pools.length <= k) pools.push(await s.plan({ slots, swapped, products, variant: v + pools.length + 1 })); return pools[k]; };
+    const list = [];
+    for (const sp of base) {
+      const here = locked.filter((d) => place(d.spec) === place(sp));
+      if (here.length) { here.forEach((d) => list.push(d)); continue; }
+      let pick = null;
+      if (next) {
+        const avoid = current.get(place(sp));
+        for (let k = 0; k < 24 && !pick; k++) {
+          const cand = (await poolAt(k)).find((x) => place(x) === place(sp));
+          if (cand && !used.has(specKey(cand)) && (!avoid || specKey(avoid.spec) !== specKey(cand))) pick = cand;
+        }
+        if (!pick && avoid) { list.push(avoid); used.add(specKey(avoid.spec)); continue; }   // no new combination for this one
+      }
+      pick = pick || (!used.has(specKey(sp)) ? sp : null);
+      if (!pick) continue;
+      used.add(specKey(pick));
+      list.push({ uid: uid(), spec: pick, locked: false });
+    }
+    locked.filter((d) => !list.includes(d)).forEach((d) => list.push(d));   // locked designs from products no longer selected
+    if (next) setVariant((x) => x + 1);
+    else if (fresh) setVariant(0);
+    setDesigns(list);
+    setIdx(0);
+    setView("review");
+    setEditing(false); setPickRole(null);
+    if (!sessionId) setSessionId(newId());
+    setStatus(`${list.length} designs${locked.length ? ` · ${locked.length} locked kept` : ""}`);
+    renderAll(list, new Set(list.filter((d) => !d.canvas).map((d) => d.uid)));
+  }, [slots, swapped, products, variant, designs, sessionId, renderAll]);
 
-  // live re-render once there are results (thread mode, fur, logo size, quick styles, logo edits)
-  const hasOut = out.length > 0;
+  // settings that change every render (fur, logo size, thread, logo edits): redraw the whole session
   const rerenderTimer = useRef(null);
   useEffect(() => {
-    if (!hasOut) return;
+    if (!designs.length) return;
     clearTimeout(rerenderTimer.current);
-    rerenderTimer.current = setTimeout(() => generate(), 120);
-  }, [oneColor, furId, logoSize, quick, logoView, products]);
+    rerenderTimer.current = setTimeout(() => renderAll(designs), 150);
+  }, [oneColor, furId, logoSize, logoView]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggleStar = (i) => setOut((p) => p.map((x, k) => (k === i ? { ...x, star: !x.star } : x)));
-  const swap = () => { const v = !swapped; setSwapped(v); generate({ swapped: v }); };
+  const cur = designs[idx] || null;
+  const updateDesign = (u, patch) => setDesigns((p) => p.map((d) => (d.uid === u ? { ...d, ...patch } : d)));
+  const toggleLock = (d) => d && updateDesign(d.uid, { locked: !d.locked });
+  const removeDesign = (d) => {
+    if (!d) return;
+    const at = designs.findIndex((x) => x.uid === d.uid);
+    setDesigns((p) => p.filter((x) => x.uid !== d.uid));
+    setIdx((i) => Math.max(0, Math.min(i, designs.length - 2)));
+    setEditing(false); setPickRole(null);
+    showToast(`Deleted ${d.spec.design} ${d.spec.cw}`, () => {
+      setDesigns((p) => { const n = [...p]; n.splice(at, 0, d); return n; });
+      setIdx(at);
+    });
+  };
+  // edit: swap one role's material, redraw just that design; an edited design is locked so it's kept
+  const setRole = async (k, m) => {
+    if (!cur) return;
+    await ensureTiles([m]);
+    const spec = { ...cur.spec, roles: cur.spec.roles.map((r, i) => (i === k ? { ...r, mat: m } : r)) };
+    updateDesign(cur.uid, { spec, locked: true });
+    setPickRole(null);
+    const r = await S.renderSpec(spec, renderOpts());
+    if (r) updateDesign(cur.uid, { canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) });
+  };
+
+  /* ---------- session save / open ---------- */
+  const saveTimer = useRef(null);
+  const logoBlob = useRef(null);
+  useEffect(() => {
+    if (!sessionId || !designs.length) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        if (logoDirty.current || !logoBlob.current) { logoBlob.current = S.hasLogo() ? await canvasToBlob(S.logoCanvas()) : null; logoDirty.current = false; }
+        const first = designs.find((d) => d.locked && d.canvas) || designs.find((d) => d.canvas);
+        const prev = sessions.find((x) => x.id === sessionId);
+        await saveSession({
+          id: sessionId, name: club.trim() || "Untitled session", createdAt: prev?.createdAt || Date.now(), updatedAt: Date.now(),
+          count: designs.length, locked: designs.filter((d) => d.locked).length, thumb: first ? first.thumb : prev?.thumb || null,
+          logo: logoBlob.current,
+          settings: { slots: slots.map((m) => m && m.id), furId, logoSize, oneColor, products, swapped, variant, tol, inside },
+          designs: designs.map((d) => ({ spec: packSpec(d.spec), locked: d.locked })),
+        });
+        setSessions(await listSessions());
+      } catch (e) { console.warn("[HeadcoverStudio] session not saved", e); }
+    }, 600);
+  }, [designs, club, slots, furId, logoSize, oneColor, products, swapped, variant]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const openSession = async (id) => {
+    const x = await getSession(id);
+    if (!x) return showToast("That session couldn't be found.");
+    const st = x.settings || {};
+    if (x.logo) applyLogoResult(await S.restoreLogo(x.logo), false);
+    logoBlob.current = x.logo || null; logoDirty.current = false;
+    const sl = (st.slots || []).map((sid) => (sid ? S.matById(sid) : null));
+    setSlots([0, 1, 2, 3].map((i) => sl[i] || null)); ensureTiles(sl.filter(Boolean));
+    setClub(x.name === "Untitled session" ? "" : x.name);
+    if (st.furId) setFurId(st.furId);
+    if (st.logoSize) setLogoSize(st.logoSize);
+    setOneColor(!!st.oneColor); setSwapped(!!st.swapped); setVariant(st.variant || 0);
+    if (st.products) setProducts(st.products);
+    if (st.tol) setTol(st.tol); setInside(!!st.inside);
+    const list = (x.designs || []).map((d) => ({ uid: uid(), spec: unpackSpec(d.spec, S.matById), locked: d.locked })).filter((d) => d.spec);
+    setSessionId(x.id);
+    setDesigns(list); setIdx(0); setView("review"); setEditing(false);
+    setStatus(`Opened “${x.name}” · ${list.length} designs`);
+    // fur and logo size come from the session, so render once they are set
+    setTimeout(() => renderAll(list), 0);
+  };
+  const newSession = () => {
+    renderSeq.current++;
+    setSessionId(null); setDesigns([]); setIdx(0); setView("setup"); setEditing(false); setVariant(0);
+    setClub(""); setLogoView(null); setSuggestions([]); setSlots([null, null, null, null]); setActive(0);
+    logoBlob.current = null;
+    setStatus("New session · paste a logo to start");
+  };
+  const removeSession = async (id) => {
+    await deleteSession(id);
+    setSessions(await listSessions());
+    if (id === sessionId) newSession();
+  };
 
   /* ---------- keyboard ---------- */
   useEffect(() => {
     function onKey(e) {
-      if (e.key === "Escape") { setLb(null); setSave(null); return; }
-      if (lb && out.length) {
-        if (e.key === "ArrowRight") setLb({ i: (lb.i + 1) % out.length, flat: false });
-        if (e.key === "ArrowLeft") setLb({ i: (lb.i - 1 + out.length) % out.length, flat: false });
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "Escape") { if (pickRole != null) setPickRole(null); else if (editing) setEditing(false); setSave(null); return; }
+      if (view === "review" && designs.length) {
+        if (e.key === "ArrowRight") setIdx((i) => Math.min(designs.length - 1, i + 1));
+        if (e.key === "ArrowLeft") setIdx((i) => Math.max(0, i - 1));
+        if (e.key === "l" || e.key === "L") toggleLock(cur);
+        if (e.key === "e" || e.key === "E") setEditing((v) => !v);
+        if (e.key === "Delete") removeDesign(cur);
         return;
       }
-      const tag = document.activeElement?.tagName;
-      if (e.key === "Enter" && canGo && tag !== "BUTTON" && tag !== "INPUT") generate();
+      if (e.key === "Enter" && canGo && tag !== "BUTTON") buildBatch({ fresh: true });
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [lb, out.length, canGo, generate]);
+  });
 
   /* ---------- export ---------- */
-  const sheetOf = (list) => S.sheet(list, { club: club.trim(), furName: fur?.name });
-  const dlSheet = () => out.length && downloadCanvas(sheetOf(out), `${slug(club)}_headcover-concepts.png`);
-  const dlStarred = () => {
-    const s = out.filter((o) => o.star);
-    if (!s.length) return showToast("Star a few designs first (★ on each card).");
+  const asOut = (list) => list.filter((d) => d.canvas).map((d) => ({ ...d.spec, mats: d.spec.roles.map((r) => r.mat), canvas: d.canvas, wide: true, tpl: true }));
+  const sheetOf = (list) => S.sheet(asOut(list), { club: club.trim(), furName: fur?.name });
+  const dlSheet = () => designs.length && downloadCanvas(sheetOf(designs), `${slug(club)}_headcover-concepts.png`);
+  const dlLocked = () => {
+    const s = designs.filter((d) => d.locked);
+    if (!s.length) return showToast("Lock the designs you want first (Lock on each page).");
     downloadCanvas(sheetOf(s), `${slug(club)}_picks.png`);
   };
-
-  // Save the proof sheet into the club's customer folder in Drive (Design/<Club>), creating it if needed.
   const saveToFolder = async (choice) => {
     const name = club.trim();
     if (!name) return showToast("Type the club name first. It picks the customer folder.");
-    const starred = out.filter((o) => o.star);
-    const list = starred.length ? starred : out;
+    const locked = designs.filter((d) => d.locked);
+    const list = locked.length ? locked : designs;
     if (!list.length) return;
     setSave({ state: "saving" });
     try {
@@ -307,8 +492,8 @@ export default function HeadcoverStudio() {
       const fd = new FormData();
       fd.append("file", blob, "sheet.png");
       fd.append("club", name);
-      fd.append("kind", starred.length ? "picks" : "concepts");
-      fd.append("materials", [...new Set(list.flatMap((o) => o.mats))].map((m) => `${m.name} (${m.line})`).join(", "));
+      fd.append("kind", locked.length ? "picks" : "concepts");
+      fd.append("materials", [...new Set(list.flatMap((d) => d.spec.roles.map((r) => r.mat)))].map((m) => `${m.name} (${m.line})`).join(", "));
       if (fur) fd.append("fur", fur.name);
       if (choice?.folderId) fd.append("folderId", choice.folderId);
       if (choice?.create) fd.append("create", "1");
@@ -325,15 +510,21 @@ export default function HeadcoverStudio() {
   if (!ready) return <div className="hcs" ref={rootRef}><div className="loading">Loading Headcover Studio…</div></div>;
 
   const roles = S.roles(hasTemplates);
-  const cur = lb ? out[lb.i] : null;
+  const yourColors = [...new Set([...slots.filter(Boolean), ...suggestions.map((s) => s.material), S.WHITE, S.BLACK])];
+  const pickPool = pickLine === "Your colors" ? yourColors
+    : materials.filter((m) => (pickLine === "All" || m.line === pickLine) && (!pickQuery || `${m.name} ${m.line}`.toLowerCase().includes(pickQuery.toLowerCase())));
+  const lockedCount = designs.filter((d) => d.locked).length;
 
   return (
     <div className="hcs" ref={rootRef}>
       <div className="hcs-head">
-        <div className="brand">JR &amp; Co.</div><div className="sub">Headcover Studio</div>
+        <img className="jrlogo" src={`${process.env.PUBLIC_URL || ""}/android-chrome-512x512.png`} alt="JR & Co." /><div className="sub">Headcover Studio</div>
+        {sessionId && <div className="sess">Session: <b>{club.trim() || "Untitled"}</b></div>}
         <div className="sp" /><div className="status">{busy ? "Rendering…" : status}</div>
+        <button className="head-btn" onClick={newSession}>+ New session</button>
       </div>
-      <div className="hcs-main">
+      {view === "setup" ? (
+        <div className="hcs-main">
         <aside>
           <h2><span className="n">1</span>Logo</h2>
           <div
@@ -359,6 +550,12 @@ export default function HeadcoverStudio() {
           </div>
           <input type="file" ref={fileRef} accept="image/*" hidden
             onChange={(e) => { if (e.target.files[0]) loadBlob(e.target.files[0]); e.target.value = ""; }} />
+          {canClipboard && (
+            <div className="row">
+              <button className="wide" onClick={pasteFromClipboard}>Paste logo from clipboard</button>
+              <button className="wide" onClick={() => fileRef.current?.click()}>Choose photo / file</button>
+            </div>
+          )}
           <div className="row">
             <label>Background cleanup</label>
             <input type="range" min="8" max="110" value={tol} onChange={(e) => onTol(+e.target.value)} />
@@ -434,7 +631,10 @@ export default function HeadcoverStudio() {
             </span>
           </div>
           <div className="row"><label><input type="checkbox" checked={quick} onChange={(e) => setQuick(e.target.checked)} /> Include quick styles (stand-in shapes)</label></div>
-          <button className="primary" disabled={!canGo || busy} onClick={() => generate()}>Design covers &nbsp;↵</button>
+          <button className="primary" disabled={!canGo || busy} onClick={() => buildBatch({ fresh: true })}>
+            {designs.length ? "Redesign (keeps locked)" : "Design covers"} &nbsp;↵
+          </button>
+          {designs.length > 0 && <button className="primary ghost" onClick={() => setView("review")}>Back to designs ({designs.length}) →</button>}
 
           <h2>Material library</h2>
           <div className="lines">
@@ -455,59 +655,113 @@ export default function HeadcoverStudio() {
           </div>
         </aside>
 
-        <section className="results">
-          {!out.length ? (
-            <div className="empty-state">
-              <div className="big">Paste a club logo, pick colors, hit Enter.</div>
-              <div>{hasTemplates ? `${products.join(", ")}: 2 colorways each as 3D proofs, rendered right here in the browser. Pick more products on the left.` : "8 quick styles × 2 colorways, rendered right here in the browser."}</div>
-            </div>
-          ) : (
-            <>
-              <div className="toolbar">
-                <div className="title">{club.trim() || "Concepts"}</div>
-                <button onClick={swap}>Swap colorways</button>
-                <button onClick={dlStarred}>Download starred</button>
-                <button onClick={dlSheet}>Download sheet</button>
-                <button className="on" onClick={() => saveToFolder()}
-                  title="Saves the sheet (only starred designs, if any are starred) into the club's customer folder in Drive">
-                  Save to customer folder
-                </button>
-              </div>
-              <div className="grid">
-                {out.map((o, i) => (
-                  <div key={i} className={"card" + (o.wide ? " wide" : "")} onClick={() => setLb({ i, flat: false })}>
-                    <CanvasView canvas={o.canvas} />
-                    <div className="meta">
-                      <span className="nm">{o.design}</span>
-                      {[...new Set(o.mats)].map((m, k) => <span key={k} className="dot" title={`${m.name} · ${m.line}`} style={tileBg(m)} />)}
-                      <span className="cw">&nbsp;{o.cw}</span>
+          <section className="results">
+            <div className="sessions">
+              <div className="toolbar"><div className="title">Sessions</div></div>
+              {!sessions.length ? (
+                <div className="empty-state">
+                  <div className="big">Paste a club logo, pick colors, hit Enter.</div>
+                  <div>Each batch of designs is saved as a session in this browser. Swipe through them, then edit, delete or lock each one.</div>
+                </div>
+              ) : (
+                <div className="sgrid">
+                  {sessions.map((x) => (
+                    <div key={x.id} className={"scard" + (x.id === sessionId ? " cur" : "")} onClick={() => openSession(x.id)}>
+                      <div className="th" style={x.thumb ? { backgroundImage: `url(${x.thumb})` } : {}} />
+                      <div className="sm">
+                        <b>{x.name}</b>
+                        <span className="small">{x.count} designs{x.locked ? ` · ${x.locked} locked` : ""} · {ago(x.updatedAt)}</span>
+                      </div>
+                      <button className="del" title="Delete session" onClick={(e) => { e.stopPropagation(); if (window.confirm(`Delete the session “${x.name}”?`)) removeSession(x.id); }}>×</button>
                     </div>
-                    <button className={"star" + (o.star ? " on" : "")} onClick={(e) => { e.stopPropagation(); toggleStar(i); }}>★</button>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-
-      {cur && (
-        <div className="lightbox" onClick={(e) => { if (e.target.classList.contains("lightbox")) setLb(null); }}>
-          <LightboxCanvas src={lb.flat && cur.flat ? cur.flat : cur.canvas} />
-          <div className="side">
-            <h3>{cur.design}</h3>
-            <div className="small" style={{ color: "#bbb" }}>Colorway {cur.cw}</div>
-            <div className="mats">
-              {cur.mats.map((m, k) => (
-                <div key={k}><span className="dot" style={{ ...tileBg(m), verticalAlign: "middle" }} /> {cur.mats.length === 1 ? "Body" : S.roles(cur.tpl)[k]}: {m.name} <span style={{ color: "#999" }}>{m.line}</span></div>
-              ))}
-              {cur.tpl && fur && <div><span className="dot" style={{ ...tileBg(fur), verticalAlign: "middle" }} /> Fur: {fur.name}</div>}
+                  ))}
+                </div>
+              )}
             </div>
-            {cur.tpl && <button onClick={() => setLb({ ...lb, flat: !lb.flat })}>{lb.flat ? "Show 3D proof" : "Show flat layout"}</button>}
-            <button onClick={() => toggleStar(lb.i)}>{cur.star ? "★ Starred" : "☆ Star"}</button>
-            <button onClick={() => downloadCanvas(lb.flat && cur.flat ? cur.flat : cur.canvas, `${slug(club)}_${slug(cur.design)}_${cur.cw}${lb.flat ? "_flat" : ""}.png`)}>Download PNG</button>
-            <button onClick={() => setLb(null)}>Close (Esc)</button>
+          </section>
+        </div>
+      ) : (
+        <div className={"review" + (editing ? " editing" : "")}>
+          <div className="rv-bar">
+            <button onClick={() => { setView("setup"); setEditing(false); }}>← Setup</button>
+            <div className="title">{club.trim() || "Concepts"}</div>
+            <span className="small">{designs.length ? `${idx + 1} / ${designs.length}` : "No designs"} · {lockedCount} locked</span>
+            <div className="sp" />
+            <button className="on" disabled={busy} onClick={() => buildBatch({ next: true })}
+              title="Replaces every design that isn't locked with new combinations of your colors">
+              Create new ones{designs.length - lockedCount ? ` (${designs.length - lockedCount})` : ""}
+            </button>
+            <button onClick={dlLocked}>Download locked</button>
+            <button onClick={dlSheet}>Download all</button>
+            <button onClick={() => saveToFolder()} title="Saves the locked designs (or all, if none are locked) into the club's customer folder in Drive">Save to customer folder</button>
           </div>
+          {!designs.length ? (
+            <div className="empty-state"><div className="big">Every design is deleted.</div><button className="on" onClick={() => buildBatch({ next: true })}>Create new ones</button></div>
+          ) : (
+            <div className="rv-body">
+              <div className="rv-stage">
+                <Carousel designs={designs} idx={idx} setIdx={(i) => { setIdx(i); setPickRole(null); }} flat={flatView}>
+                  {cur?.locked && <div className="lockbadge">🔒 Locked</div>}
+                </Carousel>
+                {cur && (
+                  <div className="rv-meta">
+                    <div className="nm">{cur.spec.design}<span className="cw">Colorway {cur.spec.cw}</span></div>
+                    <div className="chips">
+                      {cur.spec.roles.map((r, k) => (
+                        <span key={k} className="mchip" title={`${r.label}: ${r.mat.name} · ${r.mat.line}`}><span className="dot" style={tileBg(r.mat)} />{r.mat.name}</span>
+                      ))}
+                    </div>
+                    <div className="acts">
+                      <button className={editing ? "on" : ""} onClick={() => { setEditing((v) => !v); setPickRole(null); }}>✎ Edit</button>
+                      <button onClick={() => removeDesign(cur)}>🗑 Delete</button>
+                      <button className={cur.locked ? "on lock" : "lock"} onClick={() => toggleLock(cur)}>{cur.locked ? "🔒 Locked" : "🔓 Lock"}</button>
+                      <button onClick={() => setFlatView((v) => !v)}>{flatView ? "3D proof" : "Flat layout"}</button>
+                      <button onClick={() => cur.canvas && downloadCanvas(flatView && cur.flat ? cur.flat : cur.canvas, `${slug(club)}_${slug(cur.spec.design)}_${cur.spec.cw}.png`)}>PNG</button>
+                    </div>
+                  </div>
+                )}
+                <div className="strip">
+                  {designs.map((d, i) => (
+                    <div key={d.uid} className={"tn" + (i === idx ? " cur" : "") + (d.locked ? " locked" : "")} onClick={() => { setIdx(i); setPickRole(null); }} title={`${d.spec.design} ${d.spec.cw}`}>
+                      {d.thumb ? <img src={d.thumb} alt="" /> : <span className="small">…</span>}
+                      {d.locked && <span className="lk">🔒</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {editing && cur && (
+                <div className="editor">
+                  <h3>Edit design</h3>
+                  <div className="small">Click a part, then pick its material. Edited designs are locked so “Create new ones” keeps them.</div>
+                  {cur.spec.roles.map((r, k) => (
+                    <div key={k} className={"role" + (pickRole === k ? " on" : "")} onClick={() => setPickRole(pickRole === k ? null : k)}>
+                      <span className="sw" style={tileBg(r.mat)} />
+                      <span className="rl"><span className="small">{r.label}</span><br /><b>{r.mat.name}</b> <span className="small">{r.mat.line}</span></span>
+                      <span className="chev">{pickRole === k ? "▾" : "▸"}</span>
+                    </div>
+                  ))}
+                  {pickRole != null && (
+                    <div className="picker">
+                      <div className="lines">
+                        {["Your colors", ...lines].map((l) => <button key={l} className={l === pickLine ? "on" : ""} onClick={() => setPickLine(l)}>{l}</button>)}
+                      </div>
+                      {pickLine !== "Your colors" && <input type="text" value={pickQuery} onChange={(e) => setPickQuery(e.target.value)} placeholder="Search materials" />}
+                      <div className="lib">
+                        {pickPool.map((m) => (
+                          <div key={m.id} className={"swt" + (cur.spec.roles[pickRole]?.mat?.id === m.id ? " sel" : "") + (invMap && !invMap[m.id] ? " noinv" : "")}
+                            onClick={() => setRole(pickRole, m)} title={`${m.name} · ${m.line}`}>
+                            <div className="t" style={tileBg(m)} />
+                            <div className="nm">{m.name}</div><div className="ln">{m.line}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <button className="primary" onClick={() => { setEditing(false); setPickRole(null); }}>Done</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -543,7 +797,10 @@ export default function HeadcoverStudio() {
           </div>
         </div>
       )}
-      {toast && <div className="toast">{toast}</div>}
+
+      {toast && (
+        <div className="toast">{toast.text}{toast.undo && <button onClick={() => { toast.undo(); setToast(null); }}>Undo</button>}</div>
+      )}
     </div>
   );
 }
