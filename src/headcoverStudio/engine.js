@@ -568,6 +568,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const pool = SW.filter((x) => x.line === "Classic Leather" && !x.hidden);
     return pool.reduce((b, x) => (dE(x.rgb, m.rgb) < dE(b.rgb, m.rgb) ? x : b), pool[0]);
   }
+  // flag: Sedgefield's off-white flag in the nearest smooth leathers (one colourway)
+  function nearestSmooth(hex) {
+    const rgb = hexToRgb(hex), pool = SW.filter((x) => isSmooth(x) && !x.hidden);
+    return pool.reduce((b, x) => (dE(x.rgb, rgb) < dE(b.rgb, rgb) ? x : b), pool[0]);
+  }
+  function flagWays() {
+    const navy = nearestSmooth("#323e4b"), red = nearestSmooth("#a43e4b"), white = nearestSmooth("#edeceb");
+    return { A: { back: navy, blue: navy, red, white } };
+  }
   // stripes: A = main pick body with the other picks as the three stripes; B = the second pick as body
   function stripeWays(picks) {
     const a = (picks.length ? picks : [NAVY, WHITE]).map(smoothFor);
@@ -617,12 +626,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const out = [];
     const tways = swapped ? [["B", TB], ["A", TA]] : [["A", TA], ["B", TB]];
     const picks = slots.filter(Boolean);
-    const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks) };
+    const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks), flag: flagWays() };
     await ensureTiles([special.A.body, special.B.body]);
     tpls.forEach((T) => tways.forEach(([cw, m]) => {
+      if (T.design === "flag" && cw === "B") return;   // the flag has one colourway: classic red, white and navy
       let mats, shown, thread = null;
       if (T.design === "quilted") {         // one smooth material, quilted, stitched in a contrasting pick
         const w = special[cw]; mats = [w.main, w.main, w.main, w.main]; thread = w.thread.hex; shown = [w.main, w.thread];
+      } else if (T.design === "flag") {   // [back, field, red stripes, canton, stars]
+        const w = special.flag[cw]; mats = [w.back, w.white, w.red, w.blue, w.white]; shown = [w.blue, w.red, w.white];
       } else if (T.design === "stripes") {   // body + three stripes from the picks (Silver Britches)
         const w = special.stripes[cw]; mats = [w.body, w.body, w.body, w.body]; shown = [w.body, ...w.stripes];
       } else if (T.design === "scatter") {   // A: light body, marks in the darkest pick · B: reversed

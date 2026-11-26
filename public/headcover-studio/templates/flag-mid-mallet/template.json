@@ -1,0 +1,41 @@
+{
+ "name": "Flag",
+ "product": "Mid Mallet",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "design": "flag",
+ "slots": [
+  {
+   "name": "Flag field",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Red stripes",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Canton",
+   "mask": "slot-2.png"
+  },
+  {
+   "name": "Stars",
+   "mask": "slot-3.png"
+  }
+ ],
+ "frame": null,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 460.44,
+  "y": 312.04,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "notes": [
+  "American flag: navy with stars on one ear (straight edge on a stripe line), driver-width stripes everywhere else; logo centred on the top, dropped 1/2in for optical centre"
+ ]
+}

@@ -1,0 +1,41 @@
+{
+ "name": "Flag",
+ "product": "Center Shaft Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "design": "flag",
+ "slots": [
+  {
+   "name": "Flag field",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Red stripes",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Canton",
+   "mask": "slot-2.png"
+  },
+  {
+   "name": "Stars",
+   "mask": "slot-3.png"
+  }
+ ],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 230.54,
+  "y": 504.54,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "notes": [
+  "vertical American flag on the logo piece (Sedgefield OffWhiteFlag); logo low on the stripes"
+ ]
+}

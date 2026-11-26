@@ -145,6 +145,38 @@
     {
       "id": "stripes-df3-mallet",
       "dir": "templates/stripes-df3-mallet/"
+    },
+    {
+      "id": "flag-driver",
+      "dir": "templates/flag-driver/"
+    },
+    {
+      "id": "flag-fairway",
+      "dir": "templates/flag-fairway/"
+    },
+    {
+      "id": "flag-hybrid",
+      "dir": "templates/flag-hybrid/"
+    },
+    {
+      "id": "flag-mallet",
+      "dir": "templates/flag-mallet/"
+    },
+    {
+      "id": "flag-blade",
+      "dir": "templates/flag-blade/"
+    },
+    {
+      "id": "flag-mid-mallet",
+      "dir": "templates/flag-mid-mallet/"
+    },
+    {
+      "id": "flag-center-shaft-mallet",
+      "dir": "templates/flag-center-shaft-mallet/"
+    },
+    {
+      "id": "flag-df3-mallet",
+      "dir": "templates/flag-df3-mallet/"
     }
   ],
   "proofs": [
