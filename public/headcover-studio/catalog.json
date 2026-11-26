@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "swatches": "swatches/swatches.json",
+  "templates": [{ "id": "camo-driver", "dir": "templates/camo-driver/" }],
+  "proofs": [{ "id": "driver", "dir": "proofs/driver/" }]
+}

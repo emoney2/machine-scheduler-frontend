@@ -42,6 +42,7 @@ import SewingPriority from './SewingPriority';
 import QueueTab from './QueueTab';
 import SalesPortal from "./SalesPortal";
 import PhotoStation from "./PhotoStation";
+import HeadcoverStudio from "./HeadcoverStudio";
 import TurntableBridge from "./TurntableBridge";
 import MachineHome from "./MachineHome";
 import MachineJob from "./MachineJob";
@@ -2347,6 +2348,7 @@ useEffect(() => {
          { to: "/sewing-priority",   label: "Sewing Priority" },
          { to: "/needlepoint",       label: "Needlepoint" },
          { to: "/photo-station",     label: "Social Media Camera App" },
+         { to: "/headcover-studio",  label: "Headcover Studio" },
          // Hidden for now (routes still exist): Sewing Calendar, Embroidery Calendar,
          // Schedule Approvals, Conflicts, Scheduling Settings
         ].map(({ to, label }) => (
@@ -2517,6 +2519,7 @@ useEffect(() => {
           <Route path="/shipment-complete" element={<ShipmentComplete />} />
           <Route path="/sales" element={<SalesPortal />} />
           <Route path="/photo-station" element={<PhotoStation />} />
+          <Route path="/headcover-studio" element={<HeadcoverStudio />} />
           <Route path="/turntable-bridge" element={<TurntableBridge />} />
         </Routes>
     </>

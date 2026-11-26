@@ -1,0 +1,85 @@
+{
+ "name": "Driver",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 6300,
+ "contentH": 5252,
+ "views": [
+  {
+   "name": "DriverMasterLayout copy",
+   "bbox": [
+    775,
+    89,
+    430,
+    878
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin"
+  },
+  {
+   "name": "DriverMasterLayout",
+   "bbox": [
+    92,
+    83,
+    442,
+    884
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin"
+  },
+  {
+   "name": "DriverMasterLayout copy 3",
+   "bbox": [
+    590,
+    80,
+    176,
+    888
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin"
+  },
+  {
+   "name": "DriverMasterLayout copy 6",
+   "bbox": [
+    578,
+    82,
+    158,
+    883
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin"
+  },
+  {
+   "name": "DriverMasterLayout copy 4",
+   "bbox": [
+    1219,
+    83,
+    159,
+    888
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin"
+  },
+  {
+   "name": "DriverMasterLayout copy 2",
+   "bbox": [
+    1249,
+    85,
+    151,
+    883
+   ],
+   "base": "view-5.png",
+   "uv": "view-5.uv.bin"
+  }
+ ],
+ "fur": {
+  "bbox": [
+   143,
+   95,
+   1378,
+   887
+  ],
+  "png": "fur.png"
+ },
+ "overlay": "overlay.png"
+}

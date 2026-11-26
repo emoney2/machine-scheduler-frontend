@@ -1,0 +1,87 @@
+/* Headcover Studio (/headcover-studio). Everything is scoped under .hcs so it can't leak into other pages. */
+.hcs{--ink:#111;--paper:#f6f4f0;--line:#ddd8cf;--muted:#7a746a;--gold:#b08d57;--card:#fff;
+  font-family:"Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--paper);
+  display:flex;flex-direction:column;height:calc(100vh - var(--hcs-top,0px));min-height:520px}
+.hcs *{box-sizing:border-box}
+.hcs-head{height:52px;background:#000;color:#fff;display:flex;align-items:center;padding:0 20px;gap:16px;flex-shrink:0}
+.hcs-head .brand{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-size:22px;letter-spacing:.5px}
+.hcs-head .sub{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#bbb}
+.hcs-head .sp{flex:1}
+.hcs-head .status{font-size:13px;color:#cfc6b6}
+.hcs-main{display:grid;grid-template-columns:400px 1fr;flex:1;min-height:0}
+.hcs aside{border-right:1px solid var(--line);overflow-y:auto;padding:16px 18px 40px;background:#fbfaf7}
+.hcs .results{overflow-y:auto;padding:18px 22px 60px}
+.hcs h2{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;display:flex;align-items:center;gap:8px;font-weight:600}
+.hcs h2 .n{background:#000;color:#fff;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;letter-spacing:0}
+.hcs .drop{border:2px dashed #c9c1b3;border-radius:12px;min-height:190px;display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;position:relative;overflow:hidden;
+  background-color:#fff;background-image:linear-gradient(45deg,#eee 25%,transparent 25%),linear-gradient(-45deg,#eee 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#eee 75%),linear-gradient(-45deg,transparent 75%,#eee 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0}
+.hcs .drop.over{border-color:#000}
+.hcs .drop .hint{text-align:center;color:#555;font-size:14px;background:rgba(255,255,255,.9);padding:10px 14px;border-radius:8px;line-height:1.5}
+.hcs .drop .hint b{font-size:16px;color:#000}
+.hcs kbd{border:1px solid #bbb;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px;background:#fff}
+.hcs .logoPrev canvas{max-width:92%;max-height:240px;cursor:crosshair;display:block;margin:auto}
+.hcs .logoPrev{width:100%;display:flex;justify-content:center}
+.hcs .row{display:flex;gap:8px;align-items:center;margin-top:8px;font-size:13px}
+.hcs .row label{color:#555}
+.hcs input[type=range]{flex:1}
+.hcs input[type=text]{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-size:14px}
+.hcs button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid #cfc8bb;background:#fff;padding:7px 11px;font-size:13px;color:#111}
+.hcs button:hover{border-color:#000}
+.hcs button:disabled{opacity:.5;cursor:not-allowed}
+.hcs button.primary{background:#000;color:#fff;border-color:#000;font-size:16px;padding:13px;width:100%;margin-top:14px;letter-spacing:.5px}
+.hcs button.primary:disabled{background:#999;border-color:#999;opacity:1}
+.hcs button.on{background:#000;color:#fff;border-color:#000}
+.hcs .small{font-size:12px;color:var(--muted);line-height:1.45}
+.hcs .slots{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.hcs .slot{border:2px solid var(--line);border-radius:10px;height:92px;position:relative;cursor:pointer;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+.hcs .slot.active{border-color:#000;box-shadow:0 0 0 3px rgba(0,0,0,.12)}
+.hcs .slot .sw{flex:1;background-size:60px}
+.hcs .slot .lb{font-size:10.5px;padding:3px 5px;line-height:1.2;background:#fff;min-height:28px}
+.hcs .slot .role{position:absolute;top:4px;left:5px;font-size:9px;letter-spacing:1px;text-transform:uppercase;background:rgba(255,255,255,.85);padding:1px 4px;border-radius:3px}
+.hcs .slot .x{position:absolute;top:2px;right:4px;font-size:14px;background:rgba(255,255,255,.85);border-radius:50%;width:18px;height:18px;line-height:17px;text-align:center}
+.hcs .slot.empty .sw{background:repeating-linear-gradient(45deg,#f3f0ea,#f3f0ea 6px,#fff 6px,#fff 12px)}
+.hcs .sugg{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.hcs .chip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:20px;padding:3px 9px 3px 3px;font-size:12px;background:#fff;cursor:pointer}
+.hcs .chip:hover{border-color:#000}
+.hcs .dot{width:18px;height:18px;border-radius:50%;border:1px solid rgba(0,0,0,.15);display:inline-block;background-size:30px;flex-shrink:0}
+.hcs .furs{display:flex;gap:4px;flex-wrap:wrap}
+.hcs .furs .dot{width:22px;height:22px;cursor:pointer;background-size:44px}
+.hcs .furs .dot.sel{outline:2px solid #000;outline-offset:1px}
+.hcs .lines{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 8px}
+.hcs .lines button{font-size:11.5px;padding:4px 8px;border-radius:14px}
+.hcs .lib{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.hcs .swt{cursor:pointer;text-align:center;position:relative}
+.hcs .swt .t{height:48px;border-radius:7px;border:1px solid rgba(0,0,0,.12);background-size:72px}
+.hcs .swt:hover .t{outline:2px solid #000;outline-offset:1px}
+.hcs .swt .nm{font-size:10px;line-height:1.15;margin-top:3px;color:#333}
+.hcs .swt .ln{font-size:9px;color:var(--muted)}
+.hcs .swt.sel .t{outline:3px solid var(--gold);outline-offset:1px}
+.hcs .swt.noinv .t{opacity:.55}
+.hcs .swt .inv{position:absolute;top:2px;right:3px;font-size:9px;background:#fff;border-radius:3px;padding:0 3px;color:#a33}
+.hcs .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.hcs .toolbar .title{font-family:Georgia,serif;font-size:26px;font-style:italic;margin-right:auto}
+.hcs .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.hcs .card.wide{grid-column:span 2}
+.hcs .card{background:var(--card);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow:hidden;position:relative;cursor:zoom-in}
+.hcs .card canvas{width:100%;display:block}
+.hcs .card .meta{padding:8px 40px 10px 10px;display:flex;align-items:center;gap:6px;border-top:1px solid #f0ece5}
+.hcs .card .meta .nm{font-size:13px;font-weight:600;flex:1}
+.hcs .card .meta .cw{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.hcs .card .star{position:absolute;bottom:6px;right:10px;font-size:22px;line-height:1;color:#ccc;background:none;border:none;padding:0}
+.hcs .card .star.on{color:var(--gold)}
+.hcs .empty-state{height:70%;display:flex;align-items:center;justify-content:center;flex-direction:column;color:var(--muted);text-align:center;gap:10px}
+.hcs .empty-state .big{font-family:Georgia,serif;font-style:italic;font-size:30px;color:#000}
+.hcs .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;z-index:2000;gap:24px}
+.hcs .lightbox canvas{max-height:90vh;max-width:68vw;border-radius:10px;background:#fff;display:block}
+.hcs .lightbox .side{color:#fff;width:260px}
+.hcs .lightbox .side h3{font-family:Georgia,serif;font-style:italic;font-size:28px;margin:0 0 4px}
+.hcs .lightbox .side .mats{margin:14px 0;font-size:13px;line-height:1.9}
+.hcs .lightbox .side button{width:100%;margin-top:8px}
+.hcs .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:2100}
+.hcs .modal .box{background:#fff;border-radius:12px;padding:20px 22px;width:440px;max-width:92vw;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.hcs .modal h3{margin:0 0 6px;font-family:Georgia,serif;font-style:italic;font-size:22px}
+.hcs .modal .opt{display:block;width:100%;text-align:left;margin-top:8px}
+.hcs .modal a{color:#000}
+.hcs .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;z-index:2200;max-width:80vw}
+.hcs .loading{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:15px}
+@media (max-width:900px){.hcs-main{grid-template-columns:1fr}.hcs aside{border-right:none;border-bottom:1px solid var(--line)}.hcs .card.wide{grid-column:auto}}

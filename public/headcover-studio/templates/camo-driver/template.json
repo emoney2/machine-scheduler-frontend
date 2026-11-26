@@ -1,0 +1,45 @@
+{
+ "name": "Camo",
+ "w": 1260,
+ "h": 1050,
+ "notes": [
+  "ignored hidden: JRCO_FUR_NAME:Light Grey Fur",
+  "ignored hidden: PRINT",
+  "ignored hidden: Quilting"
+ ],
+ "markers": {
+  "JRCO_MATERIAL": "Luscious|White",
+  "JRCO_FUR_NAME": "Light Grey Fur"
+ },
+ "body": {
+  "name": "White",
+  "material": "Luscious|White"
+ },
+ "logo": {
+  "x": 283.6,
+  "y": 315.8,
+  "w": 63.2,
+  "h": 60.6
+ },
+ "product": "Driver",
+ "pxPerInch": 60,
+ "slots": [
+  {
+   "name": "Camo Base Layer",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Camo Mid Layer",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Camo Top Layer",
+   "mask": "slot-2.png"
+  }
+ ],
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ }
+}
