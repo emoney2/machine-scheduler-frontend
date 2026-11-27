@@ -833,7 +833,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       const kind = kindOf(T);
       if (kind === "scatter") return;   // parked
       if (kind === "painted" && !COURSE.src) return;   // needs a course photo
-      if ((kind === "flag" || kind === "stockcamo") && cw === "B") return;   // the flag has one colourway: classic red, white and navy
+      if ((kind === "flag" || kind === "stockcamo" || kind === "painted") && cw === "B") return;   // painted course: dark back only (back colour can still be changed in Edit)   // the flag has one colourway: classic red, white and navy
       if (kind === "tartan" && !special.tartan[cw]) return;
       let r;
       if (kind === "quilted") r = [special[cw].main, special[cw].thread];
