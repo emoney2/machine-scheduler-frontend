@@ -254,3 +254,16 @@
 .hcs .course .row { margin-top: 6px; align-items: center; }
 .hcs .coursePrev { width: 72px; height: 48px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid #ddd; }
 .hcs .patctl .warn { color: #b3261e; }
+
+/* logo tools + colours */
+.hcs .brushing canvas{cursor:cell;touch-action:none}
+.hcs .logotools{flex-wrap:wrap;gap:6px}
+.hcs .logotools input[type=range]{flex:1;min-width:90px}
+.hcs .logocols .lcrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.hcs .logocols .lc{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:16px}
+.hcs .logocols .lc.on{outline:2px solid #000}
+.hcs .logocols .dot{display:inline-block;width:20px;height:20px;border-radius:50%;border:1px solid rgba(0,0,0,.25);cursor:pointer;vertical-align:middle}
+.hcs .logocols .lcpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px;padding:8px;border:1px solid #e3ded5;border-radius:8px;background:#fff}
+.hcs .logocols .lcpick .dot{width:26px;height:26px}
+.hcs .logocols .anyc{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.hcs .logocols .anyc input{width:30px;height:26px;padding:0;border:none;background:none}
