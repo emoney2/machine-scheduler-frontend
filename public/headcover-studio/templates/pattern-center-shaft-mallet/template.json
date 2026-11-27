@@ -1,0 +1,25 @@
+{
+ "name": "Logo Pattern",
+ "product": "Center Shaft Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 230.47,
+  "y": 490.6,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "pattern",
+ "pattern": {
+  "all": "pattern-all.png",
+  "front": "pattern-front.png"
+ }
+}

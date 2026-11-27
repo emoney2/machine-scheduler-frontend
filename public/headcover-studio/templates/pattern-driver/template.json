@@ -1,0 +1,25 @@
+{
+ "name": "Logo Pattern",
+ "w": 1260,
+ "h": 1050,
+ "logo": {
+  "x": 280.74,
+  "y": 311.64,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "product": "Driver",
+ "pxPerInch": 60,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "slots": [],
+ "design": "pattern",
+ "pattern": {
+  "all": "pattern-all.png",
+  "front": "pattern-front.png"
+ }
+}

@@ -116,6 +116,7 @@ function loadTemplateAssets(T) {
     T.quiltShadeImg = T.quilt ? await loadImg(dir + T.quilt.shade) : null;
     T.stripeMaskImg = T.stripes ? await loadImg(dir + T.stripes.mask) : null;
     T.quiltStitchImg = T.quilt ? await loadImg(dir + T.quilt.stitch) : null;
+    T.patternImgs = T.pattern ? { all: await loadImg(dir + T.pattern.all), front: await loadImg(dir + T.pattern.front) } : null;
     T.tartanImgs = T.tartan ? await Promise.all(T.tartan.stitches.map((f) => loadImg(dir + f))) : null;
     T.logoGround = -1;   // which slot sits under the logo centre (for logo contrast)
     if (T.logo) {
@@ -212,6 +213,7 @@ function drawQuiltThread(ctx, T, color) {
   ctx.save(); ctx.globalAlpha = 0.35; ctx.globalCompositeOperation = "screen"; ctx.drawImage(tint(T.quiltStitchImg, "#ffffff", w, h), 0, -0.4); ctx.restore();   // thread sheen
 }
 
+export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: null };   // orig null = auto (filled badges keep their colours)
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
   const find = (line, name) => SW.find((s) => s.line === line && s.name.toLowerCase() === name.toLowerCase());
@@ -380,6 +382,37 @@ export function createStudio({ materials, furs, templates, proofs }) {
     if (!opts.flat) { ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 3; ctx.shadowOffsetX = 1.2; ctx.shadowOffsetY = 2.2; }
     ctx.drawImage(img, x, y); ctx.restore();
   }
+  // logo pattern (Atlanta Athletic Club / Wade Hampton style): along each row the logo alternates
+  // 180°, 0°, 180°, 0°; every other row is shifted by half the spacing; size and spacing in inches, set per design in Edit
+  // a filled badge/crest printed in one colour turns into a blob; line marks (monograms) read fine
+  function logoFill() {
+    const c = LOGO.canvas; if (!c) return 0;
+    if (LOGO._fill && LOGO._fill[0] === c) return LOGO._fill[1];
+    const s = Math.min(1, 120 / Math.max(c.width, c.height)), k = makeCanvas(Math.max(1, c.width * s), Math.max(1, c.height * s)), x = k.getContext("2d");
+    x.drawImage(c, 0, 0, k.width, k.height); const d = x.getImageData(0, 0, k.width, k.height).data;
+    let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 128) n++;
+    const f = n / (k.width * k.height); LOGO._fill = [c, f]; return f;
+  }
+  const patternOrig = (P) => (P.orig == null ? logoFill() > 0.45 : P.orig);
+  function drawLogoPattern(ctx, T, P, ppi) {
+    const lc = LOGO.canvas, lw = P.size * ppi, lh = (lw * lc.height) / lc.width;
+    const img = logoLayer(lw, lh, patternOrig(P) ? null : P.ink);
+    const cw = lw + P.gapX * ppi, ch = lh + P.gapY * ppi;
+    const ax = T.logo ? T.logo.x + T.logo.w / 2 : T.w / 2, ay = T.logo ? T.logo.y + T.logo.h / 2 : T.h / 2;
+    const pc = makeCanvas(T.w, T.h), x = pc.getContext("2d"), R = Math.hypot(T.w, T.h);
+    x.translate(ax, ay); if (T.logo && T.logo.rot) x.rotate((T.logo.rot * Math.PI) / 180);
+    const nr = Math.ceil(R / ch) + 1, nc = Math.ceil(R / cw) + 1;
+    for (let j = -nr; j <= nr; j++) {
+      const off = (j & 1) * cw / 2;
+      for (let i = -nc; i <= nc; i++) {
+        x.save(); x.translate(i * cw + off, j * ch); if (P.flip && !(i & 1)) x.rotate(Math.PI);   // 180, 0, 180, 0 along each row
+        x.drawImage(img, -lw / 2, -lh / 2); x.restore();
+      }
+    }
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "destination-in";
+    x.drawImage(P.front ? T.patternImgs.front : T.patternImgs.all, 0, 0);
+    ctx.drawImage(pc, 0, 0);
+  }
   function pickThread(c) {
     const cands = [c.accent, c.trim, c.extra, WHITE, BLACK];
     return cands.find((m) => m && dE(m.rgb, c.body.rgb) > 40)?.hex || bestContrast(c.body).hex;
@@ -441,6 +474,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     // mats = [back panel, camo base, camo mid, camo top]; body fill first, then the camo pieces
     ctx.fillStyle = matStyle(ctx, mats[0], ppi); ctx.fillRect(0, 0, T.w, T.h); ctx.fillStyle = grain(ctx); ctx.fillRect(0, 0, T.w, T.h);
     T.slotImgs.forEach((im, i) => { if (im) maskFill(ctx, T, im, matStyle(ctx, mats[(i + 1) % mats.length], ppi), !T.printed); });   // printed camo: no raised edges
+    if (T.patternImgs && opts.pattern && LOGO.canvas) drawLogoPattern(ctx, T, opts.pattern, ppi);
     if (T.stripeMaskImg && opts.stripes) {   // Silver Britches-style stripes through the logo spot, zigzag-stitched
       const S = T.stripes, c = makeCanvas(T.w, T.h), x = c.getContext("2d"), L = T.w + T.h;
       const total = S.widths.reduce((a, b) => a + b, 0);
@@ -482,7 +516,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       const k = Math.min(opts.logoScale || 1, 1.15);   // the size slider can't push marks into each other
       T.scatter.forEach((m) => drawLogo(ctx, m.x, m.y, m.w * k, m.w * k, mats[0], { tint: opts.scatterTint, rot: m.rot, flat: true }));
     }
-    if (T.logo && LOGO.canvas) {
+    if (T.logo && LOGO.canvas && !T.patternImgs) {
       const s = opts.logoScale, g = T.logoGround >= 0 ? mats[(T.logoGround + 1) % mats.length] : mats[0];
       const c = { body: mats[0], accent: mats[1], trim: mats[2], extra: mats[3] };
       drawLogo(ctx, T.logo.x + T.logo.w / 2, T.logo.y + T.logo.h / 2, T.logo.w * s, T.logo.h * s, g, { tint: opts.oneColor ? pickThread({ ...c, body: g }) : null, rot: T.logo.rot || 0 });
@@ -663,6 +697,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     tartan: () => ["Leather", "Thread 1", "Thread 2", "Thread 3"],
     flag: () => ["Navy", "Red", "White"],
     scatter: () => ["Body", "Marks"],
+    pattern: () => ["Background", "Logo colour"],
     stockcamo: (T) => ["Back panel", ...(T.stockNames || T.slots.map((x, i) => `Camo ${i + 1}`))],
   };
   // stock designs (Duck Camo, Light Camo) come in their own printed colours; these colours aren't in the
@@ -702,12 +737,13 @@ export function createStudio({ materials, furs, templates, proofs }) {
       else if (kind === "stripes") r = [special.stripes[cw].body, ...special.stripes[cw].stripes];
       else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
       else if (kind === "flag") r = [special.flag[cw].blue, special.flag[cw].red, special.flag[cw].white];
+      else if (kind === "pattern") r = [special.scatter[cw].body, special.scatter[cw].ink];
       else if (kind === "stockcamo") { const st = T.stock.map((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)); r = [st[0], ...st]; }
       else if (kind === "camo") r = [m[0], ...T.slots.map((x, i) => m[(i + 1) % m.length])];
       else r = [m[1] && m[1] !== m[0] ? m[1] : m[0]];
       const roles = KIND_ROLES[kind](T);
       specs.push({ tpl: T.id, product: T.product, name: T.name, design: `${T.product} · ${T.name}`, cw, kind,
-        roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })) });
+        roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })), ...(kind === "pattern" ? { pattern: { ...PATTERN_DEFAULT } } : {}) });
     }));
     return specs;
   }
@@ -718,7 +754,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const r = spec.roles.map((x) => x.mat);
     await Promise.all([ensureTiles([...r, fur, WHITE, BLACK, NAVY]), loadTemplateAssets(T), P ? loadProofAssets(P) : null]);
     CUR = { mats: r };
-    let mats, thread = null, stripes = null, tartan = null;
+    let mats, thread = null, stripes = null, tartan = null, pattern = null;
     switch (spec.kind) {
       case "quilted": mats = [r[0], r[0], r[0], r[0]]; thread = r[1].hex; break;
       case "exotic": mats = [r[0], r[0], r[0], r[0]]; break;
@@ -727,9 +763,10 @@ export function createStudio({ materials, furs, templates, proofs }) {
       case "flag": mats = [r[0], r[2], r[1], r[0], r[2]]; break;   // [back, field, red stripes, canton, stars]
       case "camo": mats = r.length >= 4 ? r : [...r, ...r].slice(0, 4); break;
       case "stockcamo": mats = r; break;
+      case "pattern": mats = [r[0], r[0], r[0], r[0]]; pattern = { ...PATTERN_DEFAULT, ...(spec.pattern || {}), ink: r[1].hex }; break;
       default: mats = [r[0], r[0], r[0], r[0]];
     }
-    const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, stripes, tartan });
+    const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, stripes, tartan, pattern });
     const canvas = P ? renderProof(P, flat, fur) : flat;
     return { flat, canvas, proof: canvas };
   }
@@ -927,6 +964,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
 
   const products = [...new Set(templates.map((T) => T.product))];
   return {
+    patternOwnColours: () => logoFill() > 0.45,
     materials: SW, furs, templates, proofs, products, WHITE, BLACK,
     hasLogo: () => !!LOGO.canvas, logoCanvas: () => LOGO.canvas,
     loadBlob, processLogo, eraseAt, undoErase, resetLogo, nearest, generate, sheet,

@@ -1,0 +1,24 @@
+{
+ "name": "Logo Pattern",
+ "product": "Hybrid",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 207.94,
+  "y": 199.94,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "pattern",
+ "pattern": {
+  "all": "pattern-all.png",
+  "front": "pattern-front.png"
+ }
+}

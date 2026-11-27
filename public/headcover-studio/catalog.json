@@ -321,6 +321,42 @@
   {
    "id": "lightcamo-zipper-pouch",
    "dir": "templates/lightcamo-zipper-pouch/"
+  },
+  {
+   "id": "pattern-driver",
+   "dir": "templates/pattern-driver/"
+  },
+  {
+   "id": "pattern-fairway",
+   "dir": "templates/pattern-fairway/"
+  },
+  {
+   "id": "pattern-hybrid",
+   "dir": "templates/pattern-hybrid/"
+  },
+  {
+   "id": "pattern-mallet",
+   "dir": "templates/pattern-mallet/"
+  },
+  {
+   "id": "pattern-blade",
+   "dir": "templates/pattern-blade/"
+  },
+  {
+   "id": "pattern-mid-mallet",
+   "dir": "templates/pattern-mid-mallet/"
+  },
+  {
+   "id": "pattern-center-shaft-mallet",
+   "dir": "templates/pattern-center-shaft-mallet/"
+  },
+  {
+   "id": "pattern-df3-mallet",
+   "dir": "templates/pattern-df3-mallet/"
+  },
+  {
+   "id": "pattern-zipper-pouch",
+   "dir": "templates/pattern-zipper-pouch/"
   }
  ],
  "proofs": [

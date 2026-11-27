@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
 import {
-  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb,
+  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT,
 } from "./headcoverStudio/engine";
 import { matchInventory } from "./headcoverStudio/inventory";
 import { saveSession, getSession, deleteSession, listSessions, newId, packSpec, unpackSpec, thumbOf } from "./headcoverStudio/sessions";
@@ -325,7 +325,8 @@ export default function HeadcoverStudio() {
   const renderOpts = useCallback(() => ({ oneColor, logoScale: logoSize / 100, fur }), [oneColor, logoSize, fur]);
   // a design can carry its own fur lining (set in Edit); otherwise it uses the session fur
   const furOf = useCallback((spec) => (spec && spec.furId && furs.find((f) => f.id === spec.furId)) || fur, [furs, fur]);
-  const optsFor = useCallback((spec, o) => ({ ...(o || renderOpts()), fur: furOf(spec) }), [renderOpts, furOf]);
+  // a design can also carry its own logo size (set in Edit); otherwise the session slider applies
+  const optsFor = useCallback((spec, o) => { const b = o || renderOpts(); return { ...b, fur: furOf(spec), logoScale: spec && spec.logoScale ? spec.logoScale : b.logoScale }; }, [renderOpts, furOf]);
   const renderSeq = useRef(0);
   // (re)draw the given designs one at a time so the first ones show up straight away
   const renderAll = useCallback(async (list, onlyUids) => {
@@ -419,6 +420,24 @@ export default function HeadcoverStudio() {
     if (r) updateDesign(cur.uid, { canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) });
   };
   // edit: this design's fur lining (null = follow the session fur)
+  // edit: logo pattern size / spacing; drags re-render the newest values without queueing every step
+  const patBusy = useRef(false), patNext = useRef(null);
+  const setPattern = (patch) => cur && liveSpec({ ...cur.spec, pattern: { ...PATTERN_DEFAULT, ...(cur.spec.pattern || {}), ...patch } });
+  const setDesignLogo = (v) => cur && liveSpec({ ...cur.spec, logoScale: v == null ? undefined : v });
+  const liveSpec = (spec) => {
+    updateDesign(cur.uid, { spec, locked: true });
+    patNext.current = { uid: cur.uid, spec };
+    if (patBusy.current) return;
+    patBusy.current = true;
+    (async () => {
+      while (patNext.current) {
+        const job = patNext.current; patNext.current = null;
+        const r = await S.renderSpec(job.spec, optsFor(job.spec));
+        if (r) updateDesign(job.uid, { canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) });
+      }
+      patBusy.current = false;
+    })();
+  };
   const setDesignFur = async (f) => {
     if (!cur) return;
     if (f) await ensureTiles([f]);
@@ -743,7 +762,7 @@ export default function HeadcoverStudio() {
           {!designs.length ? (
             <div className="empty-state"><div className="big">Every design is deleted.</div><button className="on" onClick={() => buildBatch({ next: true })}>Create new ones</button></div>
           ) : (
-            <div className="rv-body">
+            <div className={"rv-body" + (editing && cur ? " editing" : "")}>
               <div className="rv-stage">
                 <Carousel designs={designs} idx={idx} setIdx={(i) => { setIdx(i); setPickRole(null); }} flat={flatView}>
                   {cur?.locked && <div className="lockbadge">🔒 Locked</div>}
@@ -785,6 +804,39 @@ export default function HeadcoverStudio() {
                       <span className="chev">{pickRole === k ? "▾" : "▸"}</span>
                     </div>
                   ))}
+                  {cur.spec.kind !== "pattern" && (() => {
+                    const v = cur.spec.logoScale || logoSize / 100;
+                    return (
+                      <div className="patctl">
+                        <label className="patrow">
+                          <span>Logo size{cur.spec.logoScale ? "" : " · same as session"}<b>{Math.round(v * 100)}%</b></span>
+                          <input type="range" min="60" max="400" step="5" value={Math.round(v * 100)} onChange={(e) => setDesignLogo(+e.target.value / 100)} />
+                        </label>
+                        {cur.spec.logoScale && <button className="ghost" onClick={() => setDesignLogo(null)}>Use session size</button>}
+                      </div>
+                    );
+                  })()}
+                  {cur.spec.kind === "pattern" && (() => {
+                    const P = { ...PATTERN_DEFAULT, ...(cur.spec.pattern || {}) };
+                    const sl = (k, label, min, max) => (
+                      <label className="patrow" key={k}>
+                        <span>{label}<b>{P[k].toFixed(2)}"</b></span>
+                        <input type="range" min={min} max={max} step="0.05" value={P[k]} onChange={(e) => setPattern({ [k]: +e.target.value })} />
+                      </label>
+                    );
+                    return (
+                      <div className="patctl">
+                        <div className="small">Logo pattern</div>
+                        {sl("size", "Logo size", 0.5, 3)}
+                        {sl("gapX", "Space across (X)", 0, 2)}
+                        {sl("gapY", "Space down (Y)", 0, 2)}
+                        <label className="chk"><input type="checkbox" checked={P.flip} onChange={(e) => setPattern({ flip: e.target.checked })} /> Alternate upside-down (180 / 0)</label>
+                        <label className="chk"><input type="checkbox" checked={P.front} onChange={(e) => setPattern({ front: e.target.checked })} /> Front only (plain back)</label>
+                        <label className="chk"><input type="checkbox" checked={P.orig == null ? !!S.patternOwnColours() : P.orig} onChange={(e) => setPattern({ orig: e.target.checked })} /> Logo in its own colours</label>
+                        <button className="ghost" onClick={() => setPattern({ ...PATTERN_DEFAULT })}>Reset pattern</button>
+                      </div>
+                    );
+                  })()}
                   <div className="role furrow">
                     <span className="rl"><span className="small">Fur lining{cur.spec.furId ? "" : " · same as session"}</span><br /><b>{furOf(cur.spec)?.name}</b></span>
                   </div>
