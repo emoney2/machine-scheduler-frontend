@@ -23,5 +23,21 @@
   "all": "paint-all.png",
   "front": "paint-front.png"
  },
- "paintArea": "front"
+ "paintArea": "all",
+ "logos": [
+  {
+   "x": 148.1,
+   "y": 155.1,
+   "w": 46,
+   "h": 46,
+   "rot": 180
+  },
+  {
+   "x": 335.8,
+   "y": 155.1,
+   "w": 46,
+   "h": 46,
+   "rot": 180
+  }
+ ]
 }
