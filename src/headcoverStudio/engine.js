@@ -390,7 +390,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const img = logoLayer(w, h, tint);
     const main = tint ? hexToRgb(tint) : LOGO.main;
     // opts.rot (degrees) turns the logo upright on panels that sit rotated in the flat layout
-    ctx.save(); ctx.translate(cx, cy); if (opts.rot) ctx.rotate((opts.rot * Math.PI) / 180);
+    ctx.save(); ctx.translate(cx, cy);
+    if (opts.m) ctx.transform(opts.m[0], opts.m[1], opts.m[2], opts.m[3], 0, 0);   // undoes the 3D model's local stretch at this spot
+    if (opts.rot) ctx.rotate((opts.rot * Math.PI) / 180);
     const x = -w / 2, y = -h / 2;
     if (!opts.flat && main && dE(main, ground.rgb) < 28) {   // logo would vanish on its ground: outline it
       const o = opts.outline || bestContrast(ground);
@@ -619,7 +621,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       const c = { body: mats[0], accent: mats[1], trim: mats[2], extra: mats[3] };
       // T.logos: more than one logo spot (painted blade: one on each side; painted mallet: on the tab, upside down)
       (T.logos || [T.logo]).forEach((L) =>
-        drawLogo(ctx, L.x + L.w / 2, L.y + L.h / 2, L.w * s, L.h * s, g, { tint: opts.oneColor ? pickThread({ ...c, body: g }) : null, rot: L.rot || 0 }));
+        drawLogo(ctx, L.x + L.w / 2, L.y + L.h / 2, L.w * s, L.h * s, g, { tint: opts.oneColor ? pickThread({ ...c, body: g }) : null, rot: L.rot || 0, m: L.m }));
     }
     return cv;
   }
