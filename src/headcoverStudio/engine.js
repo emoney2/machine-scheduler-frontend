@@ -230,7 +230,7 @@ function drawQuiltThread(ctx, T, color) {
 // x / y move it (fraction of the area), rot turns it in 90° steps; look = oil paint settings
 export const PAINT_DEFAULT = { area: null, zoom: 1, x: 0, y: 0, rot: 0, look: {} };
 export { OIL_DEFAULT };
-export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: null };   // orig null = auto (filled badges keep their colours)
+export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: true };   // orig: logo in its own colours (false = one colour)
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
   const find = (line, name) => SW.find((s) => s.line === line && s.name.toLowerCase() === name.toLowerCase());
@@ -358,17 +358,10 @@ export function createStudio({ materials, furs, templates, proofs }) {
   }
 
   /* ----- logo drawing (embroidery look) ----- */
-  let threadPat = null;
-  function threadTile() {
-    if (threadPat) return threadPat;
-    const c = makeCanvas(6, 6), x = c.getContext("2d");
-    x.fillStyle = "rgba(255,255,255,.22)"; x.fillRect(0, 0, 6, 2); x.fillStyle = "rgba(0,0,0,.20)"; x.fillRect(0, 3, 6, 1.5);
-    threadPat = c;
-    return c;
-  }
   /* logo colours: a colour map [{from, to}] (hex) moves each of the logo's own colours to a new one.
      The session map applies everywhere; a design can carry its own map (e.g. logo in the leather colour). */
-  let ACTIVE = null;   // {canvas, map} while one design is being drawn
+  let ACTIVE = null;
+  let STROKE = null, PPI = 60;   // this design's logo outline {color, width in inches} while it is drawn   // {canvas, map} while one design is being drawn
   const recolorCache = new Map();
   function recolor(map) {
     if (!LOGO.canvas || !map || !map.length) return LOGO.canvas;
@@ -408,9 +401,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const c = makeCanvas(w, h), x = c.getContext("2d");
     x.imageSmoothingQuality = "high"; x.drawImage(art(), 0, 0, w, h);
     if (tint) { x.globalCompositeOperation = "source-in"; x.fillStyle = tint; x.fillRect(0, 0, w, h); }
-    x.globalCompositeOperation = "source-atop";
-    const p = x.createPattern(threadTile(), "repeat"); p.setTransform(new DOMMatrix().rotate(-38)); x.fillStyle = p; x.fillRect(0, 0, w, h);
-    return c;
+    return c;   // plain colours: the old diagonal thread texture read as stripes
+  }
+  /** The logo with an outline of the given colour and width (px) around it; returns {img, pad}. */
+  function stroked(img, color, wpx) {
+    const pad = Math.ceil(wpx) + 1, c = makeCanvas(img.width + pad * 2, img.height + pad * 2), x = c.getContext("2d");
+    const sil = silhouetteOf(img, color), n = Math.max(16, Math.round(wpx * 6));
+    for (let a = 0; a < n; a++) { const t = (a / n) * Math.PI * 2; x.drawImage(sil, pad + Math.cos(t) * wpx, pad + Math.sin(t) * wpx); }
+    x.drawImage(sil, pad, pad); x.drawImage(img, pad, pad);
+    return { img: c, pad };
   }
   function silhouetteOf(img, color) {
     const c = makeCanvas(img.width, img.height), x = c.getContext("2d");
@@ -438,8 +437,10 @@ export function createStudio({ materials, furs, templates, proofs }) {
       const sil = silhouetteOf(img, o.hex);
       for (let a = 0; a < 16; a++) { const t = (a / 16) * Math.PI * 2; ctx.drawImage(sil, x + Math.cos(t) * 4.5, y + Math.sin(t) * 4.5); }
     }
+    let draw = img, dx = x, dy = y;
+    if (STROKE && STROKE.width > 0) { const k = stroked(img, STROKE.color, STROKE.width * PPI); draw = k.img; dx = x - k.pad; dy = y - k.pad; }
     if (!opts.flat) { ctx.shadowColor = "rgba(0,0,0,.5)"; ctx.shadowBlur = 3; ctx.shadowOffsetX = 1.2; ctx.shadowOffsetY = 2.2; }
-    ctx.drawImage(img, x, y); ctx.restore();
+    ctx.drawImage(draw, dx, dy); ctx.restore();
   }
   // logo pattern (Atlanta Athletic Club / Wade Hampton style): along each row the logo alternates
   // 180°, 0°, 180°, 0°; every other row is shifted by half the spacing; size and spacing in inches, set per design in Edit
@@ -452,10 +453,11 @@ export function createStudio({ materials, furs, templates, proofs }) {
     let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 128) n++;
     const f = n / (k.width * k.height); LOGO._fill = [c, f]; return f;
   }
-  const patternOrig = (P) => (P.orig == null ? logoFill() > 0.45 : P.orig);
+  const patternOrig = (P) => P.orig !== false;
   function drawLogoPattern(ctx, T, P, ppi) {
     const lc = LOGO.canvas, lw = P.size * ppi, lh = (lw * lc.height) / lc.width;
-    const img = logoLayer(lw, lh, patternOrig(P) ? null : P.ink);
+    let img = logoLayer(lw, lh, patternOrig(P) ? null : P.ink);
+    if (STROKE && STROKE.width > 0) img = stroked(img, STROKE.color, STROKE.width * ppi).img;
     const cw = lw + P.gapX * ppi, ch = lh + P.gapY * ppi;
     const ax = T.logo ? T.logo.x + T.logo.w / 2 : T.w / 2, ay = T.logo ? T.logo.y + T.logo.h / 2 : T.h / 2;
     const pc = makeCanvas(T.w, T.h), x = pc.getContext("2d"), R = Math.hypot(T.w, T.h);
@@ -916,9 +918,10 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const own = spec.logoColors && spec.logoColors.length ? spec.logoColors : null;
     const map = own ? mergeMaps(LOGO.map, own) : null;
     ACTIVE = map ? { map, canvas: recolor(map) } : null;
+    STROKE = spec.logoStroke && spec.logoStroke.width > 0 ? spec.logoStroke : null; PPI = T.pxPerInch || 60;
     let flat;
     try { flat = renderTemplate(T, mats, { oneColor: oneColor && !own, logoScale, fur, thread, stripes, tartan, pattern, paint }); }
-    finally { ACTIVE = null; }
+    finally { ACTIVE = null; STROKE = null; }
     const canvas = P ? renderProof(P, flat, fur) : flat;
     return { flat, canvas, proof: canvas };
   }
@@ -1053,6 +1056,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
     x.drawImage(t, ox, oy);
   }
   function brushEnd() { return afterLogo(); }
+  /** For the Edit logo pop-up: take a copy on open, put it back on Cancel. */
+  const logoSnapshot = () => (LOGO.canvas ? { canvas: cloneCanvas(LOGO.canvas), history: LOGO.history.slice(), map: (LOGO.map || []).slice(), base: LOGO.base, orig: LOGO.orig, palette: LOGO.palette } : null);
+  function logoRestore(sn) { if (!sn) return null; Object.assign(LOGO, { canvas: sn.canvas, history: sn.history, map: sn.map, base: sn.base, orig: sn.orig, palette: sn.palette }); return afterLogo(); }
   function setLogoColors(map) { LOGO.map = map || []; return afterLogo(); }
   /** The logo drawn with a given colour map (for previews and swatch pickers). */
   const logoWith = (map) => recolor(map);
@@ -1149,7 +1155,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     setCourse, hasCourse: () => !!COURSE.src, courseCanvas: () => COURSE.src, paintDpi, renderPrint,
     materials: SW, furs, templates, proofs, products, WHITE, BLACK,
     hasLogo: () => !!LOGO.canvas, logoCanvas: () => LOGO.canvas, logoPalette: () => LOGO.palette || [], logoMap: () => LOGO.map || [],
-    brushStart, brushAt, brushEnd, setLogoColors, logoWith, mergeMaps,
+    brushStart, brushAt, brushEnd, setLogoColors, logoWith, mergeMaps, logoSnapshot, logoRestore,
     loadBlob, processLogo, eraseAt, undoErase, resetLogo, nearest, generate, sheet,
     plan, renderSpec, restoreLogo, matById,
     renderTemplate, renderProof,   // exposed for tests / future tools

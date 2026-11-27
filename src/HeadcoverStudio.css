@@ -267,3 +267,11 @@
 .hcs .logocols .lcpick .dot{width:26px;height:26px}
 .hcs .logocols .anyc{display:inline-flex;align-items:center;gap:4px;font-size:12px}
 .hcs .logocols .anyc input{width:30px;height:26px;padding:0;border:none;background:none}
+
+/* Edit logo pop-up */
+.hcs .modal .box.logoedit{width:min(720px,94vw);max-height:94vh;overflow:auto}
+.hcs .logoedit .lebig{background:repeating-conic-gradient(#eee 0% 25%,#fff 0% 50%) 50%/18px 18px;border:1px solid #ddd;border-radius:8px;padding:10px;margin:6px 0 10px}
+.hcs .logoedit .lebig .logoPrev canvas{max-height:min(46vh,420px);max-width:100%}
+.hcs .logoedit .lebtns{display:flex;gap:8px;margin-top:14px}
+.hcs button.editlogo{font-weight:600}
+.hcs .lcpick .dot.sel{outline:2px solid #000;outline-offset:1px}

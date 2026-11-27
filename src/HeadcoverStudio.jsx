@@ -133,6 +133,8 @@ export default function HeadcoverStudio() {
   const [liveLogo, setLiveLogo] = useState(null);       // the logo canvas itself while a brush stroke is under way
   const [logoPal, setLogoPal] = useState([]);           // the logo's own colours
   const [logoMap, setLogoMap] = useState([]);           // session colour changes [{from,to}]
+  const [logoEdit, setLogoEdit] = useState(null);       // Edit logo pop-up open: what to put back on Cancel
+  const modalLogo = useMemo(() => (logoView ? copyCanvas(logoView) : null), [logoView]);   // its own copy: a canvas can only sit in one place
   const [suggestions, setSuggestions] = useState([]);
   const [tol, setTol] = useState(42);
   const [inside, setInside] = useState(false);
@@ -378,6 +380,9 @@ export default function HeadcoverStudio() {
     applyLogoResult(S.brushEnd(), false);
   };
   const setSessionLogoColors = (map) => applyLogoResult(S.setLogoColors(map), false);
+  const openLogoEdit = () => { if (S && S.hasLogo()) { setLogoTool("click"); setLogoEdit({ snap: S.logoSnapshot(), tol, inside }); } };
+  const cancelLogoEdit = () => { const e = logoEdit; setLogoEdit(null); if (e) { setTol(e.tol); setInside(e.inside); applyLogoResult(S.logoRestore(e.snap), false); } };
+  const saveLogoEdit = () => { setLogoEdit(null); showToast("Logo saved · redrawing the covers"); };
 
   /* ---------- slots + library ---------- */
   const assign = (m) => {
@@ -460,10 +465,10 @@ export default function HeadcoverStudio() {
   // settings that change every render (fur, logo size, thread, logo edits): redraw the whole session
   const rerenderTimer = useRef(null);
   useEffect(() => {
-    if (!designs.length) return;
+    if (!designs.length || logoEdit) return;   // logo edits show up on the covers when Save is pressed
     clearTimeout(rerenderTimer.current);
     rerenderTimer.current = setTimeout(() => renderAll(designs), 150);
-  }, [oneColor, furId, logoSize, logoView]);
+  }, [oneColor, furId, logoSize, logoView, !!logoEdit]);
 
   const cur = designs[idx] || null;
   const updateDesign = (u, patch) => setDesigns((p) => p.map((d) => (d.uid === u ? { ...d, ...patch } : d)));
@@ -494,6 +499,7 @@ export default function HeadcoverStudio() {
   const patBusy = useRef(false), patNext = useRef(null);
   const setPattern = (patch) => cur && liveSpec({ ...cur.spec, pattern: { ...PATTERN_DEFAULT, ...(cur.spec.pattern || {}), ...patch } });
   // this design's logo colours (null = follow the session colours)
+  const setDesignStroke = (st) => cur && liveSpec({ ...cur.spec, logoStroke: st || undefined });
   const setDesignLogoColors = (m) => cur && liveSpec({ ...cur.spec, logoColors: m && m.length ? m : undefined });
   const setDesignLogo = (v) => cur && liveSpec({ ...cur.spec, logoScale: v == null ? undefined : v });
   const liveSpec = (spec) => {
@@ -695,10 +701,7 @@ export default function HeadcoverStudio() {
             }}
           >
             {logoView ? (
-              <div onPointerDown={onLogoDown} onPointerMove={onLogoMove} onPointerUp={onLogoUp} onPointerCancel={onLogoUp}
-                className={logoTool === "click" ? "" : "brushing"} style={{ width: "100%" }}>
-                <CanvasView canvas={liveLogo || logoView} className="logoPrev" onClick={logoTool === "click" ? onLogoClick : (e) => e.stopPropagation()} />
-              </div>
+              <CanvasView canvas={logoView} className="logoPrev" onClick={(e) => { e.stopPropagation(); openLogoEdit(); }} />
             ) : (
               <div className="hint">
                 {isTouch ? (
@@ -724,33 +727,11 @@ export default function HeadcoverStudio() {
             <button onClick={pasteFromClipboard}>Paste</button>
             <button onClick={() => fileRef.current?.click()}>Photo / file</button>
           </div>
-          <div className="row">
-            <label>Background cleanup</label>
-            <input type="range" min="8" max="110" value={tol} onChange={(e) => onTol(+e.target.value)} />
-            <button className={inside ? "on" : ""} onClick={toggleInside} title="Also remove background color trapped inside letters and shapes">Clear inside</button>
-          </div>
-          <div className="row">
-            <button disabled={!canUndo} onClick={() => applyLogoResult(S.undoErase(), false)}>Undo</button>
-            <button disabled={!logoView} onClick={() => applyLogoResult(S.resetLogo(), false)}>Reset</button>
-            <span className="small" style={{ flex: 1 }}>{logoTool === "click" ? "Click leftover background on the logo to erase it." : logoTool === "erase" ? "Paint over anything you want gone." : "Paint to bring back anything erased."}</span>
-          </div>
           {logoView && (
-            <>
-              <div className="row logotools">
-                <label>Tool</label>
-                <button className={logoTool === "click" ? "on" : ""} onClick={() => setLogoTool("click")}>Click erase</button>
-                <button className={logoTool === "erase" ? "on" : ""} onClick={() => setLogoTool("erase")}>Eraser</button>
-                <button className={logoTool === "restore" ? "on" : ""} onClick={() => setLogoTool("restore")}>Restore</button>
-                {logoTool !== "click" && <input type="range" min="3" max="40" value={brush} onChange={(e) => setBrush(+e.target.value)} title="Brush size" />}
-              </div>
-              <div className="row" style={{ alignItems: "flex-start" }}>
-                <label style={{ marginTop: 6 }}>Logo colours</label>
-                <span style={{ flex: 1 }}>
-                  <LogoColors palette={logoPal} map={logoMap} onChange={setSessionLogoColors}
-                    picks={[...slots.filter(Boolean), S.WHITE, S.BLACK].filter((m, i, l) => l.findIndex((q) => q.hex.toLowerCase() === m.hex.toLowerCase() || q.name === m.name) === i)} />
-                </span>
-              </div>
-            </>
+            <div className="row">
+              <button className="editlogo" onClick={openLogoEdit}>✎ Edit logo</button>
+              <span className="small" style={{ flex: 1 }}>Erase, clean up the background, change colours{logoMap.length ? ` · ${logoMap.length} colour change${logoMap.length > 1 ? "s" : ""}` : ""}</span>
+            </div>
           )}
           <div className="row" style={{ marginTop: 12 }}>
             <input type="text" value={club} onChange={(e) => setClub(e.target.value)} placeholder="Club name (customer folder, file name, sheet)" />
@@ -977,7 +958,7 @@ export default function HeadcoverStudio() {
                       </div>
                     );
                   })()}
-                  {cur.spec.kind !== "pattern" && (() => {
+                  {(() => {
                     const own = cur.spec.logoColors || [];
                     const map = own.length ? own : logoMap;
                     const body = S.logoGroundMat(cur.spec) || cur.spec.roles[0].mat;
@@ -988,6 +969,20 @@ export default function HeadcoverStudio() {
                         <LogoColors palette={logoPal} map={map} picks={picks} onChange={(m) => setDesignLogoColors(m)}
                           extra={<button className="ghost" title={`Whole logo in ${body.name}`} onClick={() => setDesignLogoColors(logoPal.map((c) => ({ from: c.hex, to: body.hex })))}>Match leather</button>} />
                         {own.length > 0 && <button className="ghost" onClick={() => setDesignLogoColors(null)}>Use session colours</button>}
+                        <div className="small" style={{ marginTop: 10 }}>Logo outline{cur.spec.logoStroke && cur.spec.logoStroke.width > 0 ? "" : " · none"}</div>
+                        <div className="logocols"><div className="lcpick" style={{ marginTop: 4 }}>
+                          {picks.map((m, i) => <span key={(m.id || m.hex) + i} className={"dot" + (cur.spec.logoStroke && cur.spec.logoStroke.color === m.hex ? " sel" : "")} title={m.name} style={{ background: m.hex }}
+                            onClick={() => setDesignStroke({ color: m.hex, width: (cur.spec.logoStroke && cur.spec.logoStroke.width) || 0.04 })} />)}
+                          <label className="anyc"><input type="color" value={(cur.spec.logoStroke && cur.spec.logoStroke.color) || "#ffffff"}
+                            onChange={(e) => setDesignStroke({ color: e.target.value, width: (cur.spec.logoStroke && cur.spec.logoStroke.width) || 0.04 })} /> Any</label>
+                        </div></div>
+                        {cur.spec.logoStroke && cur.spec.logoStroke.width > 0 && (
+                          <label className="patrow">
+                            <span>Outline width<b>{cur.spec.logoStroke.width.toFixed(2)}"</b></span>
+                            <input type="range" min="0.01" max="0.15" step="0.01" value={cur.spec.logoStroke.width} onChange={(e) => setDesignStroke({ ...cur.spec.logoStroke, width: +e.target.value })} />
+                          </label>
+                        )}
+                        {cur.spec.logoStroke && cur.spec.logoStroke.width > 0 && <button className="ghost" onClick={() => setDesignStroke(null)}>No outline</button>}
                       </div>
                     );
                   })()}
@@ -1099,6 +1094,44 @@ export default function HeadcoverStudio() {
 
       {toast && (
         <div className="toast">{toast.text}{toast.undo && <button onClick={() => { toast.undo(); setToast(null); }}>Undo</button>}</div>
+      )}
+      {logoEdit && (
+        <div className="modal">
+          <div className="box logoedit">
+            <h3>Edit logo</h3>
+            <div onPointerDown={onLogoDown} onPointerMove={onLogoMove} onPointerUp={onLogoUp} onPointerCancel={onLogoUp}
+              className={"lebig" + (logoTool === "click" ? "" : " brushing")}>
+              <CanvasView canvas={liveLogo || modalLogo} className="logoPrev" onClick={logoTool === "click" ? onLogoClick : (e) => e.stopPropagation()} />
+            </div>
+            <div className="row logotools">
+              <label>Tool</label>
+              <button className={logoTool === "click" ? "on" : ""} onClick={() => setLogoTool("click")}>Click erase</button>
+              <button className={logoTool === "erase" ? "on" : ""} onClick={() => setLogoTool("erase")}>Eraser</button>
+              <button className={logoTool === "restore" ? "on" : ""} onClick={() => setLogoTool("restore")}>Restore</button>
+              {logoTool !== "click" && <><span className="small">Size</span><input type="range" min="3" max="40" value={brush} onChange={(e) => setBrush(+e.target.value)} /></>}
+              <button disabled={!canUndo} onClick={() => applyLogoResult(S.undoErase(), false)}>Undo</button>
+            </div>
+            <div className="small" style={{ margin: "2px 0 8px" }}>{logoTool === "click" ? "Click leftover background to erase every touching pixel of that colour." : logoTool === "erase" ? "Paint over anything you want gone (taglines, ® marks, specks)." : "Paint to bring back anything erased or eaten by the cleanup."}</div>
+            <div className="row">
+              <label>Background cleanup</label>
+              <input type="range" min="8" max="110" value={tol} onChange={(e) => onTol(+e.target.value)} />
+              <button className={inside ? "on" : ""} onClick={toggleInside} title="Also remove background colour trapped inside letters and shapes">Clear inside</button>
+            </div>
+            <div className="row" style={{ alignItems: "flex-start" }}>
+              <label style={{ marginTop: 6 }}>Colours</label>
+              <span style={{ flex: 1 }}>
+                <LogoColors palette={logoPal} map={logoMap} onChange={setSessionLogoColors}
+                  picks={[...slots.filter(Boolean), S.WHITE, S.BLACK].filter((m, i, l) => l.findIndex((q) => q.hex.toLowerCase() === m.hex.toLowerCase() || q.name === m.name) === i)} />
+              </span>
+            </div>
+            <div className="lebtns">
+              <button onClick={() => applyLogoResult(S.resetLogo(), false)}>Start over</button>
+              <span style={{ flex: 1 }} />
+              <button onClick={cancelLogoEdit}>Cancel</button>
+              <button className="primary" onClick={saveLogoEdit}>Save logo</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
