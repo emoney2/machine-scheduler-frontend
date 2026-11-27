@@ -323,6 +323,9 @@ export default function HeadcoverStudio() {
   /* ---------- rendering a session ---------- */
   const canGo = !!(S && logoView && slots.some(Boolean));
   const renderOpts = useCallback(() => ({ oneColor, logoScale: logoSize / 100, fur }), [oneColor, logoSize, fur]);
+  // a design can carry its own fur lining (set in Edit); otherwise it uses the session fur
+  const furOf = useCallback((spec) => (spec && spec.furId && furs.find((f) => f.id === spec.furId)) || fur, [furs, fur]);
+  const optsFor = useCallback((spec, o) => ({ ...(o || renderOpts()), fur: furOf(spec) }), [renderOpts, furOf]);
   const renderSeq = useRef(0);
   // (re)draw the given designs one at a time so the first ones show up straight away
   const renderAll = useCallback(async (list, onlyUids) => {
@@ -330,13 +333,14 @@ export default function HeadcoverStudio() {
     setBusy(true);
     for (const d of list) {
       if (onlyUids && !onlyUids.has(d.uid)) continue;
-      const r = await s.renderSpec(d.spec, o);
+      const df = furOf(d.spec); if (df && df !== o.fur) await ensureTiles([df]);
+      const r = await s.renderSpec(d.spec, optsFor(d.spec, o));
       if (seq !== renderSeq.current) return;
       if (!r) continue;
       setDesigns((cur) => cur.map((x) => (x.uid === d.uid ? { ...x, canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) } : x)));
     }
     setBusy(false);
-  }, [renderOpts]);
+  }, [renderOpts, furOf, optsFor]);
 
   // Design covers / Redesign / Create new ones. The batch has one place per product design + colorway.
   // A locked design keeps its place; every other place gets a design (a new combination of the picks
@@ -411,7 +415,16 @@ export default function HeadcoverStudio() {
     const spec = { ...cur.spec, roles: cur.spec.roles.map((r, i) => (i === k ? { ...r, mat: m } : r)) };
     updateDesign(cur.uid, { spec, locked: true });
     setPickRole(null);
-    const r = await S.renderSpec(spec, renderOpts());
+    const r = await S.renderSpec(spec, optsFor(spec));
+    if (r) updateDesign(cur.uid, { canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) });
+  };
+  // edit: this design's fur lining (null = follow the session fur)
+  const setDesignFur = async (f) => {
+    if (!cur) return;
+    if (f) await ensureTiles([f]);
+    const spec = { ...cur.spec, furId: f ? f.id : undefined };
+    updateDesign(cur.uid, { spec, locked: true });
+    const r = await S.renderSpec(spec, optsFor(spec));
     if (r) updateDesign(cur.uid, { canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) });
   };
 
@@ -494,7 +507,8 @@ export default function HeadcoverStudio() {
 
   /* ---------- export ---------- */
   const asOut = (list) => list.filter((d) => d.canvas).map((d) => ({ ...d.spec, mats: d.spec.roles.map((r) => r.mat), canvas: d.canvas, wide: true, tpl: true }));
-  const sheetOf = (list) => S.sheet(asOut(list), { club: club.trim(), furName: fur?.name });
+  const fursIn = (list) => [...new Set(list.map((d) => furOf(d.spec)?.name).filter(Boolean))].join(", ");
+  const sheetOf = (list) => S.sheet(asOut(list), { club: club.trim(), furName: fursIn(list) });
   const dlSheet = () => designs.length && downloadCanvas(sheetOf(designs), `${slug(club)}_headcover-concepts.png`);
   const dlLocked = () => {
     const s = designs.filter((d) => d.locked);
@@ -515,7 +529,7 @@ export default function HeadcoverStudio() {
       fd.append("club", name);
       fd.append("kind", locked.length ? "picks" : "concepts");
       fd.append("materials", [...new Set(list.flatMap((d) => d.spec.roles.map((r) => r.mat)))].map((m) => `${m.name} (${m.line})`).join(", "));
-      if (fur) fd.append("fur", fur.name);
+      if (fursIn(list)) fd.append("fur", fursIn(list));
       if (choice?.folderId) fd.append("folderId", choice.folderId);
       if (choice?.create) fd.append("create", "1");
       const r = await axios.post(`${API_ROOT}/headcover-studio/sheets`, fd, { withCredentials: true });
@@ -771,6 +785,17 @@ export default function HeadcoverStudio() {
                       <span className="chev">{pickRole === k ? "▾" : "▸"}</span>
                     </div>
                   ))}
+                  <div className="role furrow">
+                    <span className="rl"><span className="small">Fur lining{cur.spec.furId ? "" : " · same as session"}</span><br /><b>{furOf(cur.spec)?.name}</b></span>
+                  </div>
+                  <span className="furs editfurs">
+                    {furs.map((f) => (
+                      <span key={f.id} title={f.name + (furInStock(f) ? "" : " · not in Material Inventory")}
+                        className={"dot" + (f.id === furOf(cur.spec)?.id ? " sel" : "")}
+                        style={{ ...tileBg(f), opacity: furInStock(f) ? 1 : 0.45 }}
+                        onClick={() => setDesignFur(f.id === fur?.id ? null : f)} />
+                    ))}
+                  </span>
                   {pickRole != null && (
                     <div className="picker">
                       <div className="lines">

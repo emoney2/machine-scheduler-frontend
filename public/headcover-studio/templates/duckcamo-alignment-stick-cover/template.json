@@ -1,0 +1,51 @@
+{
+ "name": "Duck Camo",
+ "product": "Alignment Stick Cover",
+ "w": 966,
+ "h": 942,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 337.87,
+  "y": 233.33,
+  "w": 53.81,
+  "h": 53.81,
+  "rot": 0
+ },
+ "printed": true,
+ "slots": [
+  {
+   "name": "Tan",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Green",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Brown",
+   "mask": "slot-2.png"
+  },
+  {
+   "name": "Dark",
+   "mask": "slot-3.png"
+  }
+ ],
+ "design": "stockcamo",
+ "stock": [
+  "#d4bc94",
+  "#6c7454",
+  "#735a3a",
+  "#4b483e"
+ ],
+ "stockNames": [
+  "Tan",
+  "Green",
+  "Brown",
+  "Dark"
+ ]
+}

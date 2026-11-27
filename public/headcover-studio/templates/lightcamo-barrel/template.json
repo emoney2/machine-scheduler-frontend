@@ -1,0 +1,44 @@
+{
+ "name": "Light Camo",
+ "product": "Barrel",
+ "w": 1071,
+ "h": 1235,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 485.75,
+  "y": 284.79,
+  "w": 103.08,
+  "h": 103.08,
+  "rot": 0
+ },
+ "printed": true,
+ "slots": [
+  {
+   "name": "White",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Light grey",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Grey",
+   "mask": "slot-2.png"
+  }
+ ],
+ "design": "stockcamo",
+ "stock": [
+  "#ffffff",
+  "#f3f3f3",
+  "#e7e7e7"
+ ],
+ "stockNames": [
+  "White",
+  "Light grey",
+  "Grey"
+ ]
+}

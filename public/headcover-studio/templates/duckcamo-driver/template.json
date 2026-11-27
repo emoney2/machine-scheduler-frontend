@@ -1,0 +1,51 @@
+{
+ "name": "Duck Camo",
+ "w": 1260,
+ "h": 1050,
+ "logo": {
+  "x": 280.74,
+  "y": 311.64,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "product": "Driver",
+ "pxPerInch": 60,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "printed": true,
+ "slots": [
+  {
+   "name": "Tan",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Green",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Brown",
+   "mask": "slot-2.png"
+  },
+  {
+   "name": "Dark",
+   "mask": "slot-3.png"
+  }
+ ],
+ "design": "stockcamo",
+ "stock": [
+  "#d4bc94",
+  "#6c7454",
+  "#735a3a",
+  "#4b483e"
+ ],
+ "stockNames": [
+  "Tan",
+  "Green",
+  "Brown",
+  "Dark"
+ ]
+}

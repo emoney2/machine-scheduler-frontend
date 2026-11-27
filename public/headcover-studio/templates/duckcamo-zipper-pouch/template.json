@@ -1,0 +1,47 @@
+{
+ "name": "Duck Camo",
+ "product": "Zipper Pouch",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "frame": "frame.png",
+ "logo": {
+  "x": 601.74,
+  "y": 305.34,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "printed": true,
+ "slots": [
+  {
+   "name": "Tan",
+   "mask": "slot-0.png"
+  },
+  {
+   "name": "Green",
+   "mask": "slot-1.png"
+  },
+  {
+   "name": "Brown",
+   "mask": "slot-2.png"
+  },
+  {
+   "name": "Dark",
+   "mask": "slot-3.png"
+  }
+ ],
+ "design": "stockcamo",
+ "stock": [
+  "#d4bc94",
+  "#6c7454",
+  "#735a3a",
+  "#4b483e"
+ ],
+ "stockNames": [
+  "Tan",
+  "Green",
+  "Brown",
+  "Dark"
+ ]
+}

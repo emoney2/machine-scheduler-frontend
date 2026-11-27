@@ -440,7 +440,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const cv = makeCanvas(T.w, T.h), ctx = cv.getContext("2d"), ppi = T.pxPerInch || 60;
     // mats = [back panel, camo base, camo mid, camo top]; body fill first, then the camo pieces
     ctx.fillStyle = matStyle(ctx, mats[0], ppi); ctx.fillRect(0, 0, T.w, T.h); ctx.fillStyle = grain(ctx); ctx.fillRect(0, 0, T.w, T.h);
-    T.slotImgs.forEach((im, i) => { if (im) maskFill(ctx, T, im, matStyle(ctx, mats[(i + 1) % mats.length], ppi)); });
+    T.slotImgs.forEach((im, i) => { if (im) maskFill(ctx, T, im, matStyle(ctx, mats[(i + 1) % mats.length], ppi), !T.printed); });   // printed camo: no raised edges
     if (T.stripeMaskImg && opts.stripes) {   // Silver Britches-style stripes through the logo spot, zigzag-stitched
       const S = T.stripes, c = makeCanvas(T.w, T.h), x = c.getContext("2d"), L = T.w + T.h;
       const total = S.widths.reduce((a, b) => a + b, 0);
@@ -663,7 +663,17 @@ export function createStudio({ materials, furs, templates, proofs }) {
     tartan: () => ["Leather", "Thread 1", "Thread 2", "Thread 3"],
     flag: () => ["Navy", "Red", "White"],
     scatter: () => ["Body", "Marks"],
+    stockcamo: (T) => ["Back panel", ...(T.stockNames || T.slots.map((x, i) => `Camo ${i + 1}`))],
   };
+  // stock designs (Duck Camo, Light Camo) come in their own printed colours; these colours aren't in the
+  // material picker, but sessions can still find them by id
+  const STOCK = new Map();
+  const stockMat = (hex, name) => {
+    const id = "stock-" + hex.replace("#", "");
+    if (!STOCK.has(id)) STOCK.set(id, { id, name: name || hex, line: "Printed camo colour", hex, rgb: hexToRgb(hex), solid: true });
+    return STOCK.get(id);
+  };
+  templates.forEach((T) => (T.stock || []).forEach((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)));
   const kindOf = (T) => T.design || (T.slots.length ? "camo" : "solid");
   function permute(picks, v) {   // the v-th ordering of the picks (v = 0 keeps them as chosen)
     const a = picks.slice(), n = a.length, f = [1];
@@ -684,7 +694,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     tpls.forEach((T) => tways.forEach(([cw, m]) => {
       const kind = kindOf(T);
       if (kind === "scatter") return;   // parked
-      if (kind === "flag" && cw === "B") return;   // the flag has one colourway: classic red, white and navy
+      if ((kind === "flag" || kind === "stockcamo") && cw === "B") return;   // the flag has one colourway: classic red, white and navy
       if (kind === "tartan" && !special.tartan[cw]) return;
       let r;
       if (kind === "quilted") r = [special[cw].main, special[cw].thread];
@@ -692,6 +702,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       else if (kind === "stripes") r = [special.stripes[cw].body, ...special.stripes[cw].stripes];
       else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
       else if (kind === "flag") r = [special.flag[cw].blue, special.flag[cw].red, special.flag[cw].white];
+      else if (kind === "stockcamo") { const st = T.stock.map((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)); r = [st[0], ...st]; }
       else if (kind === "camo") r = [m[0], ...T.slots.map((x, i) => m[(i + 1) % m.length])];
       else r = [m[1] && m[1] !== m[0] ? m[1] : m[0]];
       const roles = KIND_ROLES[kind](T);
@@ -715,13 +726,14 @@ export function createStudio({ materials, furs, templates, proofs }) {
       case "tartan": mats = [r[0], r[0], r[0], r[0]]; tartan = r.slice(1).map((m) => m.hex); break;
       case "flag": mats = [r[0], r[2], r[1], r[0], r[2]]; break;   // [back, field, red stripes, canton, stars]
       case "camo": mats = r.length >= 4 ? r : [...r, ...r].slice(0, 4); break;
+      case "stockcamo": mats = r; break;
       default: mats = [r[0], r[0], r[0], r[0]];
     }
     const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, stripes, tartan });
     const canvas = P ? renderProof(P, flat, fur) : flat;
     return { flat, canvas, proof: canvas };
   }
-  const allMats = () => [...SW, ...furs];
+  const allMats = () => [...SW, ...furs, ...STOCK.values()];
   const matById = (id) => allMats().find((m) => m.id === id) || null;
 
   async function generate({ slots, swapped, oneColor, logoScale, fur, quick, products }) {

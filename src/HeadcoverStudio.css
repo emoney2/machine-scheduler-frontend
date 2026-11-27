@@ -198,3 +198,7 @@
 .hcs .pastebox:empty:before{content:attr(data-ph);color:var(--muted)}
 .hcs .pastebox:focus{border-color:#000;border-style:solid}
 .hcs .pastebox img{max-height:20px}
+
+.hcs .editor .furrow { cursor: default; }
+.hcs .editor .editfurs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+@media (pointer: coarse) { .hcs .editor .editfurs .dot { width: 34px; height: 34px; } }

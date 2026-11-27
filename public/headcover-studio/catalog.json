@@ -1,284 +1,372 @@
 {
-  "version": 1,
-  "swatches": "swatches/swatches.json",
-  "templates": [
-    {
-      "id": "camo-driver",
-      "dir": "templates/camo-driver/"
-    },
-    {
-      "id": "fairway",
-      "dir": "templates/fairway/"
-    },
-    {
-      "id": "hybrid",
-      "dir": "templates/hybrid/"
-    },
-    {
-      "id": "mallet",
-      "dir": "templates/mallet/"
-    },
-    {
-      "id": "blade",
-      "dir": "templates/blade/"
-    },
-    {
-      "id": "mid-mallet",
-      "dir": "templates/mid-mallet/"
-    },
-    {
-      "id": "center-shaft-mallet",
-      "dir": "templates/center-shaft-mallet/"
-    },
-    {
-      "id": "df3-mallet",
-      "dir": "templates/df3-mallet/"
-    },
-    {
-      "id": "barrel",
-      "dir": "templates/barrel/"
-    },
-    {
-      "id": "alignment-stick-cover",
-      "dir": "templates/alignment-stick-cover/"
-    },
-    {
-      "id": "quilted-driver",
-      "dir": "templates/quilted-driver/"
-    },
-    {
-      "id": "quilted-fairway",
-      "dir": "templates/quilted-fairway/"
-    },
-    {
-      "id": "quilted-hybrid",
-      "dir": "templates/quilted-hybrid/"
-    },
-    {
-      "id": "quilted-mallet",
-      "dir": "templates/quilted-mallet/"
-    },
-    {
-      "id": "quilted-blade",
-      "dir": "templates/quilted-blade/"
-    },
-    {
-      "id": "quilted-mid-mallet",
-      "dir": "templates/quilted-mid-mallet/"
-    },
-    {
-      "id": "quilted-center-shaft-mallet",
-      "dir": "templates/quilted-center-shaft-mallet/"
-    },
-    {
-      "id": "quilted-df3-mallet",
-      "dir": "templates/quilted-df3-mallet/"
-    },
-    {
-      "id": "exotic-driver",
-      "dir": "templates/exotic-driver/"
-    },
-    {
-      "id": "exotic-fairway",
-      "dir": "templates/exotic-fairway/"
-    },
-    {
-      "id": "exotic-hybrid",
-      "dir": "templates/exotic-hybrid/"
-    },
-    {
-      "id": "exotic-mallet",
-      "dir": "templates/exotic-mallet/"
-    },
-    {
-      "id": "exotic-blade",
-      "dir": "templates/exotic-blade/"
-    },
-    {
-      "id": "exotic-mid-mallet",
-      "dir": "templates/exotic-mid-mallet/"
-    },
-    {
-      "id": "exotic-center-shaft-mallet",
-      "dir": "templates/exotic-center-shaft-mallet/"
-    },
-    {
-      "id": "exotic-df3-mallet",
-      "dir": "templates/exotic-df3-mallet/"
-    },
-    {
-      "id": "exotic-barrel",
-      "dir": "templates/exotic-barrel/"
-    },
-    {
-      "id": "exotic-alignment-stick-cover",
-      "dir": "templates/exotic-alignment-stick-cover/"
-    },
-    {
-      "id": "stripes-driver",
-      "dir": "templates/stripes-driver/"
-    },
-    {
-      "id": "stripes-fairway",
-      "dir": "templates/stripes-fairway/"
-    },
-    {
-      "id": "stripes-mallet",
-      "dir": "templates/stripes-mallet/"
-    },
-    {
-      "id": "stripes-hybrid",
-      "dir": "templates/stripes-hybrid/"
-    },
-    {
-      "id": "stripes-blade",
-      "dir": "templates/stripes-blade/"
-    },
-    {
-      "id": "stripes-mid-mallet",
-      "dir": "templates/stripes-mid-mallet/"
-    },
-    {
-      "id": "stripes-center-shaft-mallet",
-      "dir": "templates/stripes-center-shaft-mallet/"
-    },
-    {
-      "id": "stripes-df3-mallet",
-      "dir": "templates/stripes-df3-mallet/"
-    },
-    {
-      "id": "flag-driver",
-      "dir": "templates/flag-driver/"
-    },
-    {
-      "id": "flag-fairway",
-      "dir": "templates/flag-fairway/"
-    },
-    {
-      "id": "flag-hybrid",
-      "dir": "templates/flag-hybrid/"
-    },
-    {
-      "id": "flag-mallet",
-      "dir": "templates/flag-mallet/"
-    },
-    {
-      "id": "flag-blade",
-      "dir": "templates/flag-blade/"
-    },
-    {
-      "id": "flag-mid-mallet",
-      "dir": "templates/flag-mid-mallet/"
-    },
-    {
-      "id": "flag-center-shaft-mallet",
-      "dir": "templates/flag-center-shaft-mallet/"
-    },
-    {
-      "id": "flag-df3-mallet",
-      "dir": "templates/flag-df3-mallet/"
-    },
-    {
-      "id": "zipper-pouch",
-      "dir": "templates/zipper-pouch/"
-    },
-    {
-      "id": "tartan-driver",
-      "dir": "templates/tartan-driver/"
-    },
-    {
-      "id": "tartan-fairway",
-      "dir": "templates/tartan-fairway/"
-    },
-    {
-      "id": "tartan-hybrid",
-      "dir": "templates/tartan-hybrid/"
-    },
-    {
-      "id": "tartan-mallet",
-      "dir": "templates/tartan-mallet/"
-    },
-    {
-      "id": "tartan-blade",
-      "dir": "templates/tartan-blade/"
-    },
-    {
-      "id": "tartan-mid-mallet",
-      "dir": "templates/tartan-mid-mallet/"
-    },
-    {
-      "id": "tartan-center-shaft-mallet",
-      "dir": "templates/tartan-center-shaft-mallet/"
-    },
-    {
-      "id": "tartan-df3-mallet",
-      "dir": "templates/tartan-df3-mallet/"
-    },
-    {
-      "id": "quilted-zipper-pouch",
-      "dir": "templates/quilted-zipper-pouch/"
-    },
-    {
-      "id": "exotic-zipper-pouch",
-      "dir": "templates/exotic-zipper-pouch/"
-    },
-    {
-      "id": "stripes-zipper-pouch",
-      "dir": "templates/stripes-zipper-pouch/"
-    },
-    {
-      "id": "flag-zipper-pouch",
-      "dir": "templates/flag-zipper-pouch/"
-    },
-    {
-      "id": "tartan-zipper-pouch",
-      "dir": "templates/tartan-zipper-pouch/"
-    }
-  ],
-  "proofs": [
-    {
-      "id": "driver",
-      "dir": "proofs/driver/"
-    },
-    {
-      "id": "fairway",
-      "dir": "proofs/fairway/"
-    },
-    {
-      "id": "hybrid",
-      "dir": "proofs/hybrid/"
-    },
-    {
-      "id": "mallet",
-      "dir": "proofs/mallet/"
-    },
-    {
-      "id": "blade",
-      "dir": "proofs/blade/"
-    },
-    {
-      "id": "mid-mallet",
-      "dir": "proofs/mid-mallet/"
-    },
-    {
-      "id": "center-shaft-mallet",
-      "dir": "proofs/center-shaft-mallet/"
-    },
-    {
-      "id": "df3-mallet",
-      "dir": "proofs/df3-mallet/"
-    },
-    {
-      "id": "barrel",
-      "dir": "proofs/barrel/"
-    },
-    {
-      "id": "alignment-stick-cover",
-      "dir": "proofs/alignment-stick-cover/"
-    },
-    {
-      "id": "zipper-pouch",
-      "dir": "proofs/zipper-pouch/"
-    }
-  ]
+ "version": 1,
+ "swatches": "swatches/swatches.json",
+ "templates": [
+  {
+   "id": "camo-driver",
+   "dir": "templates/camo-driver/"
+  },
+  {
+   "id": "fairway",
+   "dir": "templates/fairway/"
+  },
+  {
+   "id": "hybrid",
+   "dir": "templates/hybrid/"
+  },
+  {
+   "id": "mallet",
+   "dir": "templates/mallet/"
+  },
+  {
+   "id": "blade",
+   "dir": "templates/blade/"
+  },
+  {
+   "id": "mid-mallet",
+   "dir": "templates/mid-mallet/"
+  },
+  {
+   "id": "center-shaft-mallet",
+   "dir": "templates/center-shaft-mallet/"
+  },
+  {
+   "id": "df3-mallet",
+   "dir": "templates/df3-mallet/"
+  },
+  {
+   "id": "barrel",
+   "dir": "templates/barrel/"
+  },
+  {
+   "id": "alignment-stick-cover",
+   "dir": "templates/alignment-stick-cover/"
+  },
+  {
+   "id": "quilted-driver",
+   "dir": "templates/quilted-driver/"
+  },
+  {
+   "id": "quilted-fairway",
+   "dir": "templates/quilted-fairway/"
+  },
+  {
+   "id": "quilted-hybrid",
+   "dir": "templates/quilted-hybrid/"
+  },
+  {
+   "id": "quilted-mallet",
+   "dir": "templates/quilted-mallet/"
+  },
+  {
+   "id": "quilted-blade",
+   "dir": "templates/quilted-blade/"
+  },
+  {
+   "id": "quilted-mid-mallet",
+   "dir": "templates/quilted-mid-mallet/"
+  },
+  {
+   "id": "quilted-center-shaft-mallet",
+   "dir": "templates/quilted-center-shaft-mallet/"
+  },
+  {
+   "id": "quilted-df3-mallet",
+   "dir": "templates/quilted-df3-mallet/"
+  },
+  {
+   "id": "exotic-driver",
+   "dir": "templates/exotic-driver/"
+  },
+  {
+   "id": "exotic-fairway",
+   "dir": "templates/exotic-fairway/"
+  },
+  {
+   "id": "exotic-hybrid",
+   "dir": "templates/exotic-hybrid/"
+  },
+  {
+   "id": "exotic-mallet",
+   "dir": "templates/exotic-mallet/"
+  },
+  {
+   "id": "exotic-blade",
+   "dir": "templates/exotic-blade/"
+  },
+  {
+   "id": "exotic-mid-mallet",
+   "dir": "templates/exotic-mid-mallet/"
+  },
+  {
+   "id": "exotic-center-shaft-mallet",
+   "dir": "templates/exotic-center-shaft-mallet/"
+  },
+  {
+   "id": "exotic-df3-mallet",
+   "dir": "templates/exotic-df3-mallet/"
+  },
+  {
+   "id": "exotic-barrel",
+   "dir": "templates/exotic-barrel/"
+  },
+  {
+   "id": "exotic-alignment-stick-cover",
+   "dir": "templates/exotic-alignment-stick-cover/"
+  },
+  {
+   "id": "stripes-driver",
+   "dir": "templates/stripes-driver/"
+  },
+  {
+   "id": "stripes-fairway",
+   "dir": "templates/stripes-fairway/"
+  },
+  {
+   "id": "stripes-mallet",
+   "dir": "templates/stripes-mallet/"
+  },
+  {
+   "id": "stripes-hybrid",
+   "dir": "templates/stripes-hybrid/"
+  },
+  {
+   "id": "stripes-blade",
+   "dir": "templates/stripes-blade/"
+  },
+  {
+   "id": "stripes-mid-mallet",
+   "dir": "templates/stripes-mid-mallet/"
+  },
+  {
+   "id": "stripes-center-shaft-mallet",
+   "dir": "templates/stripes-center-shaft-mallet/"
+  },
+  {
+   "id": "stripes-df3-mallet",
+   "dir": "templates/stripes-df3-mallet/"
+  },
+  {
+   "id": "flag-driver",
+   "dir": "templates/flag-driver/"
+  },
+  {
+   "id": "flag-fairway",
+   "dir": "templates/flag-fairway/"
+  },
+  {
+   "id": "flag-hybrid",
+   "dir": "templates/flag-hybrid/"
+  },
+  {
+   "id": "flag-mallet",
+   "dir": "templates/flag-mallet/"
+  },
+  {
+   "id": "flag-blade",
+   "dir": "templates/flag-blade/"
+  },
+  {
+   "id": "flag-mid-mallet",
+   "dir": "templates/flag-mid-mallet/"
+  },
+  {
+   "id": "flag-center-shaft-mallet",
+   "dir": "templates/flag-center-shaft-mallet/"
+  },
+  {
+   "id": "flag-df3-mallet",
+   "dir": "templates/flag-df3-mallet/"
+  },
+  {
+   "id": "zipper-pouch",
+   "dir": "templates/zipper-pouch/"
+  },
+  {
+   "id": "tartan-driver",
+   "dir": "templates/tartan-driver/"
+  },
+  {
+   "id": "tartan-fairway",
+   "dir": "templates/tartan-fairway/"
+  },
+  {
+   "id": "tartan-hybrid",
+   "dir": "templates/tartan-hybrid/"
+  },
+  {
+   "id": "tartan-mallet",
+   "dir": "templates/tartan-mallet/"
+  },
+  {
+   "id": "tartan-blade",
+   "dir": "templates/tartan-blade/"
+  },
+  {
+   "id": "tartan-mid-mallet",
+   "dir": "templates/tartan-mid-mallet/"
+  },
+  {
+   "id": "tartan-center-shaft-mallet",
+   "dir": "templates/tartan-center-shaft-mallet/"
+  },
+  {
+   "id": "tartan-df3-mallet",
+   "dir": "templates/tartan-df3-mallet/"
+  },
+  {
+   "id": "quilted-zipper-pouch",
+   "dir": "templates/quilted-zipper-pouch/"
+  },
+  {
+   "id": "exotic-zipper-pouch",
+   "dir": "templates/exotic-zipper-pouch/"
+  },
+  {
+   "id": "stripes-zipper-pouch",
+   "dir": "templates/stripes-zipper-pouch/"
+  },
+  {
+   "id": "flag-zipper-pouch",
+   "dir": "templates/flag-zipper-pouch/"
+  },
+  {
+   "id": "tartan-zipper-pouch",
+   "dir": "templates/tartan-zipper-pouch/"
+  },
+  {
+   "id": "duckcamo-driver",
+   "dir": "templates/duckcamo-driver/"
+  },
+  {
+   "id": "duckcamo-fairway",
+   "dir": "templates/duckcamo-fairway/"
+  },
+  {
+   "id": "duckcamo-hybrid",
+   "dir": "templates/duckcamo-hybrid/"
+  },
+  {
+   "id": "duckcamo-mallet",
+   "dir": "templates/duckcamo-mallet/"
+  },
+  {
+   "id": "duckcamo-blade",
+   "dir": "templates/duckcamo-blade/"
+  },
+  {
+   "id": "duckcamo-mid-mallet",
+   "dir": "templates/duckcamo-mid-mallet/"
+  },
+  {
+   "id": "duckcamo-center-shaft-mallet",
+   "dir": "templates/duckcamo-center-shaft-mallet/"
+  },
+  {
+   "id": "duckcamo-df3-mallet",
+   "dir": "templates/duckcamo-df3-mallet/"
+  },
+  {
+   "id": "duckcamo-barrel",
+   "dir": "templates/duckcamo-barrel/"
+  },
+  {
+   "id": "duckcamo-alignment-stick-cover",
+   "dir": "templates/duckcamo-alignment-stick-cover/"
+  },
+  {
+   "id": "duckcamo-zipper-pouch",
+   "dir": "templates/duckcamo-zipper-pouch/"
+  },
+  {
+   "id": "lightcamo-driver",
+   "dir": "templates/lightcamo-driver/"
+  },
+  {
+   "id": "lightcamo-fairway",
+   "dir": "templates/lightcamo-fairway/"
+  },
+  {
+   "id": "lightcamo-hybrid",
+   "dir": "templates/lightcamo-hybrid/"
+  },
+  {
+   "id": "lightcamo-mallet",
+   "dir": "templates/lightcamo-mallet/"
+  },
+  {
+   "id": "lightcamo-blade",
+   "dir": "templates/lightcamo-blade/"
+  },
+  {
+   "id": "lightcamo-mid-mallet",
+   "dir": "templates/lightcamo-mid-mallet/"
+  },
+  {
+   "id": "lightcamo-center-shaft-mallet",
+   "dir": "templates/lightcamo-center-shaft-mallet/"
+  },
+  {
+   "id": "lightcamo-df3-mallet",
+   "dir": "templates/lightcamo-df3-mallet/"
+  },
+  {
+   "id": "lightcamo-barrel",
+   "dir": "templates/lightcamo-barrel/"
+  },
+  {
+   "id": "lightcamo-alignment-stick-cover",
+   "dir": "templates/lightcamo-alignment-stick-cover/"
+  },
+  {
+   "id": "lightcamo-zipper-pouch",
+   "dir": "templates/lightcamo-zipper-pouch/"
+  }
+ ],
+ "proofs": [
+  {
+   "id": "driver",
+   "dir": "proofs/driver/"
+  },
+  {
+   "id": "fairway",
+   "dir": "proofs/fairway/"
+  },
+  {
+   "id": "hybrid",
+   "dir": "proofs/hybrid/"
+  },
+  {
+   "id": "mallet",
+   "dir": "proofs/mallet/"
+  },
+  {
+   "id": "blade",
+   "dir": "proofs/blade/"
+  },
+  {
+   "id": "mid-mallet",
+   "dir": "proofs/mid-mallet/"
+  },
+  {
+   "id": "center-shaft-mallet",
+   "dir": "proofs/center-shaft-mallet/"
+  },
+  {
+   "id": "df3-mallet",
+   "dir": "proofs/df3-mallet/"
+  },
+  {
+   "id": "barrel",
+   "dir": "proofs/barrel/"
+  },
+  {
+   "id": "alignment-stick-cover",
+   "dir": "proofs/alignment-stick-cover/"
+  },
+  {
+   "id": "zipper-pouch",
+   "dir": "proofs/zipper-pouch/"
+  }
+ ]
 }
