@@ -1,0 +1,23 @@
+{
+ "name": "Painted Course",
+ "product": "Zipper Pouch",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "frame": "frame.png",
+ "logo": {
+  "x": 601.74,
+  "y": 305.34,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "painted",
+ "printed": true,
+ "paint": {
+  "all": "paint-all.png",
+  "front": "paint-front.png"
+ },
+ "paintArea": "front"
+}

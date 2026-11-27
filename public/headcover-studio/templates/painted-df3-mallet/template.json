@@ -1,0 +1,27 @@
+{
+ "name": "Painted Course",
+ "product": "DF3 Mallet",
+ "w": 961,
+ "h": 813,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 226.53,
+  "y": 516.48,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "painted",
+ "printed": true,
+ "paint": {
+  "all": "paint-all.png",
+  "front": "paint-front.png"
+ },
+ "paintArea": "front"
+}

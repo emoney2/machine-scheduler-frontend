@@ -357,6 +357,46 @@
   {
    "id": "pattern-zipper-pouch",
    "dir": "templates/pattern-zipper-pouch/"
+  },
+  {
+   "id": "painted-driver",
+   "dir": "templates/painted-driver/"
+  },
+  {
+   "id": "painted-fairway",
+   "dir": "templates/painted-fairway/"
+  },
+  {
+   "id": "painted-hybrid",
+   "dir": "templates/painted-hybrid/"
+  },
+  {
+   "id": "painted-mallet",
+   "dir": "templates/painted-mallet/"
+  },
+  {
+   "id": "painted-blade",
+   "dir": "templates/painted-blade/"
+  },
+  {
+   "id": "painted-mid-mallet",
+   "dir": "templates/painted-mid-mallet/"
+  },
+  {
+   "id": "painted-center-shaft-mallet",
+   "dir": "templates/painted-center-shaft-mallet/"
+  },
+  {
+   "id": "painted-df3-mallet",
+   "dir": "templates/painted-df3-mallet/"
+  },
+  {
+   "id": "painted-barrel",
+   "dir": "templates/painted-barrel/"
+  },
+  {
+   "id": "painted-zipper-pouch",
+   "dir": "templates/painted-zipper-pouch/"
   }
  ],
  "proofs": [

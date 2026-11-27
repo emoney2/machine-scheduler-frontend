@@ -1,0 +1,26 @@
+{
+ "name": "Painted Course",
+ "product": "Hybrid",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 207.94,
+  "y": 199.94,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "painted",
+ "printed": true,
+ "paint": {
+  "all": "paint-all.png",
+  "front": "paint-front.png"
+ },
+ "paintArea": "front"
+}

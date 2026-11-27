@@ -1,0 +1,26 @@
+{
+ "name": "Painted Course",
+ "product": "Barrel",
+ "w": 1071,
+ "h": 1235,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 485.75,
+  "y": 284.79,
+  "w": 103.08,
+  "h": 103.08,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "painted",
+ "printed": true,
+ "paint": {
+  "all": "paint-all.png",
+  "front": "paint-front.png"
+ },
+ "paintArea": "all"
+}

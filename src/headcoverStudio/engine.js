@@ -12,6 +12,8 @@
  *   - customers see the 3D proof; the flat layout is only shown in the lightbox
  */
 
+import { oilPaintAsync, OIL_DEFAULT } from "./oilpaint";
+
 const { DecompressionStream, DOMMatrix } = window;
 
 /* ---------- colour math ---------- */
@@ -117,6 +119,16 @@ function loadTemplateAssets(T) {
     T.stripeMaskImg = T.stripes ? await loadImg(dir + T.stripes.mask) : null;
     T.quiltStitchImg = T.quilt ? await loadImg(dir + T.quilt.stitch) : null;
     T.patternImgs = T.pattern ? { all: await loadImg(dir + T.pattern.all), front: await loadImg(dir + T.pattern.front) } : null;
+    if (T.paint) {   // painted course: where the painting goes (front panel / every panel) and each area's box
+      T.paintImgs = { all: await loadImg(dir + T.paint.all), front: await loadImg(dir + T.paint.front) };
+      T.paintBox = {};
+      Object.entries(T.paintImgs).forEach(([k, im]) => {
+        const c = makeCanvas(T.w, T.h), x = c.getContext("2d"); x.drawImage(im, 0, 0);
+        const d = x.getImageData(0, 0, T.w, T.h).data; let x0 = T.w, y0 = T.h, x1 = 0, y1 = 0;
+        for (let y = 0; y < T.h; y++) for (let xx = 0; xx < T.w; xx++) if (d[(y * T.w + xx) * 4 + 3] > 128) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        T.paintBox[k] = { x: x0, y: y0, w: Math.max(1, x1 - x0 + 1), h: Math.max(1, y1 - y0 + 1) };
+      });
+    }
     T.tartanImgs = T.tartan ? await Promise.all(T.tartan.stitches.map((f) => loadImg(dir + f))) : null;
     T.logoGround = -1;   // which slot sits under the logo centre (for logo contrast)
     if (T.logo) {
@@ -213,6 +225,11 @@ function drawQuiltThread(ctx, T, color) {
   ctx.save(); ctx.globalAlpha = 0.35; ctx.globalCompositeOperation = "screen"; ctx.drawImage(tint(T.quiltStitchImg, "#ffffff", w, h), 0, -0.4); ctx.restore();   // thread sheen
 }
 
+// painted course: the customer's clubhouse / course photo, oil-painted in the browser (no Photoshop, no AI),
+// printed on the panels with the logo embroidered on top. zoom 1 = the photo just covers the area;
+// x / y move it (fraction of the area), rot turns it in 90° steps; look = oil paint settings
+export const PAINT_DEFAULT = { area: null, zoom: 1, x: 0, y: 0, rot: 0, look: {} };
+export { OIL_DEFAULT };
 export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: null };   // orig null = auto (filled badges keep their colours)
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
@@ -225,6 +242,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
   const SIL_PPI = 60;   // quick-style silhouettes are ~14" tall on a 830 px canvas
   const LOGO = { src: null, canvas: null, base: null, history: [], main: null, colors: [] };
   let CUR = { mats: [] };
+  const COURSE = { src: null, cache: new Map() };   // photo (capped at 6000 px) + painted previews by look
 
   /* ----- materials as canvas fills ----- */
   let grainPat = null;
@@ -413,6 +431,85 @@ export function createStudio({ materials, furs, templates, proofs }) {
     x.drawImage(P.front ? T.patternImgs.front : T.patternImgs.all, 0, 0);
     ctx.drawImage(pc, 0, 0);
   }
+  // where the photo sits on the layout: photo units are (aspect x 1); returns the transform pieces
+  function paintPlace(T, P) {
+    const area = P.area || T.paintArea || "front", box = T.paintBox[area], a = COURSE.src.width / COURSE.src.height;
+    const rot = ((((P.rot || 0) + ((T.logo && T.logo.rot) || 0)) % 360) + 360) % 360, side = rot % 180 !== 0;
+    const rw = side ? 1 : a, rh = side ? a : 1, fit = Math.max(box.w / rw, box.h / rh) * (P.zoom || 1);
+    return { area, box, a, rot, fit, cx: box.x + box.w / 2 + (P.x || 0) * box.w, cy: box.y + box.h / 2 + (P.y || 0) * box.h };
+  }
+  // src = {img, sx, sy, sw, sh}: img shows that part of the photo (0..1 of its width / height)
+  function drawPainting(ctx, T, P, src, k = 1) {
+    const g = paintPlace(T, P), pc = makeCanvas(T.w * k, T.h * k), x = pc.getContext("2d");
+    x.imageSmoothingQuality = "high";
+    x.scale(k, k); x.translate(g.cx, g.cy); x.rotate((g.rot * Math.PI) / 180); x.scale(g.fit, g.fit); x.translate(-g.a / 2, -0.5);
+    x.drawImage(src.img, src.sx * g.a, src.sy, src.sw * g.a, src.sh);
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "destination-in";
+    x.drawImage(T.paintImgs[g.area], 0, 0, T.w * k, T.h * k);
+    ctx.drawImage(pc, 0, 0);
+  }
+  async function paintedCourse(look) {
+    const key = JSON.stringify(look || {});
+    if (COURSE.cache.has(key)) return COURSE.cache.get(key);
+    const s = Math.min(1, 1400 / COURSE.src.width), c = makeCanvas(COURSE.src.width * s, COURSE.src.height * s), x = c.getContext("2d");
+    x.imageSmoothingQuality = "high"; x.drawImage(COURSE.src, 0, 0, c.width, c.height);
+    const job = oilPaintAsync(x.getImageData(0, 0, c.width, c.height), look, c.width / 1100).then((r) => { x.putImageData(new ImageData(r.data, r.width, r.height), 0, 0); return c; });
+    COURSE.cache.set(key, job);
+    if (COURSE.cache.size > 6) COURSE.cache.delete(COURSE.cache.keys().next().value);   // keep the last few looks
+    return job;
+  }
+  async function setCourse(blob) {
+    if (!blob) { COURSE.src = null; COURSE.cache.clear(); return null; }
+    const url = URL.createObjectURL(blob), im = await loadImg(url); URL.revokeObjectURL(url);
+    if (!im) throw new Error("That file isn't a picture this browser can open.");
+    const s = Math.min(1, 6000 / Math.max(im.width, im.height)), c = makeCanvas(im.width * s, im.height * s);
+    c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+    COURSE.src = c; COURSE.cache.clear(); COURSE.w = im.width; COURSE.h = im.height;
+    return { width: im.width, height: im.height };
+  }
+  /** Print sharpness: how many of the photo's own pixels land on each inch of the painted area. */
+  function paintDpi(spec) {
+    const T = templates.find((t) => t.id === spec.tpl);
+    if (!COURSE.src || !T || !T.paintBox) return null;
+    const g = paintPlace(T, { ...PAINT_DEFAULT, ...(spec.paint || {}) });
+    return Math.round((COURSE.h * (T.pxPerInch || 60)) / g.fit);
+  }
+  /** 300 dpi print file of one painted design: background colour + painting + cut lines, no logo
+      (the logo is embroidered). The painting is redone at full size so the brush marks stay crisp. */
+  async function renderPrint(spec, dpi = 300, onStep) {
+    const T = templates.find((t) => t.id === spec.tpl);
+    await loadTemplateAssets(T);
+    const P = { ...PAINT_DEFAULT, ...(spec.paint || {}) }, ppi = T.pxPerInch || 60, k = dpi / ppi, g = paintPlace(T, P);
+    // the part of the photo that can show: the area's box taken back into photo units
+    const r = (-g.rot * Math.PI) / 180, cs = Math.cos(r), sn = Math.sin(r);
+    let u0 = 1e9, v0 = 1e9, u1 = -1e9, v1 = -1e9;
+    [[g.box.x, g.box.y], [g.box.x + g.box.w, g.box.y], [g.box.x, g.box.y + g.box.h], [g.box.x + g.box.w, g.box.y + g.box.h]].forEach(([px, py]) => {
+      const dx = px - g.cx, dy = py - g.cy, u = (dx * cs - dy * sn) / g.fit + g.a / 2, v = (dx * sn + dy * cs) / g.fit + 0.5;
+      u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v);
+    });
+    const pad = 0.03;
+    u0 = Math.max(0, u0 - pad); v0 = Math.max(0, v0 - pad); u1 = Math.min(g.a, u1 + pad); v1 = Math.min(1, v1 + pad);
+    let scale = g.fit * k;   // print px per photo unit
+    const cap = 10e6, area = (u1 - u0) * (v1 - v0) * scale * scale;
+    if (area > cap) scale *= Math.sqrt(cap / area);   // very large panels: paint at up to 10 MP, then scale up
+    const cw = Math.round((u1 - u0) * scale), ch = Math.round((v1 - v0) * scale), crop = makeCanvas(cw, ch), cx = crop.getContext("2d");
+    cx.imageSmoothingQuality = "high";
+    const H = COURSE.src.height;
+    cx.drawImage(COURSE.src, (u0 * H), v0 * H, (u1 - u0) * H, (v1 - v0) * H, 0, 0, cw, ch);
+    onStep && onStep(`Painting at ${dpi} dpi (${cw}×${ch})…`);
+    const pr = await oilPaintAsync(cx.getImageData(0, 0, cw, ch), P.look, (g.a * scale) / 1100);
+    cx.putImageData(new ImageData(pr.data, pr.width, pr.height), 0, 0);
+    onStep && onStep("Laying out the print file…");
+    const out = makeCanvas(T.w * k, T.h * k), o = out.getContext("2d");
+    o.imageSmoothingQuality = "high";
+    o.fillStyle = "#fff"; o.fillRect(0, 0, out.width, out.height);
+    const bg = makeCanvas(out.width, out.height), b = bg.getContext("2d");   // background colour on every panel
+    b.drawImage(T.paintImgs.all, 0, 0, out.width, out.height); b.globalCompositeOperation = "source-in";
+    b.fillStyle = spec.roles[0].mat.hex; b.fillRect(0, 0, out.width, out.height); o.drawImage(bg, 0, 0);
+    drawPainting(o, T, P, { img: crop, sx: u0 / g.a, sy: v0, sw: (u1 - u0) / g.a, sh: v1 - v0 }, k);
+    if (T.frameImg) o.drawImage(T.frameImg, 0, 0, out.width, out.height);
+    return out;
+  }
   function pickThread(c) {
     const cands = [c.accent, c.trim, c.extra, WHITE, BLACK];
     return cands.find((m) => m && dE(m.rgb, c.body.rgb) > 40)?.hex || bestContrast(c.body).hex;
@@ -475,6 +572,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     ctx.fillStyle = matStyle(ctx, mats[0], ppi); ctx.fillRect(0, 0, T.w, T.h); ctx.fillStyle = grain(ctx); ctx.fillRect(0, 0, T.w, T.h);
     T.slotImgs.forEach((im, i) => { if (im) maskFill(ctx, T, im, matStyle(ctx, mats[(i + 1) % mats.length], ppi), !T.printed); });   // printed camo: no raised edges
     if (T.patternImgs && opts.pattern && LOGO.canvas) drawLogoPattern(ctx, T, opts.pattern, ppi);
+    if (T.paintImgs && opts.paint && opts.paint.img) drawPainting(ctx, T, opts.paint, { img: opts.paint.img, sx: 0, sy: 0, sw: 1, sh: 1 });
     if (T.stripeMaskImg && opts.stripes) {   // Silver Britches-style stripes through the logo spot, zigzag-stitched
       const S = T.stripes, c = makeCanvas(T.w, T.h), x = c.getContext("2d"), L = T.w + T.h;
       const total = S.widths.reduce((a, b) => a + b, 0);
@@ -698,6 +796,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     flag: () => ["Navy", "Red", "White"],
     scatter: () => ["Body", "Marks"],
     pattern: () => ["Background", "Logo colour"],
+    painted: () => ["Back / sides"],
     stockcamo: (T) => ["Back panel", ...(T.stockNames || T.slots.map((x, i) => `Camo ${i + 1}`))],
   };
   // stock designs (Duck Camo, Light Camo) come in their own printed colours; these colours aren't in the
@@ -729,6 +828,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     tpls.forEach((T) => tways.forEach(([cw, m]) => {
       const kind = kindOf(T);
       if (kind === "scatter") return;   // parked
+      if (kind === "painted" && !COURSE.src) return;   // needs a course photo
       if ((kind === "flag" || kind === "stockcamo") && cw === "B") return;   // the flag has one colourway: classic red, white and navy
       if (kind === "tartan" && !special.tartan[cw]) return;
       let r;
@@ -738,12 +838,13 @@ export function createStudio({ materials, furs, templates, proofs }) {
       else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
       else if (kind === "flag") r = [special.flag[cw].blue, special.flag[cw].red, special.flag[cw].white];
       else if (kind === "pattern") r = [special.scatter[cw].body, special.scatter[cw].ink];
+      else if (kind === "painted") r = [cw === "A" ? special.scatter.A.ink : special.scatter.A.body];   // A dark back (Wade Hampton), B light
       else if (kind === "stockcamo") { const st = T.stock.map((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)); r = [st[0], ...st]; }
       else if (kind === "camo") r = [m[0], ...T.slots.map((x, i) => m[(i + 1) % m.length])];
       else r = [m[1] && m[1] !== m[0] ? m[1] : m[0]];
       const roles = KIND_ROLES[kind](T);
       specs.push({ tpl: T.id, product: T.product, name: T.name, design: `${T.product} · ${T.name}`, cw, kind,
-        roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })), ...(kind === "pattern" ? { pattern: { ...PATTERN_DEFAULT } } : {}) });
+        roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })), ...(kind === "pattern" ? { pattern: { ...PATTERN_DEFAULT } } : {}), ...(kind === "painted" ? { paint: { ...PAINT_DEFAULT } } : {}) });
     }));
     return specs;
   }
@@ -754,7 +855,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const r = spec.roles.map((x) => x.mat);
     await Promise.all([ensureTiles([...r, fur, WHITE, BLACK, NAVY]), loadTemplateAssets(T), P ? loadProofAssets(P) : null]);
     CUR = { mats: r };
-    let mats, thread = null, stripes = null, tartan = null, pattern = null;
+    let mats, thread = null, stripes = null, tartan = null, pattern = null, paint = null;
     switch (spec.kind) {
       case "quilted": mats = [r[0], r[0], r[0], r[0]]; thread = r[1].hex; break;
       case "exotic": mats = [r[0], r[0], r[0], r[0]]; break;
@@ -763,10 +864,13 @@ export function createStudio({ materials, furs, templates, proofs }) {
       case "flag": mats = [r[0], r[2], r[1], r[0], r[2]]; break;   // [back, field, red stripes, canton, stars]
       case "camo": mats = r.length >= 4 ? r : [...r, ...r].slice(0, 4); break;
       case "stockcamo": mats = r; break;
+      case "painted": mats = [r[0], r[0], r[0], r[0]];
+        if (COURSE.src) { const P = { ...PAINT_DEFAULT, ...(spec.paint || {}) }; paint = { ...P, img: await paintedCourse(P.look) }; }
+        break;
       case "pattern": mats = [r[0], r[0], r[0], r[0]]; pattern = { ...PATTERN_DEFAULT, ...(spec.pattern || {}), ink: r[1].hex }; break;
       default: mats = [r[0], r[0], r[0], r[0]];
     }
-    const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, stripes, tartan, pattern });
+    const flat = renderTemplate(T, mats, { oneColor, logoScale, fur, thread, stripes, tartan, pattern, paint });
     const canvas = P ? renderProof(P, flat, fur) : flat;
     return { flat, canvas, proof: canvas };
   }
@@ -965,6 +1069,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
   const products = [...new Set(templates.map((T) => T.product))];
   return {
     patternOwnColours: () => logoFill() > 0.45,
+    setCourse, hasCourse: () => !!COURSE.src, courseCanvas: () => COURSE.src, paintDpi, renderPrint,
     materials: SW, furs, templates, proofs, products, WHITE, BLACK,
     hasLogo: () => !!LOGO.canvas, logoCanvas: () => LOGO.canvas,
     loadBlob, processLogo, eraseAt, undoErase, resetLogo, nearest, generate, sheet,
@@ -976,6 +1081,22 @@ export function createStudio({ materials, furs, templates, proofs }) {
 
 export const slug = (s) => (s || "club").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "club";
 export const canvasToBlob = (canvas) => new Promise((r) => canvas.toBlob(r, "image/png"));
+/** PNG with its print resolution written in (pHYs), so Photoshop / the RIP opens it at the right size. */
+export async function pngWithDpi(blob, dpi) {
+  const b = new Uint8Array(await blob.arrayBuffer()), ppm = Math.round(dpi / 0.0254);
+  const chunk = new Uint8Array(21), dv = new DataView(chunk.buffer);
+  dv.setUint32(0, 9); chunk.set([112, 72, 89, 115], 4); dv.setUint32(8, ppm); dv.setUint32(12, ppm); chunk[16] = 1;
+  let c = ~0;
+  for (let i = 4; i < 17; i++) { c ^= chunk[i]; for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
+  dv.setUint32(17, ~c >>> 0);
+  const at = 8 + 25;   // signature + IHDR
+  return new Blob([b.slice(0, at), chunk, b.slice(at)], { type: "image/png" });
+}
+export async function downloadBlob(b, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
 export async function downloadCanvas(canvas, name) {
   const b = await canvasToBlob(canvas), a = document.createElement("a");
   a.href = URL.createObjectURL(b); a.download = name; a.click();

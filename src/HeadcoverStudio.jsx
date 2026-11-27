@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
 import {
-  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT,
+  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT, PAINT_DEFAULT, OIL_DEFAULT, pngWithDpi, downloadBlob,
 } from "./headcoverStudio/engine";
 import { matchInventory } from "./headcoverStudio/inventory";
 import { saveSession, getSession, deleteSession, listSessions, newId, packSpec, unpackSpec, thumbOf } from "./headcoverStudio/sessions";
@@ -124,6 +124,9 @@ export default function HeadcoverStudio() {
   const [swapped, setSwapped] = useState(false);
   const [busy, setBusy] = useState(false);
   const [save, setSave] = useState(null);             // save-to-customer-folder dialog state
+  const [course, setCourseInfo] = useState(null);     // clubhouse / course photo for Painted Course {url, width, height}
+  const [printing, setPrinting] = useState(null);     // print-file progress text
+  const courseRef = useRef(null), courseBlob = useRef(null);
 
   const fileRef = useRef(null);
   const toastTimer = useRef(null);
@@ -447,6 +450,34 @@ export default function HeadcoverStudio() {
     if (r) updateDesign(cur.uid, { canvas: r.canvas, flat: r.flat, thumb: thumbOf(r.canvas, 200) });
   };
 
+  // painted course: the customer's clubhouse / course photo
+  const loadCourse = async (file, quiet) => {
+    if (!file) { await S.setCourse(null); courseBlob.current = null; setCourseInfo(null); return; }
+    try {
+      const r = await S.setCourse(file);
+      courseBlob.current = file;
+      setCourseInfo((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(file), ...r }; });
+      if (!quiet) {
+        const painted = designs.filter((d) => d.spec.kind === "painted");
+        if (painted.length) renderAll(designs, new Set(painted.map((d) => d.uid)));
+        showToast(painted.length ? "Course photo changed · repainting" : designs.length ? "Course photo added · press Redesign to add Painted Course" : "Course photo added");
+      }
+    } catch (e) { showToast(e.message || "Couldn't open that photo."); }
+  };
+  const setPaint = (patch) => cur && liveSpec({ ...cur.spec, paint: { ...PAINT_DEFAULT, ...(cur.spec.paint || {}), ...patch } });
+  const setLook = (patch) => cur && setPaint({ look: { ...((cur.spec.paint || {}).look || {}), ...patch } });
+  const downloadPrint = async () => {
+    if (!cur || printing) return;
+    try {
+      setPrinting("Starting…");
+      const c = await S.renderPrint(cur.spec, 300, setPrinting);
+      setPrinting("Saving the file…");
+      const b = await pngWithDpi(await canvasToBlob(c), 300);
+      downloadBlob(b, `${slug(club)}_${slug(cur.spec.product)}_painted-course_${cur.spec.cw}_300dpi.png`);
+    } catch (e) { console.warn(e); showToast("The print file couldn't be made on this device."); }
+    setPrinting(null);
+  };
+
   /* ---------- session save / open ---------- */
   const saveTimer = useRef(null);
   const logoBlob = useRef(null);
@@ -461,7 +492,7 @@ export default function HeadcoverStudio() {
         await saveSession({
           id: sessionId, name: club.trim() || "Untitled session", createdAt: prev?.createdAt || Date.now(), updatedAt: Date.now(),
           count: designs.length, locked: designs.filter((d) => d.locked).length, thumb: first ? first.thumb : prev?.thumb || null,
-          logo: logoBlob.current,
+          logo: logoBlob.current, course: courseBlob.current,
           settings: { slots: slots.map((m) => m && m.id), furId, logoSize, oneColor, products, swapped, variant, tol, inside },
           designs: designs.map((d) => ({ spec: packSpec(d.spec), locked: d.locked })),
         });
@@ -476,6 +507,7 @@ export default function HeadcoverStudio() {
     const st = x.settings || {};
     if (x.logo) applyLogoResult(await S.restoreLogo(x.logo), false);
     logoBlob.current = x.logo || null; logoDirty.current = false;
+    await loadCourse(x.course || null, true);
     const sl = (st.slots || []).map((sid) => (sid ? S.matById(sid) : null));
     setSlots([0, 1, 2, 3].map((i) => sl[i] || null)); ensureTiles(sl.filter(Boolean));
     setClub(x.name === "Untitled session" ? "" : x.name);
@@ -495,7 +527,7 @@ export default function HeadcoverStudio() {
     renderSeq.current++;
     setSessionId(null); setDesigns([]); setIdx(0); setView("setup"); setEditing(false); setVariant(0);
     setClub(""); setLogoView(null); setSuggestions([]); setSlots([null, null, null, null]); setActive(0);
-    logoBlob.current = null;
+    logoBlob.current = null; loadCourse(null, true);
     setStatus("New session · paste a logo to start");
   };
   const removeSession = async (id) => {
@@ -632,6 +664,24 @@ export default function HeadcoverStudio() {
           </div>
           <div className="row" style={{ marginTop: 12 }}>
             <input type="text" value={club} onChange={(e) => setClub(e.target.value)} placeholder="Club name (customer folder, file name, sheet)" />
+          </div>
+
+          <div className="course">
+            <div className="small"><b>Painted Course</b> · optional clubhouse or course photo, oil-painted onto the cover with the logo embroidered on top</div>
+            <div className="row">
+              {course ? (
+                <>
+                  <img src={course.url} alt="" className="coursePrev" onClick={() => courseRef.current?.click()} />
+                  <span className="small" style={{ flex: 1 }}>{course.width} × {course.height} px{course.width * course.height < 4e6 ? " · small for print, ask for the original photo" : ""}</span>
+                  <button onClick={() => courseRef.current?.click()}>Change</button>
+                  <button onClick={() => loadCourse(null)}>Remove</button>
+                </>
+              ) : (
+                <button onClick={() => courseRef.current?.click()}>Add course photo</button>
+              )}
+            </div>
+            <input type="file" ref={courseRef} accept="image/*" hidden
+              onChange={(e) => { if (e.target.files[0]) loadCourse(e.target.files[0]); e.target.value = ""; }} />
           </div>
 
           <h2><span className="n">2</span>Pick up to 4 materials</h2>
@@ -834,6 +884,43 @@ export default function HeadcoverStudio() {
                         <label className="chk"><input type="checkbox" checked={P.front} onChange={(e) => setPattern({ front: e.target.checked })} /> Front only (plain back)</label>
                         <label className="chk"><input type="checkbox" checked={P.orig == null ? !!S.patternOwnColours() : P.orig} onChange={(e) => setPattern({ orig: e.target.checked })} /> Logo in its own colours</label>
                         <button className="ghost" onClick={() => setPattern({ ...PATTERN_DEFAULT })}>Reset pattern</button>
+                      </div>
+                    );
+                  })()}
+                  {cur.spec.kind === "painted" && (() => {
+                    const P = { ...PAINT_DEFAULT, ...(cur.spec.paint || {}) }, L = { ...OIL_DEFAULT, ...P.look };
+                    const T = S.templates.find((t) => t.id === cur.spec.tpl), area = P.area || (T && T.paintArea) || "front";
+                    const dpi = S.paintDpi(cur.spec);
+                    const sl = (label, val, min, max, step, on, fmt) => (
+                      <label className="patrow" key={label}>
+                        <span>{label}<b>{fmt ? fmt(val) : val}</b></span>
+                        <input type="range" min={min} max={max} step={step} value={val} onChange={(e) => on(+e.target.value)} />
+                      </label>
+                    );
+                    if (!S.hasCourse()) return <div className="patctl"><div className="small">Add a course photo in setup to paint this design.</div></div>;
+                    return (
+                      <div className="patctl">
+                        <div className="small">Painting</div>
+                        <div className="lines" style={{ margin: "2px 0 6px" }}>
+                          <button className={area === "front" ? "on" : ""} onClick={() => setPaint({ area: "front" })}>Front panel</button>
+                          <button className={area === "all" ? "on" : ""} onClick={() => setPaint({ area: "all" })}>All panels</button>
+                          <button onClick={() => setPaint({ rot: ((P.rot || 0) + 90) % 360 })}>Turn 90°</button>
+                        </div>
+                        {sl("Zoom", P.zoom, 1, 3, 0.05, (v) => setPaint({ zoom: v }), (v) => `${Math.round(v * 100)}%`)}
+                        {sl("Move left / right", P.x, -0.5, 0.5, 0.01, (v) => setPaint({ x: v }), (v) => (v * 100).toFixed(0))}
+                        {sl("Move up / down", P.y, -0.5, 0.5, 0.01, (v) => setPaint({ y: v }), (v) => (v * 100).toFixed(0))}
+                        <div className="small">Paint look</div>
+                        {sl("Brush size", L.scale, 2, 9, 1, (v) => setLook({ scale: v }))}
+                        {sl("Paint ridges", L.rim, 0, 8, 1, (v) => setLook({ rim: v, relief: v }))}
+                        {sl("Keep detail", L.detail, 2, 10, 1, (v) => setLook({ detail: v }))}
+                        {sl("Colour pop", L.vivid, 0, 10, 1, (v) => setLook({ vivid: v }))}
+                        <button className="ghost" onClick={() => setPaint({ ...PAINT_DEFAULT })}>Reset painting</button>
+                        {dpi != null && (
+                          <div className={"small" + (dpi < 150 ? " warn" : "")} style={{ marginTop: 6 }}>
+                            Photo sharpness at this size: <b>{dpi} dpi</b>{dpi < 150 ? " · low, the print will look soft. Zoom out or get a bigger photo." : dpi < 300 ? " · fine once painted" : ""}
+                          </div>
+                        )}
+                        <button className="ghost" disabled={!!printing} onClick={downloadPrint}>{printing || "Download print file (300 dpi, no logo)"}</button>
                       </div>
                     );
                   })()}

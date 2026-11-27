@@ -248,3 +248,9 @@
   .hcs .rv-meta .acts{flex:1;justify-content:flex-end}
   .hcs .strip .tn{width:100px;height:66px}
 }
+
+/* painted course */
+.hcs .course { margin-top: 12px; padding: 8px 10px; border: 1px dashed #c9c2b6; border-radius: 8px; }
+.hcs .course .row { margin-top: 6px; align-items: center; }
+.hcs .coursePrev { width: 72px; height: 48px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid #ddd; }
+.hcs .patctl .warn { color: #b3261e; }
