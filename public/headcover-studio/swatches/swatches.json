@@ -405,9 +405,10 @@
    "kind": "material",
    "hex": "#a8aca9",
    "solid": false,
-   "tile": "gator-leather-metallic-silver.jpg",
-   "tileInches": 2.1,
-   "source": "p23@4172,1896"
+   "tile": "gator-leather-metallic-silver-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@4172,1896",
+   "chip": "gator-leather-metallic-silver-chip.jpg"
   },
   {
    "id": "gator-leather-metallic-gold",
@@ -417,9 +418,10 @@
    "kind": "material",
    "hex": "#b09051",
    "solid": false,
-   "tile": "gator-leather-metallic-gold.jpg",
-   "tileInches": 2.1,
-   "source": "p23@3920,1896"
+   "tile": "gator-leather-metallic-gold-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@3920,1896",
+   "chip": "gator-leather-metallic-gold-chip.jpg"
   },
   {
    "id": "gator-leather-pink",
@@ -429,9 +431,10 @@
    "kind": "material",
    "hex": "#e2928a",
    "solid": false,
-   "tile": "gator-leather-pink.jpg",
-   "tileInches": 2.1,
-   "source": "p23@3668,1896"
+   "tile": "gator-leather-pink-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@3668,1896",
+   "chip": "gator-leather-pink-chip.jpg"
   },
   {
    "id": "gator-leather-orange",
@@ -441,9 +444,10 @@
    "kind": "material",
    "hex": "#c7572b",
    "solid": false,
-   "tile": "gator-leather-orange.jpg",
-   "tileInches": 2.1,
-   "source": "p23@3416,1896"
+   "tile": "gator-leather-orange-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@3416,1896",
+   "chip": "gator-leather-orange-chip.jpg"
   },
   {
    "id": "gator-leather-red",
@@ -453,9 +457,10 @@
    "kind": "material",
    "hex": "#853337",
    "solid": false,
-   "tile": "gator-leather-red.jpg",
-   "tileInches": 2.1,
-   "source": "p23@3164,1895"
+   "tile": "gator-leather-red-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@3164,1895",
+   "chip": "gator-leather-red-chip.jpg"
   },
   {
    "id": "gator-leather-navy-blue",
@@ -465,9 +470,10 @@
    "kind": "material",
    "hex": "#262932",
    "solid": false,
-   "tile": "gator-leather-navy-blue.jpg",
-   "tileInches": 2.1,
-   "source": "p23@2912,1896"
+   "tile": "gator-leather-navy-blue-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@2912,1896",
+   "chip": "gator-leather-navy-blue-chip.jpg"
   },
   {
    "id": "gator-leather-denim",
@@ -477,9 +483,10 @@
    "kind": "material",
    "hex": "#4a5160",
    "solid": false,
-   "tile": "gator-leather-denim.jpg",
-   "tileInches": 2.1,
-   "source": "p23@2660,1895"
+   "tile": "gator-leather-denim-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@2660,1895",
+   "chip": "gator-leather-denim-chip.jpg"
   },
   {
    "id": "gator-leather-light-blue",
@@ -489,9 +496,10 @@
    "kind": "material",
    "hex": "#507aab",
    "solid": false,
-   "tile": "gator-leather-light-blue.jpg",
-   "tileInches": 2.1,
-   "source": "p23@2408,1895"
+   "tile": "gator-leather-light-blue-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@2408,1895",
+   "chip": "gator-leather-light-blue-chip.jpg"
   },
   {
    "id": "gator-leather-dark-green",
@@ -501,9 +509,10 @@
    "kind": "material",
    "hex": "#21312d",
    "solid": false,
-   "tile": "gator-leather-dark-green.jpg",
-   "tileInches": 2.1,
-   "source": "p23@2151,1895"
+   "tile": "gator-leather-dark-green-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@2151,1895",
+   "chip": "gator-leather-dark-green-chip.jpg"
   },
   {
    "id": "gator-leather-yellow",
@@ -513,9 +522,10 @@
    "kind": "material",
    "hex": "#e8b81a",
    "solid": false,
-   "tile": "gator-leather-yellow.jpg",
-   "tileInches": 2.1,
-   "source": "p23@1904,1898"
+   "tile": "gator-leather-yellow-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@1904,1898",
+   "chip": "gator-leather-yellow-chip.jpg"
   },
   {
    "id": "gator-leather-white",
@@ -525,9 +535,10 @@
    "kind": "material",
    "hex": "#e2e2e2",
    "solid": false,
-   "tile": "gator-leather-white.jpg",
-   "tileInches": 2.1,
-   "source": "p23@1647,1895"
+   "tile": "gator-leather-white-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@1647,1895",
+   "chip": "gator-leather-white-chip.jpg"
   },
   {
    "id": "gator-leather-cognac",
@@ -535,11 +546,13 @@
    "line": "Gator Leather",
    "origin": "Italy",
    "kind": "material",
-   "hex": "#73381f",
+   "hex": "#803c1c",
    "solid": false,
-   "tile": "gator-leather-cognac.jpg",
-   "tileInches": 2.1,
-   "source": "p23@1395,1898"
+   "tile": "gator-leather-cognac-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@1395,1898",
+   "chip": "gator-leather-cognac-chip.jpg",
+   "noLift": true
   },
   {
    "id": "gator-leather-brown",
@@ -549,9 +562,10 @@
    "kind": "material",
    "hex": "#2e2525",
    "solid": false,
-   "tile": "gator-leather-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p23@1143,1898"
+   "tile": "gator-leather-brown-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@1143,1898",
+   "chip": "gator-leather-brown-chip.jpg"
   },
   {
    "id": "gator-leather-light-grey",
@@ -561,9 +575,10 @@
    "kind": "material",
    "hex": "#72716b",
    "solid": false,
-   "tile": "gator-leather-light-grey.jpg",
-   "tileInches": 2.1,
-   "source": "p23@891,1901"
+   "tile": "gator-leather-light-grey-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@891,1901",
+   "chip": "gator-leather-light-grey-chip.jpg"
   },
   {
    "id": "gator-leather-dark-grey",
@@ -573,9 +588,10 @@
    "kind": "material",
    "hex": "#383839",
    "solid": false,
-   "tile": "gator-leather-dark-grey.jpg",
-   "tileInches": 2.1,
-   "source": "p23@639,1901"
+   "tile": "gator-leather-dark-grey-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@639,1901",
+   "chip": "gator-leather-dark-grey-chip.jpg"
   },
   {
    "id": "gator-leather-black",
@@ -585,9 +601,10 @@
    "kind": "material",
    "hex": "#1c1c1d",
    "solid": false,
-   "tile": "gator-leather-black.jpg",
-   "tileInches": 2.1,
-   "source": "p23@382,1901"
+   "tile": "gator-leather-black-hide.jpg",
+   "tileInches": 24.0,
+   "source": "p23@382,1901",
+   "chip": "gator-leather-black-chip.jpg"
   },
   {
    "id": "ostrich-leather-brown-black",
@@ -597,9 +614,10 @@
    "kind": "material",
    "hex": "#795640",
    "solid": false,
-   "tile": "ostrich-leather-brown-black.jpg",
-   "tileInches": 2.1,
-   "source": "p24@4359,1127"
+   "tile": "ostrich-leather-brown-black-hide.jpg",
+   "tileInches": 10.19,
+   "source": "p24@4359,1127",
+   "chip": "ostrich-leather-brown-black-chip.jpg"
   },
   {
    "id": "ostrich-leather-black",
@@ -609,9 +627,10 @@
    "kind": "material",
    "hex": "#393839",
    "solid": false,
-   "tile": "ostrich-leather-black.jpg",
-   "tileInches": 2.1,
-   "source": "p24@4107,1127"
+   "tile": "ostrich-leather-black-hide.jpg",
+   "tileInches": 10.19,
+   "source": "p24@4107,1127",
+   "chip": "ostrich-leather-black-chip.jpg"
   },
   {
    "id": "ostrich-leather-brown",
@@ -621,9 +640,10 @@
    "kind": "material",
    "hex": "#534138",
    "solid": false,
-   "tile": "ostrich-leather-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@3855,1130"
+   "tile": "ostrich-leather-brown-hide.jpg",
+   "tileInches": 10.19,
+   "source": "p24@3855,1130",
+   "chip": "ostrich-leather-brown-chip.jpg"
   },
   {
    "id": "ostrich-leather-light-brown",
@@ -633,9 +653,10 @@
    "kind": "material",
    "hex": "#834e34",
    "solid": false,
-   "tile": "ostrich-leather-light-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@3603,1130"
+   "tile": "ostrich-leather-light-brown-hide.jpg",
+   "tileInches": 10.19,
+   "source": "p24@3603,1130",
+   "chip": "ostrich-leather-light-brown-chip.jpg"
   },
   {
    "id": "ostrich-leather-tan",
@@ -645,9 +666,10 @@
    "kind": "material",
    "hex": "#8d5b35",
    "solid": false,
-   "tile": "ostrich-leather-tan.jpg",
-   "tileInches": 2.1,
-   "source": "p24@3346,1130"
+   "tile": "ostrich-leather-tan-hide.jpg",
+   "tileInches": 10.19,
+   "source": "p24@3346,1130",
+   "chip": "ostrich-leather-tan-chip.jpg"
   },
   {
    "id": "metallic-leather-red",
@@ -717,9 +739,10 @@
    "kind": "material",
    "hex": "#1d1c21",
    "solid": false,
-   "tile": "heritage-leather-black.jpg",
-   "tileInches": 2.1,
-   "source": "p24@2162,1889"
+   "tile": "heritage-leather-black-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@2162,1889",
+   "chip": "heritage-leather-black-chip.jpg"
   },
   {
    "id": "heritage-leather-red",
@@ -729,9 +752,10 @@
    "kind": "material",
    "hex": "#723035",
    "solid": false,
-   "tile": "heritage-leather-red.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1915,1888"
+   "tile": "heritage-leather-red-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@1915,1888",
+   "chip": "heritage-leather-red-chip.jpg"
   },
   {
    "id": "heritage-leather-navy-blue",
@@ -741,9 +765,10 @@
    "kind": "material",
    "hex": "#3d4e58",
    "solid": false,
-   "tile": "heritage-leather-navy-blue.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1658,1885"
+   "tile": "heritage-leather-navy-blue-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@1658,1885",
+   "chip": "heritage-leather-navy-blue-chip.jpg"
   },
   {
    "id": "heritage-leather-light-grey",
@@ -753,9 +778,10 @@
    "kind": "material",
    "hex": "#b1a38d",
    "solid": false,
-   "tile": "heritage-leather-light-grey.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1406,1888"
+   "tile": "heritage-leather-light-grey-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@1406,1888",
+   "chip": "heritage-leather-light-grey-chip.jpg"
   },
   {
    "id": "heritage-leather-dark-green",
@@ -765,9 +791,10 @@
    "kind": "material",
    "hex": "#464a33",
    "solid": false,
-   "tile": "heritage-leather-dark-green.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1154,1888"
+   "tile": "heritage-leather-dark-green-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@1154,1888",
+   "chip": "heritage-leather-dark-green-chip.jpg"
   },
   {
    "id": "heritage-leather-light-brown",
@@ -777,9 +804,10 @@
    "kind": "material",
    "hex": "#8f5f48",
    "solid": false,
-   "tile": "heritage-leather-light-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@902,1891"
+   "tile": "heritage-leather-light-brown-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@902,1891",
+   "chip": "heritage-leather-light-brown-chip.jpg"
   },
   {
    "id": "heritage-leather-brown",
@@ -789,9 +817,10 @@
    "kind": "material",
    "hex": "#423535",
    "solid": false,
-   "tile": "heritage-leather-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@650,1891"
+   "tile": "heritage-leather-brown-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@650,1891",
+   "chip": "heritage-leather-brown-chip.jpg"
   },
   {
    "id": "heritage-leather-charcoal",
@@ -801,9 +830,10 @@
    "kind": "material",
    "hex": "#333334",
    "solid": false,
-   "tile": "heritage-leather-charcoal.jpg",
-   "tileInches": 2.1,
-   "source": "p24@393,1891"
+   "tile": "heritage-leather-charcoal-hide.jpg",
+   "tileInches": 5.35,
+   "source": "p24@393,1891",
+   "chip": "heritage-leather-charcoal-chip.jpg"
   },
   {
    "id": "rustic-gator-leather-cognac",
@@ -813,9 +843,10 @@
    "kind": "material",
    "hex": "#774d42",
    "solid": false,
-   "tile": "rustic-gator-leather-cognac.jpg",
-   "tileInches": 2.1,
-   "source": "p24@3689,350"
+   "tile": "rustic-gator-leather-cognac-hide.jpg",
+   "tileInches": 6.5,
+   "source": "p24@3689,350",
+   "chip": "rustic-gator-leather-cognac-chip.jpg"
   },
   {
    "id": "rustic-gator-leather-brown",
@@ -825,9 +856,10 @@
    "kind": "material",
    "hex": "#473c3b",
    "solid": false,
-   "tile": "rustic-gator-leather-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@3437,350"
+   "tile": "rustic-gator-leather-brown-hide.jpg",
+   "tileInches": 6.5,
+   "source": "p24@3437,350",
+   "chip": "rustic-gator-leather-brown-chip.jpg"
   },
   {
    "id": "rustic-gator-leather-black",
@@ -837,9 +869,10 @@
    "kind": "material",
    "hex": "#363639",
    "solid": false,
-   "tile": "rustic-gator-leather-black.jpg",
-   "tileInches": 2.1,
-   "source": "p24@3180,350"
+   "tile": "rustic-gator-leather-black-hide.jpg",
+   "tileInches": 6.5,
+   "source": "p24@3180,350",
+   "chip": "rustic-gator-leather-black-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-black-charcoal",
@@ -849,9 +882,10 @@
    "kind": "material",
    "hex": "#232425",
    "solid": false,
-   "tile": "split-tone-gator-leather-black-charcoal.jpg",
-   "tileInches": 2.1,
-   "source": "p24@2399,356"
+   "tile": "split-tone-gator-leather-black-charcoal-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@2399,356",
+   "chip": "split-tone-gator-leather-black-charcoal-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-black-lime",
@@ -861,9 +895,10 @@
    "kind": "material",
    "hex": "#464b30",
    "solid": false,
-   "tile": "split-tone-gator-leather-black-lime.jpg",
-   "tileInches": 2.1,
-   "source": "p24@2142,356"
+   "tile": "split-tone-gator-leather-black-lime-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@2142,356",
+   "chip": "split-tone-gator-leather-black-lime-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-grey-grey",
@@ -873,9 +908,10 @@
    "kind": "material",
    "hex": "#b6ad9a",
    "solid": false,
-   "tile": "split-tone-gator-leather-grey-grey.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1895,359"
+   "tile": "split-tone-gator-leather-grey-grey-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@1895,359",
+   "chip": "split-tone-gator-leather-grey-grey-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-brown-blue",
@@ -885,9 +921,10 @@
    "kind": "material",
    "hex": "#251a1d",
    "solid": false,
-   "tile": "split-tone-gator-leather-brown-blue.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1638,356"
+   "tile": "split-tone-gator-leather-brown-blue-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@1638,356",
+   "chip": "split-tone-gator-leather-brown-blue-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-brown-caramel",
@@ -897,9 +934,10 @@
    "kind": "material",
    "hex": "#513927",
    "solid": false,
-   "tile": "split-tone-gator-leather-brown-caramel.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1386,355"
+   "tile": "split-tone-gator-leather-brown-caramel-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@1386,355",
+   "chip": "split-tone-gator-leather-brown-caramel-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-black-brown",
@@ -909,9 +947,10 @@
    "kind": "material",
    "hex": "#3c312e",
    "solid": false,
-   "tile": "split-tone-gator-leather-black-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1134,355"
+   "tile": "split-tone-gator-leather-black-brown-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@1134,355",
+   "chip": "split-tone-gator-leather-black-brown-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-navy-brown",
@@ -921,9 +960,10 @@
    "kind": "material",
    "hex": "#3e3a3a",
    "solid": false,
-   "tile": "split-tone-gator-leather-navy-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@882,358"
+   "tile": "split-tone-gator-leather-navy-brown-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@882,358",
+   "chip": "split-tone-gator-leather-navy-brown-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-brown-copper",
@@ -933,9 +973,10 @@
    "kind": "material",
    "hex": "#9e6e54",
    "solid": false,
-   "tile": "split-tone-gator-leather-brown-copper.jpg",
-   "tileInches": 2.1,
-   "source": "p24@630,358"
+   "tile": "split-tone-gator-leather-brown-copper-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@630,358",
+   "chip": "split-tone-gator-leather-brown-copper-chip.jpg"
   },
   {
    "id": "split-tone-gator-leather-black-grey",
@@ -945,9 +986,10 @@
    "kind": "material",
    "hex": "#605d57",
    "solid": false,
-   "tile": "split-tone-gator-leather-black-grey.jpg",
-   "tileInches": 2.1,
-   "source": "p24@373,358"
+   "tile": "split-tone-gator-leather-black-grey-hide.jpg",
+   "tileInches": 11.78,
+   "source": "p24@373,358",
+   "chip": "split-tone-gator-leather-black-grey-chip.jpg"
   },
   {
    "id": "distressed-leather-navy-blue",
@@ -957,9 +999,11 @@
    "kind": "material",
    "hex": "#171c29",
    "solid": false,
-   "tile": "distressed-leather-navy-blue.jpg",
-   "tileInches": 2.1,
-   "source": "p24@2651,1127"
+   "tile": "distressed-leather-navy-blue-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@2651,1127",
+   "noLift": true,
+   "chip": "distressed-leather-navy-blue-chip.jpg"
   },
   {
    "id": "distressed-leather-forest-green",
@@ -969,9 +1013,11 @@
    "kind": "material",
    "hex": "#232a28",
    "solid": false,
-   "tile": "distressed-leather-forest-green.jpg",
-   "tileInches": 2.1,
-   "source": "p24@2399,1127"
+   "tile": "distressed-leather-forest-green-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@2399,1127",
+   "noLift": true,
+   "chip": "distressed-leather-forest-green-chip.jpg"
   },
   {
    "id": "distressed-leather-olive",
@@ -981,9 +1027,11 @@
    "kind": "material",
    "hex": "#2c2d24",
    "solid": false,
-   "tile": "distressed-leather-olive.jpg",
-   "tileInches": 2.1,
-   "source": "p24@2142,1127"
+   "tile": "distressed-leather-olive-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@2142,1127",
+   "noLift": true,
+   "chip": "distressed-leather-olive-chip.jpg"
   },
   {
    "id": "distressed-leather-sand",
@@ -993,9 +1041,11 @@
    "kind": "material",
    "hex": "#aa9074",
    "solid": false,
-   "tile": "distressed-leather-sand.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1895,1130"
+   "tile": "distressed-leather-sand-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@1895,1130",
+   "noLift": true,
+   "chip": "distressed-leather-sand-chip.jpg"
   },
   {
    "id": "distressed-leather-brown",
@@ -1005,9 +1055,11 @@
    "kind": "material",
    "hex": "#41322a",
    "solid": false,
-   "tile": "distressed-leather-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1638,1127"
+   "tile": "distressed-leather-brown-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@1638,1127",
+   "noLift": true,
+   "chip": "distressed-leather-brown-chip.jpg"
   },
   {
    "id": "distressed-leather-chestnut",
@@ -1017,9 +1069,11 @@
    "kind": "material",
    "hex": "#42211c",
    "solid": false,
-   "tile": "distressed-leather-chestnut.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1386,1126"
+   "tile": "distressed-leather-chestnut-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@1386,1126",
+   "noLift": true,
+   "chip": "distressed-leather-chestnut-chip.jpg"
   },
   {
    "id": "distressed-leather-dark-brown",
@@ -1029,9 +1083,11 @@
    "kind": "material",
    "hex": "#2a1d1e",
    "solid": false,
-   "tile": "distressed-leather-dark-brown.jpg",
-   "tileInches": 2.1,
-   "source": "p24@1134,1126"
+   "tile": "distressed-leather-dark-brown-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@1134,1126",
+   "noLift": true,
+   "chip": "distressed-leather-dark-brown-chip.jpg"
   },
   {
    "id": "distressed-leather-slate-grey",
@@ -1041,9 +1097,11 @@
    "kind": "material",
    "hex": "#5e5b56",
    "solid": false,
-   "tile": "distressed-leather-slate-grey.jpg",
-   "tileInches": 2.1,
-   "source": "p24@882,1129"
+   "tile": "distressed-leather-slate-grey-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@882,1129",
+   "noLift": true,
+   "chip": "distressed-leather-slate-grey-chip.jpg"
   },
   {
    "id": "distressed-leather-charcoal",
@@ -1053,9 +1111,11 @@
    "kind": "material",
    "hex": "#47413d",
    "solid": false,
-   "tile": "distressed-leather-charcoal.jpg",
-   "tileInches": 2.1,
-   "source": "p24@630,1129"
+   "tile": "distressed-leather-charcoal-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@630,1129",
+   "noLift": true,
+   "chip": "distressed-leather-charcoal-chip.jpg"
   },
   {
    "id": "distressed-leather-black",
@@ -1065,9 +1125,11 @@
    "kind": "material",
    "hex": "#232325",
    "solid": false,
-   "tile": "distressed-leather-black.jpg",
-   "tileInches": 2.1,
-   "source": "p24@373,1129"
+   "tile": "distressed-leather-black-hide.jpg",
+   "tileInches": 4.5,
+   "source": "p24@373,1129",
+   "noLift": true,
+   "chip": "distressed-leather-black-chip.jpg"
   },
   {
    "id": "fur-interior-lining-tiger-print",
@@ -1620,6 +1682,540 @@
    "tile": "premium-vinyl-solid-white.jpg",
    "tileInches": 2.1,
    "source": "p26@428,311"
+  },
+  {
+   "id": "waxed-canvas-blood-red",
+   "name": "Blood Red",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#3d1f28",
+   "solid": false,
+   "tile": "waxed-canvas-blood-red-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-blood-red-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-navy-blue",
+   "name": "Navy Blue",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#2a3c4a",
+   "solid": false,
+   "tile": "waxed-canvas-navy-blue-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-navy-blue-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-dark-grey",
+   "name": "Dark Grey",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#3f3f3f",
+   "solid": false,
+   "tile": "waxed-canvas-dark-grey-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-dark-grey-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-brown",
+   "name": "Brown",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#382d23",
+   "solid": false,
+   "tile": "waxed-canvas-brown-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-brown-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-natural",
+   "name": "Natural",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#c2a468",
+   "solid": false,
+   "tile": "waxed-canvas-natural-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-natural-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-red",
+   "name": "Red",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#7d1919",
+   "solid": false,
+   "tile": "waxed-canvas-red-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-red-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-dark-green",
+   "name": "Dark Green",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#283123",
+   "solid": false,
+   "tile": "waxed-canvas-dark-green-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-dark-green-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-purple",
+   "name": "Purple",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#662f49",
+   "solid": false,
+   "tile": "waxed-canvas-purple-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-purple-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "waxed-canvas-black",
+   "name": "Black",
+   "line": "Waxed Canvas",
+   "kind": "material",
+   "hex": "#202020",
+   "solid": false,
+   "tile": "waxed-canvas-black-hide.jpg",
+   "tileInches": 3.44,
+   "chip": "waxed-canvas-black-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "weave-leather-cognac",
+   "name": "Cognac",
+   "line": "Weave Leather",
+   "kind": "material",
+   "hex": "#6f452e",
+   "solid": false,
+   "tile": "weave-leather-cognac-hide.jpg",
+   "tileInches": 4.0,
+   "chip": "weave-leather-cognac-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "weave-leather-black",
+   "name": "Black",
+   "line": "Weave Leather",
+   "kind": "material",
+   "hex": "#312e30",
+   "solid": false,
+   "tile": "weave-leather-black-hide.jpg",
+   "tileInches": 4.0,
+   "chip": "weave-leather-black-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "weave-leather-brown",
+   "name": "Brown",
+   "line": "Weave Leather",
+   "kind": "material",
+   "hex": "#41352d",
+   "solid": false,
+   "tile": "weave-leather-brown-hide.jpg",
+   "tileInches": 4.0,
+   "chip": "weave-leather-brown-chip.jpg",
+   "source": "p28"
+  },
+  {
+   "id": "ballistic-nylon-black",
+   "name": "Black",
+   "line": "Ballistic Nylon",
+   "kind": "material",
+   "hex": "#252523",
+   "solid": false,
+   "tile": "ballistic-nylon-black-hide.jpg",
+   "tileInches": 4.6,
+   "chip": "ballistic-nylon-black-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ballistic-nylon-charcoal",
+   "name": "Charcoal",
+   "line": "Ballistic Nylon",
+   "kind": "material",
+   "hex": "#3e3e3e",
+   "solid": false,
+   "tile": "ballistic-nylon-charcoal-hide.jpg",
+   "tileInches": 4.6,
+   "chip": "ballistic-nylon-charcoal-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ballistic-nylon-navy-blue",
+   "name": "Navy Blue",
+   "line": "Ballistic Nylon",
+   "kind": "material",
+   "hex": "#393e4e",
+   "solid": false,
+   "tile": "ballistic-nylon-navy-blue-hide.jpg",
+   "tileInches": 4.6,
+   "chip": "ballistic-nylon-navy-blue-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ballistic-nylon-red",
+   "name": "Red",
+   "line": "Ballistic Nylon",
+   "kind": "material",
+   "hex": "#9c0305",
+   "solid": false,
+   "tile": "ballistic-nylon-red-hide.jpg",
+   "tileInches": 4.6,
+   "chip": "ballistic-nylon-red-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ballistic-nylon-royal-blue",
+   "name": "Royal Blue",
+   "line": "Ballistic Nylon",
+   "kind": "material",
+   "hex": "#02286f",
+   "solid": false,
+   "tile": "ballistic-nylon-royal-blue-hide.jpg",
+   "tileInches": 4.6,
+   "chip": "ballistic-nylon-royal-blue-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ballistic-nylon-od-green",
+   "name": "OD Green",
+   "line": "Ballistic Nylon",
+   "kind": "material",
+   "hex": "#464d32",
+   "solid": false,
+   "tile": "ballistic-nylon-od-green-hide.jpg",
+   "tileInches": 4.6,
+   "chip": "ballistic-nylon-od-green-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ballistic-nylon-coyote",
+   "name": "Coyote",
+   "line": "Ballistic Nylon",
+   "kind": "material",
+   "hex": "#896d4d",
+   "solid": false,
+   "tile": "ballistic-nylon-coyote-hide.jpg",
+   "tileInches": 4.6,
+   "chip": "ballistic-nylon-coyote-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "carbon-fiber-vinyl-black",
+   "name": "Black",
+   "line": "Carbon Fiber Vinyl",
+   "kind": "material",
+   "hex": "#0f0f10",
+   "solid": false,
+   "tile": "carbon-fiber-vinyl-black-hide.jpg",
+   "tileInches": 5.02,
+   "chip": "carbon-fiber-vinyl-black-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "carbon-fiber-vinyl-royal-blue",
+   "name": "Royal Blue",
+   "line": "Carbon Fiber Vinyl",
+   "kind": "material",
+   "hex": "#20207e",
+   "solid": false,
+   "tile": "carbon-fiber-vinyl-royal-blue-hide.jpg",
+   "tileInches": 5.02,
+   "chip": "carbon-fiber-vinyl-royal-blue-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "carbon-fiber-vinyl-red",
+   "name": "Red",
+   "line": "Carbon Fiber Vinyl",
+   "kind": "material",
+   "hex": "#742929",
+   "solid": false,
+   "tile": "carbon-fiber-vinyl-red-hide.jpg",
+   "tileInches": 5.02,
+   "chip": "carbon-fiber-vinyl-red-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "carbon-fiber-vinyl-dark-grey",
+   "name": "Dark Grey",
+   "line": "Carbon Fiber Vinyl",
+   "kind": "material",
+   "hex": "#494949",
+   "solid": false,
+   "tile": "carbon-fiber-vinyl-dark-grey-hide.jpg",
+   "tileInches": 5.02,
+   "chip": "carbon-fiber-vinyl-dark-grey-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "carbon-fiber-vinyl-yellow",
+   "name": "Yellow",
+   "line": "Carbon Fiber Vinyl",
+   "kind": "material",
+   "hex": "#e3c303",
+   "solid": false,
+   "tile": "carbon-fiber-vinyl-yellow-hide.jpg",
+   "tileInches": 5.02,
+   "chip": "carbon-fiber-vinyl-yellow-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "carbon-fiber-vinyl-white",
+   "name": "White",
+   "line": "Carbon Fiber Vinyl",
+   "kind": "material",
+   "hex": "#cacaca",
+   "solid": false,
+   "tile": "carbon-fiber-vinyl-white-hide.jpg",
+   "tileInches": 5.02,
+   "chip": "carbon-fiber-vinyl-white-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "carbon-fiber-vinyl-silver",
+   "name": "Silver",
+   "line": "Carbon Fiber Vinyl",
+   "kind": "material",
+   "hex": "#858585",
+   "solid": false,
+   "tile": "carbon-fiber-vinyl-silver-hide.jpg",
+   "tileInches": 5.02,
+   "chip": "carbon-fiber-vinyl-silver-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-navy-blue",
+   "name": "Navy Blue",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#282632",
+   "solid": false,
+   "tile": "ostrich-vinyl-navy-blue-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-navy-blue-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-chestnut",
+   "name": "Chestnut",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#8f4d26",
+   "solid": false,
+   "tile": "ostrich-vinyl-chestnut-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-chestnut-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-hot-pink",
+   "name": "Hot Pink",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#c74f6e",
+   "solid": false,
+   "tile": "ostrich-vinyl-hot-pink-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-hot-pink-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-orange",
+   "name": "Orange",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#bc5319",
+   "solid": false,
+   "tile": "ostrich-vinyl-orange-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-orange-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-beige",
+   "name": "Beige",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#bbb6a5",
+   "solid": false,
+   "tile": "ostrich-vinyl-beige-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-beige-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-lime-green",
+   "name": "Lime Green",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#229c03",
+   "solid": false,
+   "tile": "ostrich-vinyl-lime-green-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-lime-green-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-purple",
+   "name": "Purple",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#674e65",
+   "solid": false,
+   "tile": "ostrich-vinyl-purple-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-purple-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-bright-yellow",
+   "name": "Bright Yellow",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#c7cf02",
+   "solid": false,
+   "tile": "ostrich-vinyl-bright-yellow-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-bright-yellow-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-red",
+   "name": "Red",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#cb2e33",
+   "solid": false,
+   "tile": "ostrich-vinyl-red-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-red-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-silver",
+   "name": "Silver",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#979994",
+   "solid": false,
+   "tile": "ostrich-vinyl-silver-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-silver-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-gold",
+   "name": "Gold",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#9b8337",
+   "solid": false,
+   "tile": "ostrich-vinyl-gold-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-gold-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-brown",
+   "name": "Brown",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#705439",
+   "solid": false,
+   "tile": "ostrich-vinyl-brown-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-brown-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-black",
+   "name": "Black",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#272825",
+   "solid": false,
+   "tile": "ostrich-vinyl-black-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-black-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-forrest-green",
+   "name": "Forrest Green",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#324337",
+   "solid": false,
+   "tile": "ostrich-vinyl-forrest-green-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-forrest-green-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-charcoal",
+   "name": "Charcoal",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#58554a",
+   "solid": false,
+   "tile": "ostrich-vinyl-charcoal-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-charcoal-chip.jpg",
+   "source": "p28",
+   "noLift": true
+  },
+  {
+   "id": "ostrich-vinyl-toffee",
+   "name": "Toffee",
+   "line": "Ostrich Vinyl",
+   "kind": "material",
+   "hex": "#ab926f",
+   "solid": false,
+   "tile": "ostrich-vinyl-toffee-hide.jpg",
+   "tileInches": 5.4,
+   "chip": "ostrich-vinyl-toffee-chip.jpg",
+   "source": "p28",
+   "noLift": true
   }
  ]
 }

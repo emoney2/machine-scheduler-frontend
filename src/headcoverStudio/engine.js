@@ -78,7 +78,7 @@ export async function loadStudioData(base) {
   const cat = await (await fetch(base + "catalog.json", { cache: "no-cache" })).json();
   const swDir = base + cat.swatches.replace(/[^/]+$/, "");
   const sw = await (await fetch(base + cat.swatches, { cache: "no-cache" })).json();
-  const all = (sw.materials || sw).map((s) => ({ ...s, rgb: hexToRgb(s.hex), tileUrl: s.tile ? swDir + s.tile : null }));
+  const all = (sw.materials || sw).map((s) => ({ ...s, rgb: hexToRgb(s.hex), tileUrl: s.tile ? swDir + s.tile : null, chipUrl: s.chip ? swDir + s.chip : null }));
 
   // Only the small manifests load up front; each product's images and UV maps load when it's first used.
   const templates = await Promise.all(
@@ -183,12 +183,35 @@ function liftDetail(img) {
 export async function ensureTiles(list) {
   await Promise.all(
     list.filter((m) => m && m.tileUrl && !m.solid && !m.img).map(async (m) => {
-      m.img = liftDetail(await loadImg(m.tileUrl));
+      const im = await loadImg(m.tileUrl);
+      m.img = m.noLift ? im : liftDetail(im);   // noLift: tile already has its final contrast
     })
   );
 }
 
 /* ---------- studio ---------- */
+
+// Quilt stitching as real thread: a sunken needle channel, then thick dashed stitches in the thread
+// colour with a soft highlight, so a light thread reads on dark leather as well as a dark one on light.
+function quiltThreadMask(T) {
+  if (T._qMask) return T._qMask;
+  const w = T.w, h = T.h, m = makeCanvas(w, h), x = m.getContext("2d");
+  for (const [dx, dy] of [[0, 0], [0.7, 0], [-0.7, 0], [0, 0.7], [0, -0.7]]) x.drawImage(T.quiltStitchImg, dx, dy);   // ~2px thread
+  const d = makeCanvas(1, 7), dc = d.getContext("2d"); dc.fillStyle = "#000"; dc.fillRect(0, 0, 1, 5);              // 5 on / 2 off
+  x.globalCompositeOperation = "destination-in"; x.fillStyle = x.createPattern(d, "repeat"); x.fillRect(0, 0, w, h);
+  return (T._qMask = m);
+}
+function tint(mask, color, w, h) {
+  const c = makeCanvas(w, h), x = c.getContext("2d");
+  x.drawImage(mask, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = color; x.fillRect(0, 0, w, h); return c;
+}
+function drawQuiltThread(ctx, T, color) {
+  const w = T.w, h = T.h, mask = quiltThreadMask(T);
+  ctx.save(); ctx.filter = "blur(0.8px)"; ctx.globalAlpha = 0.55; ctx.drawImage(tint(T.quiltStitchImg, "#000", w, h), 0, 0.6); ctx.restore();   // needle channel
+  ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 1.2; ctx.shadowOffsetY = 0.8; ctx.drawImage(tint(mask, color, w, h), 0, 0); ctx.restore();
+  ctx.save(); ctx.globalAlpha = 0.35; ctx.globalCompositeOperation = "screen"; ctx.drawImage(tint(T.quiltStitchImg, "#ffffff", w, h), 0, -0.4); ctx.restore();   // thread sheen
+}
+
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
   const find = (line, name) => SW.find((s) => s.line === line && s.name.toLowerCase() === name.toLowerCase());
@@ -444,11 +467,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     }
     if (T.quiltShadeImg) {   // quilted: puffed diamonds (multiply), then the stitching in the thread colour
       ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.drawImage(T.quiltShadeImg, 0, 0); ctx.drawImage(T.quiltShadeImg, 0, 0); ctx.restore();
-      if (T.quiltStitchImg) {
-        const c = makeCanvas(T.w, T.h), x = c.getContext("2d");
-        x.drawImage(T.quiltStitchImg, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = opts.thread || "#f2efe8"; x.fillRect(0, 0, T.w, T.h);
-        ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 1; ctx.shadowOffsetY = 0.6; ctx.drawImage(c, 0, 0); ctx.restore();
-      }
+      if (T.quiltStitchImg) drawQuiltThread(ctx, T, opts.thread || "#f2efe8");
     }
     if (T.tartanImgs && opts.tartan) {   // tartan: straight stitch lines, one thread colour per layer
       T.tartanImgs.forEach((im, i) => {

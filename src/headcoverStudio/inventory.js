@@ -22,6 +22,11 @@ const LINE_KEYS = {
   "emboss patch leather": ["emboss", "embossed", "patch"],
   "premium vinyl solid": ["vinyl"],
   "fur interior lining": ["fur"],
+  "waxed canvas": ["canvas"],
+  "weave leather": ["weave", "woven"],
+  "ballistic nylon": ["ballistic", "nylon"],
+  "carbon fiber vinyl": ["carbon"],
+  "ostrich vinyl": ["ostrich vinyl"],
 };
 
 export function matchInventory(swatches, rows, overrides = {}, kind = "material") {
