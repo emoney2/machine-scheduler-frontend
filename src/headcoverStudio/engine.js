@@ -614,10 +614,12 @@ export function createStudio({ materials, furs, templates, proofs }) {
       const k = Math.min(opts.logoScale || 1, 1.15);   // the size slider can't push marks into each other
       T.scatter.forEach((m) => drawLogo(ctx, m.x, m.y, m.w * k, m.w * k, mats[0], { tint: opts.scatterTint, rot: m.rot, flat: true }));
     }
-    if (T.logo && LOGO.canvas && !T.patternImgs) {
+    if (T.logo && LOGO.canvas && !T.patternImgs && !opts.noLogo) {
       const s = opts.logoScale, g = T.logoGround >= 0 ? mats[(T.logoGround + 1) % mats.length] : mats[0];
       const c = { body: mats[0], accent: mats[1], trim: mats[2], extra: mats[3] };
-      drawLogo(ctx, T.logo.x + T.logo.w / 2, T.logo.y + T.logo.h / 2, T.logo.w * s, T.logo.h * s, g, { tint: opts.oneColor ? pickThread({ ...c, body: g }) : null, rot: T.logo.rot || 0 });
+      // T.logos: more than one logo spot (painted blade: one on each side; painted mallet: on the tab, upside down)
+      (T.logos || [T.logo]).forEach((L) =>
+        drawLogo(ctx, L.x + L.w / 2, L.y + L.h / 2, L.w * s, L.h * s, g, { tint: opts.oneColor ? pickThread({ ...c, body: g }) : null, rot: L.rot || 0 }));
     }
     return cv;
   }
