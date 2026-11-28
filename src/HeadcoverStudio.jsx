@@ -1010,7 +1010,7 @@ export default function HeadcoverStudio() {
                         </div>
                         {Q.pattern !== "diamond" && (
                           <label className="patrow">
-                            <span>Pocket size<b>{Q.size.toFixed(2)}"</b></span>
+                            <span>Diamond size<b>{Math.round(Q.size * 100)}%</b></span>
                             <input type="range" min="0.6" max="1.8" step="0.05" value={Q.size} onChange={(e) => setQ({ size: +e.target.value })} />
                           </label>
                         )}

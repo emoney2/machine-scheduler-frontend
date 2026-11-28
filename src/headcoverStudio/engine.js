@@ -245,9 +245,7 @@ function tint(mask, color, w, h) {
 }
 // More quilting patterns, generated for any template (the PSD only has the diamond): stitch lines in inches, then
 // a puffed shade from the same lines (dark in the seams, full in the middle of each pocket)
-export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"], ["viper", "Viper"], ["chevron", "Herringbone"], ["channel", "Channel"], ["box", "Box"],
-  ["zigzag", "Zigzag"], ["wave", "Wave"], ["onion", "Onion"], ["scallop", "Scallop"], ["honeycomb", "Honeycomb"], ["mountain", "Mountain"],
-  ["basket", "Basketweave"], ["circles", "Quatrefoil"], ["brick", "Brick"]];
+export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"]];
 const quiltGen = new Map();
 function quiltPaths(x, w, h, ppi, pattern, size, axes) {
   const S = ppi * (size || 1);   // one pocket ~1"
