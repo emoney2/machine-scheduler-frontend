@@ -558,7 +558,7 @@ export default function HeadcoverStudio() {
   useEffect(() => {
     if (!S) return;
     S.setClubName(club);
-    const ct = designs.filter((d) => (["camotext", "painttext", "tartantext", "flagtext"].includes(d.spec.kind) && !(d.spec.camotext && d.spec.camotext.text)) || (d.spec.kind === "patch" && !(d.spec.patch && (d.spec.patch.text || d.spec.patch.topText || d.spec.patch.bottomText))));
+    const ct = designs.filter((d) => (["camotext", "flagtext"].includes(d.spec.kind) && !(d.spec.camotext && d.spec.camotext.text)) || (d.spec.kind === "patch" && !(d.spec.patch && (d.spec.patch.text || d.spec.patch.topText || d.spec.patch.bottomText))));
     if (!ct.length) return;
     clearTimeout(clubTimer.current);
     clubTimer.current = setTimeout(() => renderAll(designs, new Set(ct.map((d) => d.uid))), 450);
@@ -1029,8 +1029,8 @@ export default function HeadcoverStudio() {
                       </div>
                     );
                   })()}
-                  {["camotext", "painttext", "tartantext", "flagtext"].includes(cur.spec.kind) && (() => {
-                    const C = { ...CAMOTEXT_DEFAULT, ...(cur.spec.camotext || {}) }, isCamo = cur.spec.kind === "camotext", look = C.look || {};
+                  {["camotext", "flagtext"].includes(cur.spec.kind) && (() => {
+                    const C = { ...CAMOTEXT_DEFAULT, ...(cur.spec.camotext || {}) }, isCamo = cur.spec.kind === "camotext";
                     const sl = (label, k, min, max, step, fmt) => (
                       <label className="patrow" key={k}>
                         <span>{label}<b>{fmt(C[k])}</b></span>
@@ -1039,23 +1039,14 @@ export default function HeadcoverStudio() {
                     );
                     return (
                       <div className="patctl">
-                        <div className="small">{isCamo ? "Camo text" : "Text"}</div>
+                        <div className="small">{isCamo ? "Camo text" : "Flag text"}</div>
                         <input type="text" value={C.text} placeholder={club ? club.toUpperCase() + " (club name)" : "Club name"} onChange={(e) => setCamoText({ text: e.target.value })} style={{ width: "100%", margin: "4px 0 6px" }} />
                         {sl("Letter size", "size", 0.6, 1.2, 0.02, (v) => `${Math.round(v * 100)}%`)}
                         {sl("Letter width", "wide", 0.7, 1.4, 0.02, (v) => `${Math.round(v * 100)}%`)}
                         {sl("Letter spacing", "spacing", 0, 0.3, 0.01, (v) => v.toFixed(2))}
-                        {cur.spec.kind !== "flagtext" && sl(isCamo ? "Camo size" : cur.spec.kind === "painttext" ? "Painting zoom" : "Tartan size", "camoScale", 1, 3, 0.05, (v) => `${Math.round(v * 100)}%`)}
+                        {isCamo && sl("Camo size", "camoScale", 1, 3, 0.05, (v) => `${Math.round(v * 100)}%`)}
                         {sl("Outline width", "outlineW", 0, 0.12, 0.01, (v) => `${v.toFixed(2)}"`)}
                         {isCamo && <button className="ghost" onClick={() => setCamoText({ seed: ((C.seed || 0) + 1) % 4 })}>Flip camo</button>}
-                        {cur.spec.kind === "painttext" && (
-                          <div className="lines" style={{ margin: "6px 0" }}>
-                            {[["oil", "Oil paint"], ["ink", "Pen & ink"], ["screen", "Screen print"], ["water", "Watercolour"]].map(([v, l]) => (
-                              <button key={v} className={(look.style || "oil") === v ? "on" : ""} onClick={() => setCamoText({ look: { ...look, style: v } })}>{l}</button>
-                            ))}
-                          </div>
-                        )}
-                        {cur.spec.kind === "painttext" && sl("Painting left / right", "paintX", -1, 1, 0.05, (v) => v.toFixed(2))}
-                        {cur.spec.kind === "painttext" && sl("Painting up / down", "paintY", -1, 1, 0.05, (v) => v.toFixed(2))}
                       </div>
                     );
                   })()}
