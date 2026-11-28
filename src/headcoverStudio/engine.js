@@ -1069,6 +1069,19 @@ export function createStudio({ materials, furs, templates, proofs }) {
   function brushEnd() { return afterLogo(); }
   /** For the Edit logo pop-up: take a copy on open, put it back on Cancel. */
   const logoSnapshot = () => (LOGO.canvas ? { canvas: cloneCanvas(LOGO.canvas), history: LOGO.history.slice(), map: (LOGO.map || []).slice(), base: LOGO.base, orig: LOGO.orig, palette: LOGO.palette } : null);
+  /** After editing: crop to what's left of the logo (+ a little room), so sizing uses the logo, not the old box. */
+  function trimLogo() {
+    const c = LOGO.canvas; if (!c) return null;
+    const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
+    let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return afterLogo();
+    const pad = 6; x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(c.width - 1, x1 + pad); y1 = Math.min(c.height - 1, y1 + pad);
+    if (x0 === 0 && y0 === 0 && x1 === c.width - 1 && y1 === c.height - 1) return afterLogo();
+    const crop = (src) => { if (!src) return src; const k = makeCanvas(x1 - x0 + 1, y1 - y0 + 1); k.getContext("2d").drawImage(src, -x0, -y0); return k; };
+    LOGO.canvas = crop(LOGO.canvas); LOGO.orig = crop(LOGO.orig); LOGO.base = crop(LOGO.base); LOGO.history = [];
+    return afterLogo();
+  }
   function logoRestore(sn) { if (!sn) return null; Object.assign(LOGO, { canvas: sn.canvas, history: sn.history, map: sn.map, base: sn.base, orig: sn.orig, palette: sn.palette }); return afterLogo(); }
   function setLogoColors(map) { LOGO.map = map || []; return afterLogo(); }
   /** The logo drawn with a given colour map (for previews and swatch pickers). */
@@ -1166,7 +1179,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     setCourse, hasCourse: () => !!COURSE.src, courseCanvas: () => COURSE.src, paintDpi, renderPrint,
     materials: SW, furs, templates, proofs, products, WHITE, BLACK,
     hasLogo: () => !!LOGO.canvas, logoCanvas: () => LOGO.canvas, logoPalette: () => LOGO.palette || [], logoMap: () => LOGO.map || [],
-    brushStart, brushAt, brushEnd, setLogoColors, logoWith, mergeMaps, logoSnapshot, logoRestore,
+    brushStart, brushAt, brushEnd, setLogoColors, logoWith, mergeMaps, logoSnapshot, logoRestore, trimLogo,
     loadBlob, processLogo, eraseAt, undoErase, resetLogo, nearest, generate, sheet,
     plan, renderSpec, restoreLogo, matById,
     renderTemplate, renderProof,   // exposed for tests / future tools

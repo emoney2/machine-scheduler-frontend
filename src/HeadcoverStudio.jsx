@@ -382,7 +382,7 @@ export default function HeadcoverStudio() {
   const setSessionLogoColors = (map) => applyLogoResult(S.setLogoColors(map), false);
   const openLogoEdit = () => { if (S && S.hasLogo()) { setLogoTool("click"); setLogoEdit({ snap: S.logoSnapshot(), tol, inside }); } };
   const cancelLogoEdit = () => { const e = logoEdit; setLogoEdit(null); if (e) { setTol(e.tol); setInside(e.inside); applyLogoResult(S.logoRestore(e.snap), false); } };
-  const saveLogoEdit = () => { setLogoEdit(null); showToast("Logo saved · redrawing the covers"); };
+  const saveLogoEdit = () => { applyLogoResult(S.trimLogo(), false); setLogoEdit(null); showToast("Logo saved · redrawing the covers"); };   // trimmed to what is left
 
   /* ---------- slots + library ---------- */
   const assign = (m) => {
