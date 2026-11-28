@@ -18,16 +18,16 @@
  "design": "camotext",
  "slots": [],
  "camotext": {
-  "cx": 510,
-  "cy": 400,
-  "len": 240,
-  "thick": 72,
+  "cx": 495,
+  "cy": 385,
+  "len": 262,
+  "thick": 86,
   "rot": 90,
   "camo": [
-   400,
-   240,
-   180,
-   330
+   385,
+   215,
+   220,
+   340
   ],
   "camoRot": false,
   "mask": "text-area.png"
