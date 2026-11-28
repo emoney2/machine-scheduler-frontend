@@ -246,7 +246,8 @@ function tint(mask, color, w, h) {
 // More quilting patterns, generated for any template (the PSD only has the diamond): stitch lines in inches, then
 // a puffed shade from the same lines (dark in the seams, full in the middle of each pocket)
 export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"], ["viper", "Viper"], ["chevron", "Herringbone"], ["channel", "Channel"], ["box", "Box"],
-  ["zigzag", "Zigzag"], ["wave", "Wave"], ["onion", "Onion"], ["scallop", "Scallop"], ["honeycomb", "Honeycomb"], ["mountain", "Mountain"]];
+  ["zigzag", "Zigzag"], ["wave", "Wave"], ["onion", "Onion"], ["scallop", "Scallop"], ["honeycomb", "Honeycomb"], ["mountain", "Mountain"],
+  ["basket", "Basketweave"], ["circles", "Quatrefoil"], ["brick", "Brick"]];
 const quiltGen = new Map();
 function quiltPaths(x, w, h, ppi, pattern, size, axes) {
   const S = ppi * (size || 1);   // one pocket ~1"
@@ -268,6 +269,24 @@ function quiltPaths(x, w, h, ppi, pattern, size, axes) {
         for (let y = -2 * cw; y < h + 2 * cw; y += S * 0.95) line([[x0, y + (side > 0 ? 0 : cw * 0.55)], [x0 + cw, y + (side > 0 ? cw * 0.55 : 0)]]);
       }
     });
+  }
+  if (pattern === "basket") {   // squares of three short channels, turning 90° square to square
+    const B = S * 1.2, n = 3;
+    for (let y = 0, r = 0; y < h + B; y += B, r++) for (let xx = 0, c = 0; xx < w + B; xx += B, c++) {
+      line([[xx, y], [xx + B, y]]); line([[xx, y], [xx, y + B]]);
+      for (let i = 1; i < n; i++) { const t = (B * i) / n; if ((r + c) % 2) line([[xx + t, y], [xx + t, y + B]]); else line([[xx, y + t], [xx + B, y + t]]); }
+    }
+  }
+  if (pattern === "circles") {   // interlocking circles: each pocket a four-petal quatrefoil
+    const a = S * 1.1, r = a / Math.SQRT2;
+    for (let y = 0; y < h + a; y += a) for (let xx = 0; xx < w + a; xx += a) { x.beginPath(); x.arc(xx, y, r, 0, Math.PI * 2); x.stroke(); }
+  }
+  if (pattern === "brick") {   // rows of long pockets, each row shifted half a brick
+    const bh = S * 0.75, bw = S * 1.6;
+    for (let y = 0, r = 0; y < h + bh; y += bh, r++) {
+      line([[0, y], [w, y]]);
+      for (let xx = (r % 2) * (bw / 2) - bw; xx < w + bw; xx += bw) line([[xx, y], [xx, y + bh]]);
+    }
   }
   if (pattern === "wave") for (let y = S * 0.5; y < h + S; y += S) curve((xx) => y + S * 0.22 * Math.sin((xx / (S * 1.6)) * Math.PI * 2));
   if (pattern === "onion") for (let y = 0; y < h + S; y += S) { curve((xx) => y + S * 0.35 * Math.sin((xx / (S * 1.4)) * Math.PI * 2)); curve((xx) => y - S * 0.35 * Math.sin((xx / (S * 1.4)) * Math.PI * 2)); }
