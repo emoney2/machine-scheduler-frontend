@@ -1,0 +1,26 @@
+{
+ "name": "Circle Patch",
+ "product": "Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 229.32,
+  "y": 490.7,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "patch",
+ "patch": {
+  "cx": 264,
+  "cy": 543,
+  "r": 71
+ }
+}

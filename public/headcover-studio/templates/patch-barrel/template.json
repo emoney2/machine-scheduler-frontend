@@ -1,0 +1,26 @@
+{
+ "name": "Circle Patch",
+ "product": "Barrel",
+ "w": 1071,
+ "h": 1235,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 485.75,
+  "y": 284.79,
+  "w": 103.08,
+  "h": 103.08,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "patch",
+ "patch": {
+  "cx": 538,
+  "cy": 860,
+  "r": 80,
+  "sx": 1.42
+ }
+}

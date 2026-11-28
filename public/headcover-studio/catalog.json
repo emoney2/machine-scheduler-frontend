@@ -437,6 +437,46 @@
   {
    "id": "camotext-df3-mallet",
    "dir": "templates/camotext-df3-mallet/"
+  },
+  {
+   "id": "patch-driver",
+   "dir": "templates/patch-driver/"
+  },
+  {
+   "id": "patch-fairway",
+   "dir": "templates/patch-fairway/"
+  },
+  {
+   "id": "patch-hybrid",
+   "dir": "templates/patch-hybrid/"
+  },
+  {
+   "id": "patch-blade",
+   "dir": "templates/patch-blade/"
+  },
+  {
+   "id": "patch-mallet",
+   "dir": "templates/patch-mallet/"
+  },
+  {
+   "id": "patch-mid-mallet",
+   "dir": "templates/patch-mid-mallet/"
+  },
+  {
+   "id": "patch-center-shaft-mallet",
+   "dir": "templates/patch-center-shaft-mallet/"
+  },
+  {
+   "id": "patch-df3-mallet",
+   "dir": "templates/patch-df3-mallet/"
+  },
+  {
+   "id": "patch-barrel",
+   "dir": "templates/patch-barrel/"
+  },
+  {
+   "id": "patch-zipper-pouch",
+   "dir": "templates/patch-zipper-pouch/"
   }
  ],
  "proofs": [

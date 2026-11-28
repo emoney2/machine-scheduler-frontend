@@ -1,0 +1,26 @@
+{
+ "name": "Circle Patch",
+ "product": "Fairway",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 205.15,
+  "y": 200.14,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "patch",
+ "patch": {
+  "cx": 241,
+  "cy": 221,
+  "r": 71
+ }
+}

@@ -1,0 +1,25 @@
+{
+ "name": "Circle Patch",
+ "product": "Mid Mallet",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 460.84,
+  "y": 314.67,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "patch",
+ "patch": {
+  "cx": 495,
+  "cy": 405,
+  "r": 62
+ }
+}

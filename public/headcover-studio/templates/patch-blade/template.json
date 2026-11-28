@@ -1,0 +1,26 @@
+{
+ "name": "Circle Patch",
+ "product": "Blade",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 455.94,
+  "y": 314.26,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "patch",
+ "patch": {
+  "cx": 489,
+  "cy": 425,
+  "r": 60
+ }
+}
