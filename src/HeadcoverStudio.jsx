@@ -1011,11 +1011,11 @@ export default function HeadcoverStudio() {
                         <div className="small">Camo text</div>
                         <input type="text" value={C.text} placeholder={club ? club.toUpperCase() + " (club name)" : "Club name"} onChange={(e) => setCamoText({ text: e.target.value })} style={{ width: "100%", margin: "4px 0 6px" }} />
                         {sl("Letter size", "size", 0.6, 1.2, 0.02, (v) => `${Math.round(v * 100)}%`)}
-                        {sl("Letter width", "wide", 0.8, 1.8, 0.05, (v) => `${Math.round(v * 100)}%`)}
+                        {sl("Letter width", "wide", 0.7, 1.4, 0.02, (v) => `${Math.round(v * 100)}%`)}
                         {sl("Letter spacing", "spacing", 0, 0.3, 0.01, (v) => v.toFixed(2))}
-                        {sl("Camo size", "camoScale", 0.5, 2.5, 0.05, (v) => `${Math.round(v * 100)}%`)}
+                        {sl("Camo size", "camoScale", 1, 3, 0.05, (v) => `${Math.round(v * 100)}%`)}
                         {sl("Outline width", "outlineW", 0, 0.12, 0.01, (v) => `${v.toFixed(2)}"`)}
-                        <button className="ghost" onClick={() => setCamoText({ seed: (C.seed || 0) + 1 })}>Shuffle camo</button>
+                        <button className="ghost" onClick={() => setCamoText({ seed: ((C.seed || 0) + 1) % 4 })}>Flip camo</button>
                       </div>
                     );
                   })()}

@@ -249,7 +249,7 @@ function drawQuiltThread(ctx, T, color) {
 // x / y move it (fraction of the area), rot turns it in 90° steps; look = oil paint settings
 export const PAINT_DEFAULT = { area: null, zoom: 1, x: 0, y: 0, rot: 0, look: {} };
 export { OIL_DEFAULT };
-export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.06, camoScale: 1.3, outlineW: 0.05, seed: 0, wide: 1 };
+export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.128, camoScale: 1, outlineW: 0.06, seed: 0, wide: 1 };
 export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: true };   // orig: logo in its own colours (false = one colour)
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
@@ -585,39 +585,33 @@ export function createStudio({ materials, furs, templates, proofs }) {
     for (let i = 0; i < p.length; i += 4) { const l = Math.round(p[i] / 80), k = l === 0 ? 2 : l === 1 ? 1 : 0; p[i] = rgb[k][0]; p[i + 1] = rgb[k][1]; p[i + 2] = rgb[k][2]; p[i + 3] = 255; }
     x.putImageData(d, 0, 0); camoCache.set(key, c); return c;
   }
+  // set like the OAKMONT layer in the Oakmont file: NFL Bears Throwback at 81% width, gaps 12.8% of the letter height,
+  // camo = that file's "Camo Top Layer" art laid over the front panel, outline round the outside of the letters
   function drawCamoText(ctx, T, C, ppi) {
     const B = T.camotext, txt = String(C.text || CLUB_NAME || "CLUB").toUpperCase().trim() || "CLUB", chars = [...txt];
     const L = makeCanvas(T.w, T.h), x = L.getContext("2d");
     x.translate(B.cx, B.cy); x.rotate(((B.rot || 0) * Math.PI) / 180);
     const fam = "JRBlock, Impact, sans-serif";
     x.font = `100px ${fam}`;
-    const cap100 = x.measureText("H").actualBoundingBoxAscent || 72;
-    let capPx = B.thick * (C.size || 1), fs = capPx * (100 / cap100);
-    x.font = `${fs}px ${fam}`;
-    const w0 = chars.map((ch) => x.measureText(ch).width), sum0 = w0.reduce((a, b) => a + b, 0) || 1;
-    const gapK = C.spacing == null ? 0.1 : C.spacing;
-    // like the Oakmont file: the word fills the panel's length, letters widened to fit, small even gaps
-    let wk = ((B.len * 0.99 - gapK * capPx * (chars.length - 1)) / sum0) * (C.wide || 1);
-    if (wk < 0.55) { const k = wk / 0.55; capPx *= k; fs *= k; x.font = `${fs}px ${fam}`; wk = 0.55; }   // very long names: smaller letters
-    wk = Math.min(wk, 2.2);
-    const widths = chars.map((ch) => x.measureText(ch).width * wk), gap = gapK * capPx;
-    const total = widths.reduce((a, b) => a + b, 0) + gap * (chars.length - 1), px = -total / 2;
+    const cap100 = x.measureText("H").actualBoundingBoxAscent || 80;
+    let capPx = B.thick * (C.size || 1), wk = 0.81 * (C.wide || 1), gapK = C.spacing == null ? 0.128 : C.spacing;
+    const adv100 = chars.map((ch) => x.measureText(ch).width);
+    const lenAt = (cp) => adv100.reduce((a, b) => a + b, 0) * (cp / cap100) * wk + gapK * cp * (chars.length - 1);
+    if (lenAt(capPx) > B.len) capPx *= B.len / lenAt(capPx);   // long names: smaller letters
+    const fs = capPx * (100 / cap100); x.font = `${fs}px ${fam}`;
+    const widths = adv100.map((w) => w * (fs / 100) * wk), gap = gapK * capPx, total = lenAt(capPx), px = -total / 2;
     const glyph = (c, q, stroke) => { x.save(); x.translate(q, capPx / 2); x.scale(wk, 1); if (stroke) x.strokeText(c, 0, 0); else x.fillText(c, 0, 0); x.restore(); };
     const each = (stroke) => { let q = px; chars.forEach((c, i) => { glyph(c, q, stroke); q += widths[i] + gap; }); };
     x.fillStyle = "#000"; each(false);
-    // camo under the letters: one unbroken piece of the Light Camo print (no repeats or mirror seams), turned to run along the word
     x.globalCompositeOperation = "source-in";
-    const tile = camoTileIn(T.camoTile, C.colors), seed = C.seed || 0;
-    let sc = (ppi / 149) * (C.camoScale || 1);
-    sc = Math.max(sc, (total + 4) / tile.height, (capPx + 4) / tile.width);   // must cover the word
-    const tw = tile.width * sc, th = tile.height * sc, slackX = Math.max(0, th - total), slackY = Math.max(0, tw - capPx);
-    const r1 = ((seed * 0.618034) % 1), r2 = ((seed * 0.414214 + 0.5) % 1);
-    x.save(); x.rotate(-Math.PI / 2); if (seed & 1) x.scale(-1, 1); if (seed & 2) x.scale(1, -1);
-    // after the turn, the tile's height runs along the word
-    x.drawImage(tile, -tw / 2 + (r2 - 0.5) * slackY, -th / 2 + (r1 - 0.5) * slackX, tw, th);
+    const tile = camoTileIn(T.camoTile, C.colors), seed = C.seed || 0, [cx0, cy0, cw, ch] = B.camo || [0, 0, T.w, T.h];
+    x.save(); x.setTransform(1, 0, 0, 1, 0, 0);
+    x.translate(cx0 + cw / 2, cy0 + ch / 2); if (seed & 1) x.scale(-1, 1); if (seed & 2) x.scale(1, -1);
+    const k = C.camoScale || 1; x.drawImage(tile, (-cw / 2) * k, (-ch / 2) * k, cw * k, ch * k);
     x.restore();
-    x.globalCompositeOperation = "source-over";
-    x.lineJoin = "miter"; x.lineWidth = Math.max(1.2, ppi * (C.outlineW || 0.05)) / wk; x.strokeStyle = C.outline;
+    // outline outside the letters, in the outline colour
+    x.globalCompositeOperation = "destination-over";
+    x.lineJoin = "miter"; x.lineWidth = (2 * Math.max(0.6, ppi * (C.outlineW == null ? 0.06 : C.outlineW))) / wk; x.strokeStyle = C.outline;
     each(true);
     x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "destination-in"; x.drawImage(T.camoMaskImg, 0, 0);
     ctx.drawImage(L, 0, 0);

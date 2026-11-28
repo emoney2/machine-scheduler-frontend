@@ -20,11 +20,17 @@
  "design": "camotext",
  "camotext": {
   "cx": 239,
-  "cy": 428.0,
-  "len": 622,
-  "thick": 142,
+  "cy": 435.51670378619156,
+  "len": 617,
+  "thick": 136.9,
   "rot": 90,
-  "mask": "paint-front.png"
+  "mask": "paint-front.png",
+  "camo": [
+   66,
+   53,
+   347,
+   750
+  ]
  },
  "logos": [
   {

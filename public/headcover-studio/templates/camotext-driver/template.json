@@ -19,12 +19,18 @@
  "slots": [],
  "design": "camotext",
  "camotext": {
-  "cx": 316,
-  "cy": 549.0,
-  "len": 745,
-  "thick": 191,
+  "cx": 318.5,
+  "cy": 558.2,
+  "len": 739,
+  "thick": 184.2,
   "rot": 90,
-  "mask": "paint-front.png"
+  "mask": "paint-front.png",
+  "camo": [
+   81.4,
+   100.0,
+   467.6,
+   899.4
+  ]
  },
  "logos": [
   {
