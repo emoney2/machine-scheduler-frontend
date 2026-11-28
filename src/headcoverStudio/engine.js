@@ -770,12 +770,11 @@ export function createStudio({ materials, furs, templates, proofs }) {
   }
 
   /* ----- Quilted / Exotic colourways ----- */
-  const EXOTIC_LINES = ["Gator Leather", "Rustic Gator Leather", "Split-tone Gator Leather", "Ostrich Leather"];
-  const isExotic = (m) => m && EXOTIC_LINES.includes(m.line);
   // the exotic closest in colour to m (m itself if it already is one); `avoid` keeps colourway B different from A
+  // the Exotic cover is built from plain Gator Leather; split-tone, rustic or ostrich only by choosing it in Edit
   function exoticFor(m, avoid) {
-    if (isExotic(m)) return m;
-    const pool = SW.filter((x) => isExotic(x) && x !== avoid && !x.hidden);
+    if (m && m.line === "Gator Leather") return m;
+    const pool = SW.filter((x) => x.line === "Gator Leather" && x !== avoid && !x.hidden);
     return pool.reduce((b, x) => (dE(x.rgb, m.rgb) < dE(b.rgb, m.rgb) ? x : b), pool[0]);
   }
   const isSmooth = (m) => m && m.solid && m.kind !== "fur";
