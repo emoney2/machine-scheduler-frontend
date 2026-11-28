@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
 import {
-  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT, PAINT_DEFAULT, OIL_DEFAULT, pngWithDpi, downloadBlob,
+  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT, PAINT_DEFAULT, CAMOTEXT_DEFAULT, OIL_DEFAULT, pngWithDpi, downloadBlob,
 } from "./headcoverStudio/engine";
 import { matchInventory } from "./headcoverStudio/inventory";
 import { saveSession, getSession, deleteSession, listSessions, newId, packSpec, unpackSpec, thumbOf } from "./headcoverStudio/sessions";
@@ -553,6 +553,18 @@ export default function HeadcoverStudio() {
     setPrinting(null);
   };
 
+  // Camo Text spells the club name: when it changes, redraw just those designs
+  const clubTimer = useRef(null);
+  useEffect(() => {
+    if (!S) return;
+    S.setClubName(club);
+    const ct = designs.filter((d) => d.spec.kind === "camotext" && !(d.spec.camotext && d.spec.camotext.text));
+    if (!ct.length) return;
+    clearTimeout(clubTimer.current);
+    clubTimer.current = setTimeout(() => renderAll(designs, new Set(ct.map((d) => d.uid))), 450);
+  }, [club]);
+  const setCamoText = (patch) => cur && liveSpec({ ...cur.spec, camotext: { ...CAMOTEXT_DEFAULT, ...(cur.spec.camotext || {}), ...patch } });
+
   /* ---------- session save / open ---------- */
   const saveTimer = useRef(null);
   const logoBlob = useRef(null);
@@ -983,6 +995,27 @@ export default function HeadcoverStudio() {
                           </label>
                         )}
                         {cur.spec.logoStroke && cur.spec.logoStroke.width > 0 && <button className="ghost" onClick={() => setDesignStroke(null)}>No outline</button>}
+                      </div>
+                    );
+                  })()}
+                  {cur.spec.kind === "camotext" && (() => {
+                    const C = { ...CAMOTEXT_DEFAULT, ...(cur.spec.camotext || {}) };
+                    const sl = (label, k, min, max, step, fmt) => (
+                      <label className="patrow" key={k}>
+                        <span>{label}<b>{fmt(C[k])}</b></span>
+                        <input type="range" min={min} max={max} step={step} value={C[k]} onChange={(e) => setCamoText({ [k]: +e.target.value })} />
+                      </label>
+                    );
+                    return (
+                      <div className="patctl">
+                        <div className="small">Camo text</div>
+                        <input type="text" value={C.text} placeholder={club ? club.toUpperCase() + " (club name)" : "Club name"} onChange={(e) => setCamoText({ text: e.target.value })} style={{ width: "100%", margin: "4px 0 6px" }} />
+                        {sl("Letter size", "size", 0.6, 1.2, 0.02, (v) => `${Math.round(v * 100)}%`)}
+                        {sl("Letter width", "wide", 0.8, 1.8, 0.05, (v) => `${Math.round(v * 100)}%`)}
+                        {sl("Letter spacing", "spacing", 0, 0.3, 0.01, (v) => v.toFixed(2))}
+                        {sl("Camo size", "camoScale", 0.5, 2.5, 0.05, (v) => `${Math.round(v * 100)}%`)}
+                        {sl("Outline width", "outlineW", 0, 0.12, 0.01, (v) => `${v.toFixed(2)}"`)}
+                        <button className="ghost" onClick={() => setCamoText({ seed: (C.seed || 0) + 1 })}>Shuffle camo</button>
                       </div>
                     );
                   })()}

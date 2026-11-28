@@ -1,0 +1,38 @@
+{
+ "name": "Camo Text",
+ "product": "Fairway",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 205.15,
+  "y": 200.14,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "camotext",
+ "camotext": {
+  "cx": 239.5,
+  "cy": 428.0,
+  "len": 622,
+  "thick": 142,
+  "rot": 90,
+  "mask": "paint-front.png"
+ },
+ "logos": [
+  {
+   "x": 625.5,
+   "y": 168.5,
+   "w": 69,
+   "h": 69,
+   "rot": 0
+  }
+ ]
+}

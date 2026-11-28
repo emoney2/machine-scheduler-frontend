@@ -397,6 +397,18 @@
   {
    "id": "painted-zipper-pouch",
    "dir": "templates/painted-zipper-pouch/"
+  },
+  {
+   "id": "camotext-driver",
+   "dir": "templates/camotext-driver/"
+  },
+  {
+   "id": "camotext-fairway",
+   "dir": "templates/camotext-fairway/"
+  },
+  {
+   "id": "camotext-hybrid",
+   "dir": "templates/camotext-hybrid/"
   }
  ],
  "proofs": [

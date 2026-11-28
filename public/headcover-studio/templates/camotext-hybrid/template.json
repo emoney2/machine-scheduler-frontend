@@ -1,0 +1,37 @@
+{
+ "name": "Camo Text",
+ "product": "Hybrid",
+ "w": 900,
+ "h": 857,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 207.94,
+  "y": 199.94,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "slots": [],
+ "design": "camotext",
+ "camotext": {
+  "cx": 262.0,
+  "cy": 430,
+  "len": 530,
+  "thick": 190,
+  "rot": 90,
+  "mask": "paint-front.png"
+ },
+ "logos": [
+  {
+   "x": 624.5,
+   "y": 197.7,
+   "w": 69,
+   "h": 69,
+   "rot": 0
+  }
+ ]
+}

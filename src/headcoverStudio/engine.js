@@ -111,6 +111,7 @@ export async function loadStudioData(base) {
   return { materials, furs, templates, proofs };
 }
 
+const CAMO_ASSETS = { tile: null, font: null };
 function loadTemplateAssets(T) {
   if (T.ready) return T.ready;
   T.ready = (async () => {
@@ -121,6 +122,15 @@ function loadTemplateAssets(T) {
     T.quiltShadeImg = T.quilt ? await loadImg(dir + T.quilt.shade) : null;
     T.stripeMaskImg = T.stripes ? await loadImg(dir + T.stripes.mask) : null;
     T.quiltStitchImg = T.quilt ? await loadImg(dir + T.quilt.stitch) : null;
+    if (T.camotext) {   // Camo Text (Oakmont): panel mask, the camo tile and the block letter font
+      T.camoMaskImg = await loadImg(dir + T.camotext.mask);
+      if (!CAMO_ASSETS.tile) CAMO_ASSETS.tile = loadImg(dir + "../../camotile.png");
+      if (!CAMO_ASSETS.font && typeof FontFace !== "undefined") {
+        const ff = new FontFace("JRBlock", "url(" + dir + "../../fonts/Anton-Regular.ttf)");
+        CAMO_ASSETS.font = ff.load().then((f) => { document.fonts.add(f); return f; }).catch(() => null);
+      }
+      T.camoTile = await CAMO_ASSETS.tile; await CAMO_ASSETS.font;
+    }
     T.patternImgs = T.pattern ? { all: await loadImg(dir + T.pattern.all), front: await loadImg(dir + T.pattern.front) } : null;
     if (T.paint) {   // painted course: where the painting goes (front panel / every panel) and each area's box
       T.paintImgs = { all: await loadImg(dir + T.paint.all), front: await loadImg(dir + T.paint.front) };
@@ -239,6 +249,7 @@ function drawQuiltThread(ctx, T, color) {
 // x / y move it (fraction of the area), rot turns it in 90° steps; look = oil paint settings
 export const PAINT_DEFAULT = { area: null, zoom: 1, x: 0, y: 0, rot: 0, look: {} };
 export { OIL_DEFAULT };
+export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.07, camoScale: 1.0, outlineW: 0.05, seed: 0, wide: 1.12 };
 export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: true };   // orig: logo in its own colours (false = one colour)
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
@@ -251,6 +262,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
   const SIL_PPI = 60;   // quick-style silhouettes are ~14" tall on a 830 px canvas
   const LOGO = { src: null, canvas: null, base: null, history: [], main: null, colors: [], map: [] };
   let CUR = { mats: [] };
+  let CLUB_NAME = "";   // the session's club name: Camo Text spells it unless a design has its own text
   const COURSE = { src: null, cache: new Map() };   // photo (capped at 6000 px) + painted previews by look
 
   /* ----- materials as canvas fills ----- */
@@ -562,6 +574,47 @@ export function createStudio({ materials, furs, templates, proofs }) {
     if (T.frameImg) o.drawImage(T.frameImg, 0, 0, out.width, out.height);
     return out;
   }
+  // Camo Text (Oakmont): the club name in tall block letters up the front, filled with camo in the club colours
+  const camoCache = new Map();
+  function camoTileIn(img, colors) {   // labels 0 = ground, 1-3 = blobs -> 3 colours (1 & 3 share colour 1)
+    const key = colors.join(",");
+    if (camoCache.has(key)) return camoCache.get(key);
+    const c = makeCanvas(img.width, img.height), x = c.getContext("2d"); x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height), p = d.data, rgb = colors.map(hexToRgb);
+    for (let i = 0; i < p.length; i += 4) { const l = Math.round(p[i] / 80), k = l === 0 ? 2 : l === 2 ? 1 : 0; p[i] = rgb[k][0]; p[i + 1] = rgb[k][1]; p[i + 2] = rgb[k][2]; p[i + 3] = 255; }
+    x.putImageData(d, 0, 0); camoCache.set(key, c); return c;
+  }
+  function drawCamoText(ctx, T, C, ppi) {
+    const B = T.camotext, txt = String(C.text || CLUB_NAME || "CLUB").toUpperCase().trim() || "CLUB", chars = [...txt];
+    const L = makeCanvas(T.w, T.h), x = L.getContext("2d");
+    x.translate(B.cx, B.cy); x.rotate(((B.rot || 0) * Math.PI) / 180);
+    const fam = "JRBlock, Impact, 'Arial Black', sans-serif";
+    let fs = 100; x.font = `${fs}px ${fam}`;
+    const cap = x.measureText("H").actualBoundingBoxAscent || 72;
+    fs = (B.thick * (C.size || 1)) * (100 / cap); x.font = `${fs}px ${fam}`;
+    const wk = C.wide || 1, gap = fs * (C.spacing == null ? 0.08 : C.spacing), widths = chars.map((ch) => x.measureText(ch).width * wk);
+    let total = widths.reduce((a, b) => a + b, 0) + gap * (chars.length - 1);
+    if (total > B.len) { const k = B.len / total; fs *= k; x.font = `${fs}px ${fam}`; for (let i = 0; i < widths.length; i++) widths[i] *= k; total = B.len; }
+    const capH = B.thick * (C.size || 1) * Math.min(1, B.len / Math.max(1, total)) ;
+    const g2 = fs * (C.spacing == null ? 0.08 : C.spacing);
+    total = widths.reduce((a, b) => a + b, 0) + g2 * (chars.length - 1);
+    const ch2 = (x.measureText("H").actualBoundingBoxAscent || capH);
+    let px = -total / 2;
+    const glyph = (c, q, stroke) => { x.save(); x.translate(q, ch2 / 2); x.scale(wk, 1); if (stroke) x.strokeText(c, 0, 0); else x.fillText(c, 0, 0); x.restore(); };   // block letters: Anton widened
+    const path = () => { let q = px; chars.forEach((c, i) => { glyph(c, q); q += widths[i] + g2; }); };
+    // camo fill, clipped to the letters
+    x.fillStyle = "#000"; path();
+    x.globalCompositeOperation = "source-in";
+    const tile = camoTileIn(T.camoTile, C.colors), pat = x.createPattern(tile, "repeat"), sc = (ppi / 120) * (C.camoScale || 0.75), seed = C.seed || 0;
+    pat.setTransform(new DOMMatrix().translate(-seed * 173 % 900, -seed * 311 % 900).scale(sc));
+    x.fillStyle = pat; x.fillRect(-T.w * 2, -T.h * 2, T.w * 4, T.h * 4);
+    x.globalCompositeOperation = "source-over";
+    // outline round every letter
+    x.lineJoin = "miter"; x.lineWidth = Math.max(1.2, ppi * (C.outlineW || 0.05)) / wk; x.strokeStyle = C.outline;
+    let q = px; chars.forEach((c, i) => { glyph(c, q, true); q += widths[i] + g2; });
+    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "destination-in"; x.drawImage(T.camoMaskImg, 0, 0);
+    ctx.drawImage(L, 0, 0);
+  }
   function pickThread(c) {
     const cands = [c.accent, c.trim, c.extra, WHITE, BLACK];
     return cands.find((m) => m && dE(m.rgb, c.body.rgb) > 40)?.hex || bestContrast(c.body).hex;
@@ -624,6 +677,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     ctx.fillStyle = matStyle(ctx, mats[0], ppi); ctx.fillRect(0, 0, T.w, T.h); ctx.fillStyle = grain(ctx); ctx.fillRect(0, 0, T.w, T.h);
     T.slotImgs.forEach((im, i) => { if (im) maskFill(ctx, T, im, matStyle(ctx, mats[(i + 1) % mats.length], ppi), !T.printed); });   // printed camo: no raised edges
     if (T.patternImgs && opts.pattern && LOGO.canvas) drawLogoPattern(ctx, T, opts.pattern, ppi);
+    if (T.camotext && opts.camotext && T.camoTile) drawCamoText(ctx, T, opts.camotext, ppi);
     if (T.paintImgs && opts.paint && opts.paint.img) drawPainting(ctx, T, opts.paint, { img: opts.paint.img, sx: 0, sy: 0, sw: 1, sh: 1 });
     if (T.stripeMaskImg && opts.stripes) {   // Silver Britches-style stripes through the logo spot, zigzag-stitched
       const S = T.stripes, c = makeCanvas(T.w, T.h), x = c.getContext("2d"), L = T.w + T.h;
@@ -853,6 +907,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     scatter: () => ["Body", "Marks"],
     pattern: () => ["Background", "Logo colour"],
     painted: () => ["Back / sides"],
+    camotext: () => ["Background", "Camo 1", "Camo 2", "Letter outline"],
     stockcamo: (T) => ["Back panel", ...(T.stockNames || T.slots.map((x, i) => `Camo ${i + 1}`))],
   };
   // stock designs (Duck Camo, Light Camo) come in their own printed colours; these colours aren't in the
@@ -885,7 +940,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       const kind = kindOf(T);
       if (kind === "scatter") return;   // parked
       if (kind === "painted" && !COURSE.src) return;   // needs a course photo
-      if ((kind === "flag" || kind === "stockcamo" || kind === "painted") && cw === "B") return;   // painted course: dark back only (back colour can still be changed in Edit)   // the flag has one colourway: classic red, white and navy
+      if ((kind === "flag" || kind === "stockcamo" || kind === "painted" || kind === "camotext") && cw === "B") return;   // painted course: dark back only (back colour can still be changed in Edit)   // the flag has one colourway: classic red, white and navy
       if (kind === "tartan" && !special.tartan[cw]) return;
       let r;
       if (kind === "quilted") r = [special[cw].main, special[cw].thread];
@@ -894,13 +949,14 @@ export function createStudio({ materials, furs, templates, proofs }) {
       else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
       else if (kind === "flag") r = [special.flag[cw].blue, special.flag[cw].red, special.flag[cw].white];
       else if (kind === "pattern") r = [special.scatter[cw].body, special.scatter[cw].ink];
+      else if (kind === "camotext") { const w = special.scatter.A, others = picks.map(smoothFor).filter((m) => dE(m.rgb, w.body.rgb) > 25 && dE(m.rgb, w.ink.rgb) > 25); r = [w.body, w.ink, others[0] || bestContrast(w.ink), w.ink]; }
       else if (kind === "painted") r = [cw === "A" ? special.scatter.A.ink : special.scatter.A.body];   // A dark back (Wade Hampton), B light
       else if (kind === "stockcamo") { const st = T.stock.map((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)); r = [st[0], ...st]; }
       else if (kind === "camo") r = [m[0], ...T.slots.map((x, i) => m[(i + 1) % m.length])];
       else r = [m[1] && m[1] !== m[0] ? m[1] : m[0]];
       const roles = KIND_ROLES[kind](T);
       specs.push({ tpl: T.id, product: T.product, name: T.name, design: `${T.product} · ${T.name}`, cw, kind,
-        roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })), ...(kind === "pattern" ? { pattern: { ...PATTERN_DEFAULT } } : {}), ...(kind === "painted" ? { paint: { ...PAINT_DEFAULT } } : {}) });
+        roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })), ...(kind === "pattern" ? { pattern: { ...PATTERN_DEFAULT } } : {}), ...(kind === "painted" ? { paint: { ...PAINT_DEFAULT } } : {}), ...(kind === "camotext" ? { camotext: { ...CAMOTEXT_DEFAULT } } : {}) });
     }));
     return specs;
   }
@@ -911,7 +967,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const r = spec.roles.map((x) => x.mat);
     await Promise.all([ensureTiles([...r, fur, WHITE, BLACK, NAVY]), loadTemplateAssets(T), P ? loadProofAssets(P) : null]);
     CUR = { mats: r };
-    let mats, thread = null, stripes = null, tartan = null, pattern = null, paint = null;
+    let mats, thread = null, stripes = null, tartan = null, pattern = null, paint = null, camotext = null;
     switch (spec.kind) {
       case "quilted": mats = [r[0], r[0], r[0], r[0]]; thread = r[1].hex; break;
       case "exotic": mats = [r[0], r[0], r[0], r[0]]; break;
@@ -920,6 +976,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       case "flag": mats = [r[0], r[2], r[1], r[0], r[2]]; break;   // [back, field, red stripes, canton, stars]
       case "camo": mats = r.length >= 4 ? r : [...r, ...r].slice(0, 4); break;
       case "stockcamo": mats = r; break;
+      case "camotext": mats = [r[0], r[0], r[0], r[0]]; camotext = { ...CAMOTEXT_DEFAULT, ...(spec.camotext || {}), colors: [r[1].hex, r[2].hex, r[0].hex], outline: r[3].hex }; break;
       case "painted": mats = [r[0], r[0], r[0], r[0]];
         if (COURSE.src) { const P = { ...PAINT_DEFAULT, ...(spec.paint || {}) }; paint = { ...P, img: await paintedCourse(P.look) }; }
         break;
@@ -931,7 +988,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     ACTIVE = map ? { map, canvas: recolor(map) } : null;
     STROKE = spec.logoStroke && spec.logoStroke.width > 0 ? spec.logoStroke : null; PPI = T.pxPerInch || 60;
     let flat;
-    try { flat = renderTemplate(T, mats, { oneColor: oneColor && !own, logoScale, fur, thread, stripes, tartan, pattern, paint }); }
+    try { flat = renderTemplate(T, mats, { oneColor: oneColor && !own, logoScale, fur, thread, stripes, tartan, pattern, paint, camotext }); }
     finally { ACTIVE = null; STROKE = null; }
     const canvas = P ? renderProof(P, flat, fur) : flat;
     return { flat, canvas, proof: canvas };
@@ -1176,6 +1233,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       if (T && T.logoGround >= 0 && (spec.kind === "camo" || spec.kind === "stockcamo")) return r[(T.logoGround + 1) % r.length] || r[0];
       return r[0];
     },
+    setClubName: (n) => { CLUB_NAME = n || ""; },
     setCourse, hasCourse: () => !!COURSE.src, courseCanvas: () => COURSE.src, paintDpi, renderPrint,
     materials: SW, furs, templates, proofs, products, WHITE, BLACK,
     hasLogo: () => !!LOGO.canvas, logoCanvas: () => LOGO.canvas, logoPalette: () => LOGO.palette || [], logoMap: () => LOGO.map || [],
