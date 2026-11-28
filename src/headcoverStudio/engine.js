@@ -258,7 +258,7 @@ export { OIL_DEFAULT };
 export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.128, camoScale: 1, outlineW: 0.06, seed: 0, wide: 1 };
 // Circle Patch: a leather patch zigzag-stitched on, with a smaller laser-engraved leather patch zigzag-stitched on top;
 // the club logo in the middle and the club name around it (2 words: top / bottom, 3: two on top, 4: two and two)
-export const PATCH_DEFAULT = { text: "", topText: "", bottomText: "", font: "sans", size: 1, textSize: 1, logoSize: 1, ring: 0.2, sep: "none", tracking: 0.08 };
+export const PATCH_DEFAULT = { text: "", topText: "", bottomText: "", font: "sans", size: 1, textSize: 1, logoSize: 1, ring: 0.18, sep: "none", tracking: 0.04 };
 // the name around the logo: 1 word on top; 2 words top / bottom; 3 words two on top, one below; 4 two and two
 export function patchLines(name) {
   const w = String(name || "").toUpperCase().trim().split(/\s+/).filter(Boolean);
@@ -749,7 +749,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const near = (m) => rgbToHex(m.rgb.map((v) => v * (lum(m.rgb) > 0.3 ? 0.86 : 0.78)));
     stitchRing(x, cx, cy, R, ppi, P.thread || near(P.bottom));
     // top patch (engraved), zigzag-stitched on
-    const R2 = R * (1 - (P.ring == null ? 0.2 : P.ring));
+    const R2 = R * (1 - (P.ring == null ? 0.18 : P.ring));
     disc(R2, P.top, Math.max(1.5, ppi * 0.035));
     const zw = ppi * 0.075;
     // engraving: name around the logo
@@ -757,13 +757,13 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const fam = P.font === "serif" ? "PatchSerif, Georgia, serif" : P.font === "block" ? "JRBlock, Impact, sans-serif" : "PatchSans, 'Arial Narrow', sans-serif";
     e.font = `100px ${fam}`;
     const cap100 = e.measureText("H").actualBoundingBoxAscent || 72;
-    const ro = R2 - zw - R2 * 0.07;                    // outer edge of the lettering
-    const capBase = R2 * 0.2 * (P.textSize || 1);
+    const ro = R2 * 0.83;                    // outer edge of the lettering (Peachtree: 0.82 of the engraved patch)
+    const capBase = R2 * 0.23 * (P.textSize || 1);   // Peachtree: letters ~0.23 of the engraved patch radius
     const auto = patchLines(P.text || CLUB_NAME);
     const typed = P.topText || P.bottomText;   // typed lines win over the automatic split
     const top = typed ? String(P.topText || "").toUpperCase().trim() : auto[0];
     const bot = typed ? String(P.bottomText || "").toUpperCase().trim() : auto[1];
-    const track = P.tracking == null ? 0.08 : P.tracking;
+    const track = P.tracking == null ? 0.04 : P.tracking;
     const arcOf = (txt, cp) => {   // angle a line takes on the circle at this letter height
       const fs = (cp * 100) / cap100; e.font = `${fs}px ${fam}`;
       const ws = [...txt].map((ch) => e.measureText(ch).width), tr = cp * track;
@@ -800,9 +800,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
       });
     }
     // logo in the middle
-    const rl = ro - capBase - R2 * 0.07;
+    const rl = ro - capBase - R2 * 0.05;
     if (LOGO.canvas && rl > 4) {
-      const src = engraveArt(art()), box = rl * 2 * 0.84 * (P.logoSize || 1), sc = Math.min(box / src.width, box / src.height);
+      const src = engraveArt(art()), box = rl * 2 * 0.95 * (P.logoSize || 1), sc = Math.min(box / src.width, box / src.height);
       const lw = src.width * sc, lh = src.height * sc;
       e.drawImage(src, cx - lw / 2, cy - lh / 2, lw, lh);
     }
