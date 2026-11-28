@@ -733,7 +733,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
   function drawPatch(ctx, T, P, ppi) {
     const B = T.patch, R = B.r * (P.size || 1), cx = B.cx, cy = B.cy;
     const L = makeCanvas(T.w, T.h), x = L.getContext("2d");
-    x.translate(cx, cy); if (B.rot) x.rotate((B.rot * Math.PI) / 180); x.scale(B.sx || 1, B.sy || 1); x.translate(-cx, -cy);   // sx/sy undo the 3D model's stretch there
+    x.translate(cx, cy); if (B.rot) x.rotate((B.rot * Math.PI) / 180); x.scale(B.sx || 1, B.sy || 1); if (B.m) x.transform(B.m[0], B.m[1], B.m[2], B.m[3], 0, 0); x.translate(-cx, -cy);   // sx/sy and m undo the 3D model's stretch there, so the patch reads round
     const disc = (r, mat, sh) => {
       const c = new Path2D(); c.arc(cx, cy, r, 0, Math.PI * 2);
       x.save(); x.shadowColor = "rgba(0,0,0,.5)"; x.shadowBlur = sh; x.shadowOffsetX = sh * 0.3; x.shadowOffsetY = sh * 0.6;
