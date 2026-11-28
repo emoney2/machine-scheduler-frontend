@@ -245,7 +245,7 @@ function tint(mask, color, w, h) {
 }
 // More quilting patterns, generated for any template (the PSD only has the diamond): stitch lines in inches, then
 // a puffed shade from the same lines (dark in the seams, full in the middle of each pocket)
-export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"]];
+export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"], ["curved", "Curved Diamond"], ["viper", "Viper"], ["honeycomb", "Hex"]];
 const quiltGen = new Map();
 function quiltPaths(x, w, h, ppi, pattern, size, axes) {
   const S = ppi * (size || 1);   // one pocket ~1"
@@ -256,6 +256,13 @@ function quiltPaths(x, w, h, ppi, pattern, size, axes) {
     const dw = ppi * 1.333 * (size || 1), dh = ppi * 1.9 * (size || 1), k = dh / dw;
     const gx = (ppi * 0.12 * Math.sqrt(1 + k * k)) / k, P = dw + gx;   // the second seam's horizontal offset
     for (let c = -h / k - P; c < w + h / k + P; c += P) for (const o of [0, gx]) { line([[c + o, 0], [c + o + h / k, h]]); line([[c + o, h], [c + o + h / k, 0]]); }
+  }
+  if (pattern === "curved") {   // Oakmont: the Diamond stitch with every line bowed, rows dipping toward the panel sides like a dome
+    const dw = ppi * 1.333 * (size || 1), dh = ppi * 1.9 * (size || 1), k = dh / dw, ax = axes && axes.length ? axes : [w / 2];
+    const bow = (xx) => { let a = ax[0]; ax.forEach((q) => { if (Math.abs(q - xx) < Math.abs(a - xx)) a = q; }); const u = (xx - a) / (ppi * 3); return ppi * 0.7 * u * u; };
+    for (let c = -h / k - dw * 2; c < w + h / k + dw * 2; c += dw) for (const sgn of [1, -1]) {
+      const pts = []; for (let y = -dh; y <= h + dh; y += 4) { const xx = sgn > 0 ? c + y / k : c + (h - y) / k; pts.push([xx, y + bow(xx)]); } line(pts);
+    }
   }
   if (pattern === "viper") {   // Peachtree viper: columns with rungs rising toward each panel's centre line, so the chevrons point up the middle
     const ax = axes && axes.length ? axes : [w / 2], cw = S * 0.85;
@@ -328,8 +335,15 @@ function quiltImages(T, pattern, size) {
   const w = T.w, h = T.h, ppi = T.pxPerInch || 60;
   const sh = makeCanvas(w, h), sx = sh.getContext("2d");
   sx.fillStyle = "#fff"; sx.fillRect(0, 0, w, h); sx.lineCap = "round"; sx.lineJoin = "round";
-  sx.save(); sx.filter = `blur(${Math.round(ppi * 0.16 * (size || 1))}px)`; sx.strokeStyle = "rgba(0,0,0,.26)"; sx.lineWidth = ppi * 0.3 * (size || 1); quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes); sx.restore();
+  sx.save(); sx.filter = `blur(${Math.round(ppi * 0.16 * (size || 1))}px)`; sx.strokeStyle = "rgba(0,0,0,.17)"; sx.lineWidth = ppi * 0.3 * (size || 1); quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes); sx.restore();
   sx.save(); sx.filter = "blur(1.2px)"; sx.strokeStyle = "rgba(0,0,0,.25)"; sx.lineWidth = 2.5; quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes); sx.restore();
+  {   // level it like the PSD diamond: pocket middles stay full white, seams no darker than ~210
+    const im = sx.getImageData(0, 0, w, h), d = im.data; let lo = 255, hi = 0;
+    for (let i = 0; i < d.length; i += 4) { if (d[i] < lo) lo = d[i]; if (d[i] > hi) hi = d[i]; }
+    const k = hi > lo ? 44 / (hi - lo) : 0;
+    for (let i = 0; i < d.length; i += 4) { const v = 255 - (hi - d[i]) * k; d[i] = d[i + 1] = d[i + 2] = v; }
+    sx.putImageData(im, 0, 0);
+  }
   const st = makeCanvas(w, h), tx = st.getContext("2d");
   tx.strokeStyle = "#000"; tx.lineWidth = 1.8; tx.setLineDash([5, 2]); tx.lineJoin = "round"; quiltPaths(tx, w, h, ppi, pattern, size, T.quiltAxes);
   const out = { shade: sh, stitch: st };
