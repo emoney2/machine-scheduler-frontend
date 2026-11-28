@@ -80,7 +80,10 @@ export async function loadStudioData(base) {
   const cat = await (await fetch(base + "catalog.json", { cache: "no-cache" })).json();
   const swDir = base + cat.swatches.replace(/[^/]+$/, "");
   const sw = await (await fetch(base + cat.swatches, { cache: "no-cache" })).json();
-  const all = (sw.materials || sw).map((s) => ({ ...s, rgb: hexToRgb(s.hex), tileUrl: s.tile ? swDir + s.tile : null, chipUrl: s.chip ? swDir + s.chip : null }));
+  // whites were photographed / averaged a little grey and the 3D shading darkens them again: lift them toward true white
+  const WHITE_LIFT = 0.35;   // keep 35% of the distance to pure white
+  const bright = (s) => (/^white$/i.test(s.name) ? { ...s, hex: rgbToHex(hexToRgb(s.hex).map((v) => 255 - (255 - v) * WHITE_LIFT)), whiteLift: WHITE_LIFT } : s);
+  const all = (sw.materials || sw).map(bright).map((s) => ({ ...s, rgb: hexToRgb(s.hex), tileUrl: s.tile ? swDir + s.tile : null, chipUrl: s.chip ? swDir + s.chip : null }));
 
   // Only the small manifests load up front; each product's images and UV maps load when it's first used.
   const templates = await Promise.all(
@@ -198,6 +201,12 @@ export async function ensureTiles(list) {
     list.filter((m) => m && m.tileUrl && !m.solid && !m.img).map(async (m) => {
       const im = await loadImg(m.tileUrl);
       m.img = m.noLift ? im : liftDetail(im);   // noLift: tile already has its final contrast
+      if (m.whiteLift && m.img) {   // textured whites (gator, carbon): same lift toward white as the solid colour
+        const c = makeCanvas(m.img.width, m.img.height), x = c.getContext("2d"); x.drawImage(m.img, 0, 0);
+        const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+        for (let i = 0; i < p.length; i += 4) { p[i] = 255 - (255 - p[i]) * m.whiteLift; p[i + 1] = 255 - (255 - p[i + 1]) * m.whiteLift; p[i + 2] = 255 - (255 - p[i + 2]) * m.whiteLift; }
+        x.putImageData(d, 0, 0); m.img = c;
+      }
     })
   );
 }
@@ -717,7 +726,10 @@ export function createStudio({ materials, furs, templates, proofs }) {
         if (fx >= fw) fx = fw - 1;
         if (fy >= fh) fy = fh - 1;
         const j = (fy * fw + fx) * 4;   // multiply the design over the grey shading
-        o[i * 4] = (b[i * 4] * fd[j]) / 255; o[i * 4 + 1] = (b[i * 4 + 1] * fd[j + 1]) / 255; o[i * 4 + 2] = (b[i * 4 + 2] * fd[j + 2]) / 255; o[i * 4 + 3] = a;
+        // whites / near-whites: soften the grey shading by half so white reads white, not light grey (colours unchanged)
+        const mn = Math.min(fd[j], fd[j + 1], fd[j + 2]), kw = mn > 170 ? Math.min(1, (mn - 170) / 70) * 0.5 : 0;
+        const s0 = b[i * 4] + (255 - b[i * 4]) * kw, s1 = b[i * 4 + 1] + (255 - b[i * 4 + 1]) * kw, s2 = b[i * 4 + 2] + (255 - b[i * 4 + 2]) * kw;
+        o[i * 4] = (s0 * fd[j]) / 255; o[i * 4 + 1] = (s1 * fd[j + 1]) / 255; o[i * 4 + 2] = (s2 * fd[j + 2]) / 255; o[i * 4 + 3] = a;
       }
       tmp.width = w; tmp.height = h; tx.putImageData(out, 0, 0); ctx.drawImage(tmp, x, y);
     });
