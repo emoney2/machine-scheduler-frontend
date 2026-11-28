@@ -252,9 +252,11 @@ function quiltPaths(x, w, h, ppi, pattern, size, axes) {
   const S = ppi * (size || 1);   // one pocket ~1"
   const line = (pts) => { x.beginPath(); pts.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b))); x.stroke(); };
   const curve = (fy) => { const pts = []; for (let xx = -S; xx <= w + S; xx += 3) pts.push([xx, fy(xx)]); line(pts); };
-  if (pattern === "doublediamond") {   // diamond lattice, every seam stitched twice ~0.12" apart
-    const dw = S * 0.9, dh = S * 1.5, k = dh / dw, g = ppi * 0.06 * Math.sqrt(1 + k * k);
-    for (let c = -h / k - dw; c < w + h / k + dw; c += dw) for (const o of [-g / k, g / k]) { line([[c + o, 0], [c + o + h / k, h]]); line([[c + o, h], [c + o + h / k, 0]]); }
+  if (pattern === "doublediamond") {   // every seam stitched twice ~0.12" apart; the diamond inside each pair of seams is
+    // the same size as the plain Diamond stitch (1.33" x 1.9" pockets), so the lattice opens up by the gap
+    const dw = ppi * 1.333 * (size || 1), dh = ppi * 1.9 * (size || 1), k = dh / dw;
+    const gx = (ppi * 0.12 * Math.sqrt(1 + k * k)) / k, P = dw + gx;   // the second seam's horizontal offset
+    for (let c = -h / k - P; c < w + h / k + P; c += P) for (const o of [0, gx]) { line([[c + o, 0], [c + o + h / k, h]]); line([[c + o, h], [c + o + h / k, 0]]); }
   }
   if (pattern === "viper") {   // Peachtree viper: columns with rungs rising toward each panel's centre line, so the chevrons point up the middle
     const ax = axes && axes.length ? axes : [w / 2], cw = S * 0.85;
@@ -1030,7 +1032,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
     if (opts.pinstripe) {   // Pinstripe (River Club): thin printed lines down the whole cover
       const P = opts.pinstripe, gap = ppi * (P.gap || 0.4), lw = Math.max(1, ppi * (P.width || 0.025));
       // zones: panels laid out turned in the flat (blade / mid mallet sides) get their stripes turned to match
-      const zones = T.pinZones || [{ box: [0, 0, T.w, T.h], angle: 0 }];
+      if (T.pinFan) {   // blade / mid mallet: the middle stripe straight up the flat, the others fanning out from a point above
+        // so the outermost ones run parallel to the flat's slanted sides
+        const F = T.pinFan, vx = F.cx, vy = F.vy, ry = F.ry || T.h / 2, d = ry - vy, dt = gap / d, L = (T.w + T.h) * 3;
+        ctx.save(); ctx.strokeStyle = P.color; ctx.lineWidth = lw;
+        const n = Math.ceil(Math.atan2(T.w, d) / dt) + 2;
+        for (let i = -n; i <= n; i++) { const t = i * dt; ctx.beginPath(); ctx.moveTo(vx, vy); ctx.lineTo(vx + Math.sin(t) * L, vy + Math.cos(t) * L); ctx.stroke(); }
+        ctx.restore();
+      }
+      const zones = T.pinFan ? [] : T.pinZones || [{ box: [0, 0, T.w, T.h], angle: 0 }];
       zones.forEach((z) => {
         const pts = z.poly || [[z.box[0], z.box[1]], [z.box[2], z.box[1]], [z.box[2], z.box[3]], [z.box[0], z.box[3]]];
         const cx = pts.reduce((a, q) => a + q[0], 0) / pts.length, cy = pts.reduce((a, q) => a + q[1], 0) / pts.length, L = T.w + T.h;
