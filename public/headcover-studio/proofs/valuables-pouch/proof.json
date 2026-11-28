@@ -1,0 +1,140 @@
+{
+ "name": "Valuables Pouch",
+ "w": 1536,
+ "h": 1024,
+ "contentW": 2889,
+ "contentH": 5946,
+ "views": [
+  {
+   "name": "ValuablesPouchMasterLayout copy 2",
+   "bbox": [
+    591,
+    518,
+    413,
+    432
+   ],
+   "base": "view-0.png",
+   "uv": "view-0.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy 3",
+   "bbox": [
+    590,
+    545,
+    413,
+    369
+   ],
+   "base": "view-1.png",
+   "uv": "view-1.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy 4",
+   "bbox": [
+    590,
+    519,
+    408,
+    217
+   ],
+   "base": "view-2.png",
+   "uv": "view-2.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy 9",
+   "bbox": [
+    656,
+    194,
+    411,
+    204
+   ],
+   "base": "view-3.png",
+   "uv": "view-3.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy 8",
+   "bbox": [
+    656,
+    194,
+    411,
+    204
+   ],
+   "base": "view-4.png",
+   "uv": "view-4.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy",
+   "bbox": [
+    64,
+    564,
+    441,
+    407
+   ],
+   "base": "view-5.png",
+   "uv": "view-5.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout",
+   "bbox": [
+    61,
+    150,
+    439,
+    407
+   ],
+   "base": "view-6.png",
+   "uv": "view-6.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy 5",
+   "bbox": [
+    1067,
+    449,
+    406,
+    425
+   ],
+   "base": "view-7.png",
+   "uv": "view-7.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy 6",
+   "bbox": [
+    1067,
+    449,
+    406,
+    397
+   ],
+   "base": "view-8.png",
+   "uv": "view-8.uv.bin",
+   "exact": true
+  },
+  {
+   "name": "ValuablesPouchMasterLayout copy 7",
+   "bbox": [
+    1114,
+    496,
+    252,
+    350
+   ],
+   "base": "view-9.png",
+   "uv": "view-9.uv.bin",
+   "exact": true
+  }
+ ],
+ "fur": {
+  "bbox": [
+   706,
+   228,
+   339,
+   140
+  ],
+  "png": "fur.png",
+  "order": 10
+ },
+ "overlay": "overlay.png"
+}

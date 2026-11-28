@@ -1,0 +1,22 @@
+{
+ "name": "Circle Patch",
+ "product": "Valuables Pouch",
+ "w": 578,
+ "h": 1189,
+ "pxPerInch": 60,
+ "frame": "frame.png",
+ "logo": {
+  "x": 248.84,
+  "y": 273.65,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "design": "patch",
+ "slots": [],
+ "patch": {
+  "cx": 283,
+  "cy": 311,
+  "r": 85
+ }
+}

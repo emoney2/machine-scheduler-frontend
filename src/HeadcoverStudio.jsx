@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
 import {
-  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT, PAINT_DEFAULT, CAMOTEXT_DEFAULT, PATCH_DEFAULT, OIL_DEFAULT, pngWithDpi, downloadBlob,
+  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT, PAINT_DEFAULT, CAMOTEXT_DEFAULT, PATCH_DEFAULT, patchLines, OIL_DEFAULT, pngWithDpi, downloadBlob,
 } from "./headcoverStudio/engine";
 import { matchInventory } from "./headcoverStudio/inventory";
 import { saveSession, getSession, deleteSession, listSessions, newId, packSpec, unpackSpec, thumbOf } from "./headcoverStudio/sessions";
@@ -558,7 +558,7 @@ export default function HeadcoverStudio() {
   useEffect(() => {
     if (!S) return;
     S.setClubName(club);
-    const ct = designs.filter((d) => (d.spec.kind === "camotext" && !(d.spec.camotext && d.spec.camotext.text)) || (d.spec.kind === "patch" && !(d.spec.patch && d.spec.patch.text)));
+    const ct = designs.filter((d) => (d.spec.kind === "camotext" && !(d.spec.camotext && d.spec.camotext.text)) || (d.spec.kind === "patch" && !(d.spec.patch && (d.spec.patch.text || d.spec.patch.topText || d.spec.patch.bottomText))));
     if (!ct.length) return;
     clearTimeout(clubTimer.current);
     clubTimer.current = setTimeout(() => renderAll(designs, new Set(ct.map((d) => d.uid))), 450);
@@ -1000,7 +1000,7 @@ export default function HeadcoverStudio() {
                     );
                   })()}
                   {cur.spec.kind === "patch" && (() => {
-                    const C = { ...PATCH_DEFAULT, ...(cur.spec.patch || {}) };
+                    const C = { ...PATCH_DEFAULT, ...(cur.spec.patch || {}) }, auto = patchLines(C.text || club);
                     const sl = (label, k, min, max, step, fmt) => (
                       <label className="patrow" key={k}>
                         <span>{label}<b>{fmt(C[k])}</b></span>
@@ -1014,12 +1014,13 @@ export default function HeadcoverStudio() {
                     );
                     return (
                       <div className="patctl">
-                        <div className="small">Circle patch name (2 words: top and bottom · 3: two on top · 4: two and two)</div>
-                        <input type="text" value={C.text} placeholder={club ? club.toUpperCase() + " (club name)" : "Club name"} onChange={(e) => setPatch({ text: e.target.value })} style={{ width: "100%", margin: "4px 0 6px" }} />
+                        <div className="small">Top text</div>
+                        <input type="text" value={C.topText} placeholder={auto[0] || "Top text"} onChange={(e) => setPatch({ topText: e.target.value, bottomText: C.topText || C.bottomText ? C.bottomText : auto[1] })} style={{ width: "100%", margin: "4px 0 6px" }} />
+                        <div className="small">Bottom text</div>
+                        <input type="text" value={C.bottomText} placeholder={auto[1] || "Bottom text"} onChange={(e) => setPatch({ bottomText: e.target.value, topText: C.topText || C.bottomText ? C.topText : auto[0] })} style={{ width: "100%", margin: "4px 0 6px" }} />
+                        {(C.topText || C.bottomText) && <button className="ghost" onClick={() => setPatch({ topText: "", bottomText: "" })}>Back to the club name</button>}
                         <div className="small">Lettering</div>
                         {pick("font", [["sans", "Condensed"], ["serif", "Serif"], ["block", "Block"]])}
-                        <div className="small">Between the lines</div>
-                        {pick("sep", [["dot", "Dots"], ["star", "Stars"], ["none", "None"]])}
                         {sl("Patch size", "size", 0.7, 1.3, 0.02, (v) => `${Math.round(v * 100)}%`)}
                         {sl("Outer ring", "ring", 0.1, 0.3, 0.01, (v) => `${Math.round(v * 100)}%`)}
                         {sl("Letter size", "textSize", 0.7, 1.3, 0.02, (v) => `${Math.round(v * 100)}%`)}

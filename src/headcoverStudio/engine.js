@@ -258,7 +258,17 @@ export { OIL_DEFAULT };
 export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.128, camoScale: 1, outlineW: 0.06, seed: 0, wide: 1 };
 // Circle Patch: a leather patch zigzag-stitched on, with a smaller laser-engraved leather patch zigzag-stitched on top;
 // the club logo in the middle and the club name around it (2 words: top / bottom, 3: two on top, 4: two and two)
-export const PATCH_DEFAULT = { text: "", font: "sans", size: 1, textSize: 1, logoSize: 1, ring: 0.2, sep: "dot", tracking: 0.08 };
+export const PATCH_DEFAULT = { text: "", topText: "", bottomText: "", font: "sans", size: 1, textSize: 1, logoSize: 1, ring: 0.2, sep: "none", tracking: 0.08 };
+// the name around the logo: 1 word on top; 2 words top / bottom; 3 words two on top, one below; 4 two and two
+export function patchLines(name) {
+  const w = String(name || "").toUpperCase().trim().split(/\s+/).filter(Boolean);
+  if (!w.length) return ["CLUB", ""];
+  if (w.length === 1) return [w[0], ""];
+  if (w.length === 2) return [w[0], w[1]];
+  if (w.length === 3) return [w[0] + " " + w[1], w[2]];
+  const k = Math.ceil(w.length / 2);
+  return [w.slice(0, k).join(" "), w.slice(k).join(" ")];
+}
 export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: true };   // orig: logo in its own colours (false = one colour)
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
@@ -268,8 +278,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
   const BLACK = find("Classic Leather", "Black") || byLum[0];
   const NAVY = find("Classic Leather", "Navy Blue") || BLACK;
   const PATCH_TOP = find("Classic Leather", "Tan") || WHITE;   // the engraved patch: natural leather
-  // what the laser leaves on a leather: a dark, slightly warm burn of the same leather
-  const patchBurn = (m) => stockMat(rgbToHex(m.rgb.map((v, i) => Math.round(v * 0.38 + [26, 14, 6][i]))), "Laser engraving");
+  const PATCH_ENGRAVE = "#3a3a3c";   // the laser engraving reads dark grey on every leather colour
   const W = 600, H = 830, CX = 300;
   const SIL_PPI = 60;   // quick-style silhouettes are ~14" tall on a 830 px canvas
   const LOGO = { src: null, canvas: null, base: null, history: [], main: null, colors: [], map: [] };
@@ -693,16 +702,6 @@ export function createStudio({ materials, furs, templates, proofs }) {
     ctx.drawImage(L, 0, 0);
   }
   /* ----- Circle Patch ----- */
-  // the name around the logo: 1 word on top; 2 words top / bottom; 3 words two on top, one below; 4 two and two
-  function patchLines(name) {
-    const w = String(name || "").toUpperCase().trim().split(/\s+/).filter(Boolean);
-    if (!w.length) return ["CLUB", ""];
-    if (w.length === 1) return [w[0], ""];
-    if (w.length === 2) return [w[0], w[1]];
-    if (w.length === 3) return [w[0] + " " + w[1], w[2]];
-    const k = Math.ceil(w.length / 2);
-    return [w.slice(0, k).join(" "), w.slice(k).join(" ")];
-  }
   // laser engraving burns the dark parts of the art: near-white areas of the logo stay unburnt
   const engraveCache = new Map();
   function engraveArt(src) {
@@ -746,8 +745,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
     };
     // bottom patch, zigzag-stitched on
     disc(R, P.bottom, Math.max(2, ppi * 0.05));
-    const th = hexToRgb(P.thread), tk = lum(th) > 0.3 ? 0.88 : 0.8;   // the zigzag on the ring: its thread a shade darker than the leather so it reads
-    stitchRing(x, cx, cy, R, ppi, dE(th, P.bottom.rgb) < 12 ? rgbToHex(th.map((v) => v * tk)) : P.thread);
+    // zigzag in a thread close to the patch's own leather (a touch darker so the stitch still reads)
+    const near = (m) => rgbToHex(m.rgb.map((v) => v * (lum(m.rgb) > 0.3 ? 0.86 : 0.78)));
+    stitchRing(x, cx, cy, R, ppi, P.thread || near(P.bottom));
     // top patch (engraved), zigzag-stitched on
     const R2 = R * (1 - (P.ring == null ? 0.2 : P.ring));
     disc(R2, P.top, Math.max(1.5, ppi * 0.035));
@@ -759,7 +759,10 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const cap100 = e.measureText("H").actualBoundingBoxAscent || 72;
     const ro = R2 - zw - R2 * 0.07;                    // outer edge of the lettering
     const capBase = R2 * 0.2 * (P.textSize || 1);
-    const [top, bot] = P.lines || patchLines(P.text || CLUB_NAME);
+    const auto = patchLines(P.text || CLUB_NAME);
+    const typed = P.topText || P.bottomText;   // typed lines win over the automatic split
+    const top = typed ? String(P.topText || "").toUpperCase().trim() : auto[0];
+    const bot = typed ? String(P.bottomText || "").toUpperCase().trim() : auto[1];
     const track = P.tracking == null ? 0.08 : P.tracking;
     const arcOf = (txt, cp) => {   // angle a line takes on the circle at this letter height
       const fs = (cp * 100) / cap100; e.font = `${fs}px ${fam}`;
@@ -768,8 +771,8 @@ export function createStudio({ materials, furs, templates, proofs }) {
       return { fs, ws, tr, ang: w / (ro - cp / 2) };
     };
     const maxTop = bot ? (150 * Math.PI) / 180 : (220 * Math.PI) / 180, maxBot = (130 * Math.PI) / 180;
-    let cp = capBase; const t0 = arcOf(top, cp), b0 = bot ? arcOf(bot, cp) : null;
-    const k = Math.min(1, maxTop / t0.ang, b0 ? maxBot / b0.ang : 1);
+    let cp = capBase; const t0 = top ? arcOf(top, cp) : null, b0 = bot ? arcOf(bot, cp) : null;
+    const k = Math.min(1, t0 ? maxTop / t0.ang : 1, b0 ? maxBot / b0.ang : 1);
     cp = capBase * Math.max(0.55, k);
     const lay = (txt, upper) => {
       if (!txt) return;
@@ -786,7 +789,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     };
     e.fillStyle = "#000";
     lay(top, true); lay(bot, false);
-    if (bot && P.sep !== "none") {   // small marks between the two lines
+    if (top && bot && P.sep && P.sep !== "none") {   // small marks between the two lines
       const rm = ro - cp / 2, d = cp * 0.13;
       [0, Math.PI].forEach((a) => {
         const px = cx + Math.cos(a) * rm, py = cy + Math.sin(a) * rm;
@@ -795,10 +798,6 @@ export function createStudio({ materials, furs, templates, proofs }) {
         else e.arc(px, py, d * 1.25, 0, Math.PI * 2);
         e.fill();
       });
-    }
-    if (!bot && P.sep !== "none") {   // one word: three small marks at the bottom balance the circle
-      const rm = ro - cp / 2, d = cp * 0.13;
-      [-1, 0, 1].forEach((i) => { const a = Math.PI / 2 + (i * cp * 0.75) / rm; e.beginPath(); e.arc(cx + Math.cos(a) * rm, cy + Math.sin(a) * rm, d * 1.25, 0, Math.PI * 2); e.fill(); });
     }
     // logo in the middle
     const rl = ro - capBase - R2 * 0.07;
@@ -810,8 +809,8 @@ export function createStudio({ materials, furs, templates, proofs }) {
     // engraving colour: burnt into the leather (multiplied so the grain still shows), with a soft darker edge
     e.globalCompositeOperation = "source-in"; e.fillStyle = P.engrave; e.fillRect(0, 0, T.w, T.h);
     x.save(); x.globalAlpha = 0.35; x.filter = "blur(0.8px)"; x.drawImage(E, 0, 0); x.restore();
-    x.save(); x.globalCompositeOperation = "multiply"; x.drawImage(E, 0, 0); x.restore();
-    stitchRing(x, cx, cy, R2, ppi, P.thread2 || P.thread);
+    x.save(); x.globalAlpha = 0.93; x.drawImage(E, 0, 0); x.restore();
+    stitchRing(x, cx, cy, R2, ppi, P.thread2 || near(P.top));
     ctx.drawImage(L, 0, 0);
   }
   function pickThread(c) {
@@ -1108,7 +1107,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     pattern: () => ["Background", "Logo colour"],
     painted: () => ["Back / sides"],
     camotext: () => ["Background", "Camo 1", "Camo 2", "Letter outline"],
-    patch: () => ["Body", "Bottom patch", "Top patch", "Engraving", "Zigzag thread"],
+    patch: () => ["Body", "Bottom patch", "Top patch"],
     stockcamo: (T) => ["Back panel", ...(T.stockNames || T.slots.map((x, i) => `Camo ${i + 1}`))],
   };
   // stock designs (Duck Camo, Light Camo) come in their own printed colours; these colours aren't in the
@@ -1163,7 +1162,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
         const lp = (LOGO.palette || []).filter((c) => { const l = toLab(c.rgb)[0]; return l < 90 && l > 8; }).sort((a, b) => b.share - a.share).map((c) => nearestSmooth(c.hex));
         const ringPool = [...picks.map(smoothFor), ...lp].filter((m) => dE(m.rgb, body.rgb) > 25);
         const ring = ringPool.find((m) => dE(m.rgb, PATCH_TOP.rgb) > 25) || (isLight(body) ? NAVY : WHITE);
-        r = [body, ring, PATCH_TOP, patchBurn(PATCH_TOP), ring];
+        r = [body, ring, PATCH_TOP];
       }
       else if (kind === "painted") r = [cw === "A" ? special.scatter.A.ink : special.scatter.A.body];   // A dark back (Wade Hampton), B light
       else if (kind === "stockcamo") { const st = T.stock.map((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)); r = [st[0], ...st]; }
@@ -1191,7 +1190,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
       case "flag": mats = [r[0], r[2], r[1], r[0], r[2]]; break;   // [back, field, red stripes, canton, stars]
       case "camo": mats = r.length >= 4 ? r : [...r, ...r].slice(0, 4); break;
       case "stockcamo": mats = r; break;
-      case "patch": mats = [r[0], r[0], r[0], r[0]]; patch = { ...PATCH_DEFAULT, ...(spec.patch || {}), bottom: r[1], top: r[2], engrave: r[3].hex, thread: r[4].hex }; break;
+      case "patch": mats = [r[0], r[0], r[0], r[0]]; patch = { ...PATCH_DEFAULT, ...(spec.patch || {}), bottom: r[1], top: r[2], engrave: PATCH_ENGRAVE }; break;
       case "camotext": mats = [r[0], r[0], r[0], r[0]]; camotext = { ...CAMOTEXT_DEFAULT, ...(spec.camotext || {}), colors: [r[1].hex, r[2].hex, r[0].hex], outline: r[3].hex }; break;
       case "painted": mats = [r[0], r[0], r[0], r[0]];
         if (COURSE.src) { const P = { ...PAINT_DEFAULT, ...(spec.paint || {}) }; paint = { ...P, img: await paintedCourse(P.look) }; }
