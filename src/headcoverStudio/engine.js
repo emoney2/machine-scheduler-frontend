@@ -730,6 +730,26 @@ export function createStudio({ materials, furs, templates, proofs }) {
     ctx.restore();
     return amp;
   }
+  // curved tops (blade, mid mallet): the 3D model stretches one side more than the other there, so the patch is
+  // pre-warped with a measured grid (flat point -> where it lands in the top view) to read as a true circle
+  function warpPatch(L, B) {
+    const W = B.warp, h = W.half, n = W.n, st = W.step, x0 = Math.round(B.cx - h), y0 = Math.round(B.cy - h), sz = 2 * h;
+    const src = L.getContext("2d").getImageData(x0, y0, sz, sz), sd = src.data, out = new ImageData(sz, sz), od = out.data;
+    const at = (i, j, k) => W.pts[Math.min(n - 1, Math.max(0, j)) * n + Math.min(n - 1, Math.max(0, i))][k];
+    for (let py = 0; py < sz; py++) for (let px = 0; px < sz; px++) {
+      const gx = px / st, gy = py / st, i = Math.floor(gx), j = Math.floor(gy), fx = gx - i, fy = gy - j;
+      const q = (k) => (at(i, j, k) * (1 - fx) + at(i + 1, j, k) * fx) * (1 - fy) + (at(i, j + 1, k) * (1 - fx) + at(i + 1, j + 1, k) * fx) * fy;
+      const sx = h + q(0), sy = h + q(1);
+      if (sx < 0 || sy < 0 || sx >= sz - 1 || sy >= sz - 1) continue;
+      const ix = sx | 0, iy = sy | 0, ax = sx - ix, ay = sy - iy, o = (py * sz + px) * 4;
+      for (let c = 0; c < 4; c++) {
+        const a = sd[(iy * sz + ix) * 4 + c], b = sd[(iy * sz + ix + 1) * 4 + c], d = sd[((iy + 1) * sz + ix) * 4 + c], e = sd[((iy + 1) * sz + ix + 1) * 4 + c];
+        od[o + c] = (a * (1 - ax) + b * ax) * (1 - ay) + (d * (1 - ax) + e * ax) * ay;
+      }
+    }
+    const C = makeCanvas(L.width, L.height); C.getContext("2d").putImageData(out, x0, y0);
+    return C;
+  }
   function drawPatch(ctx, T, P, ppi) {
     const B = T.patch, R = B.r * (P.size || 1), cx = B.cx, cy = B.cy;
     const L = makeCanvas(T.w, T.h), x = L.getContext("2d");
@@ -811,7 +831,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     x.save(); x.globalAlpha = 0.35; x.filter = "blur(0.8px)"; x.drawImage(E, 0, 0); x.restore();
     x.save(); x.globalAlpha = 0.93; x.drawImage(E, 0, 0); x.restore();
     stitchRing(x, cx, cy, R2, ppi, P.thread2 || near(P.top));
-    ctx.drawImage(L, 0, 0);
+    ctx.drawImage(B.warp ? warpPatch(L, B) : L, 0, 0);
   }
   function pickThread(c) {
     const cands = [c.accent, c.trim, c.extra, WHITE, BLACK];
