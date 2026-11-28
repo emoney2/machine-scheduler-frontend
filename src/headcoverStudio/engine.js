@@ -245,9 +245,9 @@ function tint(mask, color, w, h) {
 }
 // More quilting patterns, generated for any template (the PSD only has the diamond): stitch lines in inches, then
 // a puffed shade from the same lines (dark in the seams, full in the middle of each pocket)
-export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"], ["curved", "Curved Diamond"], ["viper", "Viper"], ["honeycomb", "Hex"]];
+export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"], ["viper", "Viper"], ["fountain", "Fountain"], ["longhex", "Long Hex"]];
 const quiltGen = new Map();
-function quiltPaths(x, w, h, ppi, pattern, size, axes) {
+function quiltPaths(x, w, h, ppi, pattern, size, axes, logoC, fountainH) {
   const S = ppi * (size || 1);   // one pocket ~1"
   const line = (pts) => { x.beginPath(); pts.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b))); x.stroke(); };
   const curve = (fy) => { const pts = []; for (let xx = -S; xx <= w + S; xx += 3) pts.push([xx, fy(xx)]); line(pts); };
@@ -264,34 +264,136 @@ function quiltPaths(x, w, h, ppi, pattern, size, axes) {
       const pts = []; for (let y = -dh; y <= h + dh; y += 4) { const xx = sgn > 0 ? c + y / k : c + (h - y) / k; pts.push([xx, y + bow(xx)]); } line(pts);
     }
   }
-  if (pattern === "viper") {   // Peachtree viper: columns with rungs rising toward each panel's centre line, so the chevrons point up the middle
-    const ax = axes && axes.length ? axes : [w / 2], cw = S * 0.85;
+  // ---- luxury-car drafts ----
+  const D = { dw: ppi * 1.333 * (size || 1), dh: ppi * 1.9 * (size || 1) };
+  const latticeF = (dw, dh, map, clipY) => {   // diamond lattice drawn through a point map (for warped versions)
+    const k = dh / dw;
+    for (let c = -h / k - 3 * dw; c < w + h / k + 3 * dw; c += dw) for (const sg of [1, -1]) {
+      const pts = []; for (let y = -dh; y <= h + dh; y += 4) { const xx = sg > 0 ? c + y / k : c + (h - y) / k; if (!clipY || clipY(y)) pts.push(map(xx, y)); else if (pts.length) { line(pts); pts.length = 0; } }
+      if (pts.length) line(pts);
+    }
+  };
+  const ax0 = axes && axes.length ? axes : [w / 2], lg = logoC || [w / 2, h * 0.3];
+  const centres = ax0.map((a, i) => [i === 0 ? lg[0] : a, lg[1]]);   // front: the logo; back: same height on its centre line
+  const inPanel = (i, fn) => {   // keep a centred pattern on its own panel (front / back)
+    const lo = i ? (ax0[i - 1] + ax0[i]) / 2 : 0, hi = i < ax0.length - 1 ? (ax0[i] + ax0[i + 1]) / 2 : w;
+    x.save(); x.beginPath(); x.rect(lo, 0, hi - lo, h); x.clip(); fn(); x.restore();
+  };
+  // ---- from the reference photos ----
+  // two mirror families of lines x = c ± f(y): where f is 0 they lie on top of each other (one straight pleat);
+  // where it grows they cross their neighbours, so the pleats break into diamonds sized by how fast f changes
+  const pleatCross = (f, p) => ax0.forEach((a, pi) => inPanel(pi, () => {
+    for (let k2 = -14; k2 <= 14; k2++) for (const sg of [1, -1]) {
+      const x0 = a + k2 * p, pts = []; for (let y = 0; y <= h; y += 3) pts.push([x0 + sg * f(y), y]); line(pts);
+    }
+  }));
+  if (pattern === "alsace") {   // Alsace diamond-pleat: straight pleats up top, splitting into diamonds that get smaller going down
+    const p = ppi * 0.85 * (size || 1), y0 = Math.min(lg[1] + ppi * 1.2, h * 0.4), ramp = ppi * 2.5, m = 0.75;
+    // the slope eases in over ~2.5" then holds, so the diamonds shrink and then settle to an even size
+    pleatCross((y) => { const d = y - y0; if (d <= 0) return 0; return d < ramp ? (m * d * d) / (2 * ramp) : (m * ramp) / 2 + m * (d - ramp); }, p);
+  }
+  if (pattern === "fountain") {   // small diamonds at the tip, stretching longer and longer until the lines run straight at the bottom
+    const p = ppi * 1.08 * (size || 1), H = h * (fountainH || 0.92), F = p * 5;   // the lines' lean eases off evenly down the cover
+    // (blade / mid mallet set quiltFountainH lower so the straight lines start higher on their short panels)
+    pleatCross((y) => (y < H ? F * Math.pow(1 - y / H, 2) : 0), p);
+  }
+
+  if (pattern === "longhex") {   // tall hexagons: pointed top and bottom, straight sides
+    const W = ppi * 1.3 * (size || 1), H = ppi * 2.5 * (size || 1), t = H * 0.22, dy = H - t;
+    for (let y = -H, row = 0; y < h + H; y += dy, row++) for (let xx = (row % 2) * (W / 2) - W; xx < w + W; xx += W)
+      line([[xx - W / 2, y + H / 2 - t], [xx - W / 2, y - H / 2 + t], [xx, y - H / 2], [xx + W / 2, y - H / 2 + t]]);   // each seam once
+  }
+  if (pattern === "cascade" || pattern === "cascade2") {
+    // Cascade (Bentley Flying Spur "ever-lengthening diamonds tumbling down the seat"): separate diamonds stacked tip to tip
+    // in columns, each one longer than the one above, every column starting at its own height so they tumble out of step
+    let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const cw = ppi * 0.95 * (size || 1), dw = cw * (pattern === "cascade2" ? 0.98 : 0.78);
+    for (let xx = (w % cw) / 2 - cw, col = 0; xx < w + cw; xx += cw, col++) {
+      const cx = xx + cw / 2; let y = -ppi * (0.2 + rnd() * 0.9), hgt = ppi * (0.55 + rnd() * 0.25);
+      while (y < h) {
+        const d = [[cx, y], [cx + dw / 2, y + hgt / 2], [cx, y + hgt], [cx - dw / 2, y + hgt / 2], [cx, y]];
+        line(d);
+        if (pattern === "cascade2") { const f = 0.55, my = y + hgt / 2; line([[cx, my - (hgt / 2) * f], [cx + (dw / 2) * f, my], [cx, my + (hgt / 2) * f], [cx - (dw / 2) * f, my], [cx, my - (hgt / 2) * f]]); }
+        y += hgt; hgt *= 1.16 + rnd() * 0.08;
+      }
+    }
+  }
+  if (pattern === "mulliner") {   // double-stitched diamond grid with a diamond stitched inside every pocket
+    const { dw, dh } = D, k = dh / dw, g = (ppi * 0.1 * Math.sqrt(1 + k * k)) / k, P = dw + g;
+    for (let c = -h / k - 2 * P; c < w + h / k + 2 * P; c += P) for (const o of [0, g]) { line([[c + o, 0], [c + o + h / k, h]]); line([[c + o, h], [c + o + h / k, 0]]); }
+    const c0 = -h / k - 2 * P;
+    for (let n = 0; n < (w + 2 * h / k + 4 * P) / P; n++) for (let m = 0; m < (w + 2 * h / k + 4 * P) / P; m++) {
+      const A = c0 + g + (n + 0.5) * P - g / 2, Bv = c0 + h / k + g + (m + 0.5) * P - g / 2, cx = (A + Bv) / 2, cy = (k * (Bv - A)) / 2;
+      if (cx < -dw || cx > w + dw || cy < -dh || cy > h + dh) continue;
+      const f = 0.5; line([[cx, cy - (dh / 2) * f], [cx + (dw / 2) * f, cy], [cx, cy + (dh / 2) * f], [cx - (dw / 2) * f, cy], [cx, cy - (dh / 2) * f]]);
+    }
+  }
+  if (pattern === "fluteddiamond") {   // diamonds across the top, fluted channels below a double band
+    const yb = lg[1] + ppi * 1.4;
+    latticeF(D.dw, D.dh, (xx, y) => [xx, y], (y) => y < yb);
+    line([[0, yb], [w, yb]]); line([[0, yb + ppi * 0.12], [w, yb + ppi * 0.12]]);
+    ax0.forEach((a) => { for (let k2 = -12; k2 <= 12; k2++) line([[a + k2 * ppi * 0.75, yb + ppi * 0.12], [a + k2 * ppi * 0.75, h]]); });
+  }
+  if (pattern === "waveflute") ax0.forEach((a) => { for (let k2 = -12; k2 <= 12; k2++) { const x0 = a + k2 * ppi * 0.8, pts = []; for (let y = 0; y <= h; y += 4) pts.push([x0 + ppi * 0.18 * Math.sin((y / (ppi * 2.2)) * Math.PI * 2), y]); line(pts); } });
+  if (pattern === "tuxedo") {   // diamonds broken by double bands every ~3"
+    const band = ppi * 3.2, bw = ppi * 0.35, inBand = (y) => ((y % band) + band) % band > bw;
+    latticeF(D.dw, D.dh, (xx, y) => [xx, y], inBand);
+    for (let y = 0; y < h; y += band) { line([[0, y], [w, y]]); line([[0, y + bw], [w, y + bw]]); }
+  }
+  if (pattern === "perfdiamond") latticeF(D.dw, D.dh, (xx, y) => [xx, y]);
+  if (pattern === "cube") {   // tumbling blocks: hexagons with a Y inside, each hex reads as a 3D cube
+    const r = ppi * 0.75 * (size || 1), vw = r * Math.sqrt(3);
+    for (let y = -r, row = 0; y < h + 2 * r; y += r * 1.5, row++) for (let xx = (row % 2) * (vw / 2) - vw; xx < w + vw; xx += vw) {
+      const P6 = []; for (let i = 0; i <= 6; i++) { const t = -Math.PI / 2 + (i * Math.PI) / 3; P6.push([xx + Math.cos(t) * r, y + Math.sin(t) * r]); }
+      line(P6.slice(0, 4)); line([[xx, y], P6[0]]); line([[xx, y], P6[2]]); line([[xx, y], P6[4]]);
+    }
+  }
+  if (pattern === "sunburst") centres.forEach(([cx, cy], pi) => inPanel(pi, () => {   // channels radiating from the logo, a clear ring around it
+    const r0 = ppi * 1.1, n = 36; x.beginPath(); x.arc(cx, cy, r0, 0, Math.PI * 2); x.stroke();
+    for (let i = 0; i < n; i++) { const t = (i / n) * Math.PI * 2; line([[cx + Math.cos(t) * r0, cy + Math.sin(t) * r0], [cx + Math.cos(t) * (w + h), cy + Math.sin(t) * (w + h)]]); }
+  }));
+  if (pattern === "ripple") centres.forEach(([cx, cy], pi) => inPanel(pi, () => { for (let r = ppi * 1.1; r < w + h; r += ppi * 0.7) { x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.stroke(); } }));
+  if (pattern === "fan") ax0.forEach((a, pi) => inPanel(pi, () => {   // art-deco shell: rays and rings from the bottom centre
+    const cx = a, cy = h * 1.02, n = 22;
+    for (let i = 1; i < n; i++) { const t = Math.PI + (i / n) * Math.PI; line([[cx, cy], [cx + Math.cos(t) * (w + h), cy + Math.sin(t) * (w + h)]]); }
+    for (let r = ppi * 1.5; r < w + h; r += ppi * 1.4) { x.beginPath(); x.arc(cx, cy, r, Math.PI, 2 * Math.PI); x.stroke(); }
+  }));
+  // ---- drafts ----
+  const lattice = (dw, dh, off) => { const k = dh / dw; for (let c = -h / k - 2 * dw + (off || 0); c < w + h / k + 2 * dw; c += dw) { line([[c, 0], [c + h / k, h]]); line([[c, h], [c + h / k, 0]]); } };
+  if (pattern === "vchannel") for (let xx = S * 0.45; xx < w; xx += S * 0.9) line([[xx, 0], [xx, h]]);   // vertical pleats
+  if (pattern === "dchannel") { const k = 1.4; for (let c = -h / k; c < w + h; c += S * 0.9 * Math.sqrt(1 + 1 / (k * k))) line([[c, 0], [c + h / k, h]]); }   // one-way diagonal channels
+  if (pattern === "squarediamond") lattice(S * 1.3, S * 1.3);   // even 45° diamonds
+  if (pattern === "widediamond") lattice(S * 2.0, S * 1.2);   // wide, low diamonds
+  if (pattern === "diamondindiamond") {   // the Diamond stitch with a smaller diamond stitched inside each pocket
+    const dw = ppi * 1.333 * (size || 1), dh = ppi * 1.9 * (size || 1); lattice(dw, dh);
+    const k = dh / dw, c0 = -h / k - 2 * dw, f = 0.45;   // pocket centres sit halfway between neighbouring seams of each family
+    for (let n = 0; n < (w + 2 * h / k + 4 * dw) / dw; n++) for (let m = 0; m < (w + 2 * h / k + 4 * dw) / dw; m++) {
+      const A = c0 + (n + 0.5) * dw, Bv = c0 + h / k + (m + 0.5) * dw, cx = (A + Bv) / 2, cy = (k * (Bv - A)) / 2;
+      if (cx < -dw || cx > w + dw || cy < -dh || cy > h + dh) continue;
+      line([[cx, cy - (dh / 2) * f], [cx + (dw / 2) * f, cy], [cx, cy + (dh / 2) * f], [cx - (dw / 2) * f, cy], [cx, cy - (dh / 2) * f]]);
+    }
+  }
+  if (pattern === "harlequin") { const dw = ppi * 1.333 * (size || 1), dh = ppi * 1.9 * (size || 1); lattice(dw, dh); for (let xx = 0; xx < w + dw; xx += dw / 2) line([[xx, 0], [xx, h]]); }   // diamonds split by vertical seams
+  if (pattern === "triangle") { const t = S * 1.2, th = (t * Math.sqrt(3)) / 2; for (let y = 0; y < h + th; y += th) line([[0, y], [w, y]]); const k = th / (t / 2); for (let c = -h; c < w + h; c += t) { line([[c, 0], [c + h / k, h]]); line([[c, h], [c + h / k, 0]]); } }
+  if (pattern === "windowpane") { const B = S * 1.5, g = ppi * 0.12; for (let y = 0; y < h + B; y += B) { line([[0, y], [w, y]]); line([[0, y + g], [w, y + g]]); } for (let xx = 0; xx < w + B; xx += B) { line([[xx, 0], [xx, h]]); line([[xx + g, 0], [xx + g, h]]); } }
+  if (pattern === "lantern") {   // ogee / lantern: pairs of S-curves meeting in points
+    const L = S * 1.1, H = S * 1.6;
+    for (let c = -L; c < w + L; c += L) for (const sg of [1, -1]) { const pts = []; for (let y = -H; y <= h + H; y += 3) pts.push([c + sg * (L / 2) * Math.sin((y / H) * Math.PI), y]); line(pts); }
+  }
+  if (pattern === "rainbow") {   // rows of nested arcs
+    const r = S * 0.8;
+    for (let y = r, row = 0; y < h + 2 * r; y += r, row++) for (let xx = (row % 2) * r - 2 * r; xx < w + 2 * r; xx += 2 * r)
+      for (const f of [1, 0.6]) { x.beginPath(); x.arc(xx, y, r * f, Math.PI, 2 * Math.PI); x.stroke(); }
+  }
+  if (pattern === "viper") {   // Peachtree viper: ~1" columns crossed by long straight diagonals that meet in a peak
+    // on each panel's centre line, so the chevrons point down the middle (one rung drops ~0.55" per column)
+    const ax = axes && axes.length ? axes : [w / 2], cw = ppi * (size || 1), sl = 0.55, P = ppi * 1.7 * (size || 1);
     ax.forEach((a, i) => {
       const lo = i ? (ax[i - 1] + a) / 2 : 0, hi = i < ax.length - 1 ? (a + ax[i + 1]) / 2 : w;
-      for (let k = Math.floor((lo - a) / cw) - 1; k * cw + a < hi + cw; k++) {
-        const x0 = a + k * cw; line([[Math.max(lo, x0), 0], [Math.max(lo, x0), h]]);
-        const side = k >= 0 ? 1 : -1;   // right of the centre line: rungs rise to the left, left of it: to the right
-        for (let y = -2 * cw; y < h + 2 * cw; y += S * 0.95) line([[x0, y + (side > 0 ? 0 : cw * 0.55)], [x0 + cw, y + (side > 0 ? cw * 0.55 : 0)]]);
-      }
+      for (let k = Math.ceil((lo - a) / cw); a + k * cw <= hi; k++) line([[a + k * cw, 0], [a + k * cw, h]]);
+      const reach = Math.max(a - lo, hi - a) * sl;
+      for (let y0 = -P; y0 < h + reach + P; y0 += P) line([[lo, y0 - (a - lo) * sl], [a, y0], [hi, y0 - (hi - a) * sl]]);
     });
-  }
-  if (pattern === "basket") {   // squares of three short channels, turning 90° square to square
-    const B = S * 1.2, n = 3;
-    for (let y = 0, r = 0; y < h + B; y += B, r++) for (let xx = 0, c = 0; xx < w + B; xx += B, c++) {
-      line([[xx, y], [xx + B, y]]); line([[xx, y], [xx, y + B]]);
-      for (let i = 1; i < n; i++) { const t = (B * i) / n; if ((r + c) % 2) line([[xx + t, y], [xx + t, y + B]]); else line([[xx, y + t], [xx + B, y + t]]); }
-    }
-  }
-  if (pattern === "circles") {   // interlocking circles: each pocket a four-petal quatrefoil
-    const a = S * 1.1, r = a / Math.SQRT2;
-    for (let y = 0; y < h + a; y += a) for (let xx = 0; xx < w + a; xx += a) { x.beginPath(); x.arc(xx, y, r, 0, Math.PI * 2); x.stroke(); }
-  }
-  if (pattern === "brick") {   // rows of long pockets, each row shifted half a brick
-    const bh = S * 0.75, bw = S * 1.6;
-    for (let y = 0, r = 0; y < h + bh; y += bh, r++) {
-      line([[0, y], [w, y]]);
-      for (let xx = (r % 2) * (bw / 2) - bw; xx < w + bw; xx += bw) line([[xx, y], [xx, y + bh]]);
-    }
   }
   if (pattern === "wave") for (let y = S * 0.5; y < h + S; y += S) curve((xx) => y + S * 0.22 * Math.sin((xx / (S * 1.6)) * Math.PI * 2));
   if (pattern === "onion") for (let y = 0; y < h + S; y += S) { curve((xx) => y + S * 0.35 * Math.sin((xx / (S * 1.4)) * Math.PI * 2)); curve((xx) => y - S * 0.35 * Math.sin((xx / (S * 1.4)) * Math.PI * 2)); }
@@ -299,12 +401,14 @@ function quiltPaths(x, w, h, ppi, pattern, size, axes) {
     const r = S * 0.5;
     for (let y = 0, row = 0; y < h + S; y += r, row++) for (let xx = (row % 2) * r - 2 * r; xx < w + 2 * r; xx += 2 * r) { x.beginPath(); x.arc(xx, y, r, 0, Math.PI); x.stroke(); }
   }
-  if (pattern === "honeycomb") {   // hexagons, pointy sides left and right
-    const r = S * 0.55, hw = r * Math.sqrt(3) / 2;
-    for (let y = 0, row = 0; y < h + 2 * r; y += r * 1.5, row++) for (let xx = (row % 2) * hw - 2 * hw; xx < w + 2 * hw; xx += 2 * hw) {
-      const pts = []; for (let i = 0; i <= 6; i++) { const t = Math.PI / 6 + (i * Math.PI) / 3; pts.push([xx + Math.cos(t) * r, y + Math.sin(t) * r]); } line(pts);
+  if (pattern === "honeycomb") {   // hexagons ~1.6" point to point, points left and right, flat top and bottom
+    const r = ppi * 0.8 * (size || 1), vh = r * Math.sqrt(3);
+    for (let xx = -r, c = 0; xx < w + 2 * r; xx += 1.5 * r, c++) for (let y = (c % 2) * (vh / 2) - vh; y < h + vh; y += vh) {
+      // the lower three edges only: the upper ones belong to the hexes above, so every seam is stitched once
+      const pts = []; for (let i = 0; i <= 3; i++) { const t = (i * Math.PI) / 3; pts.push([xx + Math.cos(t) * r, y + Math.sin(t) * r]); } line(pts);
     }
   }
+
   if (pattern === "channel" || pattern === "box" || pattern === "mountain") for (let y = S * 0.5; y < h; y += S) line([[0, y], [w, y]]);
   if (pattern === "box") for (let xx = S * 0.5; xx < w; xx += S) line([[xx, 0], [xx, h]]);
   if (pattern === "zigzag") for (let y = 0; y < h + S; y += S) { const pts = []; for (let xx = -S, i = 0; xx < w + S; xx += S / 2, i++) pts.push([xx, y + (i % 2 ? S * 0.35 : -S * 0.35)]); line(pts); }
@@ -332,21 +436,40 @@ function quiltPaths(x, w, h, ppi, pattern, size, axes) {
 function quiltImages(T, pattern, size) {
   const key = T.id + "|" + pattern + "|" + (size || 1);
   if (quiltGen.has(key)) return quiltGen.get(key);
-  const w = T.w, h = T.h, ppi = T.pxPerInch || 60;
+  const w = T.w, h = T.h, ppi = T.pxPerInch || 60, lc = T.logo ? [T.logo.x + T.logo.w / 2, T.logo.y + T.logo.h / 2] : null;
   const sh = makeCanvas(w, h), sx = sh.getContext("2d");
   sx.fillStyle = "#fff"; sx.fillRect(0, 0, w, h); sx.lineCap = "round"; sx.lineJoin = "round";
-  sx.save(); sx.filter = `blur(${Math.round(ppi * 0.16 * (size || 1))}px)`; sx.strokeStyle = "rgba(0,0,0,.17)"; sx.lineWidth = ppi * 0.3 * (size || 1); quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes); sx.restore();
-  sx.save(); sx.filter = "blur(1.2px)"; sx.strokeStyle = "rgba(0,0,0,.25)"; sx.lineWidth = 2.5; quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes); sx.restore();
+  sx.save(); sx.filter = `blur(${Math.round(ppi * 0.16 * (size || 1))}px)`; sx.strokeStyle = "rgba(0,0,0,.17)"; sx.lineWidth = ppi * 0.3 * (size || 1); quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes, lc, T.quiltFountainH); sx.restore();
+  sx.save(); sx.filter = "blur(1.2px)"; sx.strokeStyle = "rgba(0,0,0,.25)"; sx.lineWidth = 2.5; quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes, lc, T.quiltFountainH); sx.restore();
   {   // level it like the PSD diamond: pocket middles stay full white, seams no darker than ~210
     const im = sx.getImageData(0, 0, w, h), d = im.data; let lo = 255, hi = 0;
     for (let i = 0; i < d.length; i += 4) { if (d[i] < lo) lo = d[i]; if (d[i] > hi) hi = d[i]; }
-    const k = hi > lo ? 44 / (hi - lo) : 0;
+    const k = hi > lo ? 26 / (hi - lo) : 0;
     for (let i = 0; i < d.length; i += 4) { const v = 255 - (hi - d[i]) * k; d[i] = d[i + 1] = d[i + 2] = v; }
     sx.putImageData(im, 0, 0);
   }
   const st = makeCanvas(w, h), tx = st.getContext("2d");
-  tx.strokeStyle = "#000"; tx.lineWidth = 1.8; tx.setLineDash([5, 2]); tx.lineJoin = "round"; quiltPaths(tx, w, h, ppi, pattern, size, T.quiltAxes);
-  const out = { shade: sh, stitch: st };
+  tx.strokeStyle = "#000"; tx.lineWidth = 1.8; tx.setLineDash([5, 2]); tx.lineJoin = "round"; quiltPaths(tx, w, h, ppi, pattern, size, T.quiltAxes, lc, T.quiltFountainH);
+  let perf = null;
+  if (pattern === "honeycomb") {   // the perforations inside each hex (Logan Olson hex perf), ~0.13" apart, kept off the seams
+    perf = makeCanvas(w, h); const px = perf.getContext("2d"); px.fillStyle = "#000";
+    const r = ppi * 0.8 * (size || 1), vh = r * Math.sqrt(3), g = ppi * 0.13, d = Math.max(0.8, ppi * 0.022);
+    for (let xx = -r, c = 0; xx < w + 2 * r; xx += 1.5 * r, c++) for (let y = (c % 2) * (vh / 2) - vh; y < h + vh; y += vh)
+      for (let dy = -vh / 2 + g * 1.2; dy <= vh / 2 - g * 1.2; dy += g) {
+        const half = r - Math.abs(dy) / Math.sqrt(3) - g * 1.1;   // hex half-width at this row, less a margin
+        for (let dx = -Math.floor(half / g) * g; dx <= half; dx += g) { px.beginPath(); px.arc(xx + dx + (Math.round(dy / g) % 2 ? g / 2 : 0), y + dy, d, 0, Math.PI * 2); px.fill(); }
+      }
+  }
+  if (pattern === "perfdiamond") {   // a cluster of perforations in the middle of every diamond
+    perf = makeCanvas(w, h); const px = perf.getContext("2d"); px.fillStyle = "#000";
+    const dw = ppi * 1.333 * (size || 1), dh = ppi * 1.9 * (size || 1), k = dh / dw, c0 = -h / k - 3 * dw, g = ppi * 0.12, d = Math.max(0.8, ppi * 0.022);
+    for (let n = 0; n < (w + 2 * h / k + 6 * dw) / dw; n++) for (let m = 0; m < (w + 2 * h / k + 6 * dw) / dw; m++) {
+      const A = c0 + (n + 0.5) * dw, Bv = c0 + h / k + (m + 0.5) * dw, cx = (A + Bv) / 2, cy = (k * (Bv - A)) / 2;
+      if (cx < -dw || cx > w + dw || cy < -dh || cy > h + dh) continue;
+      for (let i = -3; i <= 3; i++) for (let j = -3; j <= 3; j++) if (Math.abs(i) / 3 + Math.abs(j) / 3 <= 1.01) { px.beginPath(); px.arc(cx + i * g * 0.8, cy + j * g * 0.8 * k * 0.8, d, 0, Math.PI * 2); px.fill(); }
+    }
+  }
+  const out = { shade: sh, stitch: st, perf };
   quiltGen.set(key, out);
   return out;
 }
@@ -1057,7 +1180,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
     if (T.quiltShadeImg && !opts.pinstripe) {   // quilted: puffed pockets (multiply), then the stitching in the thread colour
       const q = opts.quilt || {}, gen = q.pattern && q.pattern !== "diamond" ? quiltImages(T, q.pattern, q.size) : null;
       const shade = gen ? gen.shade : T.quiltShadeImg;
-      ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.drawImage(shade, 0, 0); ctx.drawImage(shade, 0, 0); ctx.restore();
+      // one soft pass: the puff reads without the leather looking discoloured
+      ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = gen ? 1 : 0.6; ctx.drawImage(shade, 0, 0); ctx.restore();
+      if (gen && gen.perf) { ctx.save(); ctx.globalAlpha = 0.55; ctx.globalCompositeOperation = "multiply"; ctx.drawImage(tint(gen.perf, "#000000", T.w, T.h), 0, 0); ctx.restore(); }
       if (gen || T.quiltStitchImg) drawQuiltThread(ctx, T, opts.thread || "#f2efe8", gen);
     }
     if (opts.pinstripe) {   // Pinstripe (River Club): thin printed lines down the whole cover
