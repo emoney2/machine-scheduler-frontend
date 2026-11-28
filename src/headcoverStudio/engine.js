@@ -126,7 +126,7 @@ function loadTemplateAssets(T) {
       T.camoMaskImg = await loadImg(dir + T.camotext.mask);
       if (!CAMO_ASSETS.tile) CAMO_ASSETS.tile = loadImg(dir + "../../camotile.png");
       if (!CAMO_ASSETS.font && typeof FontFace !== "undefined") {
-        const ff = new FontFace("JRBlock", "url(" + dir + "../../fonts/Anton-Regular.ttf)");
+        const ff = new FontFace("JRBlock", "url(" + dir + "../../fonts/NFLBearsThrowback.ttf)");   // the block font from the Oakmont file
         CAMO_ASSETS.font = ff.load().then((f) => { document.fonts.add(f); return f; }).catch(() => null);
       }
       T.camoTile = await CAMO_ASSETS.tile; await CAMO_ASSETS.font;
@@ -249,7 +249,7 @@ function drawQuiltThread(ctx, T, color) {
 // x / y move it (fraction of the area), rot turns it in 90° steps; look = oil paint settings
 export const PAINT_DEFAULT = { area: null, zoom: 1, x: 0, y: 0, rot: 0, look: {} };
 export { OIL_DEFAULT };
-export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.07, camoScale: 1.0, outlineW: 0.05, seed: 0, wide: 1.12 };
+export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.05, camoScale: 0.6, outlineW: 0.05, seed: 0, wide: 1 };
 export const PATTERN_DEFAULT = { size: 1.4, gapX: 0.45, gapY: 0.3, flip: true, front: false, orig: true };   // orig: logo in its own colours (false = one colour)
 export function createStudio({ materials, furs, templates, proofs }) {
   const SW = materials;
@@ -576,19 +576,20 @@ export function createStudio({ materials, furs, templates, proofs }) {
   }
   // Camo Text (Oakmont): the club name in tall block letters up the front, filled with camo in the club colours
   const camoCache = new Map();
+  // Light Camo print: lightest = background colour, then camo 2, then camo 1
   function camoTileIn(img, colors) {   // labels 0 = ground, 1-3 = blobs -> 3 colours (1 & 3 share colour 1)
     const key = colors.join(",");
     if (camoCache.has(key)) return camoCache.get(key);
     const c = makeCanvas(img.width, img.height), x = c.getContext("2d"); x.drawImage(img, 0, 0);
     const d = x.getImageData(0, 0, c.width, c.height), p = d.data, rgb = colors.map(hexToRgb);
-    for (let i = 0; i < p.length; i += 4) { const l = Math.round(p[i] / 80), k = l === 0 ? 2 : l === 2 ? 1 : 0; p[i] = rgb[k][0]; p[i + 1] = rgb[k][1]; p[i + 2] = rgb[k][2]; p[i + 3] = 255; }
+    for (let i = 0; i < p.length; i += 4) { const l = Math.round(p[i] / 80), k = l === 0 ? 2 : l === 1 ? 1 : 0; p[i] = rgb[k][0]; p[i + 1] = rgb[k][1]; p[i + 2] = rgb[k][2]; p[i + 3] = 255; }
     x.putImageData(d, 0, 0); camoCache.set(key, c); return c;
   }
   function drawCamoText(ctx, T, C, ppi) {
     const B = T.camotext, txt = String(C.text || CLUB_NAME || "CLUB").toUpperCase().trim() || "CLUB", chars = [...txt];
     const L = makeCanvas(T.w, T.h), x = L.getContext("2d");
     x.translate(B.cx, B.cy); x.rotate(((B.rot || 0) * Math.PI) / 180);
-    const fam = "JRBlock, Impact, 'Arial Black', sans-serif";
+    const fam = "JRBlock, Impact, sans-serif";
     let fs = 100; x.font = `${fs}px ${fam}`;
     const cap = x.measureText("H").actualBoundingBoxAscent || 72;
     fs = (B.thick * (C.size || 1)) * (100 / cap); x.font = `${fs}px ${fam}`;
@@ -605,7 +606,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     // camo fill, clipped to the letters
     x.fillStyle = "#000"; path();
     x.globalCompositeOperation = "source-in";
-    const tile = camoTileIn(T.camoTile, C.colors), pat = x.createPattern(tile, "repeat"), sc = (ppi / 120) * (C.camoScale || 0.75), seed = C.seed || 0;
+    const tile = camoTileIn(T.camoTile, C.colors), pat = x.createPattern(tile, "repeat"), sc = (ppi / 149) * (C.camoScale || 1), seed = C.seed || 0;
     pat.setTransform(new DOMMatrix().translate(-seed * 173 % 900, -seed * 311 % 900).scale(sc));
     x.fillStyle = pat; x.fillRect(-T.w * 2, -T.h * 2, T.w * 4, T.h * 4);
     x.globalCompositeOperation = "source-over";
