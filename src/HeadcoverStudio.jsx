@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import axios from "axios";
 import { API_ROOT } from "./apiRoot";
 import {
-  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT, PAINT_DEFAULT, CAMOTEXT_DEFAULT, PATCH_DEFAULT, patchLines, OIL_DEFAULT, pngWithDpi, downloadBlob,
+  loadStudioData, createStudio, ensureTiles, slug, downloadCanvas, canvasToBlob, hexToRgb, PATTERN_DEFAULT, PAINT_DEFAULT, CAMOTEXT_DEFAULT, PATCH_DEFAULT, patchLines, QUILT_PATTERNS, OIL_DEFAULT, pngWithDpi, downloadBlob,
 } from "./headcoverStudio/engine";
 import { matchInventory } from "./headcoverStudio/inventory";
 import { saveSession, getSession, deleteSession, listSessions, newId, packSpec, unpackSpec, thumbOf } from "./headcoverStudio/sessions";
@@ -996,6 +996,37 @@ export default function HeadcoverStudio() {
                           </label>
                         )}
                         {cur.spec.logoStroke && cur.spec.logoStroke.width > 0 && <button className="ghost" onClick={() => setDesignStroke(null)}>No outline</button>}
+                      </div>
+                    );
+                  })()}
+                  {cur.spec.kind === "quilted" && (() => {
+                    const Q = { pattern: "diamond", size: 1, ...(cur.spec.quilt || {}) };
+                    const setQ = (q) => liveSpec({ ...cur.spec, quilt: { ...Q, ...q } });
+                    return (
+                      <div className="patctl">
+                        <div className="small">Quilting pattern</div>
+                        <div className="lines" style={{ margin: "2px 0 6px" }}>
+                          {QUILT_PATTERNS.map(([v, l]) => <button key={v} className={Q.pattern === v ? "on" : ""} onClick={() => setQ({ pattern: v })}>{l}</button>)}
+                        </div>
+                        {Q.pattern !== "diamond" && (
+                          <label className="patrow">
+                            <span>Pocket size<b>{Q.size.toFixed(2)}"</b></span>
+                            <input type="range" min="0.6" max="1.8" step="0.05" value={Q.size} onChange={(e) => setQ({ size: +e.target.value })} />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {cur.spec.kind === "pinstripe" && (() => {
+                    const P = { gap: 0.4, width: 0.025, ...(cur.spec.pinstripe || {}) };
+                    const setP = (q) => liveSpec({ ...cur.spec, pinstripe: { ...P, ...q } });
+                    return (
+                      <div className="patctl">
+                        <div className="small">Pinstripe</div>
+                        <label className="patrow"><span>Space between lines<b>{P.gap.toFixed(2)}"</b></span>
+                          <input type="range" min="0.2" max="1" step="0.05" value={P.gap} onChange={(e) => setP({ gap: +e.target.value })} /></label>
+                        <label className="patrow"><span>Line width<b>{P.width.toFixed(3)}"</b></span>
+                          <input type="range" min="0.015" max="0.08" step="0.005" value={P.width} onChange={(e) => setP({ width: +e.target.value })} /></label>
                       </div>
                     );
                   })()}

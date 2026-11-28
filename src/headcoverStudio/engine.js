@@ -243,11 +243,56 @@ function tint(mask, color, w, h) {
   const c = makeCanvas(w, h), x = c.getContext("2d");
   x.drawImage(mask, 0, 0); x.globalCompositeOperation = "source-in"; x.fillStyle = color; x.fillRect(0, 0, w, h); return c;
 }
-function drawQuiltThread(ctx, T, color) {
-  const w = T.w, h = T.h, mask = quiltThreadMask(T);
-  ctx.save(); ctx.filter = "blur(0.8px)"; ctx.globalAlpha = 0.55; ctx.drawImage(tint(T.quiltStitchImg, "#000", w, h), 0, 0.6); ctx.restore();   // needle channel
+// More quilting patterns, generated for any template (the PSD only has the diamond): stitch lines in inches, then
+// a puffed shade from the same lines (dark in the seams, full in the middle of each pocket)
+export const QUILT_PATTERNS = [["diamond", "Diamond"], ["channel", "Channel"], ["box", "Box"], ["chevron", "Herringbone"], ["zigzag", "Zigzag"], ["mountain", "Mountain"]];
+const quiltGen = new Map();
+function quiltPaths(x, w, h, ppi, pattern, size) {
+  const S = ppi * (size || 1);   // one pocket ~1"
+  const line = (pts) => { x.beginPath(); pts.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b))); x.stroke(); };
+  if (pattern === "channel" || pattern === "box" || pattern === "mountain") for (let y = S * 0.5; y < h; y += S) line([[0, y], [w, y]]);
+  if (pattern === "box") for (let xx = S * 0.5; xx < w; xx += S) line([[xx, 0], [xx, h]]);
+  if (pattern === "zigzag") for (let y = 0; y < h + S; y += S) { const pts = []; for (let xx = -S, i = 0; xx < w + S; xx += S / 2, i++) pts.push([xx, y + (i % 2 ? S * 0.35 : -S * 0.35)]); line(pts); }
+  if (pattern === "chevron") {   // herringbone: columns, each with slanted rungs, the slant flipping column to column
+    const cw = S * 1.1;
+    for (let xx = 0, c = 0; xx < w + cw; xx += cw, c++) {
+      line([[xx, 0], [xx, h]]);
+      const d = c % 2 ? 1 : -1;
+      for (let y = -cw; y < h + cw; y += S * 0.8) line([[xx, y], [xx + cw, y + d * cw * 0.5]]);
+    }
+  }
+  if (pattern === "mountain") {   // a ridge line inside each band (Wade Hampton mountains)
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let y = S * 0.5; y < h; y += S) {   // peaks and valleys with a shoulder on each slope, sitting on the band below
+      const base = y + S * 0.88, pts = [[-S, base - S * 0.1]]; let xx = -S * 0.6;
+      while (xx < w + S) {
+        const pw = S * (0.9 + rnd() * 0.8), top = base - S * (0.5 + rnd() * 0.35), sh = 0.35 + rnd() * 0.3;
+        pts.push([xx + pw * 0.25, base - (base - top) * sh], [xx + pw * 0.5, top], [xx + pw * 0.72, base - (base - top) * (sh + 0.1)], [xx + pw, base - S * (0.05 + rnd() * 0.12)]);
+        xx += pw;
+      }
+      line(pts);
+    }
+  }
+}
+function quiltImages(T, pattern, size) {
+  const key = T.id + "|" + pattern + "|" + (size || 1);
+  if (quiltGen.has(key)) return quiltGen.get(key);
+  const w = T.w, h = T.h, ppi = T.pxPerInch || 60;
+  const sh = makeCanvas(w, h), sx = sh.getContext("2d");
+  sx.fillStyle = "#fff"; sx.fillRect(0, 0, w, h); sx.lineCap = "round"; sx.lineJoin = "round";
+  sx.save(); sx.filter = `blur(${Math.round(ppi * 0.16 * (size || 1))}px)`; sx.strokeStyle = "rgba(0,0,0,.26)"; sx.lineWidth = ppi * 0.3 * (size || 1); quiltPaths(sx, w, h, ppi, pattern, size); sx.restore();
+  sx.save(); sx.filter = "blur(1.2px)"; sx.strokeStyle = "rgba(0,0,0,.25)"; sx.lineWidth = 2.5; quiltPaths(sx, w, h, ppi, pattern, size); sx.restore();
+  const st = makeCanvas(w, h), tx = st.getContext("2d");
+  tx.strokeStyle = "#000"; tx.lineWidth = 1.8; tx.setLineDash([5, 2]); tx.lineJoin = "round"; quiltPaths(tx, w, h, ppi, pattern, size);
+  const out = { shade: sh, stitch: st };
+  quiltGen.set(key, out);
+  return out;
+}
+function drawQuiltThread(ctx, T, color, gen) {
+  const w = T.w, h = T.h, mask = gen ? gen.stitch : quiltThreadMask(T);
+  ctx.save(); ctx.filter = "blur(0.8px)"; ctx.globalAlpha = 0.55; ctx.drawImage(tint(gen ? gen.stitch : T.quiltStitchImg, "#000", w, h), 0, 0.6); ctx.restore();   // needle channel
   ctx.save(); ctx.shadowColor = "rgba(0,0,0,.45)"; ctx.shadowBlur = 1.2; ctx.shadowOffsetY = 0.8; ctx.drawImage(tint(mask, color, w, h), 0, 0); ctx.restore();
-  ctx.save(); ctx.globalAlpha = 0.35; ctx.globalCompositeOperation = "screen"; ctx.drawImage(tint(T.quiltStitchImg, "#ffffff", w, h), 0, -0.4); ctx.restore();   // thread sheen
+  ctx.save(); ctx.globalAlpha = 0.35; ctx.globalCompositeOperation = "screen"; ctx.drawImage(tint(gen ? gen.stitch : T.quiltStitchImg, "#ffffff", w, h), 0, -0.4); ctx.restore();   // thread sheen
 }
 
 // painted course: the customer's clubhouse / course photo, oil-painted in the browser (no Photoshop, no AI),
@@ -947,9 +992,17 @@ export function createStudio({ materials, furs, templates, proofs }) {
       x.globalCompositeOperation = "destination-in"; x.drawImage(T.stripeMaskImg, 0, 0);
       ctx.save(); ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 2; ctx.shadowOffsetY = 1; ctx.drawImage(c, 0, 0); ctx.restore();
     }
-    if (T.quiltShadeImg) {   // quilted: puffed diamonds (multiply), then the stitching in the thread colour
-      ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.drawImage(T.quiltShadeImg, 0, 0); ctx.drawImage(T.quiltShadeImg, 0, 0); ctx.restore();
-      if (T.quiltStitchImg) drawQuiltThread(ctx, T, opts.thread || "#f2efe8");
+    if (T.quiltShadeImg && !opts.pinstripe) {   // quilted: puffed pockets (multiply), then the stitching in the thread colour
+      const q = opts.quilt || {}, gen = q.pattern && q.pattern !== "diamond" ? quiltImages(T, q.pattern, q.size) : null;
+      const shade = gen ? gen.shade : T.quiltShadeImg;
+      ctx.save(); ctx.globalCompositeOperation = "multiply"; ctx.drawImage(shade, 0, 0); ctx.drawImage(shade, 0, 0); ctx.restore();
+      if (gen || T.quiltStitchImg) drawQuiltThread(ctx, T, opts.thread || "#f2efe8", gen);
+    }
+    if (opts.pinstripe) {   // Pinstripe (River Club): thin printed lines down the whole cover
+      const P = opts.pinstripe, gap = ppi * (P.gap || 0.4), lw = Math.max(1, ppi * (P.width || 0.025));
+      ctx.save(); ctx.fillStyle = P.color;
+      for (let xx = gap / 2; xx < T.w; xx += gap) ctx.fillRect(Math.round(xx - lw / 2), 0, lw, T.h);
+      ctx.restore();
     }
     if (T.tartanImgs && opts.tartan) {   // tartan: straight stitch lines, one thread colour per layer
       T.tartanImgs.forEach((im, i) => {
@@ -1145,6 +1198,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     camo: (T) => ["Back panel", ...T.slots.map((x, i) => `Camo ${i + 1}`)],
     solid: () => ["Body"],
     quilted: () => ["Leather", "Quilt thread"],
+    pinstripe: () => ["Leather", "Pinstripe"],
     exotic: () => ["Exotic"],
     stripes: () => ["Body", "Stripe 1", "Stripe 2", "Stripe 3"],
     tartan: () => ["Leather", "Thread 1", "Thread 2", "Thread 3"],
@@ -1190,7 +1244,13 @@ export function createStudio({ materials, furs, templates, proofs }) {
       if ((kind === "flag" || kind === "stockcamo" || kind === "painted" || kind === "camotext") && cw === "B") return;   // painted course: dark back only (back colour can still be changed in Edit)   // the flag has one colourway: classic red, white and navy
       if (kind === "tartan" && !special.tartan[cw]) return;
       let r;
-      if (kind === "quilted") r = [special[cw].main, special[cw].thread];
+      if (kind === "quilted") {
+        r = [special[cw].main, special[cw].thread];
+        // Pinstripe uses the quilted layouts: A light leather with dark pinstripes (River Club), B the reverse
+        const ws = special.scatter.A, body = cw === "A" ? ws.body : ws.ink, line = cw === "A" ? ws.ink : ws.body;
+        specs.push({ tpl: T.id, product: T.product, name: "Pinstripe", design: `${T.product} · Pinstripe`, cw, kind: "pinstripe",
+          roles: [{ label: "Leather", mat: body }, { label: "Pinstripe", mat: line }], pinstripe: { gap: 0.4, width: 0.025 } });
+      }
       else if (kind === "exotic") r = [special[cw].body];
       else if (kind === "stripes") r = [special.stripes[cw].body, ...special.stripes[cw].stripes];
       else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
@@ -1234,9 +1294,10 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const r = spec.roles.map((x) => x.mat);
     await Promise.all([ensureTiles([...r, fur, WHITE, BLACK, NAVY]), loadTemplateAssets(T), P ? loadProofAssets(P) : null]);
     CUR = { mats: r };
-    let mats, thread = null, stripes = null, tartan = null, pattern = null, paint = null, camotext = null, patch = null;
+    let mats, thread = null, stripes = null, tartan = null, pattern = null, paint = null, camotext = null, patch = null, quilt = null, pinstripe = null;
     switch (spec.kind) {
-      case "quilted": mats = [r[0], r[0], r[0], r[0]]; thread = r[1].hex; break;
+      case "quilted": mats = [r[0], r[0], r[0], r[0]]; thread = r[1].hex; quilt = { pattern: "diamond", size: 1, ...(spec.quilt || {}) }; break;
+      case "pinstripe": mats = [r[0], r[0], r[0], r[0]]; pinstripe = { gap: 0.4, width: 0.025, ...(spec.pinstripe || {}), color: r[1].hex }; break;
       case "exotic": mats = [r[0], r[0], r[0], r[0]]; break;
       case "stripes": mats = [r[0], r[0], r[0], r[0]]; stripes = r.slice(1); break;
       case "tartan": mats = [r[0], r[0], r[0], r[0]]; tartan = r.slice(1).map((m) => m.hex); break;
@@ -1263,7 +1324,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     ACTIVE = map ? { map, canvas: recolor(map) } : null;
     STROKE = spec.logoStroke && spec.logoStroke.width > 0 ? spec.logoStroke : null; PPI = T.pxPerInch || 60;
     let flat;
-    try { flat = renderTemplate(T, mats, { oneColor: oneColor && !own, logoScale, fur, thread, stripes, tartan, pattern, paint, camotext, patch }); }
+    try { flat = renderTemplate(T, mats, { oneColor: oneColor && !own, logoScale, fur, thread, stripes, tartan, pattern, paint, camotext, patch, quilt, pinstripe }); }
     finally { ACTIVE = null; STROKE = null; }
     const canvas = P ? renderProof(P, flat, fur) : flat;
     return { flat, canvas, proof: canvas };
