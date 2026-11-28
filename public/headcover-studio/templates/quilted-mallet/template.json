@@ -25,5 +25,9 @@
   "stitch": "quilt-stitch.png",
   "pattern": "Diamond"
  },
- "logoFrom": "mallet"
+ "logoFrom": "mallet",
+ "quiltAxes": [
+  262,
+  695
+ ]
 }

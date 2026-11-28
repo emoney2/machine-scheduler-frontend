@@ -25,5 +25,9 @@
   "stitch": "quilt-stitch.png",
   "pattern": "Diamond"
  },
- "logoFrom": "fairway"
+ "logoFrom": "fairway",
+ "quiltAxes": [
+  240,
+  680
+ ]
 }

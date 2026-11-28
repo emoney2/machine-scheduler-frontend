@@ -25,5 +25,9 @@
   "stitch": "quilt-stitch.png",
   "pattern": "Diamond"
  },
- "logoFrom": "hybrid"
+ "logoFrom": "hybrid",
+ "quiltAxes": [
+  262,
+  658
+ ]
 }

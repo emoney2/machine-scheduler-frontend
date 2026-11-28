@@ -245,11 +245,40 @@ function tint(mask, color, w, h) {
 }
 // More quilting patterns, generated for any template (the PSD only has the diamond): stitch lines in inches, then
 // a puffed shade from the same lines (dark in the seams, full in the middle of each pocket)
-export const QUILT_PATTERNS = [["diamond", "Diamond"], ["channel", "Channel"], ["box", "Box"], ["chevron", "Herringbone"], ["zigzag", "Zigzag"], ["mountain", "Mountain"]];
+export const QUILT_PATTERNS = [["diamond", "Diamond"], ["doublediamond", "Double Diamond"], ["viper", "Viper"], ["chevron", "Herringbone"], ["channel", "Channel"], ["box", "Box"],
+  ["zigzag", "Zigzag"], ["wave", "Wave"], ["onion", "Onion"], ["scallop", "Scallop"], ["honeycomb", "Honeycomb"], ["mountain", "Mountain"]];
 const quiltGen = new Map();
-function quiltPaths(x, w, h, ppi, pattern, size) {
+function quiltPaths(x, w, h, ppi, pattern, size, axes) {
   const S = ppi * (size || 1);   // one pocket ~1"
   const line = (pts) => { x.beginPath(); pts.forEach(([a, b], i) => (i ? x.lineTo(a, b) : x.moveTo(a, b))); x.stroke(); };
+  const curve = (fy) => { const pts = []; for (let xx = -S; xx <= w + S; xx += 3) pts.push([xx, fy(xx)]); line(pts); };
+  if (pattern === "doublediamond") {   // diamond lattice, every seam stitched twice ~0.12" apart
+    const dw = S * 0.9, dh = S * 1.5, k = dh / dw, g = ppi * 0.06 * Math.sqrt(1 + k * k);
+    for (let c = -h / k - dw; c < w + h / k + dw; c += dw) for (const o of [-g / k, g / k]) { line([[c + o, 0], [c + o + h / k, h]]); line([[c + o, h], [c + o + h / k, 0]]); }
+  }
+  if (pattern === "viper") {   // Peachtree viper: columns with rungs rising toward each panel's centre line, so the chevrons point up the middle
+    const ax = axes && axes.length ? axes : [w / 2], cw = S * 0.85;
+    ax.forEach((a, i) => {
+      const lo = i ? (ax[i - 1] + a) / 2 : 0, hi = i < ax.length - 1 ? (a + ax[i + 1]) / 2 : w;
+      for (let k = Math.floor((lo - a) / cw) - 1; k * cw + a < hi + cw; k++) {
+        const x0 = a + k * cw; line([[Math.max(lo, x0), 0], [Math.max(lo, x0), h]]);
+        const side = k >= 0 ? 1 : -1;   // right of the centre line: rungs rise to the left, left of it: to the right
+        for (let y = -2 * cw; y < h + 2 * cw; y += S * 0.95) line([[x0, y + (side > 0 ? 0 : cw * 0.55)], [x0 + cw, y + (side > 0 ? cw * 0.55 : 0)]]);
+      }
+    });
+  }
+  if (pattern === "wave") for (let y = S * 0.5; y < h + S; y += S) curve((xx) => y + S * 0.22 * Math.sin((xx / (S * 1.6)) * Math.PI * 2));
+  if (pattern === "onion") for (let y = 0; y < h + S; y += S) { curve((xx) => y + S * 0.35 * Math.sin((xx / (S * 1.4)) * Math.PI * 2)); curve((xx) => y - S * 0.35 * Math.sin((xx / (S * 1.4)) * Math.PI * 2)); }
+  if (pattern === "scallop") {   // fish scales: rows of half-circles, every other row shifted half a scale
+    const r = S * 0.5;
+    for (let y = 0, row = 0; y < h + S; y += r, row++) for (let xx = (row % 2) * r - 2 * r; xx < w + 2 * r; xx += 2 * r) { x.beginPath(); x.arc(xx, y, r, 0, Math.PI); x.stroke(); }
+  }
+  if (pattern === "honeycomb") {   // hexagons, pointy sides left and right
+    const r = S * 0.55, hw = r * Math.sqrt(3) / 2;
+    for (let y = 0, row = 0; y < h + 2 * r; y += r * 1.5, row++) for (let xx = (row % 2) * hw - 2 * hw; xx < w + 2 * hw; xx += 2 * hw) {
+      const pts = []; for (let i = 0; i <= 6; i++) { const t = Math.PI / 6 + (i * Math.PI) / 3; pts.push([xx + Math.cos(t) * r, y + Math.sin(t) * r]); } line(pts);
+    }
+  }
   if (pattern === "channel" || pattern === "box" || pattern === "mountain") for (let y = S * 0.5; y < h; y += S) line([[0, y], [w, y]]);
   if (pattern === "box") for (let xx = S * 0.5; xx < w; xx += S) line([[xx, 0], [xx, h]]);
   if (pattern === "zigzag") for (let y = 0; y < h + S; y += S) { const pts = []; for (let xx = -S, i = 0; xx < w + S; xx += S / 2, i++) pts.push([xx, y + (i % 2 ? S * 0.35 : -S * 0.35)]); line(pts); }
@@ -280,10 +309,10 @@ function quiltImages(T, pattern, size) {
   const w = T.w, h = T.h, ppi = T.pxPerInch || 60;
   const sh = makeCanvas(w, h), sx = sh.getContext("2d");
   sx.fillStyle = "#fff"; sx.fillRect(0, 0, w, h); sx.lineCap = "round"; sx.lineJoin = "round";
-  sx.save(); sx.filter = `blur(${Math.round(ppi * 0.16 * (size || 1))}px)`; sx.strokeStyle = "rgba(0,0,0,.26)"; sx.lineWidth = ppi * 0.3 * (size || 1); quiltPaths(sx, w, h, ppi, pattern, size); sx.restore();
-  sx.save(); sx.filter = "blur(1.2px)"; sx.strokeStyle = "rgba(0,0,0,.25)"; sx.lineWidth = 2.5; quiltPaths(sx, w, h, ppi, pattern, size); sx.restore();
+  sx.save(); sx.filter = `blur(${Math.round(ppi * 0.16 * (size || 1))}px)`; sx.strokeStyle = "rgba(0,0,0,.26)"; sx.lineWidth = ppi * 0.3 * (size || 1); quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes); sx.restore();
+  sx.save(); sx.filter = "blur(1.2px)"; sx.strokeStyle = "rgba(0,0,0,.25)"; sx.lineWidth = 2.5; quiltPaths(sx, w, h, ppi, pattern, size, T.quiltAxes); sx.restore();
   const st = makeCanvas(w, h), tx = st.getContext("2d");
-  tx.strokeStyle = "#000"; tx.lineWidth = 1.8; tx.setLineDash([5, 2]); tx.lineJoin = "round"; quiltPaths(tx, w, h, ppi, pattern, size);
+  tx.strokeStyle = "#000"; tx.lineWidth = 1.8; tx.setLineDash([5, 2]); tx.lineJoin = "round"; quiltPaths(tx, w, h, ppi, pattern, size, T.quiltAxes);
   const out = { shade: sh, stitch: st };
   quiltGen.set(key, out);
   return out;
