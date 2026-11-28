@@ -588,6 +588,8 @@ export function createStudio({ materials, furs, templates, proofs }) {
   // set like the OAKMONT layer in the Oakmont file: NFL Bears Throwback at 81% width, gaps 12.8% of the letter height,
   // camo = that file's "Camo Top Layer" art laid over the front panel, outline round the outside of the letters
   function drawCamoText(ctx, T, C, ppi) {
+    if (T.camotext.spots) { T.camotext.spots.forEach((sp) => drawCamoText(ctx, { ...T, camotext: { ...T.camotext, ...sp, spots: null } }, C, ppi)); return; }   // e.g. blade: one word on each side
+    if (T.camotext.taper) return drawCamoTaper(ctx, T, C, ppi);
     const B = T.camotext, txt = String(C.text || CLUB_NAME || "CLUB").toUpperCase().trim() || "CLUB", chars = [...txt];
     const L = makeCanvas(T.w, T.h), x = L.getContext("2d");
     x.translate(B.cx, B.cy); x.rotate(((B.rot || 0) * Math.PI) / 180);
@@ -599,7 +601,11 @@ export function createStudio({ materials, furs, templates, proofs }) {
     let capPx = B.thick * (C.size || 1), gapK = C.spacing == null ? 0.128 : C.spacing;
     const ink = chars.map((ch) => { const m = x.measureText(ch); return { l: m.actualBoundingBoxLeft || 0, w: (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || m.width) }; });
     const mo = x.measureText("O"), inkO = ((mo.actualBoundingBoxLeft || 0) + (mo.actualBoundingBoxRight || mo.width)) / cap100;   // per unit cap
-    const wk = (0.43 / inkO) * (C.wide || 1);
+    let wk = (0.43 / inkO) * (C.wide || 1);
+    if (B.fill) {   // stretch the letters along the length so the word runs the whole panel
+      const inkSum = ink.reduce((a, b) => a + b.w, 0), cp = capPx;
+      wk = Math.max(wk, ((B.len - gapK * cp * (chars.length - 1)) / (inkSum * (cp / cap100))) * Math.min(1, C.wide || 1));
+    }
     const lenAt = (cp) => ink.reduce((a, b) => a + b.w, 0) * (cp / cap100) * wk + gapK * cp * (chars.length - 1);
     if (lenAt(capPx) > B.len) capPx *= B.len / lenAt(capPx);   // long names: smaller letters
     const fs = capPx * (100 / cap100); x.font = `${fs}px ${fam}`;
@@ -619,7 +625,59 @@ export function createStudio({ materials, furs, templates, proofs }) {
     x.globalCompositeOperation = "destination-over";
     x.lineJoin = "miter"; x.lineWidth = (2 * Math.max(0.6, ppi * (C.outlineW == null ? 0.06 : C.outlineW))) / wk; x.strokeStyle = C.outline;
     each(true);
-    x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = "destination-in"; x.drawImage(T.camoMaskImg, 0, 0);
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    if (T.camoMaskImg) { x.globalCompositeOperation = "destination-in"; x.drawImage(T.camoMaskImg, 0, 0); }
+    ctx.drawImage(L, 0, 0);
+  }
+  // tapered panels (blade / mid mallet top): the letters grow with the panel from the narrow tip to the wide end,
+  // each letter keeping its shape, and the word is stretched to run the whole length of the top
+  function drawCamoTaper(ctx, T, C, ppi) {
+    const B = T.camotext, [t0, t1] = B.taper, half = B.len / 2;
+    const txt = String(C.text || CLUB_NAME || "CLUB").toUpperCase().trim() || "CLUB", chars = [...txt];
+    const L = makeCanvas(T.w, T.h), x = L.getContext("2d");
+    x.translate(B.cx, B.cy); x.rotate(((B.rot || 0) * Math.PI) / 180);
+    const fam = "JRBlock, Impact, sans-serif";
+    x.font = `100px ${fam}`;
+    const cap100 = x.measureText("H").actualBoundingBoxAscent || 80, gapK = C.spacing == null ? 0.128 : C.spacing;
+    const ink = chars.map((ch) => { const m = x.measureText(ch); return { l: m.actualBoundingBoxLeft || 0, w: (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || m.width) }; });
+    const mo = x.measureText("O"), wk0 = 0.43 / (((mo.actualBoundingBoxLeft || 0) + (mo.actualBoundingBoxRight || mo.width)) / cap100);
+    const tAt = (s) => t0 + ((t1 - t0) * Math.min(B.len, Math.max(0, s + half))) / B.len;
+    const lay = (sig, lam) => {   // returns glyph caps/positions and the end point
+      let p = -half; const G = [];
+      chars.forEach((c, i) => {
+        const u = (ink[i].w / cap100) * wk0 * sig; let cp = lam * tAt(p);
+        for (let k = 0; k < 4; k++) cp = lam * tAt(p + (cp * u) / 2);
+        G.push({ c, i, p, cp }); p += cp * u + (i < chars.length - 1 ? gapK * cp : 0);
+      });
+      return { G, end: p };
+    };
+    let sig = 1, lam = C.size || 1, R = lay(sig, lam);
+    if (B.fill || R.end > half) {
+      let lo = 0.6, hi = 3;
+      for (let k = 0; k < 30; k++) { sig = (lo + hi) / 2; if (lay(sig, lam).end > half) hi = sig; else lo = sig; }
+      sig = lo;
+      if (sig <= 0.61) { let a = 0.1, z = lam; for (let k = 0; k < 30; k++) { lam = (a + z) / 2; if (lay(sig, lam).end > half) z = lam; else a = lam; } lam = a; }
+      R = lay(sig, lam);
+    }
+    const off = (half - R.end) / 2;   // centre what is left over
+    const wk = wk0 * sig * (C.wide || 1);
+    const each = (stroke) => R.G.forEach((g) => {
+      const fs = g.cp * (100 / cap100), kf = (fs / 100) * wk;
+      x.save(); x.font = `${fs}px ${fam}`; x.translate(g.p + off + ink[g.i].l * kf, g.cp / 2); x.scale(wk, 1);
+      if (stroke) x.strokeText(g.c, 0, 0); else x.fillText(g.c, 0, 0); x.restore();
+    });
+    x.fillStyle = "#000"; each(false);
+    x.globalCompositeOperation = "source-in";
+    const tile = camoTileIn(T.camoTile, C.colors), seed = C.seed || 0, k = C.camoScale || 1, big = Math.max(t0, t1) * 1.3;
+    x.save(); x.rotate((-(B.rot || 0) * Math.PI) / 180);   // camo stays upright on the flat, like the other panels
+    if (seed & 1) x.scale(-1, 1); if (seed & 2) x.scale(1, -1);
+    const vert = Math.abs(Math.sin(((B.rot || 0) * Math.PI) / 180)) > 0.7, cw = vert ? big : B.len * 1.1, ch = vert ? B.len * 1.1 : big;
+    x.drawImage(tile, (-cw / 2) * k, (-ch / 2) * k, cw * k, ch * k); x.restore();
+    x.globalCompositeOperation = "destination-over";
+    x.lineJoin = "miter"; x.lineWidth = (2 * Math.max(0.6, ppi * (C.outlineW == null ? 0.06 : C.outlineW))) / wk; x.strokeStyle = C.outline;
+    each(true);
+    x.setTransform(1, 0, 0, 1, 0, 0);
+    if (T.camoMaskImg) { x.globalCompositeOperation = "destination-in"; x.drawImage(T.camoMaskImg, 0, 0); }
     ctx.drawImage(L, 0, 0);
   }
   function pickThread(c) {
