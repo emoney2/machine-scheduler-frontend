@@ -255,7 +255,7 @@ function drawQuiltThread(ctx, T, color) {
 // x / y move it (fraction of the area), rot turns it in 90° steps; look = oil paint settings
 export const PAINT_DEFAULT = { area: null, zoom: 1, x: 0, y: 0, rot: 0, look: {} };
 export { OIL_DEFAULT };
-export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.128, camoScale: 1, outlineW: 0.06, seed: 0, wide: 1 };
+export const CAMOTEXT_DEFAULT = { text: "", size: 1, spacing: 0.128, camoScale: 1, outlineW: 0.06, seed: 0, wide: 1, paintX: 0, paintY: 0 };
 // Circle Patch: a leather patch zigzag-stitched on, with a smaller laser-engraved leather patch zigzag-stitched on top;
 // the club logo in the middle and the club name around it (2 words: top / bottom, 3: two on top, 4: two and two)
 export const PATCH_DEFAULT = { text: "", topText: "", bottomText: "", font: "sans", size: 1, textSize: 1, logoSize: 1, ring: 0.18, sep: "none", tracking: 0.04 };
@@ -608,6 +608,37 @@ export function createStudio({ materials, furs, templates, proofs }) {
   }
   // set like the OAKMONT layer in the Oakmont file: NFL Bears Throwback at 81% width, gaps 12.8% of the letter height,
   // camo = that file's "Camo Top Layer" art laid over the front panel, outline round the outside of the letters
+  // Filled Text: what goes inside the letters, in the word's own frame (x along the word, y across it)
+  function fillLetters(x, C, rx, ry, rw, rh, ppi) {
+    const pad = rh * 0.15; rx -= pad; ry -= pad; rw += 2 * pad; rh += 2 * pad;
+    x.save();
+    if (C.fill === "painted" && C.fillImg) {   // the painted course, cover-fit along the word
+      const im = C.fillImg, s = Math.max(rw / im.width, rh / im.height) * (C.camoScale || 1);
+      const w = im.width * s, h = im.height * s, ox = (C.paintX || 0) * (w - rw) / 2, oy = (C.paintY || 0) * (h - rh) / 2;
+      x.drawImage(im, rx + (rw - w) / 2 + ox, ry + (rh - h) / 2 + oy, w, h);
+    } else if (C.fill === "tartan" && C.tartanCols) {   // the club's tartan, ~1.6" sett
+      const t = tartan(C.tartanCols), pat = x.createPattern(t, "repeat");
+      pat.setTransform(new DOMMatrix().scale((ppi * 1.6 * (C.camoScale || 1)) / t.width));
+      x.fillStyle = pat; x.fillRect(rx, ry, rw, rh);
+    } else if (C.fill === "flag") {   // stars and stripes along the word: 13 stripes across the letters, blue canton at the start
+      // drawn on its own canvas first: the letters are filled with one "source-in" draw
+      const F = makeCanvas(Math.ceil(rw), Math.ceil(rh)), fx = F.getContext("2d"), X = x; fx.translate(-rx, -ry); x = fx;
+      const red = C.flagRed || "#a43e4b", white = C.flagWhite || "#edeceb", blue = C.flagBlue || "#323e4b";
+      const sy = ry + pad, sh = rh - 2 * pad, st = sh / 13;
+      x.fillStyle = white; x.fillRect(rx, ry, rw, rh);
+      x.fillStyle = red; for (let i = 0; i < 13; i += 2) x.fillRect(rx, sy + i * st - (i === 0 ? pad : 0), rw, st + (i === 0 ? pad : 0) + (i === 12 ? pad : 0));
+      const cw = Math.min(rw * 0.42, sh * 1.25), chh = st * 7 + pad;
+      x.fillStyle = blue; x.fillRect(rx, ry, cw + pad, chh);
+      x.fillStyle = white; const r = st * 0.32;
+      for (let j = 0; j < 5; j++) for (let i = 0; i < 6; i++) {   // rows of stars
+        const px = rx + pad + (i + 0.5 + (j % 2) * 0.5) * (cw / 6.5), py = sy + (j + 0.7) * (st * 7) / 5.6;
+        if (px > rx + cw + pad - r) continue;
+        x.beginPath(); for (let a = 0; a < 10; a++) { const t = -Math.PI / 2 + (a * Math.PI) / 5, rr = a % 2 ? r * 0.42 : r; x.lineTo(px + Math.cos(t) * rr, py + Math.sin(t) * rr); } x.fill();
+      }
+      x = X; x.drawImage(F, rx, ry);
+    }
+    x.restore();
+  }
   function drawCamoText(ctx, T, C, ppi) {
     if (T.camotext.spots) { T.camotext.spots.forEach((sp) => drawCamoText(ctx, { ...T, camotext: { ...T.camotext, ...sp, spots: null } }, C, ppi)); return; }   // e.g. blade: one word on each side
     if (T.camotext.taper) return drawCamoTaper(ctx, T, C, ppi);
@@ -635,6 +666,8 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const each = (stroke) => { let q = px; chars.forEach((c, i) => { glyph(c, q, stroke, i); q += widths[i] + gap; }); };
     x.fillStyle = "#000"; each(false);
     x.globalCompositeOperation = "source-in";
+    if (C.fill && C.fill !== "camo") fillLetters(x, C, -total / 2, -capPx / 2, total, capPx, ppi);   // Filled Text: painting / tartan / flag inside the letters, laid along the word
+    else {
     const tile = camoTileIn(T.camoTile, C.colors), seed = C.seed || 0, [cx0, cy0, cw, ch] = B.camo || [0, 0, T.w, T.h];
     x.save(); x.setTransform(1, 0, 0, 1, 0, 0);
     x.translate(cx0 + cw / 2, cy0 + ch / 2); if (seed & 1) x.scale(-1, 1); if (seed & 2) x.scale(1, -1);
@@ -642,6 +675,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
     if (B.camoRot) { x.rotate(Math.PI / 2); x.drawImage(tile, (-ch / 2) * k, (-cw / 2) * k, ch * k, cw * k); }   // wide panels: the camo art turned to fit
     else x.drawImage(tile, (-cw / 2) * k, (-ch / 2) * k, cw * k, ch * k);
     x.restore();
+    }
     // outline outside the letters, in the outline colour
     x.globalCompositeOperation = "destination-over";
     x.lineJoin = "miter"; x.lineWidth = (2 * Math.max(0.6, ppi * (C.outlineW == null ? 0.06 : C.outlineW))) / wk; x.strokeStyle = C.outline;
@@ -1128,6 +1162,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
     painted: () => ["Back / sides"],
     camotext: () => ["Background", "Camo 1", "Camo 2", "Letter outline"],
     patch: () => ["Body", "Bottom patch", "Top patch"],
+    painttext: () => ["Background", "Letter outline"],
+    tartantext: () => ["Background", "Tartan base", "Thread 1", "Thread 2", "Letter outline"],
+    flagtext: () => ["Background", "Letter outline"],
     stockcamo: (T) => ["Back panel", ...(T.stockNames || T.slots.map((x, i) => `Camo ${i + 1}`))],
   };
   // stock designs (Duck Camo, Light Camo) come in their own printed colours; these colours aren't in the
@@ -1189,6 +1226,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
       else if (kind === "camo") r = [m[0], ...T.slots.map((x, i) => m[(i + 1) % m.length])];
       else r = [m[1] && m[1] !== m[0] ? m[1] : m[0]];
       const roles = KIND_ROLES[kind](T);
+      if (kind === "camotext") {   // Filled Text family: the same word layout with other fills
+        const w = special.scatter.A, outl = r[3], extra = [];
+        if (COURSE.src) extra.push(["painttext", "Painted Text", [w.body, outl], "painted"]);
+        const tw = special.tartan.A || special.tartan.B;
+        if (tw) extra.push(["tartantext", "Tartan Text", [w.body, tw.body, tw.threads[0], tw.threads[1], isLight(tw.body) ? tw.threads[0] : tw.body], "tartan"]);
+        const fl = special.flag.A; extra.push(["flagtext", "Flag Text", [w.body, fl.blue], "flag"]);
+        extra.forEach(([k, nm, rr, fill]) => specs.push({ tpl: T.id, product: T.product, name: nm, design: `${T.product} · ${nm}`, cw, kind: k,
+          roles: KIND_ROLES[k](T).map((label, i) => ({ label, mat: rr[i] || rr[0] })), camotext: { ...CAMOTEXT_DEFAULT, fill } }));
+      }
       specs.push({ tpl: T.id, product: T.product, name: T.name, design: `${T.product} · ${T.name}`, cw, kind,
         roles: roles.map((label, i) => ({ label, mat: r[i] || r[0] })), ...(kind === "pattern" ? { pattern: { ...PATTERN_DEFAULT } } : {}), ...(kind === "painted" ? { paint: { ...PAINT_DEFAULT } } : {}), ...(kind === "camotext" ? { camotext: { ...CAMOTEXT_DEFAULT } } : {}), ...(kind === "patch" ? { patch: { ...PATCH_DEFAULT } } : {}) });
     }));
@@ -1210,6 +1256,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
       case "flag": mats = [r[0], r[2], r[1], r[0], r[2]]; break;   // [back, field, red stripes, canton, stars]
       case "camo": mats = r.length >= 4 ? r : [...r, ...r].slice(0, 4); break;
       case "stockcamo": mats = r; break;
+      case "painttext": case "flagtext": case "tartantext": {
+        mats = [r[0], r[0], r[0], r[0]];
+        const C = { ...CAMOTEXT_DEFAULT, ...(spec.camotext || {}) };
+        C.fill = spec.kind === "painttext" ? "painted" : spec.kind === "flagtext" ? "flag" : "tartan";
+        C.outline = r[r.length - 1].hex; C.colors = [r[0].hex, r[0].hex, r[0].hex];
+        if (C.fill === "painted") { if (!COURSE.src) return null; C.fillImg = await paintedCourse(C.look || {}); }
+        if (C.fill === "tartan") C.tartanCols = [r[1], r[2], r[3], r[2]];
+        camotext = C; break;
+      }
       case "patch": mats = [r[0], r[0], r[0], r[0]]; patch = { ...PATCH_DEFAULT, ...(spec.patch || {}), bottom: r[1], top: r[2], engrave: PATCH_ENGRAVE }; break;
       case "camotext": mats = [r[0], r[0], r[0], r[0]]; camotext = { ...CAMOTEXT_DEFAULT, ...(spec.camotext || {}), colors: [r[1].hex, r[2].hex, r[0].hex], outline: r[3].hex }; break;
       case "painted": mats = [r[0], r[0], r[0], r[0]];
