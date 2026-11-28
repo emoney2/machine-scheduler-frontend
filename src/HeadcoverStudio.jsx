@@ -74,7 +74,7 @@ function LogoColors({ palette, map, picks, onChange, extra }) {
 
 let UID = 0;
 const uid = () => `d${++UID}`;
-const specKey = (sp) => `${sp.tpl}|${sp.roles.map((r) => r.mat && r.mat.id).join(",")}`;
+const specKey = (sp) => `${sp.tpl}|${sp.kind}|${(sp.quilt && sp.quilt.pattern) || ""}|${sp.roles.map((r) => r.mat && r.mat.id).join(",")}`;
 const ago = (t) => {
   const m = Math.round((Date.now() - t) / 60000);
   if (m < 1) return "just now"; if (m < 60) return `${m} min ago`;
@@ -425,7 +425,7 @@ export default function HeadcoverStudio() {
     const s = studioRef.current;
     if (!s || !s.hasLogo() || !slots.some(Boolean)) return;
     const base = await s.plan({ slots, swapped, products, variant: 0 });
-    const place = (sp) => `${sp.tpl}|${sp.cw}`;
+    const place = (sp) => `${sp.tpl}|${sp.kind}|${(sp.quilt && sp.quilt.pattern) || ""}|${sp.cw}`;
     const locked = designs.filter((d) => d.locked);
     const used = new Set(locked.map((d) => specKey(d.spec)));
     const current = new Map(designs.filter((d) => !d.locked).map((d) => [place(d.spec), d]));
@@ -1001,7 +1001,11 @@ export default function HeadcoverStudio() {
                   })()}
                   {cur.spec.kind === "quilted" && (() => {
                     const Q = { pattern: "diamond", size: 1, ...(cur.spec.quilt || {}) };
-                    const setQ = (q) => liveSpec({ ...cur.spec, quilt: { ...Q, ...q } });
+                    const setQ = (q) => {   // keep the card's name in step with the pattern ("Driver · Quilted Viper")
+                      const nq = { ...Q, ...q }, pn = (QUILT_PATTERNS.find(([v]) => v === nq.pattern) || [])[1];
+                      const nm = pn && /^Quilted/.test(cur.spec.name) ? `Quilted ${pn}` : cur.spec.name;
+                      liveSpec({ ...cur.spec, quilt: nq, name: nm, design: `${cur.spec.product} · ${nm}` });
+                    };
                     return (
                       <div className="patctl">
                         <div className="small">Quilting pattern</div>

@@ -1447,6 +1447,24 @@ export function createStudio({ materials, furs, templates, proofs }) {
         roles: [{ label: "Leather", mat: body }, { label: "Pinstripe", mat: line }], pinstripe: { gap: 0.4, width: 0.025 } });
     };
     const specs = [];
+    // quilted: a leather / thread pairing for each pattern, spread across the picks so no two match;
+    // the two usual colourways first, then every other pick-on-pick (or white / black thread) pairing,
+    // always preferring a leather and a thread that haven't been used yet
+    let qp = null;
+    const quiltPairs = () => {
+      if (qp) return qp;
+      const leathers = [...new Set(picks.map(smoothFor))], threads = [...new Set([...picks, WHITE, BLACK])];
+      const cands = [[special.A.main, special.A.thread], [special.B.main, special.B.thread]];
+      leathers.forEach((L) => threads.forEach((t) => { if (t !== L && dE(t.rgb, L.rgb) > 40) cands.push([L, t]); }));
+      const out = [], same = (a, b) => a[0] === b[0] && a[1] === b[1];
+      while (out.length < QUILT_PATTERNS.length) {
+        const left = cands.filter((c) => !out.some((o) => same(o, c)));
+        if (!left.length) { out.push(out[out.length % Math.max(1, out.length)] || cands[0]); continue; }
+        const score = (c) => (out.some((o) => o[0] === c[0]) ? 0 : 2) + (out.some((o) => o[1] === c[1]) ? 0 : 1) - (picks.includes(c[1]) ? 0 : 1.5);   // club colours before plain black / white thread
+        out.push(left.reduce((b, c) => (score(c) > score(b) ? c : b), left[0]));
+      }
+      return (qp = out);
+    };
     tpls.forEach((T) => tways.forEach(([cw, m]) => {
       const kind = kindOf(T);
       if (kind === "scatter") return;   // parked
@@ -1454,9 +1472,15 @@ export function createStudio({ materials, furs, templates, proofs }) {
       if ((kind === "flag" || kind === "stockcamo" || kind === "painted" || kind === "camotext") && cw === "B") return;   // painted course: dark back only (back colour can still be changed in Edit)   // the flag has one colourway: classic red, white and navy
       if (kind === "tartan" && !special.tartan[cw]) return;
       let r;
-      if (kind === "quilted") {
-        r = [special[cw].main, special[cw].thread];
+      if (kind === "quilted") {   // one cover per quilt pattern, each in its own leather / thread pairing
         pushPin(T, cw);
+        if (cw !== tways[0][0]) return;
+        quiltPairs().forEach(([leather, thread], i) => {
+          const [pid, pname] = QUILT_PATTERNS[i];
+          specs.push({ tpl: T.id, product: T.product, name: `Quilted ${pname}`, design: `${T.product} · Quilted ${pname}`, cw: String.fromCharCode(65 + i), kind,
+            roles: [{ label: "Leather", mat: leather }, { label: "Quilt thread", mat: thread }], quilt: { pattern: pid, size: 1 } });
+        });
+        return;
       }
       else if (kind === "exotic") { r = [special[cw].body]; if (T.product === "Alignment Stick Cover") pushPin(T, cw); }   // alignment stick has no quilted layout
       else if (kind === "stripes") r = [special.stripes[cw].body, ...special.stripes[cw].stripes];
