@@ -26,5 +26,43 @@
   "stitch": "quilt-stitch.png",
   "pattern": "Diamond"
  },
- "logoFrom": "blade"
+ "logoFrom": "blade",
+ "pinZones": [
+  {
+   "box": [
+    0,
+    0,
+    405,
+    338
+   ],
+   "angle": 13.35
+  },
+  {
+   "box": [
+    575,
+    0,
+    992,
+    338
+   ],
+   "angle": -13.35
+  },
+  {
+   "box": [
+    405,
+    0,
+    575,
+    338
+   ],
+   "angle": 0
+  },
+  {
+   "box": [
+    0,
+    338,
+    992,
+    620
+   ],
+   "angle": 0
+  }
+ ]
 }

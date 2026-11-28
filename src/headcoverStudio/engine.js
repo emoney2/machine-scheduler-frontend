@@ -1000,9 +1000,17 @@ export function createStudio({ materials, furs, templates, proofs }) {
     }
     if (opts.pinstripe) {   // Pinstripe (River Club): thin printed lines down the whole cover
       const P = opts.pinstripe, gap = ppi * (P.gap || 0.4), lw = Math.max(1, ppi * (P.width || 0.025));
-      ctx.save(); ctx.fillStyle = P.color;
-      for (let xx = gap / 2; xx < T.w; xx += gap) ctx.fillRect(Math.round(xx - lw / 2), 0, lw, T.h);
-      ctx.restore();
+      // zones: panels laid out turned in the flat (blade / mid mallet sides) get their stripes turned to match
+      const zones = T.pinZones || [{ box: [0, 0, T.w, T.h], angle: 0 }];
+      zones.forEach((z) => {
+        const pts = z.poly || [[z.box[0], z.box[1]], [z.box[2], z.box[1]], [z.box[2], z.box[3]], [z.box[0], z.box[3]]];
+        const cx = pts.reduce((a, q) => a + q[0], 0) / pts.length, cy = pts.reduce((a, q) => a + q[1], 0) / pts.length, L = T.w + T.h;
+        ctx.save(); ctx.beginPath(); pts.forEach(([a, b], i) => (i ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); ctx.closePath(); ctx.clip();
+        if (z.angle) { ctx.translate(cx, cy); ctx.rotate((z.angle * Math.PI) / 180); }   // straight zones keep one phase so the stripes line up across them
+        ctx.fillStyle = P.color;
+        for (let xx = -L + gap / 2; xx < L; xx += gap) ctx.fillRect(xx - lw / 2, -L, lw, 2 * L);
+        ctx.restore();
+      });
     }
     if (T.tartanImgs && opts.tartan) {   // tartan: straight stitch lines, one thread colour per layer
       T.tartanImgs.forEach((im, i) => {
@@ -1236,6 +1244,13 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const tpls = templates.filter((T) => !products || products.includes(T.product));
     const special = { A: designWay(picks, 0), B: designWay(picks, 1), scatter: scatterWays(picks), stripes: stripeWays(picks), flag: flagWays(), tartan: tartanWays(picks) };
     const tways = swapped ? [["B", TB], ["A", TA]] : [["A", TA], ["B", TB]];
+    // Pinstripe (River Club) rides on the quilted layouts (and the exotic one for the alignment stick):
+    // A light leather with dark pinstripes, B the reverse; every product but the barrel and valuables pouch
+    const pushPin = (T, cw) => {
+      const ws = special.scatter.A, body = cw === "A" ? ws.body : ws.ink, line = cw === "A" ? ws.ink : ws.body;
+      specs.push({ tpl: T.id, product: T.product, name: "Pinstripe", design: `${T.product} · Pinstripe`, cw, kind: "pinstripe",
+        roles: [{ label: "Leather", mat: body }, { label: "Pinstripe", mat: line }], pinstripe: { gap: 0.4, width: 0.025 } });
+    };
     const specs = [];
     tpls.forEach((T) => tways.forEach(([cw, m]) => {
       const kind = kindOf(T);
@@ -1246,12 +1261,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
       let r;
       if (kind === "quilted") {
         r = [special[cw].main, special[cw].thread];
-        // Pinstripe uses the quilted layouts: A light leather with dark pinstripes (River Club), B the reverse
-        const ws = special.scatter.A, body = cw === "A" ? ws.body : ws.ink, line = cw === "A" ? ws.ink : ws.body;
-        specs.push({ tpl: T.id, product: T.product, name: "Pinstripe", design: `${T.product} · Pinstripe`, cw, kind: "pinstripe",
-          roles: [{ label: "Leather", mat: body }, { label: "Pinstripe", mat: line }], pinstripe: { gap: 0.4, width: 0.025 } });
+        pushPin(T, cw);
       }
-      else if (kind === "exotic") r = [special[cw].body];
+      else if (kind === "exotic") { r = [special[cw].body]; if (T.product === "Alignment Stick Cover") pushPin(T, cw); }   // alignment stick has no quilted layout
       else if (kind === "stripes") r = [special.stripes[cw].body, ...special.stripes[cw].stripes];
       else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
       else if (kind === "flag") r = [special.flag[cw].blue, special.flag[cw].red, special.flag[cw].white];
