@@ -1,0 +1,52 @@
+{
+ "name": "Camo Text",
+ "product": "Blade",
+ "w": 992,
+ "h": 620,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 455.94,
+  "y": 314.26,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "design": "camotext",
+ "slots": [],
+ "camotext": {
+  "cx": 472,
+  "cy": 420,
+  "len": 270,
+  "thick": 72,
+  "rot": 90,
+  "camo": [
+   400,
+   240,
+   180,
+   330
+  ],
+  "camoRot": false,
+  "mask": "text-area.png"
+ },
+ "logos": [
+  {
+   "x": 212.1,
+   "y": 177.6,
+   "w": 55,
+   "h": 55,
+   "rot": 103.35
+  },
+  {
+   "x": 721.3,
+   "y": 179.1,
+   "w": 55,
+   "h": 55,
+   "rot": -103.35
+  }
+ ]
+}

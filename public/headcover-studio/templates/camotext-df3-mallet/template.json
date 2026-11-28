@@ -1,0 +1,45 @@
+{
+ "name": "Camo Text",
+ "product": "DF3 Mallet",
+ "w": 961,
+ "h": 813,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 226.53,
+  "y": 516.48,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "design": "camotext",
+ "slots": [],
+ "camotext": {
+  "cx": 261,
+  "cy": 567,
+  "len": 292,
+  "thick": 100,
+  "rot": 0,
+  "camo": [
+   63,
+   369.59000000000003,
+   403,
+   362.7
+  ],
+  "camoRot": true,
+  "mask": "text-area.png"
+ },
+ "logos": [
+  {
+   "x": 342.5,
+   "y": 113.0,
+   "w": 40,
+   "h": 40,
+   "rot": 180
+  }
+ ]
+}

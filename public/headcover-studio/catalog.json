@@ -409,6 +409,34 @@
   {
    "id": "camotext-hybrid",
    "dir": "templates/camotext-hybrid/"
+  },
+  {
+   "id": "camotext-barrel",
+   "dir": "templates/camotext-barrel/"
+  },
+  {
+   "id": "camotext-zipper-pouch",
+   "dir": "templates/camotext-zipper-pouch/"
+  },
+  {
+   "id": "camotext-blade",
+   "dir": "templates/camotext-blade/"
+  },
+  {
+   "id": "camotext-mid-mallet",
+   "dir": "templates/camotext-mid-mallet/"
+  },
+  {
+   "id": "camotext-mallet",
+   "dir": "templates/camotext-mallet/"
+  },
+  {
+   "id": "camotext-center-shaft-mallet",
+   "dir": "templates/camotext-center-shaft-mallet/"
+  },
+  {
+   "id": "camotext-df3-mallet",
+   "dir": "templates/camotext-df3-mallet/"
   }
  ],
  "proofs": [

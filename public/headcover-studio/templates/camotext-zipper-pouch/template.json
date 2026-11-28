@@ -1,0 +1,41 @@
+{
+ "name": "Camo Text",
+ "product": "Zipper Pouch",
+ "w": 1260,
+ "h": 1050,
+ "pxPerInch": 60,
+ "frame": "frame.png",
+ "logo": {
+  "x": 601.74,
+  "y": 305.34,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "design": "camotext",
+ "slots": [],
+ "camotext": {
+  "cx": 636,
+  "cy": 340,
+  "len": 520,
+  "thick": 150,
+  "rot": 0,
+  "camo": [
+   225,
+   88,
+   806,
+   460
+  ],
+  "camoRot": true,
+  "mask": "text-area.png"
+ },
+ "logos": [
+  {
+   "x": 606.5,
+   "y": 735.0,
+   "w": 69,
+   "h": 69,
+   "rot": 0
+  }
+ ]
+}

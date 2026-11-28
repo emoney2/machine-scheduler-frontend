@@ -1,0 +1,45 @@
+{
+ "name": "Camo Text",
+ "product": "Mallet",
+ "w": 961,
+ "h": 765,
+ "pxPerInch": 60.0,
+ "frame": "frame.png",
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 229.32,
+  "y": 490.7,
+  "w": 68.92,
+  "h": 68.92,
+  "rot": 0
+ },
+ "design": "camotext",
+ "slots": [],
+ "camotext": {
+  "cx": 264,
+  "cy": 532,
+  "len": 276,
+  "thick": 100,
+  "rot": 0,
+  "camo": [
+   67,
+   348.76,
+   392,
+   352.8
+  ],
+  "camoRot": true,
+  "mask": "text-area.png"
+ },
+ "logos": [
+  {
+   "x": 242.4,
+   "y": 185.1,
+   "w": 42,
+   "h": 42,
+   "rot": 180
+  }
+ ]
+}

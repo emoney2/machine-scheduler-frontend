@@ -1,0 +1,44 @@
+{
+ "name": "Camo Text",
+ "product": "Barrel",
+ "w": 1071,
+ "h": 1235,
+ "pxPerInch": 60.0,
+ "fur": {
+  "name": "Light Grey Fur",
+  "mask": "fur.png"
+ },
+ "logo": {
+  "x": 485.75,
+  "y": 284.79,
+  "w": 103.08,
+  "h": 103.08,
+  "rot": 0
+ },
+ "design": "camotext",
+ "slots": [],
+ "camotext": {
+  "cx": 538,
+  "cy": 860,
+  "len": 560,
+  "thick": 150,
+  "rot": 90,
+  "camo": [
+   309,
+   502,
+   440,
+   708
+  ],
+  "camoRot": false,
+  "mask": "text-area.png"
+ },
+ "logos": [
+  {
+   "x": 485.75,
+   "y": 284.79,
+   "w": 103.08,
+   "h": 103.08,
+   "rot": 0
+  }
+ ]
+}

@@ -611,7 +611,9 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const tile = camoTileIn(T.camoTile, C.colors), seed = C.seed || 0, [cx0, cy0, cw, ch] = B.camo || [0, 0, T.w, T.h];
     x.save(); x.setTransform(1, 0, 0, 1, 0, 0);
     x.translate(cx0 + cw / 2, cy0 + ch / 2); if (seed & 1) x.scale(-1, 1); if (seed & 2) x.scale(1, -1);
-    const k = C.camoScale || 1; x.drawImage(tile, (-cw / 2) * k, (-ch / 2) * k, cw * k, ch * k);
+    const k = C.camoScale || 1;
+    if (B.camoRot) { x.rotate(Math.PI / 2); x.drawImage(tile, (-ch / 2) * k, (-cw / 2) * k, ch * k, cw * k); }   // wide panels: the camo art turned to fit
+    else x.drawImage(tile, (-cw / 2) * k, (-ch / 2) * k, cw * k, ch * k);
     x.restore();
     // outline outside the letters, in the outline colour
     x.globalCompositeOperation = "destination-over";
