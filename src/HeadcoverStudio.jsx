@@ -1008,15 +1008,45 @@ export default function HeadcoverStudio() {
                         {sl("Zoom", P.zoom, 1, 3, 0.05, (v) => setPaint({ zoom: v }), (v) => `${Math.round(v * 100)}%`)}
                         {sl("Move left / right", P.x, -0.5, 0.5, 0.01, (v) => setPaint({ x: v }), (v) => (v * 100).toFixed(0))}
                         {sl("Move up / down", P.y, -0.5, 0.5, 0.01, (v) => setPaint({ y: v }), (v) => (v * 100).toFixed(0))}
-                        <div className="small">Paint look</div>
-                        {sl("Brush size", L.scale, 2, 9, 1, (v) => setLook({ scale: v }))}
-                        {sl("Paint ridges", L.rim, 0, 8, 1, (v) => setLook({ rim: v, relief: v }))}
-                        {sl("Keep detail", L.detail, 2, 10, 1, (v) => setLook({ detail: v }))}
+                        <div className="small">Style</div>
                         <div className="lines" style={{ margin: "2px 0 6px" }}>
-                          <button className={!L.grey ? "on" : ""} onClick={() => setLook({ grey: false })}>Colour</button>
-                          <button className={L.grey ? "on" : ""} onClick={() => setLook({ grey: true })}>Greyscale</button>
+                          {[["oil", "Oil paint"], ["ink", "Pen & ink"], ["screen", "Screen print"], ["water", "Watercolour"]].map(([k, n]) => (
+                            <button key={k} className={(L.style || "oil") === k ? "on" : ""} onClick={() => setLook({ style: k })}>{n}</button>
+                          ))}
                         </div>
-                        {!L.grey && sl("Colour pop", L.vivid, 0, 10, 1, (v) => setLook({ vivid: v }))}
+                        {(L.style || "oil") === "oil" && <>
+                          {sl("Brush size", L.scale, 2, 9, 1, (v) => setLook({ scale: v }))}
+                          {sl("Paint ridges", L.rim, 0, 8, 1, (v) => setLook({ rim: v, relief: v }))}
+                          {sl("Keep detail", L.detail, 2, 10, 1, (v) => setLook({ detail: v }))}
+                        </>}
+                        {L.style === "ink" && <>
+                          {sl("Line detail", L.lineDetail, 1, 10, 1, (v) => setLook({ lineDetail: v }))}
+                          {sl("Shading", L.shading, 0, 10, 1, (v) => setLook({ shading: v }))}
+                        </>}
+                        {L.style === "screen" && sl("Detail", L.lineDetail, 1, 10, 1, (v) => setLook({ lineDetail: v }))}
+                        {L.style === "water" && <>
+                          {sl("Wash softness", L.wash, 1, 10, 1, (v) => setLook({ wash: v }))}
+                          {sl("Pencil lines", L.outline, 0, 10, 1, (v) => setLook({ outline: v }))}
+                        </>}
+                        {(L.style === "ink" || L.style === "screen") && (
+                          <>
+                            <div className="small">{L.style === "ink" ? "Ink colour" : "Print colour"}</div>
+                            <div className="logocols"><div className="lcpick" style={{ marginTop: 4 }}>
+                              {[...cur.spec.roles.map((r) => r.mat), ...slots.filter(Boolean), S.BLACK].filter((m, i, l) => m && l.findIndex((q) => q.hex === m.hex) === i).map((m, i) => (
+                                <span key={m.hex + i} className={"dot" + (L.ink === m.hex ? " sel" : "")} title={m.name} style={{ background: m.hex }} onClick={() => setLook({ ink: m.hex })} />
+                              ))}
+                              <label className="anyc"><input type="color" value={L.ink || (L.style === "ink" ? "#20243a" : "#306e50")} onChange={(e) => setLook({ ink: e.target.value })} /> Any</label>
+                              {L.ink && <button className="ghost" onClick={() => setLook({ ink: null })}>Default</button>}
+                            </div></div>
+                          </>
+                        )}
+                        {((L.style || "oil") === "oil" || L.style === "water") && (
+                          <div className="lines" style={{ margin: "2px 0 6px" }}>
+                            <button className={!L.grey ? "on" : ""} onClick={() => setLook({ grey: false })}>Colour</button>
+                            <button className={L.grey ? "on" : ""} onClick={() => setLook({ grey: true })}>Greyscale</button>
+                          </div>
+                        )}
+                        {(L.style || "oil") === "oil" && !L.grey && sl("Colour pop", L.vivid, 0, 10, 1, (v) => setLook({ vivid: v }))}
                         <button className="ghost" onClick={() => setPaint({ ...PAINT_DEFAULT })}>Reset painting</button>
                         {dpi != null && (
                           <div className={"small" + (dpi < 150 ? " warn" : "")} style={{ marginTop: 6 }}>
