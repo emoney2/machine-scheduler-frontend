@@ -1012,7 +1012,11 @@ export default function HeadcoverStudio() {
                         {sl("Brush size", L.scale, 2, 9, 1, (v) => setLook({ scale: v }))}
                         {sl("Paint ridges", L.rim, 0, 8, 1, (v) => setLook({ rim: v, relief: v }))}
                         {sl("Keep detail", L.detail, 2, 10, 1, (v) => setLook({ detail: v }))}
-                        {sl("Colour pop", L.vivid, 0, 10, 1, (v) => setLook({ vivid: v }))}
+                        <div className="lines" style={{ margin: "2px 0 6px" }}>
+                          <button className={!L.grey ? "on" : ""} onClick={() => setLook({ grey: false })}>Colour</button>
+                          <button className={L.grey ? "on" : ""} onClick={() => setLook({ grey: true })}>Greyscale</button>
+                        </div>
+                        {!L.grey && sl("Colour pop", L.vivid, 0, 10, 1, (v) => setLook({ vivid: v }))}
                         <button className="ghost" onClick={() => setPaint({ ...PAINT_DEFAULT })}>Reset painting</button>
                         {dpi != null && (
                           <div className={"small" + (dpi < 150 ? " warn" : "")} style={{ marginTop: 6 }}>

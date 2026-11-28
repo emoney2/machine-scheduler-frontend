@@ -8,7 +8,7 @@
 // takes ~20-40 s and must not freeze the page). Keep it free of spread / destructuring / for-of so the build
 // doesn't pull in helpers from outside the function.
 function makeOil() {
-  const OIL_DEFAULT = { stylization: 3, cleanliness: 3, scale: 5, bristle: 4, shine: 2, angle: -60, detail: 7, vivid: 5, rim: 3, relief: 3 };
+  const OIL_DEFAULT = { stylization: 3, cleanliness: 3, scale: 5, bristle: 4, shine: 2, angle: -60, detail: 7, vivid: 5, rim: 3, relief: 3, grey: false };
   
   function gauss1d(sigma) {
     const r = Math.max(1, Math.ceil(sigma * 2.5)), k = new Float32Array(2 * r + 1);
@@ -45,6 +45,7 @@ function makeOil() {
     const w = img.width, h = img.height, n = w * h, d = img.data;
     const R = new Float32Array(n), G = new Float32Array(n), B = new Float32Array(n);
     for (let i = 0, j = 0; i < n; i++, j += 4) { R[i] = d[j]; G[i] = d[j + 1]; B[i] = d[j + 2]; }
+    if (o.grey) for (let i = 0; i < n; i++) { const l = 0.3 * R[i] + 0.59 * G[i] + 0.11 * B[i]; R[i] = l; G[i] = l; B[i] = l; }   // black-and-white painting
     let seed = 12345;
     const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
     const sp = (3 + o.scale * 1.1) * px;                 // dab spacing (brush width)
