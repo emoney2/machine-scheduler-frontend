@@ -594,14 +594,18 @@ export function createStudio({ materials, furs, templates, proofs }) {
     const fam = "JRBlock, Impact, sans-serif";
     x.font = `100px ${fam}`;
     const cap100 = x.measureText("H").actualBoundingBoxAscent || 80;
-    let capPx = B.thick * (C.size || 1), wk = 0.81 * (C.wide || 1), gapK = C.spacing == null ? 0.128 : C.spacing;
-    const adv100 = chars.map((ch) => x.measureText(ch).width);
-    const lenAt = (cp) => adv100.reduce((a, b) => a + b, 0) * (cp / cap100) * wk + gapK * cp * (chars.length - 1);
+    // letters measured by their ink (not advance widths): in the Oakmont file an O is 0.43 x the letter height and the
+    // gap between letters is 0.128 x the letter height
+    let capPx = B.thick * (C.size || 1), gapK = C.spacing == null ? 0.128 : C.spacing;
+    const ink = chars.map((ch) => { const m = x.measureText(ch); return { l: m.actualBoundingBoxLeft || 0, w: (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || m.width) }; });
+    const mo = x.measureText("O"), inkO = ((mo.actualBoundingBoxLeft || 0) + (mo.actualBoundingBoxRight || mo.width)) / cap100;   // per unit cap
+    const wk = (0.43 / inkO) * (C.wide || 1);
+    const lenAt = (cp) => ink.reduce((a, b) => a + b.w, 0) * (cp / cap100) * wk + gapK * cp * (chars.length - 1);
     if (lenAt(capPx) > B.len) capPx *= B.len / lenAt(capPx);   // long names: smaller letters
     const fs = capPx * (100 / cap100); x.font = `${fs}px ${fam}`;
-    const widths = adv100.map((w) => w * (fs / 100) * wk), gap = gapK * capPx, total = lenAt(capPx), px = -total / 2;
-    const glyph = (c, q, stroke) => { x.save(); x.translate(q, capPx / 2); x.scale(wk, 1); if (stroke) x.strokeText(c, 0, 0); else x.fillText(c, 0, 0); x.restore(); };
-    const each = (stroke) => { let q = px; chars.forEach((c, i) => { glyph(c, q, stroke); q += widths[i] + gap; }); };
+    const kf = (fs / 100) * wk, widths = ink.map((m) => m.w * kf), gap = gapK * capPx, total = lenAt(capPx), px = -total / 2;
+    const glyph = (c, q, stroke, i) => { x.save(); x.translate(q + ink[i].l * kf, capPx / 2); x.scale(wk, 1); if (stroke) x.strokeText(c, 0, 0); else x.fillText(c, 0, 0); x.restore(); };
+    const each = (stroke) => { let q = px; chars.forEach((c, i) => { glyph(c, q, stroke, i); q += widths[i] + gap; }); };
     x.fillStyle = "#000"; each(false);
     x.globalCompositeOperation = "source-in";
     const tile = camoTileIn(T.camoTile, C.colors), seed = C.seed || 0, [cx0, cy0, cw, ch] = B.camo || [0, 0, T.w, T.h];
@@ -916,7 +920,7 @@ export function createStudio({ materials, furs, templates, proofs }) {
   const STOCK = new Map();
   const stockMat = (hex, name) => {
     const id = "stock-" + hex.replace("#", "");
-    if (!STOCK.has(id)) STOCK.set(id, { id, name: name || hex, line: "Printed camo colour", hex, rgb: hexToRgb(hex), solid: true });
+    if (!STOCK.has(id)) STOCK.set(id, { id, name: name || hex, line: "Printed colour", hex, rgb: hexToRgb(hex), solid: true });
     return STOCK.get(id);
   };
   templates.forEach((T) => (T.stock || []).forEach((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)));
@@ -950,7 +954,14 @@ export function createStudio({ materials, furs, templates, proofs }) {
       else if (kind === "tartan") r = [special.tartan[cw].body, ...special.tartan[cw].threads];
       else if (kind === "flag") r = [special.flag[cw].blue, special.flag[cw].red, special.flag[cw].white];
       else if (kind === "pattern") r = [special.scatter[cw].body, special.scatter[cw].ink];
-      else if (kind === "camotext") { const w = special.scatter.A, others = picks.map(smoothFor).filter((m) => dE(m.rgb, w.body.rgb) > 25 && dE(m.rgb, w.ink.rgb) > 25); r = [w.body, w.ink, others[0] || bestContrast(w.ink), w.ink]; }
+      else if (kind === "camotext") {   // camo is printed: use the logo's own colours exactly (Oakmont: logo green + gold)
+        const w = special.scatter.A, lp = (LOGO.palette || []).filter((c) => { const l = toLab(c.rgb)[0]; return l < 92 && l > 6; }).sort((a, b) => b.share - a.share);
+        const pm = (i, fb) => (lp[i] ? stockMat(lp[i].hex, `Logo colour ${i + 1}`) : fb);
+        const others = picks.map(smoothFor).filter((m) => dE(m.rgb, w.body.rgb) > 25 && dE(m.rgb, w.ink.rgb) > 25);
+        let c1 = pm(0, w.ink), c2 = pm(1, others[0] || bestContrast(w.ink));
+        if (lum(c2.rgb) < lum(c1.rgb)) { const t = c1; c1 = c2; c2 = t; }   // the darker logo colour leads and outlines (Oakmont: green)
+        r = [w.body, c1, c2, c1];
+      }
       else if (kind === "painted") r = [cw === "A" ? special.scatter.A.ink : special.scatter.A.body];   // A dark back (Wade Hampton), B light
       else if (kind === "stockcamo") { const st = T.stock.map((h, i) => stockMat(h, `${T.name} ${(T.stockNames || [])[i] || i + 1}`)); r = [st[0], ...st]; }
       else if (kind === "camo") r = [m[0], ...T.slots.map((x, i) => m[(i + 1) % m.length])];
